@@ -1,0 +1,253 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  RBT
+  CANDIDATE
+}
+
+enum RBTStatus {
+  NEW
+  REACH_OUT
+  TO_INTERVIEW
+  INTERVIEW_SCHEDULED
+  INTERVIEW_COMPLETED
+  HIRED
+  REJECTED
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  NO_SHOW
+  CANCELED
+}
+
+enum InterviewDecision {
+  PENDING
+  OFFERED
+  REJECTED
+}
+
+enum OnboardingTaskType {
+  DOWNLOAD_DOC
+  UPLOAD_SIGNED_DOC
+  VIDEO_COURSE
+}
+
+enum ShiftStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELED
+}
+
+enum TimeEntrySource {
+  MOBILE_APP
+  WEB_MANUAL
+}
+
+enum LeaveType {
+  SICK
+  VACATION
+  PERSONAL
+  OTHER
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+enum EmailTemplateType {
+  REACH_OUT
+  INTERVIEW_INVITE
+  OFFER
+  REJECTION
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String?
+  phoneNumber String?  @unique
+  email       String?  @unique
+  role        UserRole @default(CANDIDATE)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rbtProfile RBTProfile?
+  sessions   Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model OtpCode {
+  id          String   @id @default(cuid())
+  phoneNumber String?
+  email       String?
+  code        String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  used        Boolean  @default(false)
+
+  @@index([phoneNumber, code])
+  @@index([email, code])
+  @@map("otp_codes")
+}
+
+model RBTProfile {
+  id                  String     @id @default(cuid())
+  userId              String     @unique
+  firstName           String
+  lastName            String
+  phoneNumber         String
+  email               String?
+  locationCity        String?
+  locationState       String?
+  zipCode             String?
+  addressLine1        String?
+  addressLine2        String?
+  preferredServiceArea String?
+  notes               String?
+  status              RBTStatus  @default(NEW)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interviews          Interview[]
+  onboardingTasks     OnboardingTask[]
+  shifts              Shift[]
+  timeEntries         TimeEntry[]
+  leaveRequests       LeaveRequest[]
+  interviewEmailLogs  InterviewEmailLog[]
+
+  @@map("rbt_profiles")
+}
+
+model Interview {
+  id              String           @id @default(cuid())
+  rbtProfileId    String
+  scheduledAt     DateTime
+  durationMinutes Int              @default(60)
+  interviewerName String
+  status          InterviewStatus  @default(SCHEDULED)
+  decision        InterviewDecision @default(PENDING)
+  meetingUrl      String?
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  rbtProfile      RBTProfile       @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@map("interviews")
+}
+
+model InterviewEmailLog {
+  id           String           @id @default(cuid())
+  rbtProfileId String
+  templateType EmailTemplateType
+  sentAt       DateTime         @default(now())
+  toEmail      String
+  subject      String
+  status       String?
+  body         String?          @db.Text
+
+  rbtProfile   RBTProfile       @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@map("interview_email_logs")
+}
+
+model OnboardingTask {
+  id                 String             @id @default(cuid())
+  rbtProfileId       String
+  taskType           OnboardingTaskType
+  title              String
+  description        String?            @db.Text
+  documentDownloadUrl String?           @db.Text
+  uploadUrl          String?            @db.Text
+  isCompleted        Boolean            @default(false)
+  completedAt        DateTime?
+  sortOrder          Int                @default(0)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  rbtProfile         RBTProfile         @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId, isCompleted])
+  @@map("onboarding_tasks")
+}
+
+model Shift {
+  id             String      @id @default(cuid())
+  rbtProfileId   String
+  clientName     String
+  clientId       String?
+  startTime      DateTime
+  endTime        DateTime
+  locationAddress String?
+  status         ShiftStatus @default(SCHEDULED)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  rbtProfile     RBTProfile  @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  timeEntries    TimeEntry[]
+
+  @@map("shifts")
+}
+
+model TimeEntry {
+  id           String          @id @default(cuid())
+  rbtProfileId String
+  shiftId      String?
+  clockInTime  DateTime
+  clockOutTime DateTime?
+  totalHours   Float?
+  source       TimeEntrySource @default(WEB_MANUAL)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  rbtProfile   RBTProfile      @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  shift        Shift?          @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
+  @@map("time_entries")
+}
+
+model LeaveRequest {
+  id           String             @id @default(cuid())
+  rbtProfileId String
+  startDate    DateTime
+  endDate      DateTime
+  type         LeaveType
+  reason       String?            @db.Text
+  status       LeaveRequestStatus @default(PENDING)
+  adminNotes   String?            @db.Text
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  rbtProfile   RBTProfile         @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@map("leave_requests")
+}
+
