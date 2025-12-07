@@ -43,6 +43,9 @@ enum OnboardingTaskType {
   DOWNLOAD_DOC
   UPLOAD_SIGNED_DOC
   VIDEO_COURSE
+  TRAINING_LINK
+  SIGNATURE
+  PACKAGE_UPLOAD
 }
 
 enum ShiftStatus {

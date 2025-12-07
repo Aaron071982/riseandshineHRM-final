@@ -39,12 +39,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Find user by email
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { email },
       include: {
         rbtProfile: true,
       },
     })
+
+    // Fallback: If not found by email, try finding via RBTProfile email
+    // This handles cases where User.email might not match RBTProfile.email
+    if (!user) {
+      const rbtProfile = await prisma.rBTProfile.findFirst({
+        where: { email },
+        include: {
+          user: true,
+        },
+      })
+      if (rbtProfile && rbtProfile.user) {
+        user = await prisma.user.findUnique({
+          where: { id: rbtProfile.user.id },
+          include: {
+            rbtProfile: true,
+          },
+        })
+      }
+    }
 
     if (!user || !user.isActive) {
       return NextResponse.json(
@@ -61,6 +80,33 @@ export async function POST(request: NextRequest) {
           { error: 'Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.' },
           { status: 403 }
         )
+      }
+      
+      // If candidate is hired but role wasn't updated, fix it automatically
+      if (user.rbtProfile.status === 'HIRED') {
+        console.log(`Auto-updating user ${user.id} role from CANDIDATE to RBT (profile is HIRED)`)
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            role: 'RBT',
+            email: user.rbtProfile.email || user.email,
+            isActive: true,
+          },
+        })
+        // Update user object for session creation
+        user.role = 'RBT'
+      }
+    }
+    
+    // RBT users should always be able to log in
+    if (user.role === 'RBT') {
+      // Ensure email matches RBTProfile email if available
+      if (user.rbtProfile?.email && user.email !== user.rbtProfile.email) {
+        console.log(`Syncing user ${user.id} email to match RBTProfile email`)
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { email: user.rbtProfile.email },
+        })
       }
     }
 

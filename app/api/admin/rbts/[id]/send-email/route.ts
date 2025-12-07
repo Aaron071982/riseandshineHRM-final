@@ -5,6 +5,7 @@ import { validateSession } from '@/lib/auth'
 import {
   sendEmail,
   generateReachOutEmail,
+  generateRejectionEmail,
   EmailTemplateType,
 } from '@/lib/email'
 
@@ -45,6 +46,9 @@ export async function POST(
       case EmailTemplateType.REACH_OUT:
         emailContent = generateReachOutEmail(rbtProfile)
         break
+      case EmailTemplateType.REJECTION:
+        emailContent = generateRejectionEmail(rbtProfile)
+        break
       default:
         return NextResponse.json(
           { error: 'Invalid template type' },
@@ -52,6 +56,8 @@ export async function POST(
         )
     }
 
+    console.log(`📧 Attempting to send ${templateType} email to ${rbtProfile.email}...`)
+    
     const emailSent = await sendEmail({
       to: rbtProfile.email,
       subject: emailContent.subject,
@@ -61,15 +67,23 @@ export async function POST(
     })
 
     if (!emailSent) {
-      console.warn('Email sending returned false - may be in dev mode')
-      // Still return success since email is logged in dev mode
+      console.error(`❌ Email sending failed for ${rbtProfile.email}`)
+      return NextResponse.json({ 
+        success: false,
+        error: 'Email failed to send. Check server logs for details.',
+        message: process.env.RESEND_API_KEY 
+          ? 'Email sending failed - check Resend API key and configuration' 
+          : 'RESEND_API_KEY not configured - email logged in dev mode only (check console)'
+      }, { status: 500 })
     }
+
+    console.log(`✅ Email sent successfully to ${rbtProfile.email}`)
 
     return NextResponse.json({ 
       success: true,
       message: process.env.RESEND_API_KEY 
-        ? 'Email sent successfully' 
-        : 'Email logged (dev mode - check console)'
+        ? 'Email sent successfully via Resend' 
+        : 'Email logged (dev mode - check console). Add RESEND_API_KEY to send real emails.'
     })
   } catch (error: any) {
     console.error('Error sending email:', error)

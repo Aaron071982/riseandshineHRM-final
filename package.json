@@ -11,7 +11,10 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:clear-rbts": "tsx scripts/clear-rbts.ts",
+    "db:backfill-onboarding": "tsx scripts/backfill-onboarding-tasks.ts",
+    "fix:hired-rbts": "tsx scripts/fix-hired-rbts.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",
@@ -23,6 +26,8 @@
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-tabs": "^1.0.4",
     "@radix-ui/react-toast": "^1.1.5",
+    "@types/archiver": "^7.0.0",
+    "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
@@ -54,4 +59,3 @@
     "typescript": "^5.3.3"
   }
 }
-

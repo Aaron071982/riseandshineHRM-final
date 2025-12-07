@@ -14,35 +14,14 @@ export default function VerifyOTPPage() {
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [devOTP, setDevOTP] = useState<string | null>(null)
 
   useEffect(() => {
     const pendingEmail = sessionStorage.getItem('pendingEmail')
-    const storedDevOTP = sessionStorage.getItem('devOTP')
     if (!pendingEmail) {
       router.push('/')
       return
     }
     setEmail(pendingEmail)
-    if (storedDevOTP) {
-      setDevOTP(storedDevOTP)
-    } else {
-      // If no devOTP in session, try to fetch the latest one from API (dev mode only)
-      fetch('/api/auth/get-latest-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: pendingEmail }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.code && !data.isExpired) {
-            setDevOTP(data.code)
-          }
-        })
-        .catch(() => {
-          // Silently fail if API doesn't work
-        })
-    }
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,8 +44,9 @@ export default function VerifyOTPPage() {
         return
       }
 
-      // Clear pending email from sessionStorage
+      // Clear pending email and any stored OTP from sessionStorage
       sessionStorage.removeItem('pendingEmail')
+      sessionStorage.removeItem('devOTP')
 
       // Redirect based on role
       if (data.role === 'ADMIN') {
@@ -107,46 +87,11 @@ export default function VerifyOTPPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-            {devOTP && (
-            <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-md">
-              <p className="text-sm font-medium text-blue-900 mb-2">Development Mode - Your OTP Code:</p>
-              <p className="text-4xl font-bold text-blue-700 text-center mb-2 font-mono">{devOTP}</p>
-              <p className="text-xs text-blue-600 text-center">Enter this code below to verify</p>
-            </div>
-          )}
-          {!devOTP && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-              <p className="text-sm text-yellow-800 mb-2">
-                Don't see the code? Check your terminal/console or email inbox.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={async () => {
-                  const response = await fetch('/api/auth/get-latest-otp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email }),
-                  })
-                  const data = await response.json()
-                  if (data.code) {
-                    if (data.isExpired) {
-                      alert('Your code has expired. Please request a new one.')
-                    } else {
-                      setDevOTP(data.code)
-                      sessionStorage.setItem('devOTP', data.code)
-                    }
-                  } else {
-                    alert('No code found. Please request a new verification code.')
-                  }
-                }}
-              >
-                Show My Code
-              </Button>
-            </div>
-          )}
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-800">
+              Please check your email inbox for the verification code. Enter the 6-digit code you received below.
+            </p>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="otp">Verification Code</Label>

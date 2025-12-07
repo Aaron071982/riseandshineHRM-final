@@ -5,8 +5,16 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
 import { Plus, Users, Calendar, FileCheck, Clock, TrendingUp, UserPlus, CheckCircle } from 'lucide-react'
+import { cookies } from 'next/headers'
+import { validateSession } from '@/lib/auth'
 
 export default async function AdminDashboard() {
+  // Get current admin user
+  const cookieStore = await cookies()
+  const sessionToken = cookieStore.get('session')?.value
+  const user = sessionToken ? await validateSession(sessionToken) : null
+  const adminEmail = user?.email || ''
+
   // Fetch statistics
   const [
     totalCandidates,
@@ -26,6 +34,7 @@ export default async function AdminDashboard() {
         scheduledAt: {
           gte: new Date(),
         },
+        interviewerName: adminEmail, // Filter by current admin's email
       },
       include: {
         rbtProfile: true,

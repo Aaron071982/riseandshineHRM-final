@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDateTime } from '@/lib/utils'
+import { CheckCircle2, XCircle, Download, FileText, Trash2 } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -60,8 +61,11 @@ interface RBTProfile {
     id: string
     taskType: string
     title: string
+    description: string | null
     isCompleted: boolean
     completedAt: Date | null
+    uploadUrl: string | null
+    documentDownloadUrl: string | null
   }>
 }
 
@@ -153,6 +157,66 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     }
   }
 
+  const handleReject = async () => {
+    if (!confirm('Are you sure you want to reject this candidate? This will send a rejection email and update their status to REJECTED.')) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/reject`, {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        router.refresh()
+        alert('Candidate rejected successfully. A rejection email has been sent.')
+      } else {
+        const data = await response.json()
+        alert(`Failed to reject candidate: ${data.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error rejecting candidate:', error)
+      alert('An error occurred while rejecting the candidate.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteRBT = async () => {
+    if (!confirm(`Are you sure you want to delete ${rbtProfile.firstName} ${rbtProfile.lastName}? This action cannot be undone.`)) {
+      return
+    }
+
+    if (!confirm('This will permanently delete the RBT profile and all associated data. Are you absolutely sure?')) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/delete`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        alert('RBT deleted successfully')
+        // Force refresh and redirect
+        router.refresh()
+        setTimeout(() => {
+          router.push('/admin/rbts')
+        }, 100)
+      } else {
+        const errorData = await response.json()
+        alert(`Failed to delete RBT: ${errorData.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error deleting RBT:', error)
+      alert('An error occurred while deleting the RBT. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleScheduleInterview = async (data: any) => {
     setLoading(true)
     try {
@@ -180,6 +244,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   const canSendReachOut = rbtProfile.status === 'REACH_OUT' || rbtProfile.status === 'NEW'
   const canScheduleInterview = rbtProfile.status === 'TO_INTERVIEW' || rbtProfile.status === 'REACH_OUT'
   const canHire = rbtProfile.status === 'INTERVIEW_COMPLETED'
+  const canReject = rbtProfile.status !== 'HIRED' && rbtProfile.status !== 'REJECTED'
   const isHired = rbtProfile.status === 'HIRED'
 
   const completedOnboardingTasks = rbtProfile.onboardingTasks.filter(t => t.isCompleted).length
@@ -336,6 +401,30 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 Mark as Hired
               </Button>
             )}
+            {canReject && (
+              <Button 
+                onClick={handleReject} 
+                disabled={loading || !rbtProfile.email}
+                variant="destructive"
+                className="rounded-xl px-6"
+              >
+                Reject Candidate
+              </Button>
+            )}
+          </div>
+          
+          {/* Delete RBT Section - Always Visible */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <Button 
+              onClick={handleDeleteRBT} 
+              disabled={loading}
+              variant="outline"
+              className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 rounded-xl px-6 w-full sm:w-auto"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete RBT
+            </Button>
+            <p className="text-xs text-gray-500 mt-2">This action cannot be undone. All RBT data will be permanently deleted.</p>
           </div>
         </CardContent>
       </Card>
@@ -377,33 +466,112 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
       {/* Onboarding Progress */}
       {isHired && (
-        <Card className="border-2 border-green-100 bg-gradient-to-br from-white to-green-50/30 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-green-200/20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
-          <CardHeader className="relative">
+        <Card>
+          <CardHeader>
             <CardTitle className="text-2xl font-bold text-gray-900">Onboarding Progress</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Progress</span>
-                <span>
-                  {completedOnboardingTasks} / {totalOnboardingTasks} tasks completed
-                </span>
+            <div className="space-y-4">
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium">Overall Progress</span>
+                  <span className="font-bold">
+                    {completedOnboardingTasks} / {totalOnboardingTasks} tasks completed
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                  <div
+                    className={`h-4 rounded-full transition-all ${
+                      (completedOnboardingTasks / totalOnboardingTasks) * 100 === 100
+                        ? 'bg-green-500'
+                        : 'bg-orange-600'
+                    }`}
+                    style={{
+                      width: `${(completedOnboardingTasks / totalOnboardingTasks) * 100}%`,
+                    }}
+                  />
+                </div>
+                <div className="text-sm text-gray-600">
+                  {Math.round((completedOnboardingTasks / totalOnboardingTasks) * 100)}% complete
+                </div>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div
-                  className={`h-3 rounded-full transition-all ${
-                    (completedOnboardingTasks / totalOnboardingTasks) * 100 === 100
-                      ? 'gradient-green'
-                      : 'gradient-primary'
-                  }`}
-                  style={{
-                    width: `${(completedOnboardingTasks / totalOnboardingTasks) * 100}%`,
-                  }}
-                />
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                {Math.round((completedOnboardingTasks / totalOnboardingTasks) * 100)}% complete
+
+              {/* Tasks List */}
+              <div className="space-y-3 mt-6">
+                <h3 className="font-semibold text-gray-900">Tasks</h3>
+                {rbtProfile.onboardingTasks.map((task) => (
+                  <div key={task.id} className="border rounded-lg p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          {task.isCompleted ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-500" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-gray-400" />
+                          )}
+                          <h4 className="font-medium">{task.title}</h4>
+                        </div>
+                        {task.description && (
+                          <p className="text-sm text-gray-600 mt-1 ml-7">{task.description}</p>
+                        )}
+                        {task.isCompleted && task.completedAt && (
+                          <p className="text-xs text-gray-500 mt-1 ml-7">
+                            Completed: {formatDateTime(task.completedAt)}
+                          </p>
+                        )}
+                      </div>
+                      <Badge
+                        className={
+                          task.isCompleted
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }
+                      >
+                        {task.isCompleted ? 'Completed' : 'Pending'}
+                      </Badge>
+                    </div>
+
+                    {/* Show Signature if available */}
+                    {task.taskType === 'SIGNATURE' && task.isCompleted && task.uploadUrl && (
+                      <div className="mt-4 ml-7 p-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Digital Signature:</p>
+                        <img
+                          src={task.uploadUrl}
+                          alt="Signature"
+                          className="max-w-md border border-gray-300 rounded bg-white p-2"
+                        />
+                      </div>
+                    )}
+
+                    {/* Show Package Download if available */}
+                    {task.taskType === 'PACKAGE_UPLOAD' && task.isCompleted && task.uploadUrl && (
+                      <div className="mt-4 ml-7 p-4 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileText className="w-5 h-5 text-green-600" />
+                          <p className="text-sm font-medium text-gray-700">Uploaded Package:</p>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-3">
+                          Package uploaded and sent to administrator email
+                        </p>
+                        <a
+                          href={`/api/admin/rbts/${rbtProfile.id}/download-package`}
+                          download
+                        >
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            className="flex items-center gap-2"
+                          >
+                            <Download className="w-4 h-4" />
+                            Download Onboarding Package
+                          </Button>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </CardContent>
@@ -422,13 +590,15 @@ function InterviewScheduleForm({
   onSubmit: (data: any) => void
   onCancel: () => void
 }) {
+  const [interviewerEmail, setInterviewerEmail] = useState('')
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     onSubmit({
       scheduledAt: new Date(`${formData.get('date')}T${formData.get('time')}`).toISOString(),
       durationMinutes: parseInt(formData.get('duration') as string, 10),
-      interviewerName: formData.get('interviewerName'),
+      interviewerName: interviewerEmail, // Use the selected email
       meetingUrl: formData.get('meetingUrl') || null,
     })
   }
@@ -448,8 +618,16 @@ function InterviewScheduleForm({
         <Input id="duration" name="duration" type="number" defaultValue={60} required />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="interviewerName">Interviewer Name</Label>
-        <Input id="interviewerName" name="interviewerName" required />
+        <Label htmlFor="interviewerEmail">Interviewer Email</Label>
+        <Select value={interviewerEmail} onValueChange={setInterviewerEmail} required>
+          <SelectTrigger>
+            <SelectValue placeholder="Select interviewer" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="aaronsiam21@gmail.com">aaronsiam21@gmail.com</SelectItem>
+            <SelectItem value="kazi@siyam.nyc">kazi@siyam.nyc</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-2">
         <Label htmlFor="meetingUrl">Meeting URL (optional)</Label>

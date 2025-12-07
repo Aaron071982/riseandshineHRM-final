@@ -53,6 +53,8 @@ export async function POST(request: NextRequest) {
     })
 
     if (rbtProfile && rbtProfile.email) {
+      console.log(`📧 Sending interview invite email to ${rbtProfile.email}...`)
+      
       const emailContent = generateInterviewInviteEmail(rbtProfile, {
         scheduledAt: new Date(data.scheduledAt),
         durationMinutes: data.durationMinutes || 60,
@@ -60,13 +62,22 @@ export async function POST(request: NextRequest) {
         meetingUrl,
       })
 
-      await sendEmail({
+      const emailSent = await sendEmail({
         to: rbtProfile.email,
         subject: emailContent.subject,
         html: emailContent.html,
         templateType: EmailTemplateType.INTERVIEW_INVITE,
         rbtProfileId: rbtProfile.id,
       })
+      
+      if (!emailSent) {
+        console.error(`❌ Failed to send interview invite email to ${rbtProfile.email}`)
+        // Still return success for interview creation, but log the email failure
+      } else {
+        console.log(`✅ Interview invite email sent successfully to ${rbtProfile.email}`)
+      }
+    } else {
+      console.warn(`⚠️ No email address found for RBT profile ${data.rbtProfileId} - interview created but no email sent`)
     }
 
     return NextResponse.json({ id: interview.id, success: true })
