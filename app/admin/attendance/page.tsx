@@ -86,7 +86,7 @@ export default async function AttendancePage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Today's Entries</p>
+                <p className="text-sm font-medium text-gray-600">Today&apos;s Entries</p>
                 <p className="text-3xl font-bold text-orange-600 mt-2">{todayEntries.length}</p>
               </div>
               <div className="h-12 w-12 rounded-full gradient-primary flex items-center justify-center">

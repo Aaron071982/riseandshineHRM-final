@@ -86,7 +86,7 @@ export default async function AdminDashboard() {
         <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1>
-            <p className="text-orange-50 text-lg">Welcome back! Here's an overview of your HRM system.</p>
+            <p className="text-orange-50 text-lg">Welcome back! Here&apos;s an overview of your HRM system.</p>
           </div>
           <Link href="/admin/rbts/new">
             <Button className="bg-white text-primary hover:bg-orange-50 border-0 shadow-lg rounded-xl px-6 py-6 text-base font-semibold shine-effect">

@@ -120,7 +120,7 @@ export default async function SchedulePage() {
           {shifts.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-xl font-semibold text-gray-700 mb-2">No upcoming shifts scheduled</p>
-              <p className="text-gray-500">Your shifts will appear here once they're assigned</p>
+              <p className="text-gray-500">Your shifts will appear here once they&apos;re assigned</p>
             </div>
           ) : (
             <div className="space-y-3">

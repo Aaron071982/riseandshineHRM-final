@@ -110,7 +110,7 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">
-          Hi, {rbtProfile.firstName}! Here's your schedule and work summary.
+          Hi, {rbtProfile.firstName}! Here&apos;s your schedule and work summary.
         </h1>
       </div>
 
@@ -183,7 +183,7 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
       {/* Today's Schedule */}
       <Card>
         <CardHeader>
-          <CardTitle>Today's Schedule</CardTitle>
+          <CardTitle>Today&apos;s Schedule</CardTitle>
         </CardHeader>
         <CardContent>
           {todayShifts.length === 0 ? (
