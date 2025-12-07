@@ -8,7 +8,10 @@ export const metadata: Metadata = {
   title: 'Rise and Shine HRM',
   description: 'Human Resource Management System for Rise and Shine',
   icons: {
-    icon: '/logo.png',
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/logo.png', type: 'image/png' },
+    ],
     apple: '/logo.png',
   },
 }
