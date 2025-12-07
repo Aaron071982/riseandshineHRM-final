@@ -60,7 +60,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       to: options.to,
       subject: options.subject,
       html: options.html,
-      replyTo: emailFrom, // Add reply-to header
+      reply_to: emailFrom, // Add reply-to header
       headers: {
         'X-Entity-Ref-ID': options.rbtProfileId, // Track emails per RBT
       },
@@ -88,22 +88,23 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       console.error('❌ Resend API returned error:', JSON.stringify(result.error, null, 2))
       
       // Check for specific Resend API limitations
-      if (result.error.statusCode === 403) {
-        if (result.error.message?.includes('only send testing emails to your own email address')) {
+      const error = result.error as any
+      if (error.statusCode === 403) {
+        if (error.message?.includes('only send testing emails to your own email address')) {
           console.error('⚠️ RESEND LIMITATION: You are using the test domain (onboarding@resend.dev) which only allows sending to your own verified email address.')
           console.error('💡 SOLUTION: Verify a domain in Resend (https://resend.com/domains) and update EMAIL_FROM in .env to use that domain.')
           console.error('   Example: EMAIL_FROM=noreply@yourdomain.com')
         } else {
-          console.error(`⚠️ Resend API 403 Error: ${result.error.message}`)
+          console.error(`⚠️ Resend API 403 Error: ${error.message}`)
           console.error('💡 Check: Is your domain verified in Resend? Go to https://resend.com/domains')
           console.error(`   Current EMAIL_FROM: ${emailFrom}`)
         }
-      } else if (result.error.statusCode === 422) {
-        console.error(`⚠️ Resend API 422 Error (Validation): ${result.error.message}`)
+      } else if (error.statusCode === 422) {
+        console.error(`⚠️ Resend API 422 Error (Validation): ${error.message}`)
         console.error(`   From: ${emailFrom}`)
         console.error(`   To: ${options.to}`)
       } else {
-        console.error(`⚠️ Resend API Error (${result.error.statusCode}): ${result.error.message}`)
+        console.error(`⚠️ Resend API Error (${error.statusCode || 'unknown'}): ${error.message || 'Unknown error'}`)
       }
       
       // Update email log with error
@@ -115,7 +116,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
             subject: options.subject,
           },
           data: {
-            status: `failed: ${result.error.message || 'Resend API error'}`,
+            status: `failed: ${error.message || 'Resend API error'}`,
           },
         })
       } catch (updateError) {

@@ -116,7 +116,10 @@ export async function GET(
 
     const rbtName = `${rbtProfile.firstName}-${rbtProfile.lastName}`.replace(/\s+/g, '-')
     
-    return new NextResponse(zipBuffer, {
+    // Convert Buffer to Uint8Array for NextResponse compatibility
+    const zipUint8Array = new Uint8Array(zipBuffer)
+    
+    return new NextResponse(zipUint8Array, {
       headers: {
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="onboarding-package-${rbtName}.zip"`,

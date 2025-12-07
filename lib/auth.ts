@@ -5,7 +5,7 @@ const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
 
 export interface SessionUser {
   id: string
-  phoneNumber: string
+  phoneNumber: string | null
   role: 'ADMIN' | 'RBT' | 'CANDIDATE'
   name?: string | null
   email?: string | null

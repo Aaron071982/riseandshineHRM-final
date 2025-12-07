@@ -59,8 +59,10 @@ export async function GET(request: NextRequest) {
     return new Promise<NextResponse>((resolve, reject) => {
       archive.on('end', () => {
         const buffer = Buffer.concat(chunks)
+        // Convert Buffer to Uint8Array for NextResponse compatibility
+        const uint8Array = new Uint8Array(buffer)
         resolve(
-          new NextResponse(buffer, {
+          new NextResponse(uint8Array, {
             headers: {
               'Content-Type': 'application/zip',
               'Content-Disposition': 'attachment; filename="onboarding-documents.zip"',

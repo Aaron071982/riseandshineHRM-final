@@ -52,7 +52,7 @@ export default async function RBTDashboardPage() {
           tasks.map((task) =>
             prisma.onboardingTask.create({
               data: {
-                rbtProfileId: user.rbtProfileId,
+                rbtProfileId: user.rbtProfileId!,
                 taskType: task.taskType as any,
                 title: task.title,
                 description: task.description,

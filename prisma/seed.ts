@@ -209,7 +209,7 @@ async function main() {
         prisma.onboardingTask.create({
           data: {
             rbtProfileId: hiredRBT.rbtProfile!.id,
-            taskType: task.taskType,
+            taskType: task.taskType as any,
             title: task.title,
             description: task.description,
             documentDownloadUrl: task.documentDownloadUrl,

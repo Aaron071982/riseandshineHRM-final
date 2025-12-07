@@ -18,6 +18,7 @@ interface Task {
   title: string
   description: string | null
   documentDownloadUrl: string | null
+  uploadUrl: string | null
   isCompleted: boolean
   sortOrder: number
 }

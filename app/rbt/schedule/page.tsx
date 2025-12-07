@@ -164,14 +164,6 @@ export default async function SchedulePage() {
                           <span>{shift.locationAddress}</span>
                         </div>
                       )}
-                      
-                      {shift.notes && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <p className="text-sm text-gray-600">
-                            <span className="font-medium">Notes:</span> {shift.notes}
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )
