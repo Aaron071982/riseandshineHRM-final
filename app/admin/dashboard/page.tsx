@@ -15,14 +15,15 @@ export default async function AdminDashboard() {
   const user = sessionToken ? await validateSession(sessionToken) : null
   const adminEmail = user?.email || ''
 
-  // Fetch statistics
-  const [
-    totalCandidates,
-    candidatesByStatus,
-    upcomingInterviews,
-    recentHires,
-    pendingOnboarding,
-  ] = await Promise.all([
+  // Fetch statistics with error handling
+  let totalCandidates = 0
+  let candidatesByStatus: Array<{ status: string; _count: number }> = []
+  let upcomingInterviews: any[] = []
+  let recentHires: any[] = []
+  let pendingOnboarding: Array<{ rbtProfileId: string; _count: { id: number } }> = []
+
+  try {
+    const results = await Promise.all([
     prisma.rBTProfile.count(),
     prisma.rBTProfile.groupBy({
       by: ['status'],
@@ -56,16 +57,44 @@ export default async function AdminDashboard() {
       },
       take: 5,
     }),
-    prisma.onboardingTask.groupBy({
-      by: ['rbtProfileId'],
-      where: {
-        isCompleted: false,
-      },
-      _count: {
-        id: true,
-      },
-    }),
-  ])
+      prisma.onboardingTask.groupBy({
+        by: ['rbtProfileId'],
+        where: {
+          isCompleted: false,
+        },
+        _count: {
+          id: true,
+        },
+      }),
+    ])
+
+    totalCandidates = results[0]
+    candidatesByStatus = results[1]
+    upcomingInterviews = results[2]
+    recentHires = results[3]
+    pendingOnboarding = results[4]
+  } catch (error: any) {
+    console.error('❌ Database connection error in AdminDashboard:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack,
+    })
+    
+    // Check if it's a Prisma connection error
+    if (error.code === 'P1001' || error.message?.includes('Can\'t reach database server')) {
+      console.error('🔴 Prisma P1001: Cannot reach database server')
+      console.error('   DATABASE_URL host:', process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'NOT SET')
+      console.error('   This usually means:')
+      console.error('   1. DATABASE_URL is incorrect or not set in Vercel')
+      console.error('   2. Supabase network restrictions are blocking Vercel IPs')
+      console.error('   3. Database server is down or unreachable')
+      throw new Error('Database connection failed. Please check your DATABASE_URL configuration and Supabase network settings.')
+    }
+    
+    // Re-throw other errors
+    throw error
+  }
 
   const statusCounts = candidatesByStatus.reduce((acc, item) => {
     acc[item.status] = item._count
