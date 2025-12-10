@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { CheckCircle2, XCircle, Download, FileText, Trash2 } from 'lucide-react'
+import RBTScheduleView from './RBTScheduleView'
 import {
   Select,
   SelectContent,
@@ -576,6 +577,14 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* RBT Schedule */}
+      {isHired && (
+        <RBTScheduleView
+          rbtProfileId={rbtProfile.id}
+          rbtName={`${rbtProfile.firstName} ${rbtProfile.lastName}`}
+        />
       )}
     </div>
   )

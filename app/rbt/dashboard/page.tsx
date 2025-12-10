@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import OnboardingDashboard from '@/components/rbt/OnboardingDashboard'
 import RBTMainDashboard from '@/components/rbt/RBTMainDashboard'
+import ScheduleSetup from '@/components/rbt/ScheduleSetup'
 
 export default async function RBTDashboardPage() {
   const cookieStore = await cookies()
@@ -82,8 +83,29 @@ export default async function RBTDashboardPage() {
 
   const allTasksCompleted = onboardingTasks.length > 0 && onboardingTasks.every((task) => task.isCompleted)
 
+  // Check if schedule is completed
+  const rbtProfile = await prisma.rBTProfile.findUnique({
+    where: { id: user.rbtProfileId },
+    select: { scheduleCompleted: true },
+  })
+
+  // Show onboarding tasks if not all completed
   if (!allTasksCompleted) {
     return <OnboardingDashboard rbtProfileId={user.rbtProfileId} />
+  }
+
+  // Show schedule setup if tasks are done but schedule is not
+  if (!rbtProfile?.scheduleCompleted) {
+    return (
+      <div className="container mx-auto p-6 max-w-4xl">
+        <ScheduleSetup
+          rbtProfileId={user.rbtProfileId}
+          onComplete={() => {
+            window.location.href = '/rbt/dashboard'
+          }}
+        />
+      </div>
+    )
   }
 
   return <RBTMainDashboard rbtProfileId={user.rbtProfileId} />

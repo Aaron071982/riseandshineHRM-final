@@ -59,10 +59,82 @@ async function main() {
     },
   })
 
+  // Admin 4: Fardeen
+  const admin4 = await prisma.user.upsert({
+    where: { email: 'fardeen@riseandshine.nyc' },
+    update: {
+      role: 'ADMIN',
+      isActive: true,
+      name: 'Fardeen',
+    },
+    create: {
+      phoneNumber: null,
+      name: 'Fardeen',
+      email: 'fardeen@riseandshine.nyc',
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+
+  // Admin 5: Fardeen (alternate email)
+  const admin5 = await prisma.user.upsert({
+    where: { email: 'fardeenhassansardar12@gmail.com' },
+    update: {
+      role: 'ADMIN',
+      isActive: true,
+      name: 'Fardeen',
+    },
+    create: {
+      phoneNumber: null,
+      name: 'Fardeen',
+      email: 'fardeenhassansardar12@gmail.com',
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+
+  // Admin 6: Shazia
+  const admin6 = await prisma.user.upsert({
+    where: { email: 'shazia@riseandshine.nyc' },
+    update: {
+      role: 'ADMIN',
+      isActive: true,
+      name: 'Shazia',
+    },
+    create: {
+      phoneNumber: null,
+      name: 'Shazia',
+      email: 'shazia@riseandshine.nyc',
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+
+  // Admin 7: Shazia (alternate email)
+  const admin7 = await prisma.user.upsert({
+    where: { email: 'shaziakhaliq37@gmail.com' },
+    update: {
+      role: 'ADMIN',
+      isActive: true,
+      name: 'Shazia',
+    },
+    create: {
+      phoneNumber: null,
+      name: 'Shazia',
+      email: 'shaziakhaliq37@gmail.com',
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+
   console.log('✅ Created/updated admin users:', {
     admin1: admin1.email,
     admin2: admin2.email,
     admin3: admin3.email,
+    admin4: admin4.email,
+    admin5: admin5.email,
+    admin6: admin6.email,
+    admin7: admin7.email,
   })
 
   console.log('🎉 Seed completed successfully!')
@@ -70,6 +142,10 @@ async function main() {
   console.log('   - aaronsiam21@gmail.com')
   console.log('   - kazi@siyam.nyc')
   console.log('   - tisha@riseandshine.nyc')
+  console.log('   - fardeen@riseandshine.nyc')
+  console.log('   - fardeenhassansardar12@gmail.com')
+  console.log('   - shazia@riseandshine.nyc')
+  console.log('   - shaziakhaliq37@gmail.com')
 }
 
 main()
