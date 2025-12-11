@@ -40,15 +40,27 @@ export async function GET(
       return NextResponse.json({ error: 'RBT profile not found' }, { status: 404 })
     }
 
-    const slots = await prisma.availabilitySlot.findMany({
-      where: {
-        rbtProfileId: id,
-      },
-      orderBy: [
-        { dayOfWeek: 'asc' },
-        { hour: 'asc' },
-      ],
-    })
+    // Gracefully handle if AvailabilitySlot table doesn't exist yet
+    let slots: any[] = []
+    try {
+      slots = await prisma.availabilitySlot.findMany({
+        where: {
+          rbtProfileId: id,
+        },
+        orderBy: [
+          { dayOfWeek: 'asc' },
+          { hour: 'asc' },
+        ],
+      })
+    } catch (error: any) {
+      // If table doesn't exist, return empty array
+      if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+        console.warn('AvailabilitySlot table not found, returning empty array')
+        slots = []
+      } else {
+        throw error
+      }
+    }
 
     return NextResponse.json({
       rbtProfile: {

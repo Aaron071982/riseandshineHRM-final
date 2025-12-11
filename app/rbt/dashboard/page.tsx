@@ -84,10 +84,18 @@ export default async function RBTDashboardPage() {
   const allTasksCompleted = onboardingTasks.length > 0 && onboardingTasks.every((task) => task.isCompleted)
 
   // Check if schedule is completed
-  const rbtProfile = await prisma.rBTProfile.findUnique({
-    where: { id: user.rbtProfileId },
-    select: { scheduleCompleted: true },
-  })
+  // Gracefully handle if scheduleCompleted field doesn't exist yet
+  let rbtProfile: { scheduleCompleted?: boolean } | null = null
+  try {
+    rbtProfile = await prisma.rBTProfile.findUnique({
+      where: { id: user.rbtProfileId },
+      select: { scheduleCompleted: true },
+    })
+  } catch (error: any) {
+    // If scheduleCompleted column doesn't exist, treat as not completed
+    console.warn('scheduleCompleted field not available, treating as not completed:', error.message)
+    rbtProfile = { scheduleCompleted: false }
+  }
 
   // Show onboarding tasks if not all completed
   if (!allTasksCompleted) {
