@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDateTime } from '@/lib/utils'
-import { CheckCircle2, XCircle, Download, FileText, Trash2 } from 'lucide-react'
+import { CheckCircle2, XCircle, Download, FileText, Trash2, Edit, Loader2 } from 'lucide-react'
 import RBTScheduleView from './RBTScheduleView'
 import {
   Select,
@@ -89,6 +89,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   const [rbtProfile, setRbtProfile] = useState(initialRbtProfile)
   const [loading, setLoading] = useState(false)
   const [interviewDialogOpen, setInterviewDialogOpen] = useState(false)
+  const [editingProfile, setEditingProfile] = useState(false)
 
   const handleStatusChange = async (newStatus: string) => {
     setLoading(true)
@@ -286,46 +287,81 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       <Card className="border-2 border-orange-100 bg-gradient-to-br from-white to-orange-50/30 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 rounded-full -mr-20 -mt-20 bubble-animation" />
         <CardHeader className="relative">
-          <CardTitle className="text-2xl font-bold text-gray-900">Profile Information</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-2xl font-bold text-gray-900">Profile Information</CardTitle>
+            <Button
+              variant="outline"
+              onClick={() => setEditingProfile(!editingProfile)}
+              className="flex items-center gap-2"
+            >
+              {editingProfile ? (
+                <>
+                  <XCircle className="w-4 h-4" />
+                  Cancel
+                </>
+              ) : (
+                <>
+                  <Edit className="w-4 h-4" />
+                  Edit Profile
+                </>
+              )}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <p className="text-sm text-gray-600">Phone Number</p>
-              <p className="font-medium">{rbtProfile.phoneNumber}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Email</p>
-              <p className="font-medium">{rbtProfile.email || '—'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Location</p>
-              <p className="font-medium">
-                {rbtProfile.locationCity && rbtProfile.locationState
-                  ? `${rbtProfile.locationCity}, ${rbtProfile.locationState}`
-                  : rbtProfile.zipCode || '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Preferred Service Area</p>
-              <p className="font-medium">{rbtProfile.preferredServiceArea || '—'}</p>
-            </div>
-            {rbtProfile.addressLine1 && (
-              <div className="md:col-span-2">
-                <p className="text-sm text-gray-600">Address</p>
-                <p className="font-medium">
-                  {rbtProfile.addressLine1}
-                  {rbtProfile.addressLine2 && `, ${rbtProfile.addressLine2}`}
-                </p>
+          {editingProfile ? (
+            <EditProfileForm
+              rbtProfile={rbtProfile}
+              onCancel={() => setEditingProfile(false)}
+              onSuccess={() => {
+                setEditingProfile(false)
+                router.refresh()
+              }}
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm text-gray-600">Phone Number</p>
+                <p className="font-medium">{rbtProfile.phoneNumber}</p>
               </div>
-            )}
-            {rbtProfile.notes && (
-              <div className="md:col-span-2">
-                <p className="text-sm text-gray-600">Notes</p>
-                <p className="font-medium whitespace-pre-wrap">{rbtProfile.notes}</p>
+              <div>
+                <p className="text-sm text-gray-600">Email</p>
+                <p className="font-medium">{rbtProfile.email || '—'}</p>
               </div>
-            )}
-          </div>
+              <div>
+                <p className="text-sm text-gray-600">City</p>
+                <p className="font-medium">{rbtProfile.locationCity || '—'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">State</p>
+                <p className="font-medium">{rbtProfile.locationState || '—'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Zip Code</p>
+                <p className="font-medium">{rbtProfile.zipCode || '—'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Preferred Service Area</p>
+                <p className="font-medium">{rbtProfile.preferredServiceArea || '—'}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm text-gray-600">Address Line 1</p>
+                <p className="font-medium">{rbtProfile.addressLine1 || '—'}</p>
+              </div>
+              {rbtProfile.addressLine2 && (
+                <div className="md:col-span-2">
+                  <p className="text-sm text-gray-600">Address Line 2</p>
+                  <p className="font-medium">{rbtProfile.addressLine2}</p>
+                </div>
+              )}
+              {rbtProfile.notes && (
+                <div className="md:col-span-2">
+                  <p className="text-sm text-gray-600">Notes</p>
+                  <p className="font-medium whitespace-pre-wrap">{rbtProfile.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -648,6 +684,187 @@ function InterviewScheduleForm({
         </Button>
         <Button type="submit">Schedule Interview</Button>
       </DialogFooter>
+    </form>
+  )
+}
+
+function EditProfileForm({
+  rbtProfile,
+  onCancel,
+  onSuccess,
+}: {
+  rbtProfile: RBTProfile
+  onCancel: () => void
+  onSuccess: () => void
+}) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    const formData = new FormData(e.currentTarget)
+    const data = {
+      firstName: formData.get('firstName'),
+      lastName: formData.get('lastName'),
+      phoneNumber: formData.get('phoneNumber'),
+      email: formData.get('email') || null,
+      locationCity: formData.get('locationCity') || null,
+      locationState: formData.get('locationState') || null,
+      zipCode: formData.get('zipCode') || null,
+      addressLine1: formData.get('addressLine1') || null,
+      addressLine2: formData.get('addressLine2') || null,
+      preferredServiceArea: formData.get('preferredServiceArea') || null,
+      notes: formData.get('notes') || null,
+    }
+
+    try {
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(result.error || 'Failed to update profile')
+      }
+
+      onSuccess()
+    } catch (err: any) {
+      setError(err.message || 'Failed to update profile')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <Label htmlFor="edit-firstName">First Name *</Label>
+          <Input
+            id="edit-firstName"
+            name="firstName"
+            defaultValue={rbtProfile.firstName}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-lastName">Last Name *</Label>
+          <Input
+            id="edit-lastName"
+            name="lastName"
+            defaultValue={rbtProfile.lastName}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-phoneNumber">Phone Number *</Label>
+          <Input
+            id="edit-phoneNumber"
+            name="phoneNumber"
+            type="tel"
+            defaultValue={rbtProfile.phoneNumber}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-email">Email</Label>
+          <Input
+            id="edit-email"
+            name="email"
+            type="email"
+            defaultValue={rbtProfile.email || ''}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-locationCity">City</Label>
+          <Input
+            id="edit-locationCity"
+            name="locationCity"
+            defaultValue={rbtProfile.locationCity || ''}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-locationState">State</Label>
+          <Input
+            id="edit-locationState"
+            name="locationState"
+            maxLength={2}
+            placeholder="NY"
+            defaultValue={rbtProfile.locationState || ''}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-zipCode">Zip Code *</Label>
+          <Input
+            id="edit-zipCode"
+            name="zipCode"
+            defaultValue={rbtProfile.zipCode || ''}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-preferredServiceArea">Preferred Service Area</Label>
+          <Input
+            id="edit-preferredServiceArea"
+            name="preferredServiceArea"
+            defaultValue={rbtProfile.preferredServiceArea || ''}
+          />
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="edit-addressLine1">Address Line 1 *</Label>
+          <Input
+            id="edit-addressLine1"
+            name="addressLine1"
+            defaultValue={rbtProfile.addressLine1 || ''}
+            required
+          />
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="edit-addressLine2">Address Line 2</Label>
+          <Input
+            id="edit-addressLine2"
+            name="addressLine2"
+            defaultValue={rbtProfile.addressLine2 || ''}
+          />
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="edit-notes">Notes</Label>
+          <textarea
+            id="edit-notes"
+            name="notes"
+            rows={4}
+            defaultValue={rbtProfile.notes || ''}
+            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+        </div>
+      </div>
+
+      {error && (
+        <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+          {error}
+        </div>
+      )}
+
+      <div className="flex gap-4">
+        <Button type="submit" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Changes'
+          )}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+          Cancel
+        </Button>
+      </div>
     </form>
   )
 }

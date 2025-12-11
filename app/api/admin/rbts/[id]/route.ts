@@ -3,8 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 
-export async function POST(request: NextRequest) {
+// PATCH: Update RBT profile
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params
     const cookieStore = await cookies()
     const sessionToken = cookieStore.get('session')?.value
 
@@ -27,47 +32,54 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create user first
-    const userRecord = await prisma.user.create({
+    // Update RBT profile
+    const updatedProfile = await prisma.rBTProfile.update({
+      where: { id },
       data: {
-        phoneNumber: data.phoneNumber,
-        email: data.email || null,
-        name: `${data.firstName} ${data.lastName}`,
-        role: data.status === 'HIRED' ? 'RBT' : 'CANDIDATE',
-        isActive: true,
-      },
-    })
-
-    // Create RBT profile
-    const rbtProfile = await prisma.rBTProfile.create({
-      data: {
-        userId: userRecord.id,
         firstName: data.firstName,
         lastName: data.lastName,
         phoneNumber: data.phoneNumber,
         email: data.email || null,
         locationCity: data.locationCity || null,
         locationState: data.locationState || null,
-        zipCode: data.zipCode || null,
-        addressLine1: data.addressLine1 || null,
+        zipCode: data.zipCode,
+        addressLine1: data.addressLine1,
         addressLine2: data.addressLine2 || null,
         preferredServiceArea: data.preferredServiceArea || null,
         notes: data.notes || null,
-        status: data.status || 'NEW',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            isActive: true,
+          },
+        },
       },
     })
 
-    return NextResponse.json({ id: rbtProfile.id, success: true })
+    // Also update user email and name if they changed
+    if (data.email !== updatedProfile.email || 
+        `${data.firstName} ${data.lastName}` !== `${updatedProfile.firstName} ${updatedProfile.lastName}`) {
+      await prisma.user.update({
+        where: { id: updatedProfile.userId },
+        data: {
+          email: data.email || null,
+          name: `${data.firstName} ${data.lastName}`,
+        },
+      })
+    }
+
+    return NextResponse.json({ success: true, profile: updatedProfile })
   } catch (error: any) {
-    console.error('Error creating RBT:', error)
-    if (error.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'Phone number already exists' },
-        { status: 400 }
-      )
+    console.error('Error updating RBT profile:', error)
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: 'RBT profile not found' }, { status: 404 })
     }
     return NextResponse.json(
-      { error: 'Failed to create candidate' },
+      { error: 'Failed to update profile' },
       { status: 500 }
     )
   }

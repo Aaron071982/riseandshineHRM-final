@@ -101,8 +101,8 @@ export default function AddRBTForm() {
               <Input id="locationState" name="locationState" maxLength={2} placeholder="NY" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="zipCode">Zip Code</Label>
-              <Input id="zipCode" name="zipCode" />
+              <Label htmlFor="zipCode">Zip Code *</Label>
+              <Input id="zipCode" name="zipCode" required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Initial Status *</Label>
@@ -118,8 +118,8 @@ export default function AddRBTForm() {
               </Select>
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="addressLine1">Address Line 1</Label>
-              <Input id="addressLine1" name="addressLine1" />
+              <Label htmlFor="addressLine1">Address Line 1 *</Label>
+              <Input id="addressLine1" name="addressLine1" required />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="addressLine2">Address Line 2</Label>
