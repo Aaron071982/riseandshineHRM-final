@@ -16,7 +16,7 @@ interface AvailabilitySlot {
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const HOURS = Array.from({ length: 12 }, (_, i) => i + 9) // 9 AM to 8 PM (9-20)
+const HOURS = Array.from({ length: 8 }, (_, i) => i + 14) // 2 PM to 9 PM (14-21)
 
 export default function RBTScheduleView({ rbtProfileId, rbtName }: RBTScheduleViewProps) {
   const [slots, setSlots] = useState<AvailabilitySlot[]>([])

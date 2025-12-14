@@ -30,6 +30,22 @@ export async function POST(
       )
     }
 
+    // Validate hour range (14-21 = 2 PM to 9 PM)
+    for (const slot of slots) {
+      if (typeof slot.hour !== 'number' || slot.hour < 14 || slot.hour > 21) {
+        return NextResponse.json(
+          { error: 'Invalid hour: must be 14-21 (2 PM to 9 PM)' },
+          { status: 400 }
+        )
+      }
+      if (typeof slot.dayOfWeek !== 'number' || slot.dayOfWeek < 0 || slot.dayOfWeek > 6) {
+        return NextResponse.json(
+          { error: 'Invalid dayOfWeek: must be 0-6 (Sunday-Saturday)' },
+          { status: 400 }
+        )
+      }
+    }
+
     // Verify RBT profile exists
     const rbtProfile = await prisma.rBTProfile.findUnique({
       where: { id },

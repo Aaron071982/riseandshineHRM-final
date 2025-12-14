@@ -91,9 +91,9 @@ if (databaseUrl.includes('pooler.supabase.com')) {
   
   if (isTransactionPooler) {
     // Transaction Pooler: optimized for serverless, no pgbouncer param needed
-    // But we still want connection limits for Vercel
+    // Increase connection limit for better concurrency in serverless
     if (!url.searchParams.has('connection_limit')) {
-      url.searchParams.set('connection_limit', '1')
+      url.searchParams.set('connection_limit', '5')
     }
   } else {
     // Session Pooler: needs pgbouncer=true for Prisma
@@ -101,13 +101,18 @@ if (databaseUrl.includes('pooler.supabase.com')) {
       url.searchParams.set('pgbouncer', 'true')
     }
     if (!url.searchParams.has('connection_limit')) {
-      url.searchParams.set('connection_limit', '1')
+      url.searchParams.set('connection_limit', '5')
     }
   }
   
-  // Add timeout parameters for serverless
+  // Increase timeout parameters for serverless to handle connection pool better
   if (!url.searchParams.has('connect_timeout')) {
-    url.searchParams.set('connect_timeout', '10')
+    url.searchParams.set('connect_timeout', '20')
+  }
+  
+  // Add pool_timeout for better connection management
+  if (!url.searchParams.has('pool_timeout')) {
+    url.searchParams.set('pool_timeout', '20')
   }
   
   databaseUrl = url.toString()
@@ -119,6 +124,10 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Create Prisma client with optimized settings for Vercel serverless
+// Connection pool settings are configured via DATABASE_URL parameters:
+// - connection_limit: 5 (allows more concurrent connections)
+// - connect_timeout: 20 (increases timeout for connection acquisition)
+// - pool_timeout: 20 (increases timeout for pool operations)
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({

@@ -82,9 +82,9 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-      if (typeof slot.hour !== 'number' || slot.hour < 9 || slot.hour > 19) {
+      if (typeof slot.hour !== 'number' || slot.hour < 14 || slot.hour > 21) {
         return NextResponse.json(
-          { error: 'Invalid hour: must be 9-19' },
+          { error: 'Invalid hour: must be 14-21 (2 PM to 9 PM)' },
           { status: 400 }
         )
       }

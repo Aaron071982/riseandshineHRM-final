@@ -263,7 +263,7 @@ model AvailabilitySlot {
   id           String   @id @default(cuid())
   rbtProfileId String
   dayOfWeek    Int // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  hour         Int // 9 to 19 (representing 9-10, 10-11, ..., 19-20)
+  hour         Int // 14 to 21 (representing 2 PM-3 PM, 3 PM-4 PM, ..., 9 PM-10 PM)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
