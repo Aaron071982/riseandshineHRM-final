@@ -13,11 +13,37 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { X, FileText, Upload } from 'lucide-react'
+
+interface DocumentFile {
+  file: File
+  documentType: string
+}
 
 export default function AddRBTForm() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [documents, setDocuments] = useState<DocumentFile[]>([])
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    const newDocuments = files.map((file) => ({
+      file,
+      documentType: 'OTHER',
+    }))
+    setDocuments([...documents, ...newDocuments])
+  }
+
+  const removeDocument = (index: number) => {
+    setDocuments(documents.filter((_, i) => i !== index))
+  }
+
+  const updateDocumentType = (index: number, documentType: string) => {
+    const updated = [...documents]
+    updated[index].documentType = documentType
+    setDocuments(updated)
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -25,26 +51,32 @@ export default function AddRBTForm() {
     setLoading(true)
 
     const formData = new FormData(e.currentTarget)
-    const data = {
-      firstName: formData.get('firstName'),
-      lastName: formData.get('lastName'),
-      phoneNumber: formData.get('phoneNumber'),
-      email: formData.get('email'),
-      locationCity: formData.get('locationCity'),
-      locationState: formData.get('locationState'),
-      zipCode: formData.get('zipCode'),
-      addressLine1: formData.get('addressLine1'),
-      addressLine2: formData.get('addressLine2'),
-      preferredServiceArea: formData.get('preferredServiceArea'),
-      notes: formData.get('notes'),
-      status: formData.get('status'),
-    }
+    
+    // Create FormData for file upload
+    const submitData = new FormData()
+    submitData.append('firstName', formData.get('firstName') as string)
+    submitData.append('lastName', formData.get('lastName') as string)
+    submitData.append('phoneNumber', formData.get('phoneNumber') as string)
+    submitData.append('email', (formData.get('email') as string) || '')
+    submitData.append('locationCity', (formData.get('locationCity') as string) || '')
+    submitData.append('locationState', (formData.get('locationState') as string) || '')
+    submitData.append('zipCode', formData.get('zipCode') as string)
+    submitData.append('addressLine1', formData.get('addressLine1') as string)
+    submitData.append('addressLine2', (formData.get('addressLine2') as string) || '')
+    submitData.append('preferredServiceArea', (formData.get('preferredServiceArea') as string) || '')
+    submitData.append('notes', (formData.get('notes') as string) || '')
+    submitData.append('status', formData.get('status') as string)
+
+    // Add documents
+    documents.forEach((doc, index) => {
+      submitData.append(`documents`, doc.file)
+      submitData.append(`documentTypes`, doc.documentType)
+    })
 
     try {
       const response = await fetch('/api/admin/rbts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: submitData,
       })
 
       const result = await response.json()
@@ -137,6 +169,81 @@ export default function AddRBTForm() {
                 rows={4}
                 className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
+            </div>
+          </div>
+
+          {/* Documents Section */}
+          <div className="space-y-4 border-t pt-6">
+            <div>
+              <Label htmlFor="documents" className="text-base font-semibold">
+                Documents (Resume, Certifications, etc.)
+              </Label>
+              <p className="text-sm text-gray-500 mt-1">
+                Upload multiple documents such as resumes, certifications, or other relevant files
+              </p>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <label
+                  htmlFor="file-upload"
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span className="text-sm font-medium">Select Files</span>
+                </label>
+                <input
+                  id="file-upload"
+                  type="file"
+                  multiple
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                />
+              </div>
+
+              {documents.length > 0 && (
+                <div className="space-y-2">
+                  {documents.map((doc, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border"
+                    >
+                      <FileText className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {doc.file.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {(doc.file.size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                      <Select
+                        value={doc.documentType}
+                        onValueChange={(value) => updateDocumentType(index, value)}
+                      >
+                        <SelectTrigger className="w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="RESUME">Resume</SelectItem>
+                          <SelectItem value="CERTIFICATION">Certification</SelectItem>
+                          <SelectItem value="OTHER">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeDocument(index)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

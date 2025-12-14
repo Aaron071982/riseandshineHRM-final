@@ -147,6 +147,8 @@ model RBTProfile {
   leaveRequests      LeaveRequest[]
   interviewEmailLogs InterviewEmailLog[]
   availabilitySlots  AvailabilitySlot[]
+  documents          RBTDocument[]
+  interviewNotes     InterviewNotes[]
 
   @@map("rbt_profiles")
 }
@@ -165,6 +167,7 @@ model Interview {
   updatedAt       DateTime          @updatedAt
 
   rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  interviewNotes InterviewNotes?
 
   @@map("interviews")
 }
@@ -268,4 +271,52 @@ model AvailabilitySlot {
 
   @@unique([rbtProfileId, dayOfWeek, hour])
   @@map("availability_slots")
+}
+
+model InterviewNotes {
+  id              String   @id @default(cuid())
+  interviewId     String   @unique
+  rbtProfileId    String
+  scriptVersion   String   @default("1.0")
+  
+  // Structured answers for each question
+  greetingAnswer          String? @db.Text
+  basicInfoAnswer         String? @db.Text
+  experienceAnswer        String? @db.Text
+  heardAboutAnswer        String? @db.Text
+  abaPlatformsAnswer      String? @db.Text
+  communicationAnswer     String? @db.Text
+  availabilityAnswer      String? @db.Text
+  payExpectationsAnswer   String? @db.Text
+  previousCompanyAnswer   String? @db.Text
+  expectationsAnswer      String? @db.Text
+  closingNotes            String? @db.Text
+  
+  // Additional structured fields for basic info
+  fullName                String?
+  birthdate               String?
+  currentAddress          String? @db.Text
+  phoneNumber             String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  interview   Interview  @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  rbtProfile  RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  
+  @@map("interview_notes")
+}
+
+model RBTDocument {
+  id           String   @id @default(cuid())
+  rbtProfileId String
+  fileName     String
+  fileType     String   // MIME type
+  fileData     String   @db.Text // base64 encoded file
+  documentType String?  // 'RESUME', 'CERTIFICATION', 'OTHER'
+  uploadedAt   DateTime @default(now())
+
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@map("rbt_documents")
 }

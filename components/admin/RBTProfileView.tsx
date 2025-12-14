@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDateTime } from '@/lib/utils'
-import { CheckCircle2, XCircle, Download, FileText, Trash2, Edit, Loader2 } from 'lucide-react'
+import { CheckCircle2, XCircle, Download, FileText, Trash2, Edit, Loader2, Upload } from 'lucide-react'
+import Link from 'next/link'
 import RBTScheduleView from './RBTScheduleView'
+import InterviewNotesButton from './InterviewNotesButton'
 import {
   Select,
   SelectContent,
@@ -26,6 +28,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useToast } from '@/components/ui/toast'
 
 interface RBTProfile {
   id: string
@@ -57,6 +60,26 @@ interface RBTProfile {
     decision: string
     notes: string | null
     meetingUrl: string | null
+    interviewNotes?: {
+      id: string
+      greetingAnswer: string | null
+      basicInfoAnswer: string | null
+      experienceAnswer: string | null
+      heardAboutAnswer: string | null
+      abaPlatformsAnswer: string | null
+      communicationAnswer: string | null
+      availabilityAnswer: string | null
+      payExpectationsAnswer: string | null
+      previousCompanyAnswer: string | null
+      expectationsAnswer: string | null
+      closingNotes: string | null
+      fullName: string | null
+      birthdate: string | null
+      currentAddress: string | null
+      phoneNumber: string | null
+      createdAt: Date
+      updatedAt: Date
+    } | null
   }>
   onboardingTasks: Array<{
     id: string
@@ -67,6 +90,13 @@ interface RBTProfile {
     completedAt: Date | null
     uploadUrl: string | null
     documentDownloadUrl: string | null
+  }>
+  documents?: Array<{
+    id: string
+    fileName: string
+    fileType: string
+    documentType: string | null
+    uploadedAt: Date
   }>
 }
 
@@ -86,10 +116,22 @@ const statusColors: Record<string, string> = {
 
 export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTProfileViewProps) {
   const router = useRouter()
+  const { showToast } = useToast()
   const [rbtProfile, setRbtProfile] = useState(initialRbtProfile)
   const [loading, setLoading] = useState(false)
   const [interviewDialogOpen, setInterviewDialogOpen] = useState(false)
   const [editingProfile, setEditingProfile] = useState(false)
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null)
+  const [confirmMessage, setConfirmMessage] = useState('')
+  const [documents, setDocuments] = useState<Array<{
+    id: string
+    fileName: string
+    fileType: string
+    documentType: string | null
+    uploadedAt: Date
+  }>>(initialRbtProfile.documents || [])
+  const [uploadingDocuments, setUploadingDocuments] = useState(false)
 
   const handleStatusChange = async (newStatus: string) => {
     setLoading(true)
@@ -103,10 +145,15 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       if (response.ok) {
         const updated = await response.json()
         setRbtProfile({ ...rbtProfile, status: updated.status })
+        showToast('Status updated successfully', 'success')
         router.refresh()
+      } else {
+        const data = await response.json()
+        showToast(data.error || 'Failed to update status', 'error')
       }
     } catch (error) {
       console.error('Error updating status:', error)
+      showToast('An error occurred while updating status', 'error')
     } finally {
       setLoading(false)
     }
@@ -124,99 +171,102 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       const data = await response.json()
 
       if (response.ok) {
-        alert('Reach-out email sent successfully!')
+        showToast('Reach-out email sent successfully!', 'success')
         router.refresh()
       } else {
-        alert(`Failed to send email: ${data.error || 'Unknown error'}`)
+        showToast(`Failed to send email: ${data.error || 'Unknown error'}`, 'error')
       }
     } catch (error) {
       console.error('Error sending email:', error)
-      alert('An error occurred while sending the email. Check the console for details.')
+      showToast('An error occurred while sending the email', 'error')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleHire = async () => {
-    if (!confirm('Are you sure you want to hire this candidate? This will send a welcome email and create onboarding tasks.')) {
-      return
-    }
-
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/hire`, {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        router.refresh()
-        alert('Candidate hired successfully!')
-      }
-    } catch (error) {
-      console.error('Error hiring candidate:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleReject = async () => {
-    if (!confirm('Are you sure you want to reject this candidate? This will send a rejection email and update their status to REJECTED.')) {
-      return
-    }
-
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/reject`, {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        router.refresh()
-        alert('Candidate rejected successfully. A rejection email has been sent.')
-      } else {
-        const data = await response.json()
-        alert(`Failed to reject candidate: ${data.error || 'Unknown error'}`)
-      }
-    } catch (error) {
-      console.error('Error rejecting candidate:', error)
-      alert('An error occurred while rejecting the candidate.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleDeleteRBT = async () => {
-    if (!confirm(`Are you sure you want to delete ${rbtProfile.firstName} ${rbtProfile.lastName}? This action cannot be undone.`)) {
-      return
-    }
-
-    if (!confirm('This will permanently delete the RBT profile and all associated data. Are you absolutely sure?')) {
-      return
-    }
-
-    try {
+  const handleHire = () => {
+    setConfirmMessage('Are you sure you want to hire this candidate? This will send a welcome email and create onboarding tasks.')
+    setConfirmAction(async () => {
       setLoading(true)
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/delete`, {
-        method: 'DELETE',
-      })
+      try {
+        const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/hire`, {
+          method: 'POST',
+        })
 
-      if (response.ok) {
-        alert('RBT deleted successfully')
-        // Force refresh and redirect
-        router.refresh()
-        setTimeout(() => {
-          router.push('/admin/rbts')
-        }, 100)
-      } else {
-        const errorData = await response.json()
-        alert(`Failed to delete RBT: ${errorData.error || 'Unknown error'}`)
+        if (response.ok) {
+          // Immediately update status to HIRED in UI
+          setRbtProfile({ ...rbtProfile, status: 'HIRED' })
+          showToast('Candidate hired successfully!', 'success')
+          router.refresh()
+        } else {
+          const data = await response.json()
+          showToast(data.error || 'Failed to hire candidate', 'error')
+        }
+      } catch (error) {
+        console.error('Error hiring candidate:', error)
+        showToast('An error occurred while hiring the candidate', 'error')
+      } finally {
+        setLoading(false)
       }
-    } catch (error) {
-      console.error('Error deleting RBT:', error)
-      alert('An error occurred while deleting the RBT. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    })
+    setConfirmDialogOpen(true)
+  }
+
+  const handleReject = () => {
+    setConfirmMessage('Are you sure you want to reject this candidate? This will send a rejection email and update their status to REJECTED.')
+    setConfirmAction(async () => {
+      setLoading(true)
+      try {
+        const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/reject`, {
+          method: 'POST',
+        })
+
+        if (response.ok) {
+          setRbtProfile({ ...rbtProfile, status: 'REJECTED' })
+          showToast('Candidate rejected successfully. A rejection email has been sent.', 'success')
+          router.refresh()
+        } else {
+          const data = await response.json()
+          showToast(data.error || 'Failed to reject candidate', 'error')
+        }
+      } catch (error) {
+        console.error('Error rejecting candidate:', error)
+        showToast('An error occurred while rejecting the candidate', 'error')
+      } finally {
+        setLoading(false)
+      }
+    })
+    setConfirmDialogOpen(true)
+  }
+
+  const handleDeleteRBT = () => {
+    setConfirmMessage(`Are you sure you want to delete ${rbtProfile.firstName} ${rbtProfile.lastName}? This will permanently delete the RBT profile and all associated data. This action cannot be undone.`)
+    setConfirmAction(async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/delete`, {
+          method: 'DELETE',
+        })
+
+        if (response.ok) {
+          showToast('RBT deleted successfully', 'success')
+          // Force refresh and redirect
+          router.refresh()
+          setTimeout(() => {
+            router.push('/admin/rbts')
+          }, 100)
+        } else {
+          const errorData = await response.json()
+          showToast(`Failed to delete RBT: ${errorData.error || 'Unknown error'}`, 'error')
+        }
+      } catch (error) {
+        console.error('Error deleting RBT:', error)
+        showToast('An error occurred while deleting the RBT. Please try again.', 'error')
+      } finally {
+        setLoading(false)
+      }
+    })
+    setConfirmDialogOpen(true)
   }
 
   const handleScheduleInterview = async (data: any) => {
@@ -233,8 +283,11 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
       if (response.ok) {
         setInterviewDialogOpen(false)
+        showToast('Interview scheduled successfully!', 'success')
         router.refresh()
-        alert('Interview scheduled successfully!')
+      } else {
+        const data = await response.json()
+        showToast(data.error || 'Failed to schedule interview', 'error')
       }
     } catch (error) {
       console.error('Error scheduling interview:', error)
@@ -242,6 +295,105 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       setLoading(false)
     }
   }
+
+  const fetchDocuments = async () => {
+    try {
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents`)
+      if (response.ok) {
+        const docs = await response.json()
+        setDocuments(docs)
+      }
+    } catch (error) {
+      console.error('Error fetching documents:', error)
+    }
+  }
+
+  const handleUploadDocuments = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    setUploadingDocuments(true)
+    try {
+      const formData = new FormData()
+      files.forEach((file) => {
+        formData.append('documents', file)
+        formData.append('documentTypes', 'OTHER') // Default type
+      })
+
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        showToast(`Successfully uploaded ${files.length} document(s)`, 'success')
+        await fetchDocuments()
+        router.refresh()
+      } else {
+        const data = await response.json()
+        showToast(data.error || 'Failed to upload documents', 'error')
+      }
+    } catch (error) {
+      console.error('Error uploading documents:', error)
+      showToast('An error occurred while uploading documents', 'error')
+    } finally {
+      setUploadingDocuments(false)
+    }
+  }
+
+  const handleDeleteDocument = async (documentId: string) => {
+    setConfirmMessage('Are you sure you want to delete this document? This action cannot be undone.')
+    setConfirmAction(async () => {
+      try {
+        const response = await fetch(
+          `/api/admin/rbts/${rbtProfile.id}/documents?documentId=${documentId}`,
+          { method: 'DELETE' }
+        )
+
+        if (response.ok) {
+          showToast('Document deleted successfully', 'success')
+          await fetchDocuments()
+          router.refresh()
+        } else {
+          const data = await response.json()
+          showToast(data.error || 'Failed to delete document', 'error')
+        }
+      } catch (error) {
+        console.error('Error deleting document:', error)
+        showToast('An error occurred while deleting the document', 'error')
+      }
+    })
+    setConfirmDialogOpen(true)
+  }
+
+  const handleDownloadDocument = async (documentId: string, fileName: string) => {
+    try {
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents/${documentId}/download`)
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        showToast('Document downloaded successfully', 'success')
+      } else {
+        showToast('Failed to download document', 'error')
+      }
+    } catch (error) {
+      console.error('Error downloading document:', error)
+      showToast('An error occurred while downloading the document', 'error')
+    }
+  }
+
+  // Fetch documents on mount
+  useEffect(() => {
+    fetchDocuments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const canSendReachOut = rbtProfile.status === 'REACH_OUT' || rbtProfile.status === 'NEW'
   const canScheduleInterview = rbtProfile.status === 'TO_INTERVIEW' || rbtProfile.status === 'REACH_OUT'
@@ -622,6 +774,204 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           rbtName={`${rbtProfile.firstName} ${rbtProfile.lastName}`}
         />
       )}
+
+      {/* Interview Notes Section */}
+      {rbtProfile.interviews.some((i) => i.interviewNotes) && (
+        <Card className="border-2 border-purple-100 bg-gradient-to-br from-white to-purple-50/30 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-purple-200/20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
+          <CardHeader className="relative">
+            <CardTitle className="text-2xl font-bold text-gray-900">Interview Notes</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {rbtProfile.interviews
+              .filter((i) => i.interviewNotes)
+              .map((interview) => (
+                <div
+                  key={interview.id}
+                  className="p-4 bg-white rounded-lg border border-gray-200 space-y-3"
+                >
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        Interview on {formatDateTime(interview.scheduledAt)}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Interviewer: {interview.interviewerName}
+                      </p>
+                    </div>
+                    <Badge variant="outline">
+                      {interview.status}
+                    </Badge>
+                  </div>
+                  {interview.interviewNotes && (
+                    <div className="space-y-3 text-sm">
+                      {interview.interviewNotes.fullName && (
+                        <div>
+                          <span className="font-medium text-gray-700">Full Name: </span>
+                          <span className="text-gray-600">{interview.interviewNotes.fullName}</span>
+                        </div>
+                      )}
+                      {interview.interviewNotes.phoneNumber && (
+                        <div>
+                          <span className="font-medium text-gray-700">Phone: </span>
+                          <span className="text-gray-600">{interview.interviewNotes.phoneNumber}</span>
+                        </div>
+                      )}
+                      {interview.interviewNotes.experienceAnswer && (
+                        <div>
+                          <span className="font-medium text-gray-700">Experience: </span>
+                          <p className="text-gray-600 mt-1">{interview.interviewNotes.experienceAnswer}</p>
+                        </div>
+                      )}
+                      {interview.interviewNotes.availabilityAnswer && (
+                        <div>
+                          <span className="font-medium text-gray-700">Availability: </span>
+                          <p className="text-gray-600 mt-1">{interview.interviewNotes.availabilityAnswer}</p>
+                        </div>
+                      )}
+                      {interview.interviewNotes.payExpectationsAnswer && (
+                        <div>
+                          <span className="font-medium text-gray-700">Pay Expectations: </span>
+                          <p className="text-gray-600 mt-1">{interview.interviewNotes.payExpectationsAnswer}</p>
+                        </div>
+                      )}
+                      {interview.interviewNotes.closingNotes && (
+                        <div>
+                          <span className="font-medium text-gray-700">Closing Notes: </span>
+                          <p className="text-gray-600 mt-1">{interview.interviewNotes.closingNotes}</p>
+                        </div>
+                      )}
+                      <div className="pt-2 border-t">
+                        <InterviewNotesButton
+                          interviewId={interview.id}
+                          rbtProfileId={rbtProfile.id}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Documents Section */}
+      <Card className="border-2 border-blue-100 bg-gradient-to-br from-white to-blue-50/30 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
+        <CardHeader className="relative">
+          <CardTitle className="text-2xl font-bold text-gray-900">Documents</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Upload Section */}
+          <div className="space-y-3">
+            <label
+              htmlFor="document-upload"
+              className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+            >
+              <Upload className="w-5 h-5 text-gray-400" />
+              <span className="text-sm font-medium text-gray-700">
+                {uploadingDocuments ? 'Uploading...' : 'Upload Documents'}
+              </span>
+            </label>
+            <input
+              id="document-upload"
+              type="file"
+              multiple
+              onChange={handleUploadDocuments}
+              className="hidden"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              disabled={uploadingDocuments}
+            />
+            <p className="text-xs text-gray-500">
+              Upload resumes, certifications, or other relevant documents (PDF, DOC, DOCX, JPG, PNG)
+            </p>
+          </div>
+
+          {/* Documents List */}
+          {documents.length > 0 ? (
+            <div className="space-y-2">
+              {documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                >
+                  <FileText className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {doc.fileName}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-xs">
+                        {doc.documentType || 'OTHER'}
+                      </Badge>
+                      <span className="text-xs text-gray-500">
+                        {new Date(doc.uploadedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadDocument(doc.id, doc.fileName)}
+                      className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      Download
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteDocument(doc.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+              <p className="text-sm">No documents uploaded yet</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Action</DialogTitle>
+            <DialogDescription>{confirmMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirmDialogOpen(false)
+                setConfirmAction(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (confirmAction) {
+                  confirmAction()
+                }
+                setConfirmDialogOpen(false)
+                setConfirmAction(null)
+              }}
+              className="bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

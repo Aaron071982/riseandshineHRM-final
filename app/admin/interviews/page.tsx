@@ -5,6 +5,7 @@ import { formatDateTime } from '@/lib/utils'
 import { Calendar, Clock, User, Video } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import InterviewNotesButton from '@/components/admin/InterviewNotesButton'
 
 export default async function InterviewsPage() {
   const interviews = await prisma.interview.findMany({
@@ -144,7 +145,11 @@ export default async function InterviewsPage() {
                         </div>
                       </div>
                       
-                      <div className="flex justify-end">
+                      <div className="flex justify-end gap-2">
+                        <InterviewNotesButton
+                          interviewId={interview.id}
+                          rbtProfileId={interview.rbtProfile.id}
+                        />
                         <Link href={`/admin/rbts/${interview.rbtProfile.id}`}>
                           <Button variant="outline" size="sm" className="rounded-lg border-2 hover:bg-blue-50">
                             View Profile →

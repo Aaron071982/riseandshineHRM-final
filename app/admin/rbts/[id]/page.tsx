@@ -16,10 +16,18 @@ export default async function RBTProfilePage({
         orderBy: {
           scheduledAt: 'desc',
         },
+        include: {
+          interviewNotes: true,
+        },
       },
       onboardingTasks: {
         orderBy: {
           sortOrder: 'asc',
+        },
+      },
+      documents: {
+        orderBy: {
+          uploadedAt: 'desc',
         },
       },
     },

@@ -17,7 +17,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const data = await request.json()
+    const formData = await request.formData()
+
+    // Extract form fields
+    const data = {
+      firstName: formData.get('firstName') as string,
+      lastName: formData.get('lastName') as string,
+      phoneNumber: formData.get('phoneNumber') as string,
+      email: (formData.get('email') as string) || null,
+      locationCity: (formData.get('locationCity') as string) || null,
+      locationState: (formData.get('locationState') as string) || null,
+      zipCode: formData.get('zipCode') as string,
+      addressLine1: formData.get('addressLine1') as string,
+      addressLine2: (formData.get('addressLine2') as string) || null,
+      preferredServiceArea: (formData.get('preferredServiceArea') as string) || null,
+      notes: (formData.get('notes') as string) || null,
+      status: (formData.get('status') as string) || 'NEW',
+    }
 
     // Validate required fields
     if (!data.addressLine1 || !data.zipCode) {
@@ -53,9 +69,35 @@ export async function POST(request: NextRequest) {
         addressLine2: data.addressLine2 || null,
         preferredServiceArea: data.preferredServiceArea || null,
         notes: data.notes || null,
-        status: data.status || 'NEW',
+        status: data.status as any,
       },
     })
+
+    // Handle documents if provided
+    const files = formData.getAll('documents') as File[]
+    const documentTypes = formData.getAll('documentTypes') as string[]
+
+    if (files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const documentType = documentTypes[i] || 'OTHER'
+
+        // Convert file to base64
+        const fileBuffer = Buffer.from(await file.arrayBuffer())
+        const fileBase64 = fileBuffer.toString('base64')
+        const fileMimeType = file.type || 'application/octet-stream'
+
+        await prisma.rBTDocument.create({
+          data: {
+            rbtProfileId: rbtProfile.id,
+            fileName: file.name,
+            fileType: fileMimeType,
+            fileData: fileBase64,
+            documentType: documentType,
+          },
+        })
+      }
+    }
 
     return NextResponse.json({ id: rbtProfile.id, success: true })
   } catch (error: any) {
