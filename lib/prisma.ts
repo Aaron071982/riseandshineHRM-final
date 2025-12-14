@@ -90,8 +90,12 @@ if (databaseUrl.includes('pooler.supabase.com')) {
   const isTransactionPooler = url.port === '6543' || databaseUrl.includes(':6543')
   
   if (isTransactionPooler) {
-    // Transaction Pooler: optimized for serverless, no pgbouncer param needed
-    // Increase connection limit for better concurrency in serverless
+    // Transaction Pooler: has issues with Prisma's prepared statements in serverless
+    // Add pgbouncer=true to work around prepared statement conflicts
+    // This is a workaround - Session Pooler (port 5432) is recommended for Prisma
+    if (!url.searchParams.has('pgbouncer')) {
+      url.searchParams.set('pgbouncer', 'true')
+    }
     if (!url.searchParams.has('connection_limit')) {
       url.searchParams.set('connection_limit', '5')
     }
