@@ -10,6 +10,7 @@ import { CheckCircle2, XCircle, Download, FileText, Trash2, Edit, Loader2, Uploa
 import Link from 'next/link'
 import RBTScheduleView from './RBTScheduleView'
 import InterviewNotesButton from './InterviewNotesButton'
+import AdminOnboardingOverride from './AdminOnboardingOverride'
 import {
   Select,
   SelectContent,
@@ -44,6 +45,7 @@ interface RBTProfile {
   preferredServiceArea: string | null
   notes: string | null
   status: string
+  scheduleCompleted?: boolean
   createdAt: Date
   updatedAt: Date
   user: {
@@ -90,6 +92,7 @@ interface RBTProfile {
     completedAt: Date | null
     uploadUrl: string | null
     documentDownloadUrl: string | null
+    sortOrder: number
   }>
   documents?: Array<{
     id: string
@@ -403,6 +406,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
   const completedOnboardingTasks = rbtProfile.onboardingTasks.filter(t => t.isCompleted).length
   const totalOnboardingTasks = rbtProfile.onboardingTasks.length
+  const incompleteTasks = rbtProfile.onboardingTasks.filter(t => !t.isCompleted)
 
   const statusConfig = {
     NEW: { color: 'from-gray-500 to-gray-400' },
@@ -651,6 +655,16 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Admin Onboarding Override */}
+      {isHired && (incompleteTasks.length > 0 || !rbtProfile.scheduleCompleted) && (
+        <AdminOnboardingOverride
+          rbtProfileId={rbtProfile.id}
+          rbtName={`${rbtProfile.firstName} ${rbtProfile.lastName}`}
+          onboardingTasks={rbtProfile.onboardingTasks}
+          scheduleCompleted={rbtProfile.scheduleCompleted || false}
+        />
       )}
 
       {/* Onboarding Progress */}
