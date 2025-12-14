@@ -97,7 +97,7 @@ if (databaseUrl.includes('pooler.supabase.com')) {
       url.searchParams.set('pgbouncer', 'true')
     }
     if (!url.searchParams.has('connection_limit')) {
-      url.searchParams.set('connection_limit', '5')
+      url.searchParams.set('connection_limit', '15')
     }
   } else {
     // Session Pooler: needs pgbouncer=true for Prisma
@@ -105,7 +105,7 @@ if (databaseUrl.includes('pooler.supabase.com')) {
       url.searchParams.set('pgbouncer', 'true')
     }
     if (!url.searchParams.has('connection_limit')) {
-      url.searchParams.set('connection_limit', '5')
+      url.searchParams.set('connection_limit', '15')
     }
   }
   
