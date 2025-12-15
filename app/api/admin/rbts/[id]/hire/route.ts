@@ -203,10 +203,104 @@ export async function POST(
         // Tasks can be created manually if needed
       }
     } else {
-      // Tasks already exist - check if they match expected count (8 or 9 depending on 40-hour course)
-      const expectedTaskCount = rbtProfile.fortyHourCourseCompleted ? 8 : 9
-      if (existingTasks.length !== expectedTaskCount) {
-        console.log(`⚠️ Found ${existingTasks.length} tasks (expected ${expectedTaskCount}) for RBT ${rbtProfile.id}. Tasks already exist, skipping recreation.`)
+      // Tasks already exist - check if they match expected structure
+      const needsFortyHourCourse = !rbtProfile.fortyHourCourseCompleted
+      const expectedTaskCount = needsFortyHourCourse ? 9 : 8
+      const hasFortyHourCourseTask = existingTasks.some(t => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
+      
+      // If task count is wrong OR 40-hour course task is missing when it should exist, recreate tasks
+      if (existingTasks.length !== expectedTaskCount || (needsFortyHourCourse && !hasFortyHourCourseTask)) {
+        console.log(`⚠️ Found ${existingTasks.length} tasks (expected ${expectedTaskCount}) for RBT ${rbtProfile.id}. Missing 40-hour course task: ${needsFortyHourCourse && !hasFortyHourCourseTask}. Recreating tasks...`)
+        
+        // Delete existing tasks
+        await prisma.onboardingTask.deleteMany({
+          where: { rbtProfileId: rbtProfile.id },
+        })
+        
+        // Recreate tasks with correct structure
+        const onboardingTasks = [
+          {
+            taskType: 'DOWNLOAD_DOC',
+            title: 'HIPAA Security Overview',
+            description: 'Review the HIPAA Security Rule overview from HHS',
+            documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/security/index.html',
+            sortOrder: 1,
+          },
+          {
+            taskType: 'DOWNLOAD_DOC',
+            title: 'HIPAA Privacy Overview',
+            description: 'Review the HIPAA Privacy Rule overview from HHS',
+            documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/privacy/index.html',
+            sortOrder: 2,
+          },
+          {
+            taskType: 'DOWNLOAD_DOC',
+            title: 'HIPAA Patient Security',
+            description: 'Review HIPAA patient safety guidelines from HHS',
+            documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/patient-safety/index.html',
+            sortOrder: 3,
+          },
+          {
+            taskType: 'DOWNLOAD_DOC',
+            title: 'HIPAA Basics PDF',
+            description: 'Download and review the HIPAA Basics for Providers document from CMS',
+            documentDownloadUrl: 'https://www.cms.gov/files/document/mln909001-hipaa-basics-providers-privacy-security-breach-notification-rules.pdf',
+            sortOrder: 4,
+          },
+          {
+            taskType: 'DOWNLOAD_DOC',
+            title: 'HIPAA IT Security Guide',
+            description: 'Review the Guide to Privacy and Security of Electronic Health Information',
+            documentDownloadUrl: 'https://www.healthit.gov/topic/health-it-resources/guide-privacy-security-electronic-health-information',
+            sortOrder: 5,
+          },
+          {
+            taskType: 'DOWNLOAD_DOC',
+            title: 'Download Onboarding Documents Folder',
+            description: 'Download the complete onboarding documents folder. You will need to fill out all documents and re-upload them as a folder after logging in.',
+            documentDownloadUrl: '/api/rbt/onboarding-package/download',
+            sortOrder: needsFortyHourCourse ? 7 : 6,
+          },
+          ...(needsFortyHourCourse ? [{
+            taskType: 'FORTY_HOUR_COURSE_CERTIFICATE',
+            title: 'Complete 40-Hour RBT Course & Upload Certificate',
+            description: 'Complete the 40-hour RBT training course and upload your certificate of completion',
+            documentDownloadUrl: 'https://courses.autismpartnershipfoundation.org/offers/it285gs6/checkout',
+            sortOrder: 6,
+          }] : []),
+          {
+            taskType: 'SIGNATURE',
+            title: 'Digital Signature Confirmation',
+            description: 'Sign to confirm you have read and understood all HIPAA documents and training materials',
+            sortOrder: needsFortyHourCourse ? 8 : 7,
+          },
+          {
+            taskType: 'PACKAGE_UPLOAD',
+            title: 'Upload Completed Onboarding Package',
+            description: 'Upload your completed onboarding package with all signed documents. This will be sent to the administrator for review.',
+            sortOrder: needsFortyHourCourse ? 9 : 8,
+          },
+        ]
+
+        try {
+          await Promise.all(
+            onboardingTasks.map((task) =>
+              prisma.onboardingTask.create({
+                data: {
+                  rbtProfileId: rbtProfile.id,
+                  taskType: task.taskType as any,
+                  title: task.title,
+                  description: task.description,
+                  documentDownloadUrl: task.documentDownloadUrl || null,
+                  sortOrder: task.sortOrder,
+                },
+              })
+            )
+          )
+          console.log(`✅ Recreated ${onboardingTasks.length} onboarding tasks for RBT ${rbtProfile.id}`)
+        } catch (taskError: any) {
+          console.error(`❌ Error recreating onboarding tasks:`, taskError)
+        }
       } else {
         console.log(`✅ Onboarding tasks already exist for RBT ${rbtProfile.id} (${existingTasks.length} tasks)`)
       }
