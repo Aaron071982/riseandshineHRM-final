@@ -114,46 +114,70 @@ export async function POST(
     if (existingTasks.length === 0) {
       console.log(`Creating onboarding tasks for RBT ${rbtProfile.id}...`)
 
+      // Check if 40-hour course is completed
+      const needsFortyHourCourse = !rbtProfile.fortyHourCourseCompleted
+
       const onboardingTasks = [
         {
           taskType: 'DOWNLOAD_DOC',
-          title: 'Download HIPAA Basics PDF',
-          description: 'Download and review the HIPAA Basics for Providers document from CMS',
-          documentDownloadUrl: 'https://www.cms.gov/files/document/mln909001-hipaa-basics-providers-privacy-security-breach-notification-rules.pdf',
+          title: 'HIPAA Security Overview',
+          description: 'Review the HIPAA Security Rule overview from HHS',
+          documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/security/index.html',
           sortOrder: 1,
         },
         {
           taskType: 'DOWNLOAD_DOC',
-          title: 'Review HHS HIPAA Portal',
-          description: 'Review the HHS HIPAA for Professionals portal for comprehensive information',
-          documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/index.html',
+          title: 'HIPAA Privacy Overview',
+          description: 'Review the HIPAA Privacy Rule overview from HHS',
+          documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/privacy/index.html',
           sortOrder: 2,
         },
         {
           taskType: 'DOWNLOAD_DOC',
-          title: 'Download Confidentiality Agreement Templates',
-          description: 'Download and review the HIPAA Confidentiality Agreement templates',
-          documentDownloadUrl: 'https://www.sampleforms.com/hipaa-confidentiality-agreement-forms.html',
+          title: 'HIPAA Patient Security',
+          description: 'Review HIPAA patient safety guidelines from HHS',
+          documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/patient-safety/index.html',
           sortOrder: 3,
+        },
+        {
+          taskType: 'DOWNLOAD_DOC',
+          title: 'HIPAA Basics PDF',
+          description: 'Download and review the HIPAA Basics for Providers document from CMS',
+          documentDownloadUrl: 'https://www.cms.gov/files/document/mln909001-hipaa-basics-providers-privacy-security-breach-notification-rules.pdf',
+          sortOrder: 4,
+        },
+        {
+          taskType: 'DOWNLOAD_DOC',
+          title: 'HIPAA IT Security Guide',
+          description: 'Review the Guide to Privacy and Security of Electronic Health Information',
+          documentDownloadUrl: 'https://www.healthit.gov/topic/health-it-resources/guide-privacy-security-electronic-health-information',
+          sortOrder: 5,
         },
         {
           taskType: 'DOWNLOAD_DOC',
           title: 'Download Onboarding Documents Folder',
           description: 'Download the complete onboarding documents folder. You will need to fill out all documents and re-upload them as a folder after logging in.',
           documentDownloadUrl: '/api/rbt/onboarding-package/download', // Downloads the onboarding documents folder as a zip
-          sortOrder: 4,
+          sortOrder: needsFortyHourCourse ? 7 : 6,
         },
+        ...(needsFortyHourCourse ? [{
+          taskType: 'FORTY_HOUR_COURSE_CERTIFICATE',
+          title: 'Complete 40-Hour RBT Course & Upload Certificate',
+          description: 'Complete the 40-hour RBT training course and upload your certificate of completion',
+          documentDownloadUrl: 'https://courses.autismpartnershipfoundation.org/offers/it285gs6/checkout',
+          sortOrder: 6,
+        }] : []),
         {
           taskType: 'SIGNATURE',
           title: 'Digital Signature Confirmation',
           description: 'Sign to confirm you have read and understood all HIPAA documents and training materials',
-          sortOrder: 5,
+          sortOrder: needsFortyHourCourse ? 8 : 7,
         },
         {
           taskType: 'PACKAGE_UPLOAD',
           title: 'Upload Completed Onboarding Package',
           description: 'Upload your completed onboarding package with all signed documents. This will be sent to the administrator for review.',
-          sortOrder: 6,
+          sortOrder: needsFortyHourCourse ? 9 : 8,
         },
       ]
 
@@ -178,40 +202,14 @@ export async function POST(
         // Don't fail the entire hire process if tasks fail - log error but continue
         // Tasks can be created manually if needed
       }
-    } else if (existingTasks.length !== 6) {
-      // If tasks exist but wrong number, recreate them
-      console.log(`⚠️ Found ${existingTasks.length} tasks (expected 6) for RBT ${rbtProfile.id}. Recreating...`)
-      await prisma.onboardingTask.deleteMany({
-        where: { rbtProfileId: rbtProfile.id },
-      })
-      
-      // Recreate tasks (same code as above)
-      const onboardingTasks = [
-        { taskType: 'DOWNLOAD_DOC', title: 'Download HIPAA Basics PDF', description: 'Download and review the HIPAA Basics for Providers document from CMS', documentDownloadUrl: 'https://www.cms.gov/files/document/mln909001-hipaa-basics-providers-privacy-security-breach-notification-rules.pdf', sortOrder: 1 },
-        { taskType: 'DOWNLOAD_DOC', title: 'Review HHS HIPAA Portal', description: 'Review the HHS HIPAA for Professionals portal for comprehensive information', documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/index.html', sortOrder: 2 },
-        { taskType: 'DOWNLOAD_DOC', title: 'Download Confidentiality Agreement Templates', description: 'Download and review the HIPAA Confidentiality Agreement templates', documentDownloadUrl: 'https://www.sampleforms.com/hipaa-confidentiality-agreement-forms.html', sortOrder: 3 },
-        { taskType: 'DOWNLOAD_DOC', title: 'Download Onboarding Documents Folder', description: 'Download the complete onboarding documents folder. You will need to fill out all documents and re-upload them as a folder after logging in.', documentDownloadUrl: '/api/rbt/onboarding-package/download', sortOrder: 4 },
-        { taskType: 'SIGNATURE', title: 'Digital Signature Confirmation', description: 'Sign to confirm you have read and understood all HIPAA documents and training materials', sortOrder: 5 },
-          { taskType: 'PACKAGE_UPLOAD', title: 'Upload Completed Onboarding Documents', description: 'Upload all completed onboarding documents as a folder. You can select multiple files at once. All files will be sent to the administrator for review.', sortOrder: 6 },
-      ]
-      
-      await Promise.all(
-        onboardingTasks.map((task) =>
-          prisma.onboardingTask.create({
-            data: {
-              rbtProfileId: rbtProfile.id,
-              taskType: task.taskType as any,
-              title: task.title,
-              description: task.description,
-              documentDownloadUrl: task.documentDownloadUrl || null,
-              sortOrder: task.sortOrder,
-            },
-          })
-        )
-      )
-      console.log(`✅ Recreated 6 onboarding tasks for RBT ${rbtProfile.id}`)
     } else {
-      console.log(`✅ Onboarding tasks already exist for RBT ${rbtProfile.id} (6 tasks)`)
+      // Tasks already exist - check if they match expected count (8 or 9 depending on 40-hour course)
+      const expectedTaskCount = rbtProfile.fortyHourCourseCompleted ? 8 : 9
+      if (existingTasks.length !== expectedTaskCount) {
+        console.log(`⚠️ Found ${existingTasks.length} tasks (expected ${expectedTaskCount}) for RBT ${rbtProfile.id}. Tasks already exist, skipping recreation.`)
+      } else {
+        console.log(`✅ Onboarding tasks already exist for RBT ${rbtProfile.id} (${existingTasks.length} tasks)`)
+      }
     }
 
     // Send welcome email

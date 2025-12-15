@@ -115,7 +115,7 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
     }
   }
 
-  const handleFileUpload = async (taskId: string) => {
+  const handleFileUpload = async (taskId: string, isCertificate = false) => {
     const files = selectedFiles[taskId]
     
     if (!files || files.length === 0) {
@@ -123,42 +123,86 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
       return
     }
 
-    if (!confirm(`Upload ${files.length} file(s)?\n\n${files.map(f => f.name).join('\n')}\n\nThis will be sent to the administrator.`)) {
+    // Validate file sizes (max 10MB per file)
+    const maxFileSize = 10 * 1024 * 1024 // 10MB
+    const oversizedFiles = files.filter(file => file.size > maxFileSize)
+    if (oversizedFiles.length > 0) {
+      alert(`Some files are too large (max 10MB per file):\n${oversizedFiles.map(f => `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`).join('\n')}\n\nPlease compress or reduce file size and try again.`)
+      return
+    }
+
+    // Validate total size (max 50MB total)
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+    const maxTotalSize = 50 * 1024 * 1024 // 50MB
+    if (totalSize > maxTotalSize) {
+      alert(`Total file size is too large (max 50MB): ${(totalSize / 1024 / 1024).toFixed(2)} MB\n\nPlease reduce file sizes or split into smaller uploads.`)
+      return
+    }
+
+    if (!confirm(`Upload ${files.length} file(s)?\n\n${files.map(f => `${f.name} (${(f.size / 1024).toFixed(2)} KB)`).join('\n')}\n\nThis will be sent to the administrator.`)) {
       return
     }
 
     setUploading((prev) => ({ ...prev, [taskId]: true }))
 
     try {
-      const formData = new FormData()
-      files.forEach((file) => {
-        formData.append('files', file)
-      })
+      if (isCertificate) {
+        // For certificate, use single file upload
+        const formData = new FormData()
+        formData.append('file', files[0])
 
-      const response = await fetch(`/api/rbt/onboarding-tasks/${taskId}/upload-files`, {
-        method: 'POST',
-        body: formData,
-      })
+        const response = await fetch(`/api/rbt/onboarding-tasks/${taskId}/upload`, {
+          method: 'POST',
+          body: formData,
+        })
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          // Clear selected files for this task
-          setSelectedFiles((prev) => {
-            const newState = { ...prev }
-            delete newState[taskId]
-            return newState
-          })
-          fetchTasks()
-          alert(`Successfully uploaded ${data.filesCount} file(s)! The onboarding package has been sent to the administrator.`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setSelectedFiles((prev) => {
+              const newState = { ...prev }
+              delete newState[taskId]
+              return newState
+            })
+            fetchTasks()
+            alert('Certificate uploaded successfully!')
+          }
+        } else {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Upload failed')
         }
       } else {
-        const errorData = await response.json()
-        alert(`Failed to upload files: ${errorData.error || 'Unknown error'}`)
+        // For package upload, use multi-file upload
+        const formData = new FormData()
+        files.forEach((file) => {
+          formData.append('files', file)
+        })
+
+        const response = await fetch(`/api/rbt/onboarding-tasks/${taskId}/upload-files`, {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setSelectedFiles((prev) => {
+              const newState = { ...prev }
+              delete newState[taskId]
+              return newState
+            })
+            fetchTasks()
+            alert(`Successfully uploaded ${data.filesCount} file(s)! The onboarding package has been sent to the administrator.`)
+          }
+        } else {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Upload failed')
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading files:', error)
-      alert('An error occurred while uploading the files. Please try again.')
+      const errorMessage = error.message || 'An error occurred while uploading the files. Please check your internet connection and try again.'
+      alert(`Upload failed: ${errorMessage}`)
     } finally {
       setUploading((prev) => ({ ...prev, [taskId]: false }))
     }
@@ -216,6 +260,7 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
   const documentTasks = tasks.filter((t) => t.taskType === 'DOWNLOAD_DOC')
   const signatureTasks = tasks.filter((t) => t.taskType === 'SIGNATURE')
   const packageUploadTasks = tasks.filter((t) => t.taskType === 'PACKAGE_UPLOAD')
+  const fortyHourCourseTasks = tasks.filter((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
 
   if (allTasksCompleted) {
     return (
@@ -394,6 +439,119 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
         </Card>
       )}
 
+      {/* 40-Hour Course Certificate Section */}
+      {fortyHourCourseTasks.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>40-Hour RBT Course Certificate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {fortyHourCourseTasks.map((task) => (
+                <div key={task.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        {task.isCompleted ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        ) : (
+                          <Circle className="w-5 h-5 text-gray-400" />
+                        )}
+                        <h3 className="font-medium">{task.title}</h3>
+                      </div>
+                      {task.description && (
+                        <p className="text-sm text-gray-600 mt-1">{task.description}</p>
+                      )}
+                    </div>
+                    {task.isCompleted && <Badge className="bg-green-500">Completed</Badge>}
+                  </div>
+                  {task.documentDownloadUrl && (
+                    <div>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          window.open(task.documentDownloadUrl || '', '_blank', 'noopener,noreferrer')
+                        }}
+                        className="flex items-center gap-2 mb-4"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Access 40-Hour Course
+                      </Button>
+                    </div>
+                  )}
+                  {!task.isCompleted && (
+                    <div className="space-y-3">
+                      <div>
+                        <input
+                          id={`file-input-${task.id}`}
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => {
+                            handleFileSelect(task.id, e.target.files)
+                          }}
+                          className="text-sm"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">Accepted formats: PDF, JPG, PNG. Please upload your certificate of completion.</p>
+                      </div>
+
+                      {selectedFiles[task.id] && selectedFiles[task.id].length > 0 && (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+                          <p className="text-sm font-medium text-blue-900">
+                            Selected File:
+                          </p>
+                          <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
+                            {selectedFiles[task.id].map((file, index) => (
+                              <li key={index}>
+                                {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="flex gap-2 mt-3">
+                            <Button
+                              onClick={() => handleFileUpload(task.id, true)}
+                              disabled={uploading[task.id]}
+                              className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2"
+                            >
+                              {uploading[task.id] ? (
+                                <>
+                                  <Circle className="w-4 h-4 animate-spin" />
+                                  Uploading...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4" />
+                                  Confirm & Upload Certificate
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => handleClearSelection(task.id)}
+                              disabled={uploading[task.id]}
+                              className="flex items-center gap-2"
+                            >
+                              <X className="w-4 h-4" />
+                              Clear Selection
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {task.isCompleted && task.uploadUrl && (
+                    <div className="mt-4 ml-7 p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-600">
+                        ✅ Certificate uploaded successfully
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Package Upload Section */}
       {packageUploadTasks.length > 0 && (
         <Card>
@@ -461,7 +619,7 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
                           </ul>
                           <div className="flex gap-2 mt-3">
                             <Button
-                              onClick={() => handleFileUpload(task.id)}
+                              onClick={() => handleFileUpload(task.id, false)}
                               disabled={uploading[task.id]}
                               className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2"
                             >

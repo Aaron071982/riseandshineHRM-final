@@ -65,7 +65,9 @@ export default function AddRBTForm() {
     submitData.append('addressLine2', (formData.get('addressLine2') as string) || '')
     submitData.append('preferredServiceArea', (formData.get('preferredServiceArea') as string) || '')
     submitData.append('notes', (formData.get('notes') as string) || '')
+    submitData.append('gender', formData.get('gender') as string)
     submitData.append('status', formData.get('status') as string)
+    submitData.append('fortyHourCourseCompleted', formData.get('fortyHourCourseCompleted') === 'on' ? 'true' : 'false')
 
     // Add documents
     documents.forEach((doc, index) => {
@@ -137,6 +139,18 @@ export default function AddRBTForm() {
               <Input id="zipCode" name="zipCode" required />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="gender">Gender *</Label>
+              <Select name="gender" required defaultValue="Male">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="status">Initial Status *</Label>
               <Select name="status" required defaultValue="NEW">
                 <SelectTrigger>
@@ -148,6 +162,22 @@ export default function AddRBTForm() {
                   <SelectItem value="TO_INTERVIEW">To Interview</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="fortyHourCourseCompleted"
+                  name="fortyHourCourseCompleted"
+                  className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                />
+                <Label htmlFor="fortyHourCourseCompleted" className="font-normal cursor-pointer">
+                  40-Hour RBT Course Already Completed
+                </Label>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                If unchecked, the RBT will need to complete the 40-hour course and upload certificate during onboarding.
+              </p>
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="addressLine1">Address Line 1 *</Label>

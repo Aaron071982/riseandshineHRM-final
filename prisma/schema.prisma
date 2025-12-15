@@ -46,6 +46,7 @@ enum OnboardingTaskType {
   TRAINING_LINK
   SIGNATURE
   PACKAGE_UPLOAD
+  FORTY_HOUR_COURSE_CERTIFICATE
 }
 
 enum ShiftStatus {
@@ -134,6 +135,8 @@ model RBTProfile {
   addressLine2         String?
   preferredServiceArea String?
   notes                String?
+  gender               String?
+  fortyHourCourseCompleted Boolean @default(false)
   status               RBTStatus @default(NEW)
   scheduleCompleted    Boolean   @default(false)
   createdAt            DateTime  @default(now())

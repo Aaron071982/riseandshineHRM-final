@@ -56,16 +56,46 @@ export async function POST(
       return NextResponse.json({ error: 'No files provided' }, { status: 400 })
     }
 
+    // Validate file sizes (max 10MB per file, 50MB total)
+    const maxFileSize = 10 * 1024 * 1024 // 10MB
+    const maxTotalSize = 50 * 1024 * 1024 // 50MB
+    let totalSize = 0
+
+    for (const file of files) {
+      if (file.size > maxFileSize) {
+        return NextResponse.json(
+          { error: `File "${file.name}" exceeds maximum allowed size of 10MB. Size: ${(file.size / 1024 / 1024).toFixed(2)} MB` },
+          { status: 400 }
+        )
+      }
+      totalSize += file.size
+    }
+
+    if (totalSize > maxTotalSize) {
+      return NextResponse.json(
+        { error: `Total file size exceeds maximum allowed size of 50MB. Total: ${(totalSize / 1024 / 1024).toFixed(2)} MB` },
+        { status: 400 }
+      )
+    }
+
     // Convert all files to base64 and store them
     const uploadedFiles: UploadedFile[] = []
-    for (const file of files) {
-      const fileBuffer = Buffer.from(await file.arrayBuffer())
-      const fileBase64 = fileBuffer.toString('base64')
-      uploadedFiles.push({
-        name: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        data: fileBase64,
-      })
+    try {
+      for (const file of files) {
+        const fileBuffer = Buffer.from(await file.arrayBuffer())
+        const fileBase64 = fileBuffer.toString('base64')
+        uploadedFiles.push({
+          name: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          data: fileBase64,
+        })
+      }
+    } catch (processError: any) {
+      console.error('Error processing files:', processError)
+      return NextResponse.json(
+        { error: 'Failed to process files. Please try again or contact support.' },
+        { status: 500 }
+      )
     }
 
     // Store as JSON in uploadUrl
@@ -196,8 +226,17 @@ export async function POST(
     })
   } catch (error: any) {
     console.error('Error uploading files:', error)
+    
+    // Provide more specific error messages
+    if (error.message && (error.message.includes('size') || error.message.includes('Size'))) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to upload files: ' + error.message },
+      { error: error.message || 'Failed to upload files. Please check your connection and try again.' },
       { status: 500 }
     )
   }
