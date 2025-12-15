@@ -98,45 +98,93 @@ export async function POST(
       )
     }
 
-    // Store as JSON in uploadUrl
-    const uploadUrl = JSON.stringify({
-      files: uploadedFiles,
-      uploadedAt: new Date().toISOString(),
-    })
+    // Store as JSON in uploadUrl (but limit size to prevent database issues)
+    // For large uploads, store a reference instead
+    let uploadUrl: string
+    try {
+      const uploadData = {
+        files: uploadedFiles,
+        uploadedAt: new Date().toISOString(),
+      }
+      uploadUrl = JSON.stringify(uploadData)
+      
+      // Check if the JSON is too large (PostgreSQL TEXT field limit is ~1GB, but be safe)
+      // If too large, store a truncated version with just metadata
+      if (uploadUrl.length > 50 * 1024 * 1024) { // 50MB limit
+        console.warn(`Upload data is very large (${(uploadUrl.length / 1024 / 1024).toFixed(2)} MB), storing metadata only`)
+        uploadUrl = JSON.stringify({
+          fileCount: uploadedFiles.length,
+          fileNames: uploadedFiles.map(f => f.name),
+          uploadedAt: new Date().toISOString(),
+          note: 'Files too large to store in database - check email attachment',
+        })
+      }
+    } catch (jsonError: any) {
+      console.error('Error serializing upload data:', jsonError)
+      // Store minimal metadata if JSON serialization fails
+      uploadUrl = JSON.stringify({
+        fileCount: uploadedFiles.length,
+        uploadedAt: new Date().toISOString(),
+        error: 'Could not serialize file data',
+      })
+    }
 
-    await prisma.onboardingTask.update({
-      where: { id },
-      data: {
-        uploadUrl,
-        isCompleted: true,
-        completedAt: new Date(),
-      },
-    })
+    try {
+      await prisma.onboardingTask.update({
+        where: { id },
+        data: {
+          uploadUrl,
+          isCompleted: true,
+          completedAt: new Date(),
+        },
+      })
+    } catch (dbError: any) {
+      console.error('Error saving to database:', dbError)
+      // If database update fails, still try to send email
+      // Return error so user knows something went wrong
+      throw new Error('Failed to save upload. Files may have been processed but not saved. Please contact support.')
+    }
 
     // If this is a package upload, email all files as a zip to admin
     if (task.taskType === 'PACKAGE_UPLOAD') {
       try {
         // Create zip archive of all uploaded files
-        const archive = archiver('zip', { zlib: { level: 9 } })
-        const chunks: Buffer[] = []
-
-        archive.on('data', (chunk: Buffer) => {
-          chunks.push(chunk)
+        const archive = archiver('zip', { 
+          zlib: { level: 9 },
+          store: false // Use compression
         })
-
-        // Add all files to archive
-        for (const file of uploadedFiles) {
-          const fileBuffer = Buffer.from(file.data, 'base64')
-          archive.append(fileBuffer, { name: file.name })
-        }
-
-        await archive.finalize()
-
+        const chunks: Buffer[] = []
+        
+        // Set up event handlers BEFORE finalizing
         const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
-          archive.on('end', () => {
-            resolve(Buffer.concat(chunks))
+          archive.on('data', (chunk: Buffer) => {
+            chunks.push(chunk)
           })
-          archive.on('error', reject)
+          
+          archive.on('end', () => {
+            try {
+              resolve(Buffer.concat(chunks))
+            } catch (err) {
+              reject(err)
+            }
+          })
+          
+          archive.on('error', (err) => {
+            reject(err)
+          })
+
+          // Add all files to archive
+          try {
+            for (const file of uploadedFiles) {
+              const fileBuffer = Buffer.from(file.data, 'base64')
+              archive.append(fileBuffer, { name: file.name })
+            }
+            
+            // Finalize archive after all files are added
+            archive.finalize()
+          } catch (appendError) {
+            reject(appendError)
+          }
         })
 
         const rbtName = task.rbtProfile
@@ -200,6 +248,9 @@ export async function POST(
         if (resendApiKey) {
           const resend = new Resend(resendApiKey)
           
+          // Convert buffer to base64 for email attachment
+          const zipBase64 = zipBuffer.toString('base64')
+          
           await resend.emails.send({
             from: emailFrom,
             to: adminEmail,
@@ -208,14 +259,21 @@ export async function POST(
             attachments: [
               {
                 filename: `onboarding-package-${rbtName.replace(/\s+/g, '-')}.zip`,
-                content: zipBuffer,
+                content: zipBase64,
               },
             ],
           })
+          
+          console.log(`✅ Onboarding package email sent to ${adminEmail} for RBT ${rbtName}`)
+        } else {
+          console.log(`⚠️ [DEV MODE] Onboarding package email would be sent to ${adminEmail}`)
+          console.log(`   RBT: ${rbtName} (${rbtEmail})`)
+          console.log(`   Files: ${files.length} file(s), Total size: ${(totalSize / 1024).toFixed(2)} KB`)
         }
       } catch (emailError: any) {
-        console.error('Error sending email:', emailError)
-        // Don't fail the upload if email fails
+        console.error('Error creating zip or sending email:', emailError)
+        // Don't fail the upload if email/zip creation fails - files are already saved
+        // Log the error but continue
       }
     }
 
