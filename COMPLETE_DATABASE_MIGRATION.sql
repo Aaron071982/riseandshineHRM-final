@@ -87,9 +87,9 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 
-        FROM information_schema.table_constraints 
-        WHERE constraint_name = 'availability_slots_rbtProfileId_fkey'
-        AND table_name = 'availability_slots'
+        FROM pg_constraint 
+        WHERE conname = 'availability_slots_rbtProfileId_fkey'
+        AND conrelid = 'availability_slots'::regclass
     ) THEN
         ALTER TABLE "availability_slots" 
         ADD CONSTRAINT "availability_slots_rbtProfileId_fkey" 
@@ -105,9 +105,9 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 
-        FROM information_schema.table_constraints 
-        WHERE constraint_name = 'availability_slots_rbtProfileId_dayOfWeek_hour_key'
-        AND table_name = 'availability_slots'
+        FROM pg_constraint 
+        WHERE conname = 'availability_slots_rbtProfileId_dayOfWeek_hour_key'
+        AND conrelid = 'availability_slots'::regclass
     ) THEN
         ALTER TABLE "availability_slots" 
         ADD CONSTRAINT "availability_slots_rbtProfileId_dayOfWeek_hour_key" 
@@ -134,9 +134,9 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 
-        FROM information_schema.table_constraints 
-        WHERE constraint_name = 'rbt_documents_rbtProfileId_fkey'
-        AND table_name = 'rbt_documents'
+        FROM pg_constraint 
+        WHERE conname = 'rbt_documents_rbtProfileId_fkey'
+        AND conrelid = 'rbt_documents'::regclass
     ) THEN
         ALTER TABLE "rbt_documents" 
         ADD CONSTRAINT "rbt_documents_rbtProfileId_fkey" 
@@ -185,9 +185,9 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 
-        FROM information_schema.table_constraints 
-        WHERE constraint_name = 'interview_notes_interviewId_fkey'
-        AND table_name = 'interview_notes'
+        FROM pg_constraint 
+        WHERE conname = 'interview_notes_interviewId_fkey'
+        AND conrelid = 'interview_notes'::regclass
     ) THEN
         ALTER TABLE "interview_notes" 
         ADD CONSTRAINT "interview_notes_interviewId_fkey" 
@@ -202,9 +202,9 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 
-        FROM information_schema.table_constraints 
-        WHERE constraint_name = 'interview_notes_rbtProfileId_fkey'
-        AND table_name = 'interview_notes'
+        FROM pg_constraint 
+        WHERE conname = 'interview_notes_rbtProfileId_fkey'
+        AND conrelid = 'interview_notes'::regclass
     ) THEN
         ALTER TABLE "interview_notes" 
         ADD CONSTRAINT "interview_notes_rbtProfileId_fkey" 
