@@ -344,6 +344,29 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     }
   }
 
+  const handleFixOnboardingTasks = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/fix-onboarding-tasks`, {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        showToast(`Successfully fixed onboarding tasks. ${data.taskCount} tasks created.`, 'success')
+        router.refresh()
+      } else {
+        showToast(`Failed to fix tasks: ${data.error || 'Unknown error'}`, 'error')
+      }
+    } catch (error) {
+      console.error('Error fixing onboarding tasks:', error)
+      showToast('An error occurred while fixing onboarding tasks', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleDeleteDocument = async (documentId: string) => {
     setConfirmMessage('Are you sure you want to delete this document? This action cannot be undone.')
     setConfirmAction(async () => {
@@ -671,7 +694,18 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       {isHired && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl font-bold text-gray-900">Onboarding Progress</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-2xl font-bold text-gray-900">Onboarding Progress</CardTitle>
+              <Button
+                onClick={handleFixOnboardingTasks}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+                className="text-orange-600 border-orange-300 hover:bg-orange-50"
+              >
+                Fix Tasks
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
