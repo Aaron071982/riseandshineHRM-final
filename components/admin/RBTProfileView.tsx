@@ -44,6 +44,8 @@ interface RBTProfile {
   addressLine2: string | null
   preferredServiceArea: string | null
   notes: string | null
+  gender: string | null
+  fortyHourCourseCompleted: boolean
   status: string
   scheduleCompleted?: boolean
   createdAt: Date
@@ -124,9 +126,11 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   const [loading, setLoading] = useState(false)
   const [interviewDialogOpen, setInterviewDialogOpen] = useState(false)
   const [editingProfile, setEditingProfile] = useState(false)
+  const [pendingInterviewData, setPendingInterviewData] = useState<any>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
-  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null)
+  const [confirmAction, setConfirmAction] = useState<(() => Promise<void>) | null>(null)
   const [confirmMessage, setConfirmMessage] = useState('')
+  const [confirmLoading, setConfirmLoading] = useState(false)
   const [documents, setDocuments] = useState<Array<{
     id: string
     fileName: string
@@ -162,35 +166,39 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     }
   }
 
-  const handleSendReachOutEmail = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/send-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateType: 'REACH_OUT' }),
-      })
+  const handleSendReachOutEmail = () => {
+    setConfirmMessage(`Are you sure you want to send a reach-out email to ${rbtProfile.firstName} ${rbtProfile.lastName}?`)
+    setConfirmAction(async () => {
+      try {
+        const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templateType: 'REACH_OUT' }),
+        })
 
-      const data = await response.json()
+        const data = await response.json()
 
-      if (response.ok) {
-        showToast('Reach-out email sent successfully!', 'success')
-        router.refresh()
-      } else {
-        showToast(`Failed to send email: ${data.error || 'Unknown error'}`, 'error')
+        if (response.ok) {
+          showToast('Reach-out email sent successfully!', 'success')
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
+          router.refresh()
+        } else {
+          showToast(`Failed to send email: ${data.error || 'Unknown error'}`, 'error')
+          // Keep dialog open on error so user can see the error message
+        }
+      } catch (error) {
+        console.error('Error sending email:', error)
+        showToast('An error occurred while sending the email', 'error')
+        // Keep dialog open on error so user can see the error message
       }
-    } catch (error) {
-      console.error('Error sending email:', error)
-      showToast('An error occurred while sending the email', 'error')
-    } finally {
-      setLoading(false)
-    }
+    })
+    setConfirmDialogOpen(true)
   }
 
   const handleHire = () => {
     setConfirmMessage('Are you sure you want to hire this candidate? This will send a welcome email and create onboarding tasks.')
     setConfirmAction(async () => {
-      setLoading(true)
       try {
         const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/hire`, {
           method: 'POST',
@@ -200,16 +208,18 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           // Immediately update status to HIRED in UI
           setRbtProfile({ ...rbtProfile, status: 'HIRED' })
           showToast('Candidate hired successfully!', 'success')
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
           router.refresh()
         } else {
           const data = await response.json()
           showToast(data.error || 'Failed to hire candidate', 'error')
+          // Keep dialog open on error so user can see the error message
         }
       } catch (error) {
         console.error('Error hiring candidate:', error)
         showToast('An error occurred while hiring the candidate', 'error')
-      } finally {
-        setLoading(false)
+        // Keep dialog open on error so user can see the error message
       }
     })
     setConfirmDialogOpen(true)
@@ -218,7 +228,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   const handleReject = () => {
     setConfirmMessage('Are you sure you want to reject this candidate? This will send a rejection email and update their status to REJECTED.')
     setConfirmAction(async () => {
-      setLoading(true)
       try {
         const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/reject`, {
           method: 'POST',
@@ -227,16 +236,18 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         if (response.ok) {
           setRbtProfile({ ...rbtProfile, status: 'REJECTED' })
           showToast('Candidate rejected successfully. A rejection email has been sent.', 'success')
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
           router.refresh()
         } else {
           const data = await response.json()
           showToast(data.error || 'Failed to reject candidate', 'error')
+          // Keep dialog open on error so user can see the error message
         }
       } catch (error) {
         console.error('Error rejecting candidate:', error)
         showToast('An error occurred while rejecting the candidate', 'error')
-      } finally {
-        setLoading(false)
+        // Keep dialog open on error so user can see the error message
       }
     })
     setConfirmDialogOpen(true)
@@ -246,13 +257,14 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     setConfirmMessage(`Are you sure you want to delete ${rbtProfile.firstName} ${rbtProfile.lastName}? This will permanently delete the RBT profile and all associated data. This action cannot be undone.`)
     setConfirmAction(async () => {
       try {
-        setLoading(true)
         const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/delete`, {
           method: 'DELETE',
         })
 
         if (response.ok) {
           showToast('RBT deleted successfully', 'success')
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
           // Force refresh and redirect
           router.refresh()
           setTimeout(() => {
@@ -261,42 +273,57 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         } else {
           const errorData = await response.json()
           showToast(`Failed to delete RBT: ${errorData.error || 'Unknown error'}`, 'error')
+          // Keep dialog open on error so user can see the error message
         }
       } catch (error) {
         console.error('Error deleting RBT:', error)
         showToast('An error occurred while deleting the RBT. Please try again.', 'error')
-      } finally {
-        setLoading(false)
+        // Keep dialog open on error so user can see the error message
       }
     })
     setConfirmDialogOpen(true)
   }
 
-  const handleScheduleInterview = async (data: any) => {
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/admin/interviews`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rbtProfileId: rbtProfile.id,
-          ...data,
-        }),
-      })
+  const handleScheduleInterview = (data: any) => {
+    // Store the interview data and close the form dialog
+    setPendingInterviewData(data)
+    setInterviewDialogOpen(false)
+    
+    // Format the date/time for confirmation message
+    const scheduledDate = new Date(data.scheduledAt)
+    const formattedDate = scheduledDate.toLocaleDateString()
+    const formattedTime = scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    
+    setConfirmMessage(`Schedule interview for ${rbtProfile.firstName} ${rbtProfile.lastName} on ${formattedDate} at ${formattedTime} with ${data.interviewerName}?`)
+    setConfirmAction(async () => {
+      try {
+        const response = await fetch(`/api/admin/interviews`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rbtProfileId: rbtProfile.id,
+            ...data,
+          }),
+        })
 
-      if (response.ok) {
-        setInterviewDialogOpen(false)
-        showToast('Interview scheduled successfully!', 'success')
-        router.refresh()
-      } else {
-        const data = await response.json()
-        showToast(data.error || 'Failed to schedule interview', 'error')
+        if (response.ok) {
+          showToast('Interview scheduled successfully!', 'success')
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
+          setPendingInterviewData(null)
+          router.refresh()
+        } else {
+          const errorData = await response.json()
+          showToast(errorData.error || 'Failed to schedule interview', 'error')
+          // Keep dialog open on error so user can see the error message
+        }
+      } catch (error) {
+        console.error('Error scheduling interview:', error)
+        showToast('An error occurred while scheduling the interview', 'error')
+        // Keep dialog open on error so user can see the error message
       }
-    } catch (error) {
-      console.error('Error scheduling interview:', error)
-    } finally {
-      setLoading(false)
-    }
+    })
+    setConfirmDialogOpen(true)
   }
 
   const fetchDocuments = async () => {
@@ -330,6 +357,10 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
       if (response.ok) {
         showToast(`Successfully uploaded ${files.length} document(s)`, 'success')
+        // Show prominent notification similar to hire notification
+        setTimeout(() => {
+          showToast(`✅ ${files.length} document(s) uploaded successfully for ${rbtProfile.firstName} ${rbtProfile.lastName}`, 'success')
+        }, 100)
         await fetchDocuments()
         router.refresh()
       } else {
@@ -341,29 +372,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       showToast('An error occurred while uploading documents', 'error')
     } finally {
       setUploadingDocuments(false)
-    }
-  }
-
-  const handleFixOnboardingTasks = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/fix-onboarding-tasks`, {
-        method: 'POST',
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        showToast(`Successfully fixed onboarding tasks. ${data.taskCount} tasks created.`, 'success')
-        router.refresh()
-      } else {
-        showToast(`Failed to fix tasks: ${data.error || 'Unknown error'}`, 'error')
-      }
-    } catch (error) {
-      console.error('Error fixing onboarding tasks:', error)
-      showToast('An error occurred while fixing onboarding tasks', 'error')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -629,30 +637,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             )}
           </div>
           
-          {/* Fix Onboarding Tasks - Always visible for hired RBTs */}
-          {isHired && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <Button 
-                onClick={handleFixOnboardingTasks} 
-                disabled={loading}
-                variant="outline"
-                className="border-orange-400 text-orange-600 hover:bg-orange-50 hover:border-orange-500 rounded-xl px-6 w-full sm:w-auto mr-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Fixing...
-                  </>
-                ) : (
-                  <>
-                    Fix Onboarding Tasks
-                  </>
-                )}
-              </Button>
-              <p className="text-xs text-gray-500 mt-2">Recreate all onboarding tasks with correct structure based on RBT settings.</p>
-            </div>
-          )}
-          
           {/* Delete RBT Section - Always Visible */}
           <div className="mt-4 pt-4 border-t border-gray-200">
             <Button 
@@ -718,18 +702,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       {isHired && (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-2xl font-bold text-gray-900">Onboarding Progress</CardTitle>
-              <Button
-                onClick={handleFixOnboardingTasks}
-                disabled={loading}
-                variant="outline"
-                size="sm"
-                className="text-orange-600 border-orange-300 hover:bg-orange-50"
-              >
-                Fix Tasks
-              </Button>
-            </div>
+            <CardTitle className="text-2xl font-bold text-gray-900">Onboarding Progress</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -1013,7 +986,12 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       </Card>
 
       {/* Confirmation Dialog */}
-      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+      <Dialog open={confirmDialogOpen} onOpenChange={(open) => {
+        if (!open && !confirmLoading) {
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
+        }
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Confirm Action</DialogTitle>
@@ -1025,21 +1003,35 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               onClick={() => {
                 setConfirmDialogOpen(false)
                 setConfirmAction(null)
+                setConfirmLoading(false)
               }}
+              disabled={confirmLoading}
             >
               Cancel
             </Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 if (confirmAction) {
-                  confirmAction()
+                  setConfirmLoading(true)
+                  try {
+                    await confirmAction()
+                  } catch (error) {
+                    // Error already handled in confirmAction, but reset loading state
+                    setConfirmLoading(false)
+                  }
                 }
-                setConfirmDialogOpen(false)
-                setConfirmAction(null)
               }}
+              disabled={confirmLoading}
               className="bg-orange-500 hover:bg-orange-600 text-white"
             >
-              Confirm
+              {confirmLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Confirm'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1253,6 +1245,33 @@ function EditProfileForm({
             name="addressLine2"
             defaultValue={rbtProfile.addressLine2 || ''}
           />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-gender">Gender</Label>
+          <Select name="gender" defaultValue={rbtProfile.gender || 'Male'}>
+            <SelectTrigger id="edit-gender">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Male">Male</SelectItem>
+              <SelectItem value="Female">Female</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-fortyHourCourseCompleted">40-Hour RBT Course Already Completed</Label>
+          <Select name="fortyHourCourseCompleted" defaultValue={rbtProfile.fortyHourCourseCompleted ? 'true' : 'false'}>
+            <SelectTrigger id="edit-fortyHourCourseCompleted">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="false">No</SelectItem>
+              <SelectItem value="true">Yes</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-sm text-gray-500">
+            If &quot;No&quot;, the RBT will need to complete the 40-hour course and upload certificate during onboarding.
+          </p>
         </div>
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="edit-notes">Notes</Label>

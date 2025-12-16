@@ -47,6 +47,8 @@ export async function PATCH(
         addressLine2: data.addressLine2 || null,
         preferredServiceArea: data.preferredServiceArea || null,
         notes: data.notes || null,
+        gender: data.gender || null,
+        fortyHourCourseCompleted: data.fortyHourCourseCompleted ?? false,
       },
       include: {
         user: {
