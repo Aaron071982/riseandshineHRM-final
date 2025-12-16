@@ -629,6 +629,30 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             )}
           </div>
           
+          {/* Fix Onboarding Tasks - Always visible for hired RBTs */}
+          {isHired && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <Button 
+                onClick={handleFixOnboardingTasks} 
+                disabled={loading}
+                variant="outline"
+                className="border-orange-400 text-orange-600 hover:bg-orange-50 hover:border-orange-500 rounded-xl px-6 w-full sm:w-auto mr-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Fixing...
+                  </>
+                ) : (
+                  <>
+                    Fix Onboarding Tasks
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-gray-500 mt-2">Recreate all onboarding tasks with correct structure based on RBT settings.</p>
+            </div>
+          )}
+          
           {/* Delete RBT Section - Always Visible */}
           <div className="mt-4 pt-4 border-t border-gray-200">
             <Button 
