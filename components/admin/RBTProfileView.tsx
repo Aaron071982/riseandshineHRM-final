@@ -338,45 +338,56 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     }
   }
 
-  const handleUploadDocuments = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [pendingDocumentUpload, setPendingDocumentUpload] = useState<File[]>([])
+
+  const handleDocumentUploadClick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
+    
+    // Store files and show confirmation
+    setPendingDocumentUpload(files)
+    setConfirmMessage(`Upload ${files.length} document(s) for ${rbtProfile.firstName} ${rbtProfile.lastName}?`)
+    setConfirmAction(async () => {
+      try {
+        setUploadingDocuments(true)
+        const formData = new FormData()
+        files.forEach((file) => {
+          formData.append('documents', file)
+          formData.append('documentTypes', 'OTHER') // Default type
+        })
 
-    setUploadingDocuments(true)
-    try {
-      const formData = new FormData()
-      files.forEach((file) => {
-        formData.append('documents', file)
-        formData.append('documentTypes', 'OTHER') // Default type
-      })
+        const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents`, {
+          method: 'POST',
+          body: formData,
+        })
 
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (response.ok) {
-        showToast(`Successfully uploaded ${files.length} document(s)`, 'success')
-        // Show prominent notification similar to hire notification
-        setTimeout(() => {
+        if (response.ok) {
           showToast(`✅ ${files.length} document(s) uploaded successfully for ${rbtProfile.firstName} ${rbtProfile.lastName}`, 'success')
-        }, 100)
-        await fetchDocuments()
-        router.refresh()
-      } else {
-        const data = await response.json()
-        showToast(data.error || 'Failed to upload documents', 'error')
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
+          setPendingDocumentUpload([])
+          await fetchDocuments()
+          router.refresh()
+        } else {
+          const data = await response.json()
+          showToast(data.error || 'Failed to upload documents', 'error')
+          // Keep dialog open on error so user can see the error message
+        }
+      } catch (error) {
+        console.error('Error uploading documents:', error)
+        showToast('An error occurred while uploading documents', 'error')
+        // Keep dialog open on error so user can see the error message
+      } finally {
+        setUploadingDocuments(false)
       }
-    } catch (error) {
-      console.error('Error uploading documents:', error)
-      showToast('An error occurred while uploading documents', 'error')
-    } finally {
-      setUploadingDocuments(false)
-    }
+    })
+    setConfirmDialogOpen(true)
+    // Reset the file input
+    e.target.value = ''
   }
 
-  const handleDeleteDocument = async (documentId: string) => {
-    setConfirmMessage('Are you sure you want to delete this document? This action cannot be undone.')
+  const handleDeleteDocument = (documentId: string, fileName: string) => {
+    setConfirmMessage(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)
     setConfirmAction(async () => {
       try {
         const response = await fetch(
@@ -386,15 +397,19 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
         if (response.ok) {
           showToast('Document deleted successfully', 'success')
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
           await fetchDocuments()
           router.refresh()
         } else {
           const data = await response.json()
           showToast(data.error || 'Failed to delete document', 'error')
+          // Keep dialog open on error so user can see the error message
         }
       } catch (error) {
         console.error('Error deleting document:', error)
         showToast('An error occurred while deleting the document', 'error')
+        // Keep dialog open on error so user can see the error message
       }
     })
     setConfirmDialogOpen(true)
@@ -922,10 +937,10 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               id="document-upload"
               type="file"
               multiple
-              onChange={handleUploadDocuments}
+              onChange={handleDocumentUploadClick}
               className="hidden"
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              disabled={uploadingDocuments}
+              disabled={uploadingDocuments || confirmDialogOpen}
             />
             <p className="text-xs text-gray-500">
               Upload resumes, certifications, or other relevant documents (PDF, DOC, DOCX, JPG, PNG)
@@ -967,7 +982,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeleteDocument(doc.id)}
+                      onClick={() => handleDeleteDocument(doc.id, doc.fileName)}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1015,6 +1030,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                   setConfirmLoading(true)
                   try {
                     await confirmAction()
+                    // Reset loading state after action completes (success or failure)
+                    setConfirmLoading(false)
                   } catch (error) {
                     // Error already handled in confirmAction, but reset loading state
                     setConfirmLoading(false)
