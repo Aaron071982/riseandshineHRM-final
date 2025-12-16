@@ -105,14 +105,18 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 
-        FROM pg_constraint 
-        WHERE conname = 'availability_slots_rbtProfileId_dayOfWeek_hour_key'
-        AND conrelid = 'availability_slots'::regclass
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        WHERE c.conname = 'availability_slots_rbtProfileId_dayOfWeek_hour_key'
+        AND t.relname = 'availability_slots'
     ) THEN
         ALTER TABLE "availability_slots" 
         ADD CONSTRAINT "availability_slots_rbtProfileId_dayOfWeek_hour_key" 
         UNIQUE ("rbtProfileId", "dayOfWeek", "hour");
     END IF;
+EXCEPTION
+    WHEN duplicate_table THEN
+        NULL; -- Constraint already exists, ignore
 END $$;
 
 -- =====================================================
@@ -134,9 +138,10 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 
-        FROM pg_constraint 
-        WHERE conname = 'rbt_documents_rbtProfileId_fkey'
-        AND conrelid = 'rbt_documents'::regclass
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        WHERE c.conname = 'rbt_documents_rbtProfileId_fkey'
+        AND t.relname = 'rbt_documents'
     ) THEN
         ALTER TABLE "rbt_documents" 
         ADD CONSTRAINT "rbt_documents_rbtProfileId_fkey" 
@@ -145,6 +150,9 @@ BEGIN
         ON DELETE CASCADE 
         ON UPDATE CASCADE;
     END IF;
+EXCEPTION
+    WHEN duplicate_table THEN
+        NULL; -- Constraint already exists, ignore
 END $$;
 
 -- Create index if it doesn't exist
@@ -185,9 +193,10 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 
-        FROM pg_constraint 
-        WHERE conname = 'interview_notes_interviewId_fkey'
-        AND conrelid = 'interview_notes'::regclass
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        WHERE c.conname = 'interview_notes_interviewId_fkey'
+        AND t.relname = 'interview_notes'
     ) THEN
         ALTER TABLE "interview_notes" 
         ADD CONSTRAINT "interview_notes_interviewId_fkey" 
@@ -196,15 +205,19 @@ BEGIN
         ON DELETE CASCADE 
         ON UPDATE CASCADE;
     END IF;
+EXCEPTION
+    WHEN duplicate_table THEN
+        NULL; -- Constraint already exists, ignore
 END $$;
 
 DO $$ 
 BEGIN
     IF NOT EXISTS (
         SELECT 1 
-        FROM pg_constraint 
-        WHERE conname = 'interview_notes_rbtProfileId_fkey'
-        AND conrelid = 'interview_notes'::regclass
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        WHERE c.conname = 'interview_notes_rbtProfileId_fkey'
+        AND t.relname = 'interview_notes'
     ) THEN
         ALTER TABLE "interview_notes" 
         ADD CONSTRAINT "interview_notes_rbtProfileId_fkey" 
@@ -213,6 +226,9 @@ BEGIN
         ON DELETE CASCADE 
         ON UPDATE CASCADE;
     END IF;
+EXCEPTION
+    WHEN duplicate_table THEN
+        NULL; -- Constraint already exists, ignore
 END $$;
 
 -- Create indexes if they don't exist
