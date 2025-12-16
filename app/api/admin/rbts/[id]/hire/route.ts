@@ -114,8 +114,9 @@ export async function POST(
     if (existingTasks.length === 0) {
       console.log(`Creating onboarding tasks for RBT ${rbtProfile.id}...`)
 
-      // Check if 40-hour course is completed
-      const needsFortyHourCourse = !rbtProfile.fortyHourCourseCompleted
+      // Check if 40-hour course is completed (explicitly handle null/undefined as false)
+      const needsFortyHourCourse = !(rbtProfile.fortyHourCourseCompleted === true)
+      console.log(`RBT ${rbtProfile.id} - fortyHourCourseCompleted: ${rbtProfile.fortyHourCourseCompleted}, needsFortyHourCourse: ${needsFortyHourCourse}`)
 
       const onboardingTasks = [
         {
@@ -204,9 +205,10 @@ export async function POST(
       }
     } else {
       // Tasks already exist - check if they match expected structure
-      const needsFortyHourCourse = !rbtProfile.fortyHourCourseCompleted
+      const needsFortyHourCourse = !(rbtProfile.fortyHourCourseCompleted === true)
       const expectedTaskCount = needsFortyHourCourse ? 9 : 8
       const hasFortyHourCourseTask = existingTasks.some(t => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
+      console.log(`RBT ${rbtProfile.id} - Existing tasks: ${existingTasks.length}, Expected: ${expectedTaskCount}, Has 40-hour task: ${hasFortyHourCourseTask}, Needs course: ${needsFortyHourCourse}, fortyHourCourseCompleted value: ${rbtProfile.fortyHourCourseCompleted}`)
       
       // If task count is wrong OR 40-hour course task is missing when it should exist, recreate tasks
       if (existingTasks.length !== expectedTaskCount || (needsFortyHourCourse && !hasFortyHourCourseTask)) {
