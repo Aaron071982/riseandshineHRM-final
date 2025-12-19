@@ -1060,7 +1060,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             setPendingStatusChange(null)
           }
         }}
-        modal={true}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

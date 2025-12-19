@@ -333,7 +333,6 @@ export default function AddRBTForm() {
             setPendingFormData(null)
           }
         }}
-        modal={true}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
