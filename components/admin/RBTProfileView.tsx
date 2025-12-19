@@ -81,7 +81,6 @@ interface RBTProfile {
       birthdate: string | null
       currentAddress: string | null
       phoneNumber: string | null
-      recommendation: string | null
       createdAt: Date
       updatedAt: Date
     } | null
@@ -141,6 +140,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   }>>(initialRbtProfile.documents || [])
   const [uploadingDocuments, setUploadingDocuments] = useState(false)
   const [pendingStatusChange, setPendingStatusChange] = useState<string | null>(null)
+  const [selectKey, setSelectKey] = useState(0) // Key to force Select re-render
 
   const handleStatusChange = (newStatus: string) => {
     // Don't show confirmation if status hasn't actually changed
@@ -148,9 +148,12 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       return
     }
     
-    // Store the pending change
+    // Store the pending change - but DON'T update the Select value
     const pendingStatus = newStatus
     setPendingStatusChange(pendingStatus)
+    
+    // Force Select to re-render with original value by incrementing key
+    setSelectKey(prev => prev + 1)
     
     const statusLabels: Record<string, string> = {
       NEW: 'New',
@@ -609,6 +612,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           <div className="flex items-center gap-4">
             <Label>Change Status:</Label>
             <Select
+              key={`status-select-${selectKey}-${rbtProfile.status}`}
               value={rbtProfile.status}
               onValueChange={handleStatusChange}
               disabled={loading || confirmDialogOpen}
@@ -933,26 +937,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                           <p className="text-gray-600 mt-1">{interview.interviewNotes.closingNotes}</p>
                         </div>
                       )}
-                      {(interview.interviewNotes as any).recommendation && (
-                        <div>
-                          <span className="font-medium text-gray-700">Recommendation: </span>
-                          <Badge
-                            className={`mt-1 ${
-                              (interview.interviewNotes as any).recommendation === 'SUGGEST_HIRING'
-                                ? 'bg-green-100 text-green-700'
-                                : (interview.interviewNotes as any).recommendation === 'SUGGEST_REJECTING'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-yellow-100 text-yellow-700'
-                            }`}
-                          >
-                            {(interview.interviewNotes as any).recommendation === 'SUGGEST_HIRING'
-                              ? 'Suggest Hiring'
-                              : (interview.interviewNotes as any).recommendation === 'SUGGEST_REJECTING'
-                              ? 'Suggest Rejecting'
-                              : 'Stalling'}
-                          </Badge>
-                        </div>
-                      )}
                       <div className="pt-2 border-t">
                         <InterviewNotesButton
                           interviewId={interview.id}
@@ -1077,8 +1061,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 setConfirmAction(null)
                 setConfirmLoading(false)
                 setPendingStatusChange(null)
-                // Force Select to revert to original value by triggering a re-render
-                router.refresh()
+                // Force Select to revert to original value by incrementing key
+                setSelectKey(prev => prev + 1)
               }}
               disabled={confirmLoading}
             >
