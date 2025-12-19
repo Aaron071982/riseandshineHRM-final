@@ -89,6 +89,7 @@ export async function POST(
         birthdate: data.birthdate || null,
         currentAddress: data.currentAddress || null,
         phoneNumber: data.phoneNumber || null,
+        recommendation: data.recommendation || null,
       },
       create: {
         interviewId: id,
@@ -108,6 +109,7 @@ export async function POST(
         birthdate: data.birthdate || null,
         currentAddress: data.currentAddress || null,
         phoneNumber: data.phoneNumber || null,
+        recommendation: data.recommendation || null,
       },
     })
 

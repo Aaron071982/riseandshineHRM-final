@@ -13,7 +13,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { X, FileText, Upload } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { X, FileText, Upload, Loader2 } from 'lucide-react'
 
 interface DocumentFile {
   file: File
@@ -25,6 +33,9 @@ export default function AddRBTForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [documents, setDocuments] = useState<DocumentFile[]>([])
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [confirmLoading, setConfirmLoading] = useState(false)
+  const [pendingFormData, setPendingFormData] = useState<FormData | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -48,7 +59,6 @@ export default function AddRBTForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
-    setLoading(true)
 
     const formData = new FormData(e.currentTarget)
     
@@ -75,24 +85,39 @@ export default function AddRBTForm() {
       submitData.append(`documentTypes`, doc.documentType)
     })
 
+    // Store form data and show confirmation
+    setPendingFormData(submitData)
+    setConfirmDialogOpen(true)
+  }
+
+  const handleConfirmSubmit = async () => {
+    if (!pendingFormData) return
+
+    setConfirmLoading(true)
+    setError('')
+
     try {
       const response = await fetch('/api/admin/rbts', {
         method: 'POST',
-        body: submitData,
+        body: pendingFormData,
       })
 
       const result = await response.json()
 
       if (!response.ok) {
         setError(result.error || 'Failed to create candidate')
-        setLoading(false)
+        setConfirmLoading(false)
+        // Keep dialog open on error so user can see the error message
         return
       }
 
+      setConfirmDialogOpen(false)
+      setPendingFormData(null)
       router.push(`/admin/rbts/${result.id}`)
     } catch (err) {
       setError('An error occurred. Please try again.')
-      setLoading(false)
+      setConfirmLoading(false)
+      // Keep dialog open on error so user can see the error message
     }
   }
 
@@ -297,6 +322,61 @@ export default function AddRBTForm() {
           </div>
         </form>
       </CardContent>
+
+      {/* Confirmation Dialog */}
+      <Dialog 
+        open={confirmDialogOpen} 
+        onOpenChange={(open) => {
+          // Prevent closing during loading
+          if (!open && !confirmLoading) {
+            setConfirmDialogOpen(false)
+            setPendingFormData(null)
+          }
+        }}
+        modal={true}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Create RBT</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to create this RBT candidate? This will add them to the system and they will be available for the hiring process.
+            </DialogDescription>
+          </DialogHeader>
+          {error && (
+            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+              {error}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setConfirmDialogOpen(false)
+                setPendingFormData(null)
+                setConfirmLoading(false)
+                setError('')
+              }}
+              disabled={confirmLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmSubmit}
+              disabled={confirmLoading}
+              className="bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              {confirmLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Confirm'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

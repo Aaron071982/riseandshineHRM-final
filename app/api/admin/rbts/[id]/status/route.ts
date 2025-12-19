@@ -23,26 +23,31 @@ export async function PATCH(
 
     const { status } = await request.json()
 
-    // If marking interview as completed, also update all scheduled interviews to COMPLETED
-    if (status === 'INTERVIEW_COMPLETED') {
-      // Update all scheduled interviews for this RBT to COMPLETED
-      await prisma.interview.updateMany({
-        where: {
-          rbtProfileId: id,
-          status: 'SCHEDULED',
-        },
-        data: {
-          status: 'COMPLETED',
-        },
-      })
-    }
+    // Use transaction to ensure both updates happen atomically
+    const result = await prisma.$transaction(async (tx) => {
+      // If marking interview as completed, also update all scheduled interviews to COMPLETED
+      if (status === 'INTERVIEW_COMPLETED') {
+        // Update all scheduled interviews for this RBT to COMPLETED
+        await tx.interview.updateMany({
+          where: {
+            rbtProfileId: id,
+            status: 'SCHEDULED',
+          },
+          data: {
+            status: 'COMPLETED',
+          },
+        })
+      }
 
-    const rbtProfile = await prisma.rBTProfile.update({
-      where: { id },
-      data: { status },
+      const rbtProfile = await tx.rBTProfile.update({
+        where: { id },
+        data: { status },
+      })
+
+      return rbtProfile
     })
 
-    return NextResponse.json({ status: rbtProfile.status })
+    return NextResponse.json({ status: result.status })
   } catch (error) {
     console.error('Error updating status:', error)
     return NextResponse.json(

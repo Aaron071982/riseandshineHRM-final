@@ -81,6 +81,7 @@ interface RBTProfile {
       birthdate: string | null
       currentAddress: string | null
       phoneNumber: string | null
+      recommendation: string | null
       createdAt: Date
       updatedAt: Date
     } | null
@@ -139,31 +140,59 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     uploadedAt: Date
   }>>(initialRbtProfile.documents || [])
   const [uploadingDocuments, setUploadingDocuments] = useState(false)
+  const [pendingStatusChange, setPendingStatusChange] = useState<string | null>(null)
 
-  const handleStatusChange = async (newStatus: string) => {
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      })
-
-      if (response.ok) {
-        const updated = await response.json()
-        setRbtProfile({ ...rbtProfile, status: updated.status })
-        showToast('Status updated successfully', 'success')
-        router.refresh()
-      } else {
-        const data = await response.json()
-        showToast(data.error || 'Failed to update status', 'error')
-      }
-    } catch (error) {
-      console.error('Error updating status:', error)
-      showToast('An error occurred while updating status', 'error')
-    } finally {
-      setLoading(false)
+  const handleStatusChange = (newStatus: string) => {
+    // Don't show confirmation if status hasn't actually changed
+    if (newStatus === rbtProfile.status) {
+      return
     }
+    
+    const statusLabels: Record<string, string> = {
+      NEW: 'New',
+      REACH_OUT: 'Reach Out',
+      TO_INTERVIEW: 'To Interview',
+      INTERVIEW_SCHEDULED: 'Interview Scheduled',
+      INTERVIEW_COMPLETED: 'Interview Completed',
+      HIRED: 'Hired',
+      REJECTED: 'Rejected',
+    }
+    
+    setPendingStatusChange(newStatus)
+    setConfirmMessage(`Are you sure you want to change the status to "${statusLabels[newStatus] || newStatus}"?`)
+    setConfirmAction(async () => {
+      try {
+        setLoading(true)
+        const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        })
+
+        if (response.ok) {
+          const updated = await response.json()
+          setRbtProfile({ ...rbtProfile, status: updated.status })
+          showToast('Status updated successfully', 'success')
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
+          setPendingStatusChange(null)
+          router.refresh()
+        } else {
+          const data = await response.json()
+          showToast(data.error || 'Failed to update status', 'error')
+          setPendingStatusChange(null)
+          // Keep dialog open on error so user can see the error message
+        }
+      } catch (error) {
+        console.error('Error updating status:', error)
+        showToast('An error occurred while updating status', 'error')
+        setPendingStatusChange(null)
+        // Keep dialog open on error so user can see the error message
+      } finally {
+        setLoading(false)
+      }
+    })
+    setConfirmDialogOpen(true)
   }
 
   const handleSendReachOutEmail = () => {
@@ -577,9 +606,9 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           <div className="flex items-center gap-4">
             <Label>Change Status:</Label>
             <Select
-              value={rbtProfile.status}
+              value={pendingStatusChange || rbtProfile.status}
               onValueChange={handleStatusChange}
-              disabled={loading}
+              disabled={loading || confirmDialogOpen}
             >
               <SelectTrigger className="w-[200px]">
                 <SelectValue />
@@ -901,6 +930,26 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                           <p className="text-gray-600 mt-1">{interview.interviewNotes.closingNotes}</p>
                         </div>
                       )}
+                      {interview.interviewNotes.recommendation && (
+                        <div>
+                          <span className="font-medium text-gray-700">Recommendation: </span>
+                          <Badge
+                            className={`mt-1 ${
+                              interview.interviewNotes.recommendation === 'SUGGEST_HIRING'
+                                ? 'bg-green-100 text-green-700'
+                                : interview.interviewNotes.recommendation === 'SUGGEST_REJECTING'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`}
+                          >
+                            {interview.interviewNotes.recommendation === 'SUGGEST_HIRING'
+                              ? 'Suggest Hiring'
+                              : interview.interviewNotes.recommendation === 'SUGGEST_REJECTING'
+                              ? 'Suggest Rejecting'
+                              : 'Stalling'}
+                          </Badge>
+                        </div>
+                      )}
                       <div className="pt-2 border-t">
                         <InterviewNotesButton
                           interviewId={interview.id}
@@ -1001,12 +1050,18 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       </Card>
 
       {/* Confirmation Dialog */}
-      <Dialog open={confirmDialogOpen} onOpenChange={(open) => {
-        if (!open && !confirmLoading) {
-          setConfirmDialogOpen(false)
-          setConfirmAction(null)
-        }
-      }}>
+      <Dialog 
+        open={confirmDialogOpen} 
+        onOpenChange={(open) => {
+          // Prevent closing during loading
+          if (!open && !confirmLoading) {
+            setConfirmDialogOpen(false)
+            setConfirmAction(null)
+            setPendingStatusChange(null)
+          }
+        }}
+        modal={true}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Confirm Action</DialogTitle>
@@ -1019,6 +1074,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 setConfirmDialogOpen(false)
                 setConfirmAction(null)
                 setConfirmLoading(false)
+                setPendingStatusChange(null)
               }}
               disabled={confirmLoading}
             >

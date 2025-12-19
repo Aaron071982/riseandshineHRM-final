@@ -39,6 +39,12 @@ enum InterviewDecision {
   REJECTED
 }
 
+enum InterviewRecommendation {
+  SUGGEST_HIRING
+  SUGGEST_REJECTING
+  STALLING
+}
+
 enum OnboardingTaskType {
   DOWNLOAD_DOC
   UPLOAD_SIGNED_DOC
@@ -300,6 +306,9 @@ model InterviewNotes {
   birthdate               String?
   currentAddress          String? @db.Text
   phoneNumber             String?
+  
+  // Recommendation from interviewer
+  recommendation          InterviewRecommendation?
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
