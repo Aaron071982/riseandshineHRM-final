@@ -148,6 +148,9 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       return
     }
     
+    // Store the pending change but DON'T update the Select value yet
+    setPendingStatusChange(newStatus)
+    
     const statusLabels: Record<string, string> = {
       NEW: 'New',
       REACH_OUT: 'Reach Out',
@@ -158,7 +161,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       REJECTED: 'Rejected',
     }
     
-    setPendingStatusChange(newStatus)
     setConfirmMessage(`Are you sure you want to change the status to "${statusLabels[newStatus] || newStatus}"?`)
     setConfirmAction(async () => {
       try {
@@ -606,7 +608,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           <div className="flex items-center gap-4">
             <Label>Change Status:</Label>
             <Select
-              value={pendingStatusChange || rbtProfile.status}
+              value={rbtProfile.status}
               onValueChange={handleStatusChange}
               disabled={loading || confirmDialogOpen}
             >
@@ -1074,6 +1076,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 setConfirmAction(null)
                 setConfirmLoading(false)
                 setPendingStatusChange(null)
+                // Force Select to revert to original value by triggering a re-render
+                router.refresh()
               }}
               disabled={confirmLoading}
             >
