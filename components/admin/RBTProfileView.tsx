@@ -148,8 +148,9 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       return
     }
     
-    // Store the pending change but DON'T update the Select value yet
-    setPendingStatusChange(newStatus)
+    // Store the pending change
+    const pendingStatus = newStatus
+    setPendingStatusChange(pendingStatus)
     
     const statusLabels: Record<string, string> = {
       NEW: 'New',
@@ -161,14 +162,14 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       REJECTED: 'Rejected',
     }
     
-    setConfirmMessage(`Are you sure you want to change the status to "${statusLabels[newStatus] || newStatus}"?`)
+    setConfirmMessage(`Are you sure you want to change the status to "${statusLabels[pendingStatus] || pendingStatus}"?`)
     setConfirmAction(async () => {
       try {
         setLoading(true)
         const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/status`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus }),
+          body: JSON.stringify({ status: pendingStatus }),
         })
 
         if (response.ok) {
