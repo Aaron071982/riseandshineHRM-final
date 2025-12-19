@@ -930,21 +930,21 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                           <p className="text-gray-600 mt-1">{interview.interviewNotes.closingNotes}</p>
                         </div>
                       )}
-                      {interview.interviewNotes.recommendation && (
+                      {(interview.interviewNotes as any).recommendation && (
                         <div>
                           <span className="font-medium text-gray-700">Recommendation: </span>
                           <Badge
                             className={`mt-1 ${
-                              interview.interviewNotes.recommendation === 'SUGGEST_HIRING'
+                              (interview.interviewNotes as any).recommendation === 'SUGGEST_HIRING'
                                 ? 'bg-green-100 text-green-700'
-                                : interview.interviewNotes.recommendation === 'SUGGEST_REJECTING'
+                                : (interview.interviewNotes as any).recommendation === 'SUGGEST_REJECTING'
                                 ? 'bg-red-100 text-red-700'
                                 : 'bg-yellow-100 text-yellow-700'
                             }`}
                           >
-                            {interview.interviewNotes.recommendation === 'SUGGEST_HIRING'
+                            {(interview.interviewNotes as any).recommendation === 'SUGGEST_HIRING'
                               ? 'Suggest Hiring'
-                              : interview.interviewNotes.recommendation === 'SUGGEST_REJECTING'
+                              : (interview.interviewNotes as any).recommendation === 'SUGGEST_REJECTING'
                               ? 'Suggest Rejecting'
                               : 'Stalling'}
                           </Badge>

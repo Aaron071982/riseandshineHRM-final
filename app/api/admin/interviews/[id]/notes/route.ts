@@ -70,46 +70,37 @@ export async function POST(
       )
     }
 
-    // Upsert interview notes
+    // Upsert interview notes - use type assertion to handle recommendation field that may not exist in DB yet
+    const updateData: any = {
+      greetingAnswer: data.greetingAnswer || null,
+      basicInfoAnswer: data.basicInfoAnswer || null,
+      experienceAnswer: data.experienceAnswer || null,
+      heardAboutAnswer: data.heardAboutAnswer || null,
+      abaPlatformsAnswer: data.abaPlatformsAnswer || null,
+      communicationAnswer: data.communicationAnswer || null,
+      availabilityAnswer: data.availabilityAnswer || null,
+      payExpectationsAnswer: data.payExpectationsAnswer || null,
+      previousCompanyAnswer: data.previousCompanyAnswer || null,
+      expectationsAnswer: data.expectationsAnswer || null,
+      closingNotes: data.closingNotes || null,
+      fullName: data.fullName || null,
+      birthdate: data.birthdate || null,
+      currentAddress: data.currentAddress || null,
+      phoneNumber: data.phoneNumber || null,
+    }
+    
+    // Only include recommendation if it exists in the data (and DB has the column)
+    if (data.recommendation !== undefined) {
+      updateData.recommendation = data.recommendation || null
+    }
+
     const notes = await prisma.interviewNotes.upsert({
       where: { interviewId: id },
-      update: {
-        greetingAnswer: data.greetingAnswer || null,
-        basicInfoAnswer: data.basicInfoAnswer || null,
-        experienceAnswer: data.experienceAnswer || null,
-        heardAboutAnswer: data.heardAboutAnswer || null,
-        abaPlatformsAnswer: data.abaPlatformsAnswer || null,
-        communicationAnswer: data.communicationAnswer || null,
-        availabilityAnswer: data.availabilityAnswer || null,
-        payExpectationsAnswer: data.payExpectationsAnswer || null,
-        previousCompanyAnswer: data.previousCompanyAnswer || null,
-        expectationsAnswer: data.expectationsAnswer || null,
-        closingNotes: data.closingNotes || null,
-        fullName: data.fullName || null,
-        birthdate: data.birthdate || null,
-        currentAddress: data.currentAddress || null,
-        phoneNumber: data.phoneNumber || null,
-        recommendation: data.recommendation || null,
-      },
+      update: updateData,
       create: {
         interviewId: id,
         rbtProfileId: interview.rbtProfileId,
-        greetingAnswer: data.greetingAnswer || null,
-        basicInfoAnswer: data.basicInfoAnswer || null,
-        experienceAnswer: data.experienceAnswer || null,
-        heardAboutAnswer: data.heardAboutAnswer || null,
-        abaPlatformsAnswer: data.abaPlatformsAnswer || null,
-        communicationAnswer: data.communicationAnswer || null,
-        availabilityAnswer: data.availabilityAnswer || null,
-        payExpectationsAnswer: data.payExpectationsAnswer || null,
-        previousCompanyAnswer: data.previousCompanyAnswer || null,
-        expectationsAnswer: data.expectationsAnswer || null,
-        closingNotes: data.closingNotes || null,
-        fullName: data.fullName || null,
-        birthdate: data.birthdate || null,
-        currentAddress: data.currentAddress || null,
-        phoneNumber: data.phoneNumber || null,
-        recommendation: data.recommendation || null,
+        ...updateData,
       },
     })
 
