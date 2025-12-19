@@ -307,8 +307,8 @@ model InterviewNotes {
   currentAddress          String? @db.Text
   phoneNumber             String?
   
-  // Recommendation from interviewer
-  recommendation          InterviewRecommendation?
+  // Recommendation from interviewer (temporarily commented until migration is run)
+  // recommendation          InterviewRecommendation?
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
