@@ -11,6 +11,7 @@ import Link from 'next/link'
 import RBTScheduleView from './RBTScheduleView'
 import InterviewNotesButton from './InterviewNotesButton'
 import AdminOnboardingOverride from './AdminOnboardingOverride'
+import StatusManager from './StatusManager'
 import {
   Select,
   SelectContent,
@@ -139,67 +140,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     uploadedAt: Date
   }>>(initialRbtProfile.documents || [])
   const [uploadingDocuments, setUploadingDocuments] = useState(false)
-  const [pendingStatusChange, setPendingStatusChange] = useState<string | null>(null)
-  const [selectKey, setSelectKey] = useState(0) // Key to force Select re-render
-
-  const handleStatusChange = (newStatus: string) => {
-    // Don't show confirmation if status hasn't actually changed
-    if (newStatus === rbtProfile.status) {
-      return
-    }
-    
-    // Store the pending change - but DON'T update the Select value
-    const pendingStatus = newStatus
-    setPendingStatusChange(pendingStatus)
-    
-    // Force Select to re-render with original value by incrementing key
-    setSelectKey(prev => prev + 1)
-    
-    const statusLabels: Record<string, string> = {
-      NEW: 'New',
-      REACH_OUT: 'Reach Out',
-      TO_INTERVIEW: 'To Interview',
-      INTERVIEW_SCHEDULED: 'Interview Scheduled',
-      INTERVIEW_COMPLETED: 'Interview Completed',
-      HIRED: 'Hired',
-      REJECTED: 'Rejected',
-    }
-    
-    setConfirmMessage(`Are you sure you want to change the status to "${statusLabels[pendingStatus] || pendingStatus}"?`)
-    setConfirmAction(async () => {
-      try {
-        setLoading(true)
-        const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/status`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: pendingStatus }),
-        })
-
-        if (response.ok) {
-          const updated = await response.json()
-          setRbtProfile({ ...rbtProfile, status: updated.status })
-          showToast('Status updated successfully', 'success')
-          setConfirmDialogOpen(false)
-          setConfirmAction(null)
-          setPendingStatusChange(null)
-          router.refresh()
-        } else {
-          const data = await response.json()
-          showToast(data.error || 'Failed to update status', 'error')
-          setPendingStatusChange(null)
-          // Keep dialog open on error so user can see the error message
-        }
-      } catch (error) {
-        console.error('Error updating status:', error)
-        showToast('An error occurred while updating status', 'error')
-        setPendingStatusChange(null)
-        // Keep dialog open on error so user can see the error message
-      } finally {
-        setLoading(false)
-      }
-    })
-    setConfirmDialogOpen(true)
-  }
 
   const handleSendReachOutEmail = () => {
     setConfirmMessage(`Are you sure you want to send a reach-out email to ${rbtProfile.firstName} ${rbtProfile.lastName}?`)
@@ -609,28 +549,14 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           <CardTitle className="text-2xl font-bold text-gray-900">Status Management</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Label>Change Status:</Label>
-            <Select
-              key={`status-select-${selectKey}-${rbtProfile.status}`}
-              value={rbtProfile.status}
-              onValueChange={handleStatusChange}
-              disabled={loading || confirmDialogOpen}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NEW">New</SelectItem>
-                <SelectItem value="REACH_OUT">Reach Out</SelectItem>
-                <SelectItem value="TO_INTERVIEW">To Interview</SelectItem>
-                <SelectItem value="INTERVIEW_SCHEDULED">Interview Scheduled</SelectItem>
-                <SelectItem value="INTERVIEW_COMPLETED">Interview Completed</SelectItem>
-                <SelectItem value="HIRED">Hired</SelectItem>
-                <SelectItem value="REJECTED">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <StatusManager
+            rbtId={rbtProfile.id}
+            initialStatus={rbtProfile.status as 'NEW' | 'REACH_OUT' | 'TO_INTERVIEW' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_COMPLETED' | 'HIRED' | 'REJECTED'}
+            onStatusChange={(newStatus) => {
+              setRbtProfile({ ...rbtProfile, status: newStatus })
+              router.refresh()
+            }}
+          />
 
           <div className="flex flex-wrap gap-2">
             {canSendReachOut && (
@@ -1044,7 +970,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           if (!open && !confirmLoading) {
             setConfirmDialogOpen(false)
             setConfirmAction(null)
-            setPendingStatusChange(null)
           }
         }}
       >
@@ -1060,9 +985,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 setConfirmDialogOpen(false)
                 setConfirmAction(null)
                 setConfirmLoading(false)
-                setPendingStatusChange(null)
-                // Force Select to revert to original value by incrementing key
-                setSelectKey(prev => prev + 1)
               }}
               disabled={confirmLoading}
             >
