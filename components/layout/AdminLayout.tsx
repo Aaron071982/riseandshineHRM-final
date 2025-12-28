@@ -16,7 +16,6 @@ import {
   LogOut,
   Menu,
   X,
-  GraduationCap,
 } from 'lucide-react'
 import { useState } from 'react'
 import Image from 'next/image'
@@ -28,7 +27,6 @@ interface AdminLayoutProps {
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/rbts', label: 'RBTs & Candidates', icon: Users },
-  { href: '/admin/interns', label: 'Interns', icon: GraduationCap },
   { href: '/admin/interviews', label: 'Interviews', icon: Calendar },
   { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
   { href: '/admin/attendance', label: 'Attendance & Hours', icon: Clock },
