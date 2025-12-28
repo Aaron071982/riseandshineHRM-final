@@ -207,7 +207,11 @@ function InternEditForm({
         </div>
         <div>
           <Label htmlFor="status">Status</Label>
-          <Select value={status} onValueChange={setStatus} disabled={disabled}>
+          <Select 
+            value={status} 
+            onValueChange={(value) => setStatus(value as 'Active' | 'Inactive')} 
+            disabled={disabled}
+          >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
