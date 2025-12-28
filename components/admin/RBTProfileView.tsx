@@ -266,8 +266,12 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     
     // Format the date/time for confirmation message
     const scheduledDate = new Date(data.scheduledAt)
-    const formattedDate = scheduledDate.toLocaleDateString()
-    const formattedTime = scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const formattedDate = scheduledDate.toLocaleDateString('en-US', { timeZone: 'America/New_York' })
+    const formattedTime = scheduledDate.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      timeZone: 'America/New_York',
+    })
     
     setConfirmMessage(`Schedule interview for ${rbtProfile.firstName} ${rbtProfile.lastName} on ${formattedDate} at ${formattedTime} with ${data.interviewerName}?`)
     setConfirmAction(async () => {
@@ -1023,6 +1027,39 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   )
 }
 
+// Helper function to convert NY time to UTC ISO string
+function nyTimeToUTC(dateStr: string, timeStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const [h, min] = timeStr.split(':').map(Number)
+  
+  // Create a test date at noon UTC on the target date to determine timezone offset
+  // (NY uses EST UTC-5 in winter, EDT UTC-4 in summer due to DST)
+  const testDateUTC = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+  
+  // Format in NY timezone to see what 12:00 UTC becomes in NY
+  const nyFormatted = testDateUTC.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  
+  // Parse to get the hour in NY timezone when UTC is 12:00
+  const nyHour = parseInt(nyFormatted.split(', ')[1].split(':')[0], 10)
+  
+  // Calculate offset: if UTC 12:00 = NY 07:00, then offset is -5 (NY is 5 hours behind UTC)
+  // So to convert NY time to UTC, we ADD 5 hours
+  // offsetHours = 12 (UTC) - 7 (NY) = 5
+  const offsetHours = 12 - nyHour
+  
+  // Create UTC date: if input is NY 12:30 and offset is +5, then UTC is 17:30
+  const utcDate = new Date(Date.UTC(y, m - 1, d, h + offsetHours, min, 0))
+  return utcDate.toISOString()
+}
+
 function InterviewScheduleForm({
   rbtProfileId,
   onSubmit,
@@ -1037,8 +1074,12 @@ function InterviewScheduleForm({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
+    const dateStr = formData.get('date') as string
+    const timeStr = formData.get('time') as string
+    
+    // Treat input as New York time and convert to UTC for storage
     onSubmit({
-      scheduledAt: new Date(`${formData.get('date')}T${formData.get('time')}`).toISOString(),
+      scheduledAt: nyTimeToUTC(dateStr, timeStr),
       durationMinutes: parseInt(formData.get('duration') as string, 10),
       interviewerName: interviewerEmail, // Use the selected email
       meetingUrl: formData.get('meetingUrl') || null,

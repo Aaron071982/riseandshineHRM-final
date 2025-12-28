@@ -253,7 +253,7 @@ export default async function AdminDashboard() {
                         {interview.rbtProfile.firstName} {interview.rbtProfile.lastName}
                       </div>
                       <div className="text-sm text-gray-600 mt-1">
-                        {new Date(interview.scheduledAt).toLocaleString()} • {interview.interviewerName}
+                        {new Date(interview.scheduledAt).toLocaleString('en-US', { timeZone: 'America/New_York' })} • {interview.interviewerName}
                       </div>
                     </div>
                     <Badge className="gradient-blue text-white border-0">{interview.status}</Badge>

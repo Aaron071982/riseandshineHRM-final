@@ -127,6 +127,40 @@ async function main() {
     },
   })
 
+  // Admin 8: Q. Hossain
+  const admin8 = await prisma.user.upsert({
+    where: { email: 'q.hossains055@gmail.com' },
+    update: {
+      role: 'ADMIN',
+      isActive: true,
+      name: 'Q. Hossain',
+    },
+    create: {
+      phoneNumber: null,
+      name: 'Q. Hossain',
+      email: 'q.hossains055@gmail.com',
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+
+  // Admin 9: A. Karim
+  const admin9 = await prisma.user.upsert({
+    where: { email: 'azkarim05@gmail.com' },
+    update: {
+      role: 'ADMIN',
+      isActive: true,
+      name: 'A. Karim',
+    },
+    create: {
+      phoneNumber: null,
+      name: 'A. Karim',
+      email: 'azkarim05@gmail.com',
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+
   console.log('✅ Created/updated admin users:', {
     admin1: admin1.email,
     admin2: admin2.email,
@@ -135,6 +169,8 @@ async function main() {
     admin5: admin5.email,
     admin6: admin6.email,
     admin7: admin7.email,
+    admin8: admin8.email,
+    admin9: admin9.email,
   })
 
   console.log('🎉 Seed completed successfully!')
@@ -146,6 +182,8 @@ async function main() {
   console.log('   - fardeenhassansardar12@gmail.com')
   console.log('   - shazia@riseandshine.nyc')
   console.log('   - shaziakhaliq37@gmail.com')
+  console.log('   - q.hossains055@gmail.com')
+  console.log('   - azkarim05@gmail.com')
 }
 
 main()

@@ -256,12 +256,14 @@ export function generateInterviewInviteEmail(
     hour: 'numeric',
     minute: '2-digit',
     timeZoneName: 'short',
+    timeZone: 'America/New_York',
   })
 
   const formattedTime = new Date(interview.scheduledAt).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     timeZoneName: 'short',
+    timeZone: 'America/New_York',
   })
 
   const subject = 'Interview Invitation - Rise and Shine'
