@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export async function GET(
   request: NextRequest,
@@ -24,9 +25,30 @@ export async function GET(
     // Get the completion record
     const completion = await prisma.onboardingCompletion.findUnique({
       where: { id: completionId },
-      include: {
-        document: true,
-        rbtProfile: true,
+      select: {
+        id: true,
+        rbtProfileId: true,
+        documentId: true,
+        status: true,
+        completedAt: true,
+        signedPdfUrl: true,
+        signedPdfData: true,
+        storageBucket: true,
+        fieldValues: true,
+        document: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+          },
+        },
+        rbtProfile: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
     })
 
@@ -47,28 +69,61 @@ export async function GET(
       )
     }
 
-    if (!completion.signedPdfData) {
-      return NextResponse.json(
-        { error: 'Completed PDF data not found' },
-        { status: 404 }
-      )
-    }
-
-    // Convert base64 to buffer
-    const pdfBuffer = Buffer.from(completion.signedPdfData, 'base64')
-
     // Generate filename
     const sanitizedTitle = completion.document.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()
     const filename = `${sanitizedTitle}_${completion.rbtProfile.firstName}_${completion.rbtProfile.lastName}.pdf`
 
-    // Return PDF file
-    return new NextResponse(pdfBuffer, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': pdfBuffer.length.toString(),
-      },
-    })
+    // Check if PDF is stored in Supabase Storage
+    if (completion.signedPdfUrl && completion.storageBucket && supabaseAdmin) {
+      try {
+        // Download file from Supabase Storage
+        const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+          .from(completion.storageBucket)
+          .download(completion.signedPdfUrl)
+
+        if (downloadError) {
+          console.error('Supabase Storage download error:', downloadError)
+          // Fall through to base64 fallback
+        } else if (fileData) {
+          // Convert Blob to ArrayBuffer then to Buffer
+          const arrayBuffer = await fileData.arrayBuffer()
+          const pdfBuffer = Buffer.from(arrayBuffer)
+
+          // Return PDF file
+          return new NextResponse(pdfBuffer, {
+            headers: {
+              'Content-Type': 'application/pdf',
+              'Content-Disposition': `attachment; filename="${filename}"`,
+              'Content-Length': pdfBuffer.length.toString(),
+            },
+          })
+        }
+      } catch (storageError) {
+        console.error('Error downloading from Supabase Storage:', storageError)
+        // Fall through to base64 fallback
+      }
+    }
+
+    // Fallback to base64 stored data (legacy records)
+    if (completion.signedPdfData) {
+      // Convert base64 to buffer
+      const pdfBuffer = Buffer.from(completion.signedPdfData, 'base64')
+
+      // Return PDF file
+      return new NextResponse(pdfBuffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Content-Length': pdfBuffer.length.toString(),
+        },
+      })
+    }
+
+    // No PDF data found
+    return NextResponse.json(
+      { error: 'Completed PDF data not found' },
+      { status: 404 }
+    )
   } catch (error: any) {
     console.error('Error downloading completion PDF:', error)
     return NextResponse.json(

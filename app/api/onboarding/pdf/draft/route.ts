@@ -18,9 +18,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { documentId, formData } = body
+    const { documentId, fieldValues } = body
 
-    if (!documentId || !formData) {
+    if (!documentId || !fieldValues) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -56,13 +56,13 @@ export async function POST(request: NextRequest) {
       },
       update: {
         status: 'IN_PROGRESS',
-        draftData: formData as any,
+        draftData: fieldValues as any,
       },
       create: {
         rbtProfileId: user.rbtProfileId,
         documentId: documentId,
         status: 'IN_PROGRESS',
-        draftData: formData as any,
+        draftData: fieldValues as any,
       },
     })
 
