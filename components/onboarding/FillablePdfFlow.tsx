@@ -60,9 +60,9 @@ export default function FillablePdfFlow({
       // If we have form data from the PDF filler, use it
       if (!pdfFiller.loading && document.pdfData) {
         try {
-          filledPdfBase64 = await pdfFiller.getFilledPdf()
+          filledPdfBase64 = await pdfFiller.getFilledPdf(document.pdfData)
         } catch (error) {
-          console.error('Error getting filled PDF:', error)
+          console.error('Error getting filled PDF for draft:', error)
           // Fallback to original PDF
         }
       }
@@ -104,12 +104,16 @@ export default function FillablePdfFlow({
       let filledPdfBase64 = document.pdfData
       if (!pdfFiller.loading && document.pdfData) {
         try {
-          filledPdfBase64 = await pdfFiller.getFilledPdf()
+          // Pass the original PDF data to ensure fresh load
+          filledPdfBase64 = await pdfFiller.getFilledPdf(document.pdfData)
+          console.log('Successfully generated filled PDF with form data')
         } catch (error) {
           console.error('Error generating filled PDF:', error)
           showToast('Warning: Could not capture filled form data. Storing original PDF.', 'error')
           // Continue with original PDF as fallback
         }
+      } else {
+        console.warn('PDF filler not ready or no PDF data available')
       }
 
       const response = await fetch('/api/onboarding/pdf/finalize', {

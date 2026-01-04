@@ -1,32 +1,29 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { PDFDocument } from 'pdf-lib'
 
-interface PdfFormFillerProps {
-  pdfData: string // base64 encoded PDF
-  onFormDataChange?: (formData: Record<string, any>) => void
-  onPdfReady?: (filledPdfBase64: string) => void
-}
-
-export function usePdfFormFiller(pdfData: string) {
+export function usePdfFormFiller(pdfDataBase64: string) {
   const [formFields, setFormFields] = useState<Array<{ name: string; type: string; value: any }>>([])
   const [formData, setFormData] = useState<Record<string, any>>({})
-  const [pdfDoc, setPdfDoc] = useState<PDFDocument | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function loadPdf() {
+      if (!pdfDataBase64 || pdfDataBase64.length === 0) {
+        setLoading(false)
+        return
+      }
+      
       try {
         setLoading(true)
-        const binaryString = atob(pdfData)
+        const binaryString = atob(pdfDataBase64)
         const pdfBytes = new Uint8Array(binaryString.length)
         for (let i = 0; i < binaryString.length; i++) {
           pdfBytes[i] = binaryString.charCodeAt(i)
         }
 
         const doc = await PDFDocument.load(pdfBytes)
-        setPdfDoc(doc)
         
         const form = doc.getForm()
         const fields = form.getFields()
@@ -58,30 +55,41 @@ export function usePdfFormFiller(pdfData: string) {
         setFormData(initialData)
       } catch (error) {
         console.error('Error loading PDF:', error)
+        setFormFields([])
       } finally {
         setLoading(false)
       }
     }
 
-    if (pdfData) {
-      loadPdf()
-    }
-  }, [pdfData])
+    loadPdf()
+  }, [pdfDataBase64])
 
   const updateField = (name: string, value: any) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const getFilledPdf = async (): Promise<string> => {
-    if (!pdfDoc) {
-      throw new Error('PDF not loaded')
+  const getFilledPdf = async (pdfDataBase64Param?: string): Promise<string> => {
+    // Always reload the PDF fresh to ensure we're working with the original
+    const dataToUse = pdfDataBase64Param || pdfDataBase64
+    
+    if (!dataToUse || dataToUse.length === 0) {
+      throw new Error('PDF data not available')
     }
 
     try {
-      const form = pdfDoc.getForm()
+      // Decode and load PDF fresh
+      const binaryString = atob(dataToUse)
+      const pdfBytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        pdfBytes[i] = binaryString.charCodeAt(i)
+      }
+
+      const doc = await PDFDocument.load(pdfBytes)
+      const form = doc.getForm()
       const fields = form.getFields()
 
       // Fill form fields with our form data
+      let filledCount = 0
       fields.forEach((field) => {
         try {
           const name = field.getName()
@@ -91,10 +99,18 @@ export function usePdfFormFiller(pdfData: string) {
           if (value !== undefined && value !== null && value !== '') {
             if (type === 'PDFTextField') {
               ;(field as any).setText(String(value))
-            } else if (type === 'PDFCheckBox') {
+              filledCount++
+            } else if (type === 'PDFCheckBox' && value === true) {
               ;(field as any).check()
-            } else if (type === 'PDFDropdown' || type === 'PDFRadioGroup') {
-              ;(field as any).select(value)
+              filledCount++
+            } else if ((type === 'PDFDropdown' || type === 'PDFRadioGroup') && value) {
+              try {
+                ;(field as any).select(String(value))
+                filledCount++
+              } catch (e) {
+                // Value might not be valid option, skip
+                console.log(`Could not select value "${value}" for field ${name}`)
+              }
             }
           }
         } catch (error) {
@@ -102,12 +118,19 @@ export function usePdfFormFiller(pdfData: string) {
         }
       })
 
+      console.log(`Filled ${filledCount} form fields with data`)
+
       // Flatten form to make it non-editable
-      form.flatten()
+      try {
+        form.flatten()
+      } catch (e) {
+        // Some forms might not be flattenable
+        console.log('Could not flatten form (may already be flat)')
+      }
 
       // Save PDF
-      const pdfBytes = await pdfDoc.save()
-      return btoa(String.fromCharCode(...pdfBytes))
+      const filledPdfBytes = await doc.save()
+      return btoa(String.fromCharCode(...filledPdfBytes))
     } catch (error) {
       console.error('Error generating filled PDF:', error)
       throw error
@@ -122,4 +145,3 @@ export function usePdfFormFiller(pdfData: string) {
     loading,
   }
 }
-

@@ -163,49 +163,55 @@ export async function GET(
       try {
         // Check if it's a base64 image
         if (ackData.signatureData.startsWith('data:image')) {
-          const base64Data = ackData.signatureData.split(',')[1]
-          if (!base64Data) {
-            throw new Error('Invalid base64 data')
-          }
-          const imageBytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0))
+          const parts = ackData.signatureData.split(',')
+          const base64Data = parts.length > 1 ? parts[1] : ackData.signatureData
           
-          // Determine image type
-          let image
-          if (ackData.signatureData.includes('image/png')) {
-            image = await pdfDoc.embedPng(imageBytes)
-          } else if (ackData.signatureData.includes('image/jpeg') || ackData.signatureData.includes('image/jpg')) {
-            image = await pdfDoc.embedJpg(imageBytes)
-          } else {
-            // Default to PNG if type not specified
-            image = await pdfDoc.embedPng(imageBytes)
+          if (base64Data && base64Data.length > 0) {
+            try {
+              const imageBytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0))
+              
+              // Determine image type
+              let image
+              if (ackData.signatureData.includes('image/png')) {
+                image = await pdfDoc.embedPng(imageBytes)
+              } else if (ackData.signatureData.includes('image/jpeg') || ackData.signatureData.includes('image/jpg')) {
+                image = await pdfDoc.embedJpg(imageBytes)
+              } else {
+                // Default to PNG if type not specified
+                image = await pdfDoc.embedPng(imageBytes)
+              }
+
+              yPosition -= 20
+              page.drawText('Signature:', {
+                x: 50,
+                y: yPosition,
+                size: 12,
+                font: boldFont,
+              })
+              yPosition -= 80
+
+              // Embed signature image (max width 200px, maintain aspect ratio)
+              const maxWidth = 200
+              const maxHeight = 80
+              const dims = image.scale(maxWidth / image.width)
+              const height = dims.height > maxHeight ? maxHeight : dims.height
+              const width = dims.width * (height / dims.height)
+
+              page.drawImage(image, {
+                x: 50,
+                y: yPosition - height,
+                width: width,
+                height: height,
+              })
+              yPosition -= height + 20
+            } catch (imageError) {
+              console.error('Error embedding signature image:', imageError)
+              // Continue without signature image
+            }
           }
-
-          yPosition -= 20
-          page.drawText('Signature:', {
-            x: 50,
-            y: yPosition,
-            size: 12,
-            font: boldFont,
-          })
-          yPosition -= 80
-
-          // Embed signature image (max width 200px, maintain aspect ratio)
-          const maxWidth = 200
-          const maxHeight = 80
-          const dims = image.scale(maxWidth / image.width)
-          const height = dims.height > maxHeight ? maxHeight : dims.height
-          const width = dims.width * (height / dims.height)
-
-          page.drawImage(image, {
-            x: 50,
-            y: yPosition - height,
-            width: width,
-            height: height,
-          })
-          yPosition -= height + 20
         }
       } catch (error) {
-        console.error('Error embedding signature image:', error)
+        console.error('Error processing signature data:', error)
         // Continue without signature image
       }
     }
