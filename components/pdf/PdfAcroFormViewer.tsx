@@ -52,8 +52,13 @@ export default function PdfAcroFormViewer({
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
 
   useEffect(() => {
+    console.log('[PdfAcroFormViewer] Component mounted/re-rendered')
+    console.log('[PdfAcroFormViewer] pdfData received:', pdfData ? `Present (${pdfData.length} chars)` : 'MISSING')
+    console.log('[PdfAcroFormViewer] documentTitle:', documentTitle)
+    
     if (!pdfData || pdfData.length === 0) {
-      setError('PDF data not available')
+      console.error('[PdfAcroFormViewer] PDF data is empty or missing')
+      setError('PDF data not available. Please contact support.')
       setLoading(false)
       return
     }
@@ -137,12 +142,18 @@ export default function PdfAcroFormViewer({
           console.warn('Form field extraction failed (non-critical):', err)
         })
       } catch (pdfJsErr: any) {
-        console.warn('PDF.js failed, using iframe fallback:', pdfJsErr)
+        console.warn('[PdfAcroFormViewer] PDF.js failed, using iframe fallback:', pdfJsErr)
         // Fallback to iframe - ensures PDF is always visible
-        await renderPdfWithIframe(pdfBytes)
+        try {
+          await renderPdfWithIframe(pdfBytes)
+        } catch (iframeErr: any) {
+          console.error('[PdfAcroFormViewer] Iframe fallback also failed, using data URL:', iframeErr)
+          // Last resort: use data URL directly
+          await renderPdfWithDataUrl(pdfData)
+        }
         // Still try to extract form fields
         extractFormFields(pdfBytes).catch((err) => {
-          console.warn('Form field extraction failed (non-critical):', err)
+          console.warn('[PdfAcroFormViewer] Form field extraction failed (non-critical):', err)
         })
       }
 

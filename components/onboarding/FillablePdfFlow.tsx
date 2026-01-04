@@ -119,12 +119,24 @@ export default function FillablePdfFlow({
     )
   }
 
+  useEffect(() => {
+    console.log('[FillablePdfFlow] Document data:', {
+      id: document.id,
+      title: document.title,
+      hasPdfData: !!document.pdfData,
+      pdfDataLength: document.pdfData?.length || 0,
+    })
+  }, [document])
+
   if (!document.pdfData) {
     return (
       <Card>
         <CardContent className="pt-6">
           <div className="text-center text-gray-500 py-12">
-            PDF not available
+            <p className="font-semibold mb-2">PDF not available</p>
+            <p className="text-sm">
+              The PDF data for this document is missing. Please contact support or try refreshing the page.
+            </p>
           </div>
         </CardContent>
       </Card>
