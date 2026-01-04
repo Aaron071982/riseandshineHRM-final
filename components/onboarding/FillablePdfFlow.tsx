@@ -37,6 +37,15 @@ export default function FillablePdfFlow({
   const [isCompleted, setIsCompleted] = useState(completion?.status === 'COMPLETED')
 
   useEffect(() => {
+    console.log('[FillablePdfFlow] Document data:', {
+      id: document.id,
+      title: document.title,
+      hasPdfData: !!document.pdfData,
+      pdfDataLength: document.pdfData?.length || 0,
+    })
+  }, [document])
+
+  useEffect(() => {
     if (completion?.status === 'COMPLETED') {
       setIsCompleted(true)
     }
@@ -118,15 +127,6 @@ export default function FillablePdfFlow({
       </Card>
     )
   }
-
-  useEffect(() => {
-    console.log('[FillablePdfFlow] Document data:', {
-      id: document.id,
-      title: document.title,
-      hasPdfData: !!document.pdfData,
-      pdfDataLength: document.pdfData?.length || 0,
-    })
-  }, [document])
 
   if (!document.pdfData) {
     return (
