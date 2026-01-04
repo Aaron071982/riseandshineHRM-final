@@ -102,18 +102,32 @@ export default function FillablePdfFlow({
 
       // Get filled PDF using the PDF form filler
       let filledPdfBase64 = document.pdfData
-      if (!pdfFiller.loading && document.pdfData) {
+      if (!pdfFiller.loading && document.pdfData && pdfFiller.formFields.length > 0) {
         try {
-          // Pass the original PDF data to ensure fresh load
-          filledPdfBase64 = await pdfFiller.getFilledPdf(document.pdfData)
-          console.log('Successfully generated filled PDF with form data')
+          // Check if any form data has been filled
+          const hasFormData = Object.values(pdfFiller.formData).some(
+            (value) => value !== undefined && value !== null && value !== '' && value !== false
+          )
+          
+          if (hasFormData) {
+            // Pass the original PDF data to ensure fresh load
+            filledPdfBase64 = await pdfFiller.getFilledPdf(document.pdfData)
+            console.log('Successfully generated filled PDF with form data')
+          } else {
+            console.warn('No form data to fill, using original PDF')
+            showToast('Please fill out the form fields below before finalizing', 'error')
+            setLoading(false)
+            return
+          }
         } catch (error) {
           console.error('Error generating filled PDF:', error)
-          showToast('Warning: Could not capture filled form data. Storing original PDF.', 'error')
-          // Continue with original PDF as fallback
+          showToast('Error: Could not generate filled PDF. Please try again.', 'error')
+          setLoading(false)
+          return
         }
-      } else {
-        console.warn('PDF filler not ready or no PDF data available')
+      } else if (!pdfFiller.loading && pdfFiller.formFields.length === 0) {
+        // PDF has no form fields, store as-is
+        console.log('PDF has no form fields, storing original')
       }
 
       const response = await fetch('/api/onboarding/pdf/finalize', {

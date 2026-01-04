@@ -34,6 +34,20 @@ export default async function RBTProfilePage({
         include: {
           document: true,
         },
+        select: {
+          id: true,
+          documentId: true,
+          status: true,
+          completedAt: true,
+          acknowledgmentJson: true,
+          document: {
+            select: {
+              id: true,
+              title: true,
+              type: true,
+            },
+          },
+        },
         orderBy: {
           createdAt: 'desc',
         },

@@ -68,17 +68,14 @@ export function usePdfFormFiller(pdfDataBase64: string) {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const getFilledPdf = async (pdfDataBase64Param?: string): Promise<string> => {
-    // Always reload the PDF fresh to ensure we're working with the original
-    const dataToUse = pdfDataBase64Param || pdfDataBase64
-    
-    if (!dataToUse || dataToUse.length === 0) {
+  const getFilledPdf = async (originalPdfBase64: string): Promise<string> => {
+    if (!originalPdfBase64 || originalPdfBase64.length === 0) {
       throw new Error('PDF data not available')
     }
 
     try {
       // Decode and load PDF fresh
-      const binaryString = atob(dataToUse)
+      const binaryString = atob(originalPdfBase64)
       const pdfBytes = new Uint8Array(binaryString.length)
       for (let i = 0; i < binaryString.length; i++) {
         pdfBytes[i] = binaryString.charCodeAt(i)
@@ -90,7 +87,7 @@ export function usePdfFormFiller(pdfDataBase64: string) {
 
       // Fill form fields with our form data
       let filledCount = 0
-      fields.forEach((field) => {
+      for (const field of fields) {
         try {
           const name = field.getName()
           const value = formData[name]
@@ -116,7 +113,7 @@ export function usePdfFormFiller(pdfDataBase64: string) {
         } catch (error) {
           console.error(`Error filling field ${field.getName()}:`, error)
         }
-      })
+      }
 
       console.log(`Filled ${filledCount} form fields with data`)
 
@@ -130,7 +127,8 @@ export function usePdfFormFiller(pdfDataBase64: string) {
 
       // Save PDF
       const filledPdfBytes = await doc.save()
-      return btoa(String.fromCharCode(...filledPdfBytes))
+      const result = btoa(String.fromCharCode(...filledPdfBytes))
+      return result
     } catch (error) {
       console.error('Error generating filled PDF:', error)
       throw error

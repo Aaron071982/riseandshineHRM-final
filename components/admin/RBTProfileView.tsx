@@ -109,6 +109,7 @@ interface RBTProfile {
     documentId: string
     status: string
     completedAt: Date | null
+    acknowledgmentJson?: any
     document: {
       id: string
       title: string
@@ -884,39 +885,26 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                               Download PDF
                             </Button>
                           ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={async () => {
-                                try {
-                                  const response = await fetch(
-                                    `/api/admin/onboarding/completions/${rbtProfile.id}/${completion.id}/acknowledgment`
-                                  )
-                                  if (response.ok) {
-                                    const blob = await response.blob()
-                                    const url = window.URL.createObjectURL(blob)
-                                    const a = document.createElement('a')
-                                    a.href = url
-                                    a.download = `${completion.document.title.replace(/[^a-z0-9]/gi, '_')}_acknowledgment.pdf`
-                                    document.body.appendChild(a)
-                                    a.click()
-                                    document.body.removeChild(a)
-                                    window.URL.revokeObjectURL(url)
-                                    showToast('Acknowledgment receipt downloaded successfully', 'success')
-                                  } else {
-                                    const error = await response.json()
-                                    showToast(error.error || 'Failed to download acknowledgment', 'error')
-                                  }
-                                } catch (error) {
-                                  console.error('Error downloading acknowledgment:', error)
-                                  showToast('An error occurred while downloading the acknowledgment', 'error')
-                                }
-                              }}
-                              className="flex items-center gap-2"
-                            >
-                              <Download className="w-4 h-4" />
-                              Download Receipt
-                            </Button>
+                            // For acknowledgments, show signature inline instead of download
+                            completion.acknowledgmentJson && (
+                              <div className="flex flex-col gap-2">
+                                {(completion.acknowledgmentJson as any)?.signatureData && (
+                                  <div className="border rounded p-2 bg-gray-50">
+                                    <p className="text-xs text-gray-600 mb-1">Signature:</p>
+                                    <img
+                                      src={(completion.acknowledgmentJson as any).signatureData}
+                                      alt="Signature"
+                                      className="max-w-[200px] max-h-[80px] border rounded"
+                                    />
+                                  </div>
+                                )}
+                                {(completion.acknowledgmentJson as any)?.typedName && (
+                                  <p className="text-sm text-gray-600">
+                                    Signed: {(completion.acknowledgmentJson as any).typedName}
+                                  </p>
+                                )}
+                              </div>
+                            )
                           )}
                         </>
                       )}
