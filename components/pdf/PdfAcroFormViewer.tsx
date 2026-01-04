@@ -93,7 +93,8 @@ export default function PdfAcroFormViewer({
         return
       }
 
-      console.log('Loading PDF, data length:', pdfData.length)
+      console.log('[PdfAcroFormViewer] Loading PDF, data length:', pdfData.length)
+      console.log('[PdfAcroFormViewer] First 100 chars of base64:', pdfData.substring(0, 100))
 
       // Decode base64 PDF
       let binaryString: string
@@ -102,9 +103,16 @@ export default function PdfAcroFormViewer({
         binaryString = atob(pdfData)
         pdfBytes = new Uint8Array(binaryString.length)
         for (let i = 0; i < binaryString.length; i++) {
-          pdfBytes[i] = binaryString.charCodeAt(i)
-        }
-        console.log('PDF bytes decoded, length:', pdfBytes.length)
+        pdfBytes[i] = binaryString.charCodeAt(i)
+      }
+      console.log('[PdfAcroFormViewer] PDF bytes decoded, length:', pdfBytes.length)
+      
+      // Validate PDF bytes (should start with PDF magic bytes)
+      if (pdfBytes.length < 4 || pdfBytes[0] !== 0x25 || pdfBytes[1] !== 0x50 || pdfBytes[2] !== 0x44 || pdfBytes[3] !== 0x46) {
+        console.warn('[PdfAcroFormViewer] PDF bytes do not start with PDF magic bytes - may not be valid PDF')
+      } else {
+        console.log('[PdfAcroFormViewer] PDF bytes validated - valid PDF structure detected')
+      }
       } catch (decodeErr: any) {
         console.error('Error decoding PDF data:', decodeErr)
         setError('Failed to decode PDF data: ' + decodeErr.message)
@@ -119,7 +127,7 @@ export default function PdfAcroFormViewer({
         const pdfDoc = await loadingTask.promise
         pdfDocRef.current = pdfDoc
         setNumPages(pdfDoc.numPages)
-        console.log('PDF loaded with PDF.js, pages:', pdfDoc.numPages)
+        console.log('[PdfAcroFormViewer] PDF loaded with PDF.js, pages:', pdfDoc.numPages)
 
         // Render PDF pages
         await renderPages(pdfDoc)
@@ -153,8 +161,8 @@ export default function PdfAcroFormViewer({
     containerRef.current.innerHTML = ''
 
     // Create Blob from Uint8Array
-    // Use Array.from to convert Uint8Array to regular array for Blob
-    const blob = new Blob([Array.from(pdfBytes)], { type: 'application/pdf' })
+    // Uint8Array is a valid BlobPart, but TypeScript may complain - cast if needed
+    const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
     const url = URL.createObjectURL(blob)
 
     const iframe = document.createElement('iframe')
@@ -166,17 +174,18 @@ export default function PdfAcroFormViewer({
     iframe.style.backgroundColor = '#fff'
     iframe.setAttribute('title', documentTitle || 'PDF Document')
     iframe.onload = () => {
-      console.log('PDF iframe loaded successfully')
+      console.log('[PdfAcroFormViewer] PDF iframe loaded successfully')
     }
     iframe.onerror = (err) => {
-      console.error('PDF iframe load error:', err)
+      console.error('[PdfAcroFormViewer] PDF iframe load error:', err)
+      setError('Failed to load PDF in iframe. The PDF file may be corrupted.')
     }
 
     // Store blob URL for cleanup
     ;(containerRef.current as any).__pdfBlobUrl = url
 
     containerRef.current.appendChild(iframe)
-    console.log('PDF iframe added to container')
+    console.log('[PdfAcroFormViewer] PDF iframe added to container, src:', url.substring(0, 50) + '...')
 
     // Try to extract form fields
     try {
@@ -248,10 +257,11 @@ export default function PdfAcroFormViewer({
         }
       }
 
-      if (pagesContainer.children.length > 0) {
+        if (pagesContainer.children.length > 0) {
         containerRef.current.appendChild(pagesContainer)
-        console.log(`Successfully rendered ${pagesContainer.children.length} PDF pages`)
+        console.log(`[PdfAcroFormViewer] Successfully rendered ${pagesContainer.children.length} PDF pages`)
       } else {
+        console.error('[PdfAcroFormViewer] No pages were rendered - throwing error')
         throw new Error('No pages were rendered')
       }
     } catch (renderErr: any) {
@@ -439,17 +449,27 @@ export default function PdfAcroFormViewer({
       {/* PDF Viewer Container */}
       <Card>
         <CardContent className="pt-6">
-          <div className="mb-2">
-            <p className="text-sm text-gray-600 font-medium">
+          <div className="mb-3">
+            <p className="text-sm font-semibold text-gray-700">
               {documentTitle || 'PDF Document'}
               {numPages > 0 && ` (${numPages} page${numPages > 1 ? 's' : ''})`}
             </p>
+            {numPages === 0 && (
+              <p className="text-xs text-gray-500 mt-1">Loading PDF...</p>
+            )}
           </div>
           <div
             ref={containerRef}
-            className="pdf-container overflow-auto max-h-[800px] border border-gray-200 rounded-lg p-4 bg-gray-50"
-            style={{ minHeight: '400px', width: '100%' }}
+            className="pdf-container overflow-auto max-h-[800px] border-2 border-gray-300 rounded-lg p-4 bg-white"
+            style={{ minHeight: '500px', width: '100%' }}
           />
+          {!loading && containerRef.current && containerRef.current.children.length === 0 && (
+            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                ⚠️ PDF viewer is empty. Check browser console for errors.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
