@@ -29,6 +29,7 @@ const navItems = [
   { href: '/admin/rbts', label: 'RBTs & Candidates', icon: Users },
   { href: '/admin/interviews', label: 'Interviews', icon: Calendar },
   { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
+  { href: '/admin/onboarding-documents', label: 'Onboarding Docs', icon: FileCheck },
   { href: '/admin/attendance', label: 'Attendance & Hours', icon: Clock },
   { href: '/admin/leave', label: 'Leave Requests', icon: CalendarDays },
   { href: '/admin/settings', label: 'Settings', icon: Settings },

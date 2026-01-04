@@ -15,8 +15,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify OTP
-    const isValid = await verifyOTPEmail(email, otp)
+    // Test account: allow any OTP for hrmtesting@gmail.com (or accept '000000')
+    const isTestAccount = email.toLowerCase() === 'hrmtesting@gmail.com'
+    let isValid = false
+    
+    if (isTestAccount) {
+      // For test account, accept '000000' or verify normally
+      isValid = otp === '000000' || await verifyOTPEmail(email, otp)
+    } else {
+      // Verify OTP normally
+      isValid = await verifyOTPEmail(email, otp)
+    }
+    
     if (!isValid) {
       // In dev mode, check if there's a valid code to help debug
       const recentCode = await prisma.otpCode.findFirst({

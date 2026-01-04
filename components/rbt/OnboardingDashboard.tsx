@@ -5,8 +5,11 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, Download, Circle, ExternalLink, X, Upload } from 'lucide-react'
+import { CheckCircle2, Download, Circle, ExternalLink, X, Upload, Send } from 'lucide-react'
 import SignaturePad from './SignaturePad'
+import AcknowledgmentFlow from '@/components/onboarding/AcknowledgmentFlow'
+import FillablePdfFlow from '@/components/onboarding/FillablePdfFlow'
+import { useToast } from '@/components/ui/toast'
 
 interface OnboardingDashboardProps {
   rbtProfileId: string
@@ -23,46 +26,135 @@ interface Task {
   sortOrder: number
 }
 
+interface OnboardingDocument {
+  id: string
+  title: string
+  slug: string
+  type: 'ACKNOWLEDGMENT' | 'FILLABLE_PDF'
+  pdfUrl: string | null
+  pdfData: string | null
+  sortOrder: number
+}
+
+interface OnboardingCompletion {
+  id: string
+  documentId: string
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED'
+  completedAt: string | null
+  document: OnboardingDocument
+}
+
 export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboardProps) {
   const router = useRouter()
+  const { showToast } = useToast()
   const [tasks, setTasks] = useState<Task[]>([])
+  const [onboardingDocuments, setOnboardingDocuments] = useState<OnboardingDocument[]>([])
+  const [onboardingCompletions, setOnboardingCompletions] = useState<OnboardingCompletion[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedFiles, setSelectedFiles] = useState<{ [taskId: string]: File[] }>({})
   const [uploading, setUploading] = useState<{ [taskId: string]: boolean }>({})
+  const [expandedDocumentId, setExpandedDocumentId] = useState<string | null>(null)
+  const [submittingDocuments, setSubmittingDocuments] = useState(false)
+
+  const fetchAllData = async () => {
+    try {
+      setLoading(true)
+      const [tasksResponse, docsResponse, statusResponse] = await Promise.all([
+        fetch(`/api/rbt/onboarding-tasks?rbtProfileId=${rbtProfileId}`),
+        fetch('/api/onboarding/docs'),
+        fetch('/api/onboarding/status'),
+      ])
+
+      if (tasksResponse.ok) {
+        const tasksData = await tasksResponse.json()
+        setTasks(tasksData.sort((a: Task, b: Task) => a.sortOrder - b.sortOrder))
+      } else {
+        console.error('Failed to fetch tasks:', tasksResponse.status, await tasksResponse.text())
+      }
+
+      if (docsResponse.ok) {
+        const docsData = await docsResponse.json()
+        setOnboardingDocuments(docsData.documents || [])
+      } else {
+        console.error('Failed to fetch docs:', docsResponse.status, await docsResponse.text())
+        setOnboardingDocuments([]) // Set empty array on error
+      }
+
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json()
+        setOnboardingCompletions(statusData.completions || [])
+      } else {
+        console.error('Failed to fetch status:', statusResponse.status, await statusResponse.text())
+        setOnboardingCompletions([]) // Set empty array on error
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error)
+      // Ensure we set empty arrays on error so the page can still render
+      setOnboardingDocuments([])
+      setOnboardingCompletions([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    fetchTasks()
+    fetchAllData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const getDocumentCompletionStatus = (documentId: string) => {
+    const completion = onboardingCompletions.find((c) => c.documentId === documentId)
+    return completion?.status || 'NOT_STARTED'
+  }
+
+  const isDocumentCompleted = (documentId: string) => {
+    return getDocumentCompletionStatus(documentId) === 'COMPLETED'
+  }
+
+  const allDocumentsCompleted = () => {
+    return onboardingDocuments.every((doc) => isDocumentCompleted(doc.id))
+  }
+
+  const handleSubmitAllDocuments = async () => {
+    if (!allDocumentsCompleted()) {
+      showToast('Please complete all documents before submitting', 'error')
+      return
+    }
+
+    setSubmittingDocuments(true)
+    try {
+      const response = await fetch('/api/onboarding/submit-all', {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        showToast('All documents submitted successfully! Admins have been notified.', 'success')
+      } else {
+        const error = await response.json()
+        showToast(error.error || 'Failed to submit documents', 'error')
+      }
+    } catch (error) {
+      console.error('Error submitting documents:', error)
+      showToast('An error occurred. Please try again.', 'error')
+    } finally {
+      setSubmittingDocuments(false)
+    }
+  }
 
   // Check if all tasks are complete and redirect
   useEffect(() => {
-    if (tasks.length > 0) {
-      const allTasksCompleted = tasks.every((task) => task.isCompleted)
-      if (allTasksCompleted) {
-        // Wait a moment then redirect to refresh and show main dashboard
+    if (!loading && tasks.length > 0 && onboardingDocuments.length > 0) {
+      const allTasksCompleted = tasks.filter((t) => t.taskType !== 'PACKAGE_UPLOAD').every((task) => task.isCompleted)
+      const allDocsCompleted = allDocumentsCompleted()
+      if (allTasksCompleted && allDocsCompleted) {
         setTimeout(() => {
           router.refresh()
           window.location.href = '/rbt/dashboard'
         }, 1500)
       }
     }
-  }, [tasks, router])
-
-  const fetchTasks = async () => {
-    try {
-      const response = await fetch(`/api/rbt/onboarding-tasks?rbtProfileId=${rbtProfileId}`)
-      const data = await response.json()
-      if (response.ok) {
-        setTasks(data.sort((a: Task, b: Task) => a.sortOrder - b.sortOrder))
-      } else {
-        console.error('Failed to fetch tasks:', data.error)
-      }
-    } catch (error) {
-      console.error('Error fetching tasks:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, onboardingDocuments, onboardingCompletions, loading, router])
 
   const handleCompleteTask = async (taskId: string) => {
     try {
@@ -71,7 +163,7 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
       })
 
       if (response.ok) {
-        fetchTasks()
+        fetchAllData()
       }
     } catch (error) {
       console.error('Error completing task:', error)
@@ -95,7 +187,6 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
       document.body.removeChild(link)
       window.URL.revokeObjectURL(downloadUrl)
       
-      // Mark task as complete if not already
       const task = tasks.find(t => t.id === taskId)
       if (task && !task.isCompleted) {
         await handleCompleteTask(taskId)
@@ -123,7 +214,6 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
       return
     }
 
-    // Validate file sizes (max 10MB per file)
     const maxFileSize = 10 * 1024 * 1024 // 10MB
     const oversizedFiles = files.filter(file => file.size > maxFileSize)
     if (oversizedFiles.length > 0) {
@@ -131,7 +221,6 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
       return
     }
 
-    // Validate total size (max 50MB total)
     const totalSize = files.reduce((sum, file) => sum + file.size, 0)
     const maxTotalSize = 50 * 1024 * 1024 // 50MB
     if (totalSize > maxTotalSize) {
@@ -147,7 +236,6 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
 
     try {
       if (isCertificate) {
-        // For certificate, use single file upload
         const formData = new FormData()
         formData.append('file', files[0])
 
@@ -164,35 +252,8 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
               delete newState[taskId]
               return newState
             })
-            fetchTasks()
+            fetchAllData()
             alert('Certificate uploaded successfully!')
-          }
-        } else {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Upload failed')
-        }
-      } else {
-        // For package upload, use multi-file upload
-        const formData = new FormData()
-        files.forEach((file) => {
-          formData.append('files', file)
-        })
-
-        const response = await fetch(`/api/rbt/onboarding-tasks/${taskId}/upload-files`, {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success) {
-            setSelectedFiles((prev) => {
-              const newState = { ...prev }
-              delete newState[taskId]
-              return newState
-            })
-            fetchTasks()
-            alert(`Successfully uploaded ${data.filesCount} file(s)! The onboarding package has been sent to the administrator.`)
           }
         } else {
           const errorData = await response.json()
@@ -214,7 +275,6 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
       delete newState[taskId]
       return newState
     })
-    // Reset the file input
     const input = document.getElementById(`file-input-${taskId}`) as HTMLInputElement
     if (input) {
       input.value = ''
@@ -232,7 +292,7 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
       })
 
       if (response.ok) {
-        fetchTasks()
+        fetchAllData()
         alert('Signature submitted successfully!')
       } else {
         const errorData = await response.json()
@@ -252,15 +312,18 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
     )
   }
 
-  const completedCount = tasks.filter((t) => t.isCompleted).length
-  const totalCount = tasks.length
-  const progressPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0
-  const allTasksCompleted = totalCount > 0 && completedCount === totalCount
+  // Filter out PACKAGE_UPLOAD tasks
+  const regularTasks = tasks.filter((t) => t.taskType !== 'PACKAGE_UPLOAD')
+  const completedTasksCount = regularTasks.filter((t) => t.isCompleted).length
+  const completedDocumentsCount = onboardingDocuments.filter((doc) => isDocumentCompleted(doc.id)).length
+  const totalTasksCount = regularTasks.length + onboardingDocuments.length
+  const totalCompletedCount = completedTasksCount + completedDocumentsCount
+  const progressPercentage = totalTasksCount > 0 ? (totalCompletedCount / totalTasksCount) * 100 : 0
+  const allTasksCompleted = totalTasksCount > 0 && totalCompletedCount === totalTasksCount
 
-  const documentTasks = tasks.filter((t) => t.taskType === 'DOWNLOAD_DOC')
-  const signatureTasks = tasks.filter((t) => t.taskType === 'SIGNATURE')
-  const packageUploadTasks = tasks.filter((t) => t.taskType === 'PACKAGE_UPLOAD')
-  const fortyHourCourseTasks = tasks.filter((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
+  const documentTasks = regularTasks.filter((t) => t.taskType === 'DOWNLOAD_DOC')
+  const signatureTasks = regularTasks.filter((t) => t.taskType === 'SIGNATURE')
+  const fortyHourCourseTasks = regularTasks.filter((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
 
   if (allTasksCompleted) {
     return (
@@ -288,7 +351,7 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
         <CardHeader>
           <CardTitle>Onboarding Progress</CardTitle>
           <CardDescription>
-            {completedCount} of {totalCount} tasks completed
+            {totalCompletedCount} of {totalTasksCount} tasks completed
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -333,7 +396,6 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
                   {task.documentDownloadUrl && (
                     <div className="flex gap-2">
                       {task.documentDownloadUrl.startsWith('/api/') || task.documentDownloadUrl.includes('download') ? (
-                        // For API download endpoints, use JavaScript download
                         <Button
                           variant="outline"
                           onClick={() => {
@@ -350,7 +412,6 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
                             : 'Download'}
                         </Button>
                       ) : task.documentDownloadUrl.includes('.pdf') || task.documentDownloadUrl.includes('pdf') ? (
-                        // For PDF files
                         <Button
                           variant="outline"
                           onClick={async () => {
@@ -365,7 +426,6 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
                           Download PDF
                         </Button>
                       ) : (
-                        // For external links
                         <Button
                           variant="outline"
                           onClick={async () => {
@@ -552,117 +612,108 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
         </Card>
       )}
 
-      {/* Package Upload Section */}
-      {packageUploadTasks.length > 0 && (
+      {/* Onboarding Documents Section */}
+      {onboardingDocuments.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Onboarding Package Upload</CardTitle>
+            <CardTitle>Onboarding Documents</CardTitle>
+            <CardDescription>
+              Complete all required documents and acknowledgments. All documents are embedded and can be completed directly in this system.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {packageUploadTasks.map((task) => (
-                <div key={task.id} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        {task.isCompleted ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500" />
-                        ) : (
-                          <Circle className="w-5 h-5 text-gray-400" />
-                        )}
-                        <h3 className="font-medium">{task.title}</h3>
-                      </div>
-                      {task.description && (
-                        <p className="text-sm text-gray-600 mt-1">{task.description}</p>
-                      )}
-                    </div>
-                    {task.isCompleted && <Badge className="bg-green-500">Completed</Badge>}
-                  </div>
-                  {!task.isCompleted && (
-                    <div className="space-y-3">
-                      <div>
-                        <input
-                          id={`file-input-${task.id}`}
-                          type="file"
-                          accept=".pdf,.zip,.rar,.7z"
-                          multiple
-                          onChange={(e) => {
-                            handleFileSelect(task.id, e.target.files)
-                          }}
-                          className="text-sm"
-                        />
-                        <p className="text-xs text-gray-500 mt-2">Accepted formats: PDF, ZIP, RAR, 7Z. You can select multiple files at once.</p>
-                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <p className="text-sm font-semibold text-blue-900 mb-2">Important Instructions:</p>
-                          <ol className="text-xs text-blue-800 space-y-1 list-decimal list-inside">
-                            <li>Read through all documents carefully</li>
-                            <li>Sign all required documents (either digitally using an online tool or print and sign by hand)</li>
-                            <li>Collect all completed and signed documents in a folder</li>
-                            <li>Zip/compress the entire folder containing all your documentation</li>
-                            <li>Upload the zipped folder using the button below</li>
-                          </ol>
-                        </div>
-                      </div>
+              {onboardingDocuments.map((document) => {
+                const completion = onboardingCompletions.find((c) => c.documentId === document.id)
+                const isCompleted = isDocumentCompleted(document.id)
+                const isExpanded = expandedDocumentId === document.id
 
-                      {/* Show selected files */}
-                      {selectedFiles[task.id] && selectedFiles[task.id].length > 0 && (
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-                          <p className="text-sm font-medium text-blue-900">
-                            Selected Files ({selectedFiles[task.id].length}):
-                          </p>
-                          <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
-                            {selectedFiles[task.id].map((file, index) => (
-                              <li key={index}>
-                                {file.name} ({(file.size / 1024).toFixed(2)} KB)
-                              </li>
-                            ))}
-                          </ul>
-                          <div className="flex gap-2 mt-3">
-                            <Button
-                              onClick={() => handleFileUpload(task.id, false)}
-                              disabled={uploading[task.id]}
-                              className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2"
+                return (
+                  <div key={document.id} className="border rounded-lg">
+                    <div
+                      className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => setExpandedDocumentId(isExpanded ? null : document.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {isCompleted ? (
+                            <CheckCircle2 className="w-6 h-6 text-green-500" />
+                          ) : (
+                            <Circle className="w-6 h-6 text-gray-400" />
+                          )}
+                          <div>
+                            <h3 className="font-medium text-lg">{document.title}</h3>
+                            <Badge
+                              variant={document.type === 'ACKNOWLEDGMENT' ? 'outline' : 'secondary'}
+                              className="mt-1"
                             >
-                              {uploading[task.id] ? (
-                                <>
-                                  <Circle className="w-4 h-4 animate-spin" />
-                                  Uploading...
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="w-4 h-4" />
-                                  Confirm & Upload Files
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => handleClearSelection(task.id)}
-                              disabled={uploading[task.id]}
-                              className="flex items-center gap-2"
-                            >
-                              <X className="w-4 h-4" />
-                              Clear Selection
-                            </Button>
+                              {document.type === 'ACKNOWLEDGMENT' ? 'Acknowledgment' : 'Fillable PDF'}
+                            </Badge>
                           </div>
                         </div>
-                      )}
-
-                      <p className="text-xs text-orange-600 font-medium">
-                        All files will be automatically emailed to the administrator as a ZIP package upon upload.
-                      </p>
+                        <Badge
+                          className={
+                            isCompleted
+                              ? 'bg-green-100 text-green-700'
+                              : completion?.status === 'IN_PROGRESS'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-gray-100 text-gray-600'
+                          }
+                        >
+                          {isCompleted
+                            ? 'Completed'
+                            : completion?.status === 'IN_PROGRESS'
+                            ? 'In Progress'
+                            : 'Not Started'}
+                        </Badge>
+                      </div>
                     </div>
-                  )}
-                  {task.isCompleted && task.uploadUrl && (
-                    <div className="mt-4 ml-7 p-3 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-600">
-                        ✅ Package uploaded successfully
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    {isExpanded && (
+                      <div className="border-t p-4 bg-gray-50">
+                        {document.type === 'ACKNOWLEDGMENT' ? (
+                          <AcknowledgmentFlow
+                            document={document}
+                            completion={completion}
+                            onComplete={fetchAllData}
+                          />
+                        ) : (
+                          <FillablePdfFlow
+                            document={document}
+                            completion={completion}
+                            onComplete={fetchAllData}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
+
+            {/* Submit All Documents Button */}
+            {allDocumentsCompleted() && (
+              <div className="mt-6 p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+                <div className="text-center space-y-4">
+                  <div className="flex items-center justify-center gap-2 text-green-700">
+                    <CheckCircle2 className="w-6 h-6" />
+                    <p className="text-lg font-semibold">All documents completed!</p>
+                  </div>
+                  <p className="text-gray-600">
+                    Review all documents above, then click the button below to submit everything.
+                    Admins will be notified upon submission.
+                  </p>
+                  <Button
+                    onClick={handleSubmitAllDocuments}
+                    disabled={submittingDocuments}
+                    size="lg"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Send className="w-5 h-5 mr-2" />
+                    {submittingDocuments ? 'Submitting...' : 'Submit All Documents'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

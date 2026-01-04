@@ -30,6 +30,14 @@ export default async function RBTProfilePage({
           uploadedAt: 'desc',
         },
       },
+      onboardingCompletions: {
+        include: {
+          document: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
     },
   })
 

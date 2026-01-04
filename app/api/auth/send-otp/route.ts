@@ -13,6 +13,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Test account: skip OTP generation for hrmtesting@gmail.com
+    const isTestAccount = email.toLowerCase() === 'hrmtesting@gmail.com'
+    
+    if (isTestAccount) {
+      // For test account, generate a dummy OTP that will be accepted
+      const code = '000000'
+      await storeOTPEmail(email, code)
+      return NextResponse.json({ 
+        success: true,
+        isTestAccount: true,
+        devOTP: code // Always return for test account
+      })
+    }
+
     // Generate and store OTP
     const code = generateOTP()
     await storeOTPEmail(email, code)

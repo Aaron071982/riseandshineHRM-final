@@ -104,6 +104,17 @@ interface RBTProfile {
     documentType: string | null
     uploadedAt: Date
   }>
+  onboardingCompletions?: Array<{
+    id: string
+    documentId: string
+    status: string
+    completedAt: Date | null
+    document: {
+      id: string
+      title: string
+      type: string
+    }
+  }>
 }
 
 interface RBTProfileViewProps {
@@ -788,6 +799,131 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                   </div>
                 ))}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Onboarding Documents */}
+      {isHired && rbtProfile.onboardingCompletions && rbtProfile.onboardingCompletions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-gray-900">Onboarding Documents</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {rbtProfile.onboardingCompletions.map((completion) => (
+                <div key={completion.id} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        {completion.status === 'COMPLETED' ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        ) : completion.status === 'IN_PROGRESS' ? (
+                          <XCircle className="w-5 h-5 text-yellow-500" />
+                        ) : (
+                          <XCircle className="w-5 h-5 text-gray-400" />
+                        )}
+                        <h4 className="font-medium">{completion.document.title}</h4>
+                        <Badge variant="outline" className="ml-2">
+                          {completion.document.type === 'ACKNOWLEDGMENT' ? 'Acknowledgment' : 'Fillable PDF'}
+                        </Badge>
+                      </div>
+                      {completion.completedAt && (
+                        <p className="text-xs text-gray-500 mt-1 ml-7">
+                          Completed: {formatDateTime(completion.completedAt)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        className={
+                          completion.status === 'COMPLETED'
+                            ? 'bg-green-100 text-green-700'
+                            : completion.status === 'IN_PROGRESS'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }
+                      >
+                        {completion.status === 'COMPLETED' ? 'Completed' : completion.status === 'IN_PROGRESS' ? 'In Progress' : 'Not Started'}
+                      </Badge>
+                      {completion.status === 'COMPLETED' && (
+                        <>
+                          {completion.document.type === 'FILLABLE_PDF' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(
+                                    `/api/admin/onboarding/completions/${rbtProfile.id}/${completion.id}/download`
+                                  )
+                                  if (response.ok) {
+                                    const blob = await response.blob()
+                                    const url = window.URL.createObjectURL(blob)
+                                    const a = document.createElement('a')
+                                    a.href = url
+                                    a.download = `${completion.document.title.replace(/[^a-z0-9]/gi, '_')}.pdf`
+                                    document.body.appendChild(a)
+                                    a.click()
+                                    document.body.removeChild(a)
+                                    window.URL.revokeObjectURL(url)
+                                    showToast('PDF downloaded successfully', 'success')
+                                  } else {
+                                    const error = await response.json()
+                                    showToast(error.error || 'Failed to download PDF', 'error')
+                                  }
+                                } catch (error) {
+                                  console.error('Error downloading PDF:', error)
+                                  showToast('An error occurred while downloading the PDF', 'error')
+                                }
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Download className="w-4 h-4" />
+                              Download PDF
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(
+                                    `/api/admin/onboarding/completions/${rbtProfile.id}/${completion.id}/acknowledgment`
+                                  )
+                                  if (response.ok) {
+                                    const blob = await response.blob()
+                                    const url = window.URL.createObjectURL(blob)
+                                    const a = document.createElement('a')
+                                    a.href = url
+                                    a.download = `${completion.document.title.replace(/[^a-z0-9]/gi, '_')}_acknowledgment.pdf`
+                                    document.body.appendChild(a)
+                                    a.click()
+                                    document.body.removeChild(a)
+                                    window.URL.revokeObjectURL(url)
+                                    showToast('Acknowledgment receipt downloaded successfully', 'success')
+                                  } else {
+                                    const error = await response.json()
+                                    showToast(error.error || 'Failed to download acknowledgment', 'error')
+                                  }
+                                } catch (error) {
+                                  console.error('Error downloading acknowledgment:', error)
+                                  showToast('An error occurred while downloading the acknowledgment', 'error')
+                                }
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Download className="w-4 h-4" />
+                              Download Receipt
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

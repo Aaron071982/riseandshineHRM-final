@@ -86,6 +86,17 @@ enum EmailTemplateType {
   REJECTION
 }
 
+enum OnboardingDocumentType {
+  ACKNOWLEDGMENT
+  FILLABLE_PDF
+}
+
+enum OnboardingCompletionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
 model User {
   id          String   @id @default(cuid())
   name        String?
@@ -158,6 +169,7 @@ model RBTProfile {
   availabilitySlots  AvailabilitySlot[]
   documents          RBTDocument[]
   interviewNotes     InterviewNotes[]
+  onboardingCompletions OnboardingCompletion[]
 
   @@map("rbt_profiles")
 }
@@ -331,4 +343,41 @@ model RBTDocument {
   rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
 
   @@map("rbt_documents")
+}
+
+model OnboardingDocument {
+  id        String                 @id @default(cuid())
+  title     String
+  slug      String                 @unique
+  type      OnboardingDocumentType
+  pdfUrl    String?                @db.Text // URL or path to the PDF file
+  pdfData   String?                @db.Text // base64 encoded PDF (alternative to pdfUrl)
+  sortOrder Int                    @default(0)
+  isActive  Boolean                @default(true)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  completions OnboardingCompletion[]
+
+  @@map("onboarding_documents")
+}
+
+model OnboardingCompletion {
+  id               String                    @id @default(cuid())
+  rbtProfileId     String
+  documentId       String
+  status           OnboardingCompletionStatus @default(NOT_STARTED)
+  completedAt      DateTime?
+  acknowledgmentJson Json?                   // Stores acknowledgment data (name, checkboxes, timestamp, etc.)
+  signedPdfUrl     String?                   @db.Text // URL or path to the signed/completed PDF
+  signedPdfData    String?                   @db.Text // base64 encoded signed PDF (alternative to signedPdfUrl)
+  draftData        Json?                     // Stores draft form field data for fillable PDFs
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  rbtProfile RBTProfile          @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  document   OnboardingDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([rbtProfileId, documentId])
+  @@map("onboarding_completions")
 }

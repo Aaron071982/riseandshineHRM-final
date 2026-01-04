@@ -174,12 +174,6 @@ export async function POST(
           description: 'Sign to confirm you have read and understood all HIPAA documents and training materials',
           sortOrder: needsFortyHourCourse ? 8 : 7,
         },
-        {
-          taskType: 'PACKAGE_UPLOAD',
-          title: 'Upload Completed Onboarding Package',
-          description: 'Upload your completed onboarding package with all signed documents. This will be sent to the administrator for review.',
-          sortOrder: needsFortyHourCourse ? 9 : 8,
-        },
       ]
 
       try {
@@ -275,12 +269,6 @@ export async function POST(
             title: 'Digital Signature Confirmation',
             description: 'Sign to confirm you have read and understood all HIPAA documents and training materials',
             sortOrder: needsFortyHourCourse ? 8 : 7,
-          },
-          {
-            taskType: 'PACKAGE_UPLOAD',
-            title: 'Upload Completed Onboarding Package',
-            description: 'Upload your completed onboarding package with all signed documents. This will be sent to the administrator for review.',
-            sortOrder: needsFortyHourCourse ? 9 : 8,
           },
         ]
 
