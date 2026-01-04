@@ -49,6 +49,7 @@ export default function PdfAcroFormViewer({
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
+  const [containerReady, setContainerReady] = useState(false)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
 
   useEffect(() => {
@@ -63,12 +64,33 @@ export default function PdfAcroFormViewer({
       return
     }
 
-    loadPdf()
+    // Wait for container to be ready before loading PDF
+    let timer: NodeJS.Timeout | null = null
+    
+    if (containerReady && containerRef.current) {
+      console.log('[PdfAcroFormViewer] Container is ready, loading PDF')
+      loadPdf()
+    } else {
+      // If container not ready yet, wait a bit and try again
+      timer = setTimeout(() => {
+        if (containerRef.current) {
+          console.log('[PdfAcroFormViewer] Container ref is available after delay, loading PDF')
+          loadPdf()
+        } else {
+          console.error('[PdfAcroFormViewer] Container ref still not available after delay')
+          setError('PDF viewer container not available. Please refresh the page.')
+          setLoading(false)
+        }
+      }, 100) // Small delay to ensure ref is attached
+    }
 
     // Store ref value for cleanup
     const container = containerRef.current
 
     return () => {
+      if (timer) {
+        clearTimeout(timer)
+      }
       // Cleanup blob URLs
       if (container) {
         if ((container as any).__pdfBlobUrl) {
@@ -77,7 +99,7 @@ export default function PdfAcroFormViewer({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdfData])
+  }, [pdfData, containerReady])
 
   const loadPdf = async () => {
     try {
@@ -503,7 +525,14 @@ export default function PdfAcroFormViewer({
             )}
           </div>
           <div
-            ref={containerRef}
+            ref={(el) => {
+              if (el) {
+                // Store ref in a way that works with TypeScript
+                ;(containerRef as any).current = el
+                setContainerReady(true)
+                console.log('[PdfAcroFormViewer] Container ref attached')
+              }
+            }}
             className="pdf-container overflow-auto max-h-[800px] border-2 border-gray-300 rounded-lg p-4 bg-white"
             style={{ minHeight: '500px', width: '100%' }}
           />

@@ -11,7 +11,8 @@ interface RBTMainDashboardProps {
 }
 
 export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboardProps) {
-  const [rbtProfile, todayShifts, upcomingShifts, timeEntries, leaveRequests, upcomingInterviews] = await Promise.all([
+  try {
+    const [rbtProfile, todayShifts, upcomingShifts, timeEntries, leaveRequests, upcomingInterviews] = await Promise.all([
     prisma.rBTProfile.findUnique({
       where: { id: rbtProfileId },
     }),
@@ -309,5 +310,21 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
       </Card>
     </div>
   )
+  } catch (error: any) {
+    console.error('[RBTMainDashboard] Error loading dashboard:', error)
+    return (
+      <div className="container mx-auto p-6 max-w-4xl">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <h1 className="text-xl font-bold text-red-800 mb-2">Error Loading Dashboard</h1>
+          <p className="text-red-700">
+            Unable to load your dashboard data. Please try refreshing the page.
+          </p>
+          <p className="text-sm text-red-600 mt-2">
+            Error: {error?.message || 'Unknown error'}
+          </p>
+        </div>
+      </div>
+    )
+  }
 }
 
