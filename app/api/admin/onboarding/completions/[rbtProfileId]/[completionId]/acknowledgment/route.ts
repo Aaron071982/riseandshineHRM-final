@@ -164,14 +164,20 @@ export async function GET(
         // Check if it's a base64 image
         if (ackData.signatureData.startsWith('data:image')) {
           const base64Data = ackData.signatureData.split(',')[1]
+          if (!base64Data) {
+            throw new Error('Invalid base64 data')
+          }
           const imageBytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0))
           
           // Determine image type
           let image
           if (ackData.signatureData.includes('image/png')) {
             image = await pdfDoc.embedPng(imageBytes)
-          } else {
+          } else if (ackData.signatureData.includes('image/jpeg') || ackData.signatureData.includes('image/jpg')) {
             image = await pdfDoc.embedJpg(imageBytes)
+          } else {
+            // Default to PNG if type not specified
+            image = await pdfDoc.embedPng(imageBytes)
           }
 
           yPosition -= 20

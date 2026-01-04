@@ -1,9 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/components/ui/toast'
+import { usePdfFormFiller } from './PdfFormFiller'
 
 interface OnboardingDocument {
   id: string
@@ -37,6 +41,7 @@ export default function FillablePdfFlow({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [isCompleted, setIsCompleted] = useState(completion?.status === 'COMPLETED')
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
     if (completion?.status === 'COMPLETED') {
@@ -44,30 +49,43 @@ export default function FillablePdfFlow({
     }
   }, [completion])
 
+  // Always call hook (React rules), but it handles empty pdfData gracefully
+  const pdfFiller = usePdfFormFiller(document.pdfData || '')
+
   const handleSaveDraft = async () => {
-    // For draft, we'll just mark as in progress
-    // In a full implementation, we could save form field state
     setSaving(true)
     try {
+      let filledPdfBase64 = document.pdfData || ''
+      
+      // If we have form data from the PDF filler, use it
+      if (!pdfFiller.loading && document.pdfData) {
+        try {
+          filledPdfBase64 = await pdfFiller.getFilledPdf()
+        } catch (error) {
+          console.error('Error getting filled PDF:', error)
+          // Fallback to original PDF
+        }
+      }
+      
       const response = await fetch('/api/onboarding/pdf/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           documentId: document.id,
-          formData: {}, // Empty for now since users fill directly in PDF
+          formData: pdfFiller.formData || {},
         }),
       })
 
       if (response.ok) {
         showToast('Draft saved successfully', 'success')
-        onComplete()
+        // Don't call onComplete() to avoid refresh - preserves form state
       } else {
         const error = await response.json()
         showToast(error.error || 'Failed to save draft', 'error')
       }
     } catch (error) {
       console.error('Error saving draft:', error)
-      showToast('An error occurred. Please try again.', 'error')
+      showToast('An error occurred while saving. Your form data may not be saved.', 'error')
     } finally {
       setSaving(false)
     }
@@ -82,34 +100,38 @@ export default function FillablePdfFlow({
         return
       }
 
-      // Note: Browser security prevents extracting filled form data from iframe PDF viewers.
-      // Users fill the PDF in the iframe, but we cannot programmatically extract those values.
-      // For now, we store the original PDF. Admins can download it, but it won't contain filled data.
-      // 
-      // To properly capture filled PDFs, you would need to use PDF.js to render the PDF
-      // with programmatic access to form fields, or use a server-side PDF filling solution.
-      
-      // Store the original PDF (users have filled it in the iframe, but we can't capture that data)
+      // Get filled PDF using the PDF form filler
+      let filledPdfBase64 = document.pdfData
+      if (!pdfFiller.loading && document.pdfData) {
+        try {
+          filledPdfBase64 = await pdfFiller.getFilledPdf()
+        } catch (error) {
+          console.error('Error generating filled PDF:', error)
+          showToast('Warning: Could not capture filled form data. Storing original PDF.', 'error')
+          // Continue with original PDF as fallback
+        }
+      }
+
       const response = await fetch('/api/onboarding/pdf/finalize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           documentId: document.id,
-          completedPdfData: document.pdfData, // Store original PDF for now
+          completedPdfData: filledPdfBase64,
         }),
       })
 
       if (response.ok) {
         showToast('Document finalized successfully', 'success')
         setIsCompleted(true)
-        onComplete()
+        onComplete() // Only refresh on finalize
       } else {
         const error = await response.json()
         showToast(error.error || 'Failed to finalize document', 'error')
       }
     } catch (error) {
       console.error('Error finalizing PDF:', error)
-      showToast('An error occurred while finalizing the PDF.', 'error')
+      showToast('An error occurred while finalizing the PDF. Please try again.', 'error')
     } finally {
       setLoading(false)
     }
@@ -138,7 +160,8 @@ export default function FillablePdfFlow({
           <div className="border rounded-lg overflow-auto max-h-[600px]" style={{ height: '600px' }}>
             {document.pdfData ? (
               <iframe
-                src={`data:application/pdf;base64,${document.pdfData}`}
+                ref={iframeRef}
+                src={`data:application/pdf;base64,${document.pdfData}#toolbar=1`}
                 className="w-full h-full"
                 title={document.title}
               />
@@ -157,6 +180,45 @@ export default function FillablePdfFlow({
         </CardContent>
       </Card>
 
+      {/* Form Fields (if PDF has form fields) */}
+      {!pdfFiller.loading && pdfFiller.formFields.length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Fill Out Form Fields</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pdfFiller.formFields.map((field) => (
+                  <div key={field.name} className="space-y-2">
+                    <Label htmlFor={field.name}>{field.name}</Label>
+                    {field.type === 'PDFTextField' && (
+                      <Input
+                        id={field.name}
+                        value={pdfFiller.formData[field.name] || ''}
+                        onChange={(e) => pdfFiller.updateField(field.name, e.target.value)}
+                        disabled={isCompleted}
+                      />
+                    )}
+                    {field.type === 'PDFCheckBox' && (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={field.name}
+                          checked={pdfFiller.formData[field.name] || false}
+                          onCheckedChange={(checked) => pdfFiller.updateField(field.name, checked)}
+                          disabled={isCompleted}
+                        />
+                        <Label htmlFor={field.name} className="cursor-pointer">
+                          {field.name}
+                        </Label>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Action Buttons */}
       <Card>
         <CardContent className="pt-6">
@@ -164,7 +226,9 @@ export default function FillablePdfFlow({
             <div>
               <h3 className="font-semibold text-lg mb-2">Fill Out the PDF Form</h3>
               <p className="text-sm text-gray-600">
-                Please fill out all required fields directly in the PDF form above. When you&apos;re done, click &quot;Finalize & Submit&quot; to complete the document.
+                {!pdfFiller.loading && pdfFiller.formFields.length > 0
+                  ? 'Fill out the form fields below. You can also fill directly in the PDF viewer above. When you\'re done, click "Finalize & Submit" to complete the document.'
+                  : 'Please fill out all required fields directly in the PDF form above. When you\'re done, click "Finalize & Submit" to complete the document.'}
               </p>
             </div>
             <div className="flex gap-4">
