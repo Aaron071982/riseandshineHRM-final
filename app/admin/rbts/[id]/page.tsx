@@ -31,9 +31,6 @@ export default async function RBTProfilePage({
         },
       },
       onboardingCompletions: {
-        include: {
-          document: true,
-        },
         select: {
           id: true,
           documentId: true,
