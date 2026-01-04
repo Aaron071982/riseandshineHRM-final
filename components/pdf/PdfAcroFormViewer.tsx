@@ -125,37 +125,27 @@ export default function PdfAcroFormViewer({
         return
       }
 
-      // Try PDF.js first, fallback to iframe if it fails
-      try {
-        // Load PDF document with PDF.js
-        const loadingTask = pdfjsLib.getDocument({ data: pdfBytes })
-        const pdfDoc = await loadingTask.promise
-        pdfDocRef.current = pdfDoc
-        setNumPages(pdfDoc.numPages)
-        console.log('[PdfAcroFormViewer] PDF loaded with PDF.js, pages:', pdfDoc.numPages)
+      // Use data URL iframe first - most reliable for displaying PDFs
+      // This ensures the PDF is always visible
+      console.log('[PdfAcroFormViewer] Using data URL iframe for display (most reliable)')
+      await renderPdfWithDataUrl(pdfData)
 
-        // Render PDF pages
-        await renderPages(pdfDoc)
+      // In parallel, try to load with PDF.js to get page count
+      pdfjsLib
+        .getDocument({ data: pdfBytes })
+        .promise.then((pdfDoc) => {
+          pdfDocRef.current = pdfDoc
+          setNumPages(pdfDoc.numPages)
+          console.log('[PdfAcroFormViewer] PDF.js loaded successfully, pages:', pdfDoc.numPages)
+        })
+        .catch((pdfJsErr) => {
+          console.warn('[PdfAcroFormViewer] PDF.js failed (non-critical, using iframe):', pdfJsErr)
+        })
 
-        // Extract form fields using pdf-lib (run in parallel, don't block rendering)
-        extractFormFields(pdfBytes).catch((err) => {
-          console.warn('Form field extraction failed (non-critical):', err)
-        })
-      } catch (pdfJsErr: any) {
-        console.warn('[PdfAcroFormViewer] PDF.js failed, using iframe fallback:', pdfJsErr)
-        // Fallback to iframe - ensures PDF is always visible
-        try {
-          await renderPdfWithIframe(pdfBytes)
-        } catch (iframeErr: any) {
-          console.error('[PdfAcroFormViewer] Iframe fallback also failed, using data URL:', iframeErr)
-          // Last resort: use data URL directly
-          await renderPdfWithDataUrl(pdfData)
-        }
-        // Still try to extract form fields
-        extractFormFields(pdfBytes).catch((err) => {
-          console.warn('[PdfAcroFormViewer] Form field extraction failed (non-critical):', err)
-        })
-      }
+      // Extract form fields using pdf-lib (run in parallel, don't block rendering)
+      extractFormFields(pdfBytes).catch((err) => {
+        console.warn('[PdfAcroFormViewer] Form field extraction failed (non-critical):', err)
+      })
 
       setLoading(false)
     } catch (err: any) {
@@ -210,6 +200,49 @@ export default function PdfAcroFormViewer({
       }
     } catch (err) {
       console.warn('Could not extract form fields:', err)
+    }
+  }
+
+  const renderPdfWithDataUrl = async (base64Data: string) => {
+    if (!containerRef.current) return
+
+    console.log('[PdfAcroFormViewer] renderPdfWithDataUrl called')
+    
+    // Clear container
+    containerRef.current.innerHTML = ''
+
+    // Use data URL directly - this is the most reliable approach
+    const dataUrl = `data:application/pdf;base64,${base64Data}`
+
+    const iframe = document.createElement('iframe')
+    iframe.src = `${dataUrl}#toolbar=1`
+    iframe.style.width = '100%'
+    iframe.style.height = '800px'
+    iframe.style.border = '1px solid #e5e7eb'
+    iframe.style.borderRadius = '8px'
+    iframe.style.backgroundColor = '#fff'
+    iframe.setAttribute('title', documentTitle || 'PDF Document')
+    iframe.onload = () => {
+      console.log('[PdfAcroFormViewer] PDF iframe loaded successfully (data URL)')
+    }
+    iframe.onerror = (err) => {
+      console.error('[PdfAcroFormViewer] PDF iframe load error (data URL):', err)
+      setError('Failed to load PDF. The PDF file may be corrupted or too large.')
+    }
+
+    containerRef.current.appendChild(iframe)
+    console.log('[PdfAcroFormViewer] PDF iframe added with data URL, length:', base64Data.length)
+    
+    // Try to extract form fields
+    try {
+      const binaryString = atob(base64Data)
+      const pdfBytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        pdfBytes[i] = binaryString.charCodeAt(i)
+      }
+      await extractFormFields(pdfBytes)
+    } catch (err) {
+      console.warn('[PdfAcroFormViewer] Could not extract form fields:', err)
     }
   }
 
