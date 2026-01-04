@@ -1,9 +1,27 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import * as pdfjsLib from 'pdfjs-dist'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { Loader2 } from 'lucide-react'
+
+// Configure PDF.js worker
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+}
+
+interface FormField {
+  name: string
+  type: 'text' | 'checkbox' | 'dropdown' | 'textarea'
+  value: any
+  options?: string[]
+}
 
 interface PdfAcroFormViewerProps {
   pdfData: string // base64 encoded PDF
@@ -25,10 +43,13 @@ export default function PdfAcroFormViewer({
   const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [numPages, setNumPages] = useState(0)
+  const [formFields, setFormFields] = useState<FormField[]>([])
   const [fieldValues, setFieldValues] = useState<Record<string, any>>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
+  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
 
   useEffect(() => {
     if (!pdfData || pdfData.length === 0) {
@@ -43,14 +64,9 @@ export default function PdfAcroFormViewer({
     const container = containerRef.current
 
     return () => {
-      // Cleanup polling interval and blob URL
+      // Cleanup
       if (container) {
-        if ((container as any).__pollInterval) {
-          clearInterval((container as any).__pollInterval)
-        }
-        if ((container as any).__pdfBlobUrl) {
-          URL.revokeObjectURL((container as any).__pdfBlobUrl)
-        }
+        // Cleanup if needed
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,51 +82,24 @@ export default function PdfAcroFormViewer({
         return
       }
 
-      // Clear container
-      containerRef.current.innerHTML = ''
-
-      // Decode base64 PDF and create blob URL for iframe
+      // Decode base64 PDF
       const binaryString = atob(pdfData)
       const pdfBytes = new Uint8Array(binaryString.length)
       for (let i = 0; i < binaryString.length; i++) {
         pdfBytes[i] = binaryString.charCodeAt(i)
       }
-      
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' })
-      const url = URL.createObjectURL(blob)
 
-      // Create iframe for native browser PDF viewer (supports interactive form fields)
-      const iframe = document.createElement('iframe')
-      iframe.src = `${url}#toolbar=1`
-      iframe.style.width = '100%'
-      iframe.style.height = '800px'
-      iframe.style.border = '1px solid #e5e7eb'
-      iframe.style.borderRadius = '8px'
-      iframe.style.backgroundColor = '#fff'
-      iframe.setAttribute('title', documentTitle || 'PDF Document')
+      // Load PDF document with PDF.js
+      const loadingTask = pdfjsLib.getDocument({ data: pdfBytes })
+      const pdfDoc = await loadingTask.promise
+      pdfDocRef.current = pdfDoc
+      setNumPages(pdfDoc.numPages)
 
-      // Store blob URL for cleanup
-      ;(containerRef.current as any).__pdfBlobUrl = url
-      ;(containerRef.current as any).__pdfIframe = iframe
+      // Render PDF pages
+      await renderPages(pdfDoc)
 
-      containerRef.current.appendChild(iframe)
-
-      // Extract form fields from PDF using pdf-lib for field discovery (optional)
-      // This helps us know which fields exist for validation
-      try {
-        const { PDFDocument } = await import('pdf-lib')
-        const pdfLibDoc = await PDFDocument.load(pdfBytes)
-        const form = pdfLibDoc.getForm()
-        const fields = form.getFields()
-
-        // Store field names for validation (if needed)
-        const fieldNames = fields.map((f) => f.getName())
-        if (fieldNames.length > 0) {
-          // Fields exist - can use for validation later if needed
-        }
-      } catch (err) {
-        console.warn('Could not extract form fields (this is okay):', err)
-      }
+      // Extract form fields using pdf-lib
+      await extractFormFields(pdfBytes)
 
       setLoading(false)
     } catch (err: any) {
@@ -120,10 +109,123 @@ export default function PdfAcroFormViewer({
     }
   }
 
-  const loadFieldValues = async () => {
-    // With iframe approach, we can't directly access filled values due to CORS
-    // Values will be extracted on finalize if possible, or user will need to manually fill
-    // This is a limitation of iframe approach, but ensures PDF is visible and fillable
+  const renderPages = async (pdfDoc: pdfjsLib.PDFDocumentProxy) => {
+    if (!containerRef.current) return
+
+    // Clear container
+    containerRef.current.innerHTML = ''
+
+    // Create pages container
+    const pagesContainer = document.createElement('div')
+    pagesContainer.className = 'space-y-4'
+
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      const page = await pdfDoc.getPage(pageNum)
+      const viewport = page.getViewport({ scale: 1.5 })
+
+      // Create page container
+      const pageDiv = document.createElement('div')
+      pageDiv.className = 'pdf-page mb-4 border border-gray-300 bg-white shadow-sm rounded'
+      pageDiv.style.position = 'relative'
+      pageDiv.style.width = `${viewport.width}px`
+      pageDiv.style.height = `${viewport.height}px`
+      pageDiv.style.margin = '0 auto'
+
+      // Create canvas for PDF content
+      const canvas = document.createElement('canvas')
+      canvas.className = 'pdf-canvas'
+      const context = canvas.getContext('2d')
+      if (!context) continue
+
+      canvas.height = viewport.height
+      canvas.width = viewport.width
+
+      // Render PDF page to canvas
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport,
+        canvas: canvas,
+      }
+
+      await page.render(renderContext).promise
+      pageDiv.appendChild(canvas)
+      pagesContainer.appendChild(pageDiv)
+    }
+
+    containerRef.current.appendChild(pagesContainer)
+  }
+
+  const extractFormFields = async (pdfBytes: Uint8Array) => {
+    try {
+      const { PDFDocument } = await import('pdf-lib')
+      const pdfDoc = await PDFDocument.load(pdfBytes)
+      const form = pdfDoc.getForm()
+      const fields = form.getFields()
+
+      const extractedFields: FormField[] = []
+
+      for (const field of fields) {
+        const name = field.getName()
+        const type = field.constructor.name
+        let fieldType: 'text' | 'checkbox' | 'dropdown' | 'textarea' = 'text'
+        let value: any = ''
+        let options: string[] | undefined
+
+        try {
+          if (type === 'PDFTextField') {
+            fieldType = 'text'
+            value = (field as any).getText() || ''
+          } else if (type === 'PDFCheckBox') {
+            fieldType = 'checkbox'
+            value = (field as any).isChecked() || false
+          } else if (type === 'PDFDropdown') {
+            fieldType = 'dropdown'
+            try {
+              const optionsList = (field as any).getOptions()
+              options = optionsList || []
+              value = (field as any).getSelected() || ''
+            } catch (e) {
+              options = []
+            }
+          } else if (type === 'PDFRadioGroup') {
+            fieldType = 'dropdown'
+            try {
+              const optionsList = (field as any).getOptions()
+              options = optionsList || []
+              value = (field as any).getSelected() || ''
+            } catch (e) {
+              options = []
+            }
+          }
+        } catch (e) {
+          console.warn(`Could not extract field ${name}:`, e)
+          continue
+        }
+
+        extractedFields.push({
+          name,
+          type: fieldType,
+          value,
+          options,
+        })
+      }
+
+      setFormFields(extractedFields)
+
+      // Initialize field values state
+      const initialValues: Record<string, any> = {}
+      extractedFields.forEach((field) => {
+        initialValues[field.name] = field.value
+      })
+      setFieldValues(initialValues)
+    } catch (err) {
+      console.error('Error extracting form fields:', err)
+      // Continue even if field extraction fails - PDF will still be visible
+    }
+  }
+
+  const updateFieldValue = (fieldName: string, value: any) => {
+    setFieldValues((prev) => ({ ...prev, [fieldName]: value }))
   }
 
   const validateFields = (): boolean => {
@@ -139,16 +241,6 @@ export default function PdfAcroFormViewer({
 
     if (missing.length > 0) {
       setValidationErrors(missing)
-      // Highlight missing fields (add red border to annotation widgets)
-      if (containerRef.current) {
-        const widgets = containerRef.current.querySelectorAll('.annotationLayer [data-field-name]')
-        widgets.forEach((widget: any) => {
-          if (missing.includes(widget.dataset.fieldName)) {
-            widget.style.border = '2px solid red'
-            widget.style.borderRadius = '2px'
-          }
-        })
-      }
       return false
     }
 
@@ -157,10 +249,6 @@ export default function PdfAcroFormViewer({
   }
 
   const generateFilledPdf = async (): Promise<Blob> => {
-    // With iframe approach, we can't extract filled values due to CORS restrictions
-    // We'll use pdf-lib to fill with whatever field values we have
-    // If fieldValues is empty, the original PDF will be sent (user can fill manually later if needed)
-
     // Import the fill utility
     const { fillPdfWithValues } = await import('@/lib/pdf/fillPdfWithValues')
 
@@ -171,8 +259,7 @@ export default function PdfAcroFormViewer({
       pdfBytes[i] = binaryString.charCodeAt(i)
     }
 
-    // Generate filled PDF with current field values (may be empty)
-    // Note: This is a limitation - ideally we'd extract from iframe, but CORS prevents it
+    // Generate filled PDF with captured field values
     const filledBlob = await fillPdfWithValues(pdfBytes, fieldValues)
     return filledBlob
   }
@@ -182,7 +269,6 @@ export default function PdfAcroFormViewer({
 
     try {
       setSaving(true)
-      loadFieldValues() // Refresh field values
       await onSaveDraft({ fieldValues })
     } catch (err: any) {
       console.error('Error saving draft:', err)
@@ -204,7 +290,6 @@ export default function PdfAcroFormViewer({
     try {
       setFinalizing(true)
       setError(null)
-      loadFieldValues() // Refresh field values
 
       // Generate filled PDF
       const filledPdfBlob = await generateFilledPdf()
@@ -232,7 +317,7 @@ export default function PdfAcroFormViewer({
     )
   }
 
-  if (error) {
+  if (error && !pdfDocRef.current) {
     return (
       <Card>
         <CardContent className="pt-6">
@@ -245,7 +330,7 @@ export default function PdfAcroFormViewer({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* PDF Viewer Container */}
       <Card>
         <CardContent className="pt-6">
@@ -256,6 +341,90 @@ export default function PdfAcroFormViewer({
           />
         </CardContent>
       </Card>
+
+      {/* Form Fields Section */}
+      {formFields.length > 0 && !readOnly && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Fill Out Form Fields</h3>
+                <p className="text-sm text-gray-600">
+                  Please fill out all the form fields below. These fields correspond to the PDF form above.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {formFields.map((field) => (
+                  <div key={field.name} className="space-y-2">
+                    <Label htmlFor={field.name}>
+                      {field.name}
+                      {requiredFields.includes(field.name) && (
+                        <span className="text-red-500 ml-1">*</span>
+                      )}
+                    </Label>
+                    {field.type === 'text' && (
+                      <Input
+                        id={field.name}
+                        value={fieldValues[field.name] || ''}
+                        onChange={(e) => updateFieldValue(field.name, e.target.value)}
+                        disabled={readOnly}
+                        className={validationErrors.includes(field.name) ? 'border-red-500' : ''}
+                      />
+                    )}
+                    {field.type === 'textarea' && (
+                      <Textarea
+                        id={field.name}
+                        value={fieldValues[field.name] || ''}
+                        onChange={(e) => updateFieldValue(field.name, e.target.value)}
+                        disabled={readOnly}
+                        className={validationErrors.includes(field.name) ? 'border-red-500' : ''}
+                        rows={3}
+                      />
+                    )}
+                    {field.type === 'checkbox' && (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={field.name}
+                          checked={fieldValues[field.name] || false}
+                          onCheckedChange={(checked) => updateFieldValue(field.name, checked)}
+                          disabled={readOnly}
+                        />
+                        <Label htmlFor={field.name} className="cursor-pointer font-normal">
+                          {field.name}
+                        </Label>
+                      </div>
+                    )}
+                    {field.type === 'dropdown' && (
+                      <Select
+                        value={fieldValues[field.name]?.toString() || ''}
+                        onValueChange={(value) => updateFieldValue(field.name, value)}
+                        disabled={readOnly}
+                      >
+                        <SelectTrigger
+                          className={validationErrors.includes(field.name) ? 'border-red-500' : ''}
+                        >
+                          <SelectValue placeholder="Select an option" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {field.options && field.options.length > 0 ? (
+                            field.options.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="">No options available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
@@ -312,4 +481,3 @@ export default function PdfAcroFormViewer({
     </div>
   )
 }
-
