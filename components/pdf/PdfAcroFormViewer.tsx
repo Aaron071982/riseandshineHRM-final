@@ -1,15 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import * as pdfjsLib from 'pdfjs-dist'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
-
-// Configure PDF.js worker
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
-}
 
 interface PdfAcroFormViewerProps {
   pdfData: string // base64 encoded PDF
@@ -31,13 +25,10 @@ export default function PdfAcroFormViewer({
   const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [numPages, setNumPages] = useState(0)
   const [fieldValues, setFieldValues] = useState<Record<string, any>>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
-  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
-  const annotationStorageRef = useRef<any>(null)
 
   useEffect(() => {
     if (!pdfData || pdfData.length === 0) {
@@ -70,26 +61,56 @@ export default function PdfAcroFormViewer({
       setLoading(true)
       setError(null)
 
-      // Decode base64 PDF
+      if (!containerRef.current) {
+        setLoading(false)
+        return
+      }
+
+      // Clear container
+      containerRef.current.innerHTML = ''
+
+      // Decode base64 PDF and create blob URL for iframe
       const binaryString = atob(pdfData)
       const pdfBytes = new Uint8Array(binaryString.length)
       for (let i = 0; i < binaryString.length; i++) {
         pdfBytes[i] = binaryString.charCodeAt(i)
       }
+      
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
 
-      // Load PDF document
-      const loadingTask = pdfjsLib.getDocument({ data: pdfBytes })
-      const pdfDoc = await loadingTask.promise
-      pdfDocRef.current = pdfDoc
-      annotationStorageRef.current = pdfDoc.annotationStorage
+      // Create iframe for native browser PDF viewer (supports interactive form fields)
+      const iframe = document.createElement('iframe')
+      iframe.src = `${url}#toolbar=1`
+      iframe.style.width = '100%'
+      iframe.style.height = '800px'
+      iframe.style.border = '1px solid #e5e7eb'
+      iframe.style.borderRadius = '8px'
+      iframe.style.backgroundColor = '#fff'
+      iframe.setAttribute('title', documentTitle || 'PDF Document')
 
-      setNumPages(pdfDoc.numPages)
+      // Store blob URL for cleanup
+      ;(containerRef.current as any).__pdfBlobUrl = url
+      ;(containerRef.current as any).__pdfIframe = iframe
 
-      // Render all pages
-      await renderPages(pdfDoc)
+      containerRef.current.appendChild(iframe)
 
-      // Load existing field values from annotation storage
-      loadFieldValues()
+      // Extract form fields from PDF using pdf-lib for field discovery (optional)
+      // This helps us know which fields exist for validation
+      try {
+        const { PDFDocument } = await import('pdf-lib')
+        const pdfLibDoc = await PDFDocument.load(pdfBytes)
+        const form = pdfLibDoc.getForm()
+        const fields = form.getFields()
+
+        // Store field names for validation (if needed)
+        const fieldNames = fields.map((f) => f.getName())
+        if (fieldNames.length > 0) {
+          // Fields exist - can use for validation later if needed
+        }
+      } catch (err) {
+        console.warn('Could not extract form fields (this is okay):', err)
+      }
 
       setLoading(false)
     } catch (err: any) {
@@ -99,65 +120,10 @@ export default function PdfAcroFormViewer({
     }
   }
 
-  const renderPages = async (pdfDoc: pdfjsLib.PDFDocumentProxy) => {
-    if (!containerRef.current) return
-
-    // Clear container
-    containerRef.current.innerHTML = ''
-
-    // Use iframe for better form field support - native browser PDF viewer supports interactive forms
-    const binaryString = atob(pdfData)
-    const pdfBytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      pdfBytes[i] = binaryString.charCodeAt(i)
-    }
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' })
-    const url = URL.createObjectURL(blob)
-
-    const iframe = document.createElement('iframe')
-    iframe.src = `${url}#toolbar=1`
-    iframe.style.width = '100%'
-    iframe.style.height = '800px'
-    iframe.style.border = '1px solid #ccc'
-    iframe.style.borderRadius = '4px'
-    iframe.setAttribute('title', documentTitle || 'PDF Document')
-    iframe.setAttribute('loading', 'lazy')
-
-    // Store blob URL for cleanup
-    ;(containerRef.current as any).__pdfBlobUrl = url
-    ;(containerRef.current as any).__pdfIframe = iframe
-
-    containerRef.current.appendChild(iframe)
-
-    // Extract form fields from PDF using pdf-lib for field discovery
-    // This helps us know which fields exist for validation
-    try {
-      const { PDFDocument } = await import('pdf-lib')
-      const pdfLibDoc = await PDFDocument.load(pdfBytes)
-      const form = pdfLibDoc.getForm()
-      const fields = form.getFields()
-
-      // Store field names for validation
-      const fieldNames = fields.map((f) => f.getName())
-
-      // Set up polling to try extracting values (limited with iframe, but we'll try)
-      // The actual form filling happens in the iframe, and we capture it on finalize
-      if (fieldNames.length > 0) {
-        // Store field names in state for validation
-        // Note: We can't easily extract values from iframe due to security restrictions
-        // But users can fill the form in the iframe, and on finalize we'll use pdf-lib
-        // to read the filled PDF from the iframe if possible, or prompt user to download/upload
-      }
-    } catch (err) {
-      console.warn('Could not extract form fields:', err)
-    }
-  }
-
   const loadFieldValues = async () => {
-    // Since we're using iframe, we can't directly access PDF.js annotation storage
-    // Instead, we'll extract values when finalizing using pdf-lib
-    // This is a limitation of the iframe approach, but it works for MVP
-    // For production, proper annotation layer rendering would be needed
+    // With iframe approach, we can't directly access filled values due to CORS
+    // Values will be extracted on finalize if possible, or user will need to manually fill
+    // This is a limitation of iframe approach, but ensures PDF is visible and fillable
   }
 
   const validateFields = (): boolean => {
@@ -191,33 +157,9 @@ export default function PdfAcroFormViewer({
   }
 
   const generateFilledPdf = async (): Promise<Blob> => {
-    // Get the iframe element
-    const iframe = containerRef.current?.querySelector('iframe') as HTMLIFrameElement | null
-
-    // Try to get the filled PDF from the iframe
-    // Note: Due to browser security (CORS), we typically can't access iframe content
-    // But we'll try to use pdf-lib to fill based on current field values
-    // For now, we'll reload the PDF and fill it programmatically
-    
-    try {
-      // Try to extract from annotation storage if PDF.js was used
-      if (annotationStorageRef.current) {
-        const allValues = annotationStorageRef.current.getAll()
-        const extractedValues: Record<string, any> = {}
-        for (const [key, value] of Object.entries(allValues)) {
-          if (value && typeof value === 'object' && 'value' in value) {
-            extractedValues[key] = (value as any).value
-          } else {
-            extractedValues[key] = value
-          }
-        }
-        if (Object.keys(extractedValues).length > 0) {
-          setFieldValues(extractedValues)
-        }
-      }
-    } catch (err) {
-      console.warn('Could not extract from annotation storage:', err)
-    }
+    // With iframe approach, we can't extract filled values due to CORS restrictions
+    // We'll use pdf-lib to fill with whatever field values we have
+    // If fieldValues is empty, the original PDF will be sent (user can fill manually later if needed)
 
     // Import the fill utility
     const { fillPdfWithValues } = await import('@/lib/pdf/fillPdfWithValues')
@@ -229,9 +171,8 @@ export default function PdfAcroFormViewer({
       pdfBytes[i] = binaryString.charCodeAt(i)
     }
 
-    // Generate filled PDF with current field values
-    // If fieldValues is empty, we'll still create the PDF (user may have filled in iframe)
-    // The backend will store whatever we send
+    // Generate filled PDF with current field values (may be empty)
+    // Note: This is a limitation - ideally we'd extract from iframe, but CORS prevents it
     const filledBlob = await fillPdfWithValues(pdfBytes, fieldValues)
     return filledBlob
   }
@@ -291,7 +232,7 @@ export default function PdfAcroFormViewer({
     )
   }
 
-  if (error && !pdfDocRef.current) {
+  if (error) {
     return (
       <Card>
         <CardContent className="pt-6">
