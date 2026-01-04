@@ -64,9 +64,11 @@ export default function PdfAcroFormViewer({
     const container = containerRef.current
 
     return () => {
-      // Cleanup
+      // Cleanup blob URLs
       if (container) {
-        // Cleanup if needed
+        if ((container as any).__pdfBlobUrl) {
+          URL.revokeObjectURL((container as any).__pdfBlobUrl)
+        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -78,28 +80,63 @@ export default function PdfAcroFormViewer({
       setError(null)
 
       if (!containerRef.current) {
+        console.error('Container ref not available')
+        setError('PDF viewer container not available')
         setLoading(false)
         return
       }
 
-      // Decode base64 PDF
-      const binaryString = atob(pdfData)
-      const pdfBytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        pdfBytes[i] = binaryString.charCodeAt(i)
+      if (!pdfData || pdfData.length === 0) {
+        console.error('PDF data is empty')
+        setError('PDF data not available')
+        setLoading(false)
+        return
       }
 
-      // Load PDF document with PDF.js
-      const loadingTask = pdfjsLib.getDocument({ data: pdfBytes })
-      const pdfDoc = await loadingTask.promise
-      pdfDocRef.current = pdfDoc
-      setNumPages(pdfDoc.numPages)
+      console.log('Loading PDF, data length:', pdfData.length)
 
-      // Render PDF pages
-      await renderPages(pdfDoc)
+      // Decode base64 PDF
+      let binaryString: string
+      let pdfBytes: Uint8Array
+      try {
+        binaryString = atob(pdfData)
+        pdfBytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          pdfBytes[i] = binaryString.charCodeAt(i)
+        }
+        console.log('PDF bytes decoded, length:', pdfBytes.length)
+      } catch (decodeErr: any) {
+        console.error('Error decoding PDF data:', decodeErr)
+        setError('Failed to decode PDF data: ' + decodeErr.message)
+        setLoading(false)
+        return
+      }
 
-      // Extract form fields using pdf-lib
-      await extractFormFields(pdfBytes)
+      // Try PDF.js first, fallback to iframe if it fails
+      try {
+        // Load PDF document with PDF.js
+        const loadingTask = pdfjsLib.getDocument({ data: pdfBytes })
+        const pdfDoc = await loadingTask.promise
+        pdfDocRef.current = pdfDoc
+        setNumPages(pdfDoc.numPages)
+        console.log('PDF loaded with PDF.js, pages:', pdfDoc.numPages)
+
+        // Render PDF pages
+        await renderPages(pdfDoc)
+
+        // Extract form fields using pdf-lib (run in parallel, don't block rendering)
+        extractFormFields(pdfBytes).catch((err) => {
+          console.warn('Form field extraction failed (non-critical):', err)
+        })
+      } catch (pdfJsErr: any) {
+        console.warn('PDF.js failed, using iframe fallback:', pdfJsErr)
+        // Fallback to iframe - ensures PDF is always visible
+        await renderPdfWithIframe(pdfBytes)
+        // Still try to extract form fields
+        extractFormFields(pdfBytes).catch((err) => {
+          console.warn('Form field extraction failed (non-critical):', err)
+        })
+      }
 
       setLoading(false)
     } catch (err: any) {
@@ -109,50 +146,118 @@ export default function PdfAcroFormViewer({
     }
   }
 
-  const renderPages = async (pdfDoc: pdfjsLib.PDFDocumentProxy) => {
+  const renderPdfWithIframe = async (pdfBytes: Uint8Array) => {
     if (!containerRef.current) return
+
+    // Clear container
+    containerRef.current.innerHTML = ''
+
+    // Create Blob from Uint8Array
+    // Use Array.from to convert Uint8Array to regular array for Blob
+    const blob = new Blob([Array.from(pdfBytes)], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+
+    const iframe = document.createElement('iframe')
+    iframe.src = `${url}#toolbar=1`
+    iframe.style.width = '100%'
+    iframe.style.height = '800px'
+    iframe.style.border = '1px solid #e5e7eb'
+    iframe.style.borderRadius = '8px'
+    iframe.style.backgroundColor = '#fff'
+    iframe.setAttribute('title', documentTitle || 'PDF Document')
+    iframe.onload = () => {
+      console.log('PDF iframe loaded successfully')
+    }
+    iframe.onerror = (err) => {
+      console.error('PDF iframe load error:', err)
+    }
+
+    // Store blob URL for cleanup
+    ;(containerRef.current as any).__pdfBlobUrl = url
+
+    containerRef.current.appendChild(iframe)
+    console.log('PDF iframe added to container')
+
+    // Try to extract form fields
+    try {
+      const { PDFDocument } = await import('pdf-lib')
+      const pdfDoc = await PDFDocument.load(pdfBytes)
+      const form = pdfDoc.getForm()
+      const fields = form.getFields()
+
+      if (fields.length > 0) {
+        await extractFormFields(pdfBytes)
+      }
+    } catch (err) {
+      console.warn('Could not extract form fields:', err)
+    }
+  }
+
+  const renderPages = async (pdfDoc: pdfjsLib.PDFDocumentProxy) => {
+    if (!containerRef.current) {
+      console.error('Container ref not available for rendering')
+      return
+    }
 
     // Clear container
     containerRef.current.innerHTML = ''
 
     // Create pages container
     const pagesContainer = document.createElement('div')
-    pagesContainer.className = 'space-y-4'
+    pagesContainer.className = 'space-y-4 flex flex-col items-center'
 
-    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-      const page = await pdfDoc.getPage(pageNum)
-      const viewport = page.getViewport({ scale: 1.5 })
+    try {
+      for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+        try {
+          const page = await pdfDoc.getPage(pageNum)
+          const viewport = page.getViewport({ scale: 1.5 })
 
-      // Create page container
-      const pageDiv = document.createElement('div')
-      pageDiv.className = 'pdf-page mb-4 border border-gray-300 bg-white shadow-sm rounded'
-      pageDiv.style.position = 'relative'
-      pageDiv.style.width = `${viewport.width}px`
-      pageDiv.style.height = `${viewport.height}px`
-      pageDiv.style.margin = '0 auto'
+          // Create page container
+          const pageDiv = document.createElement('div')
+          pageDiv.className = 'pdf-page mb-4 border border-gray-300 bg-white shadow-sm rounded overflow-hidden'
+          pageDiv.style.position = 'relative'
+          pageDiv.style.width = `${viewport.width}px`
+          pageDiv.style.height = `${viewport.height}px`
+          pageDiv.style.margin = '0 auto'
 
-      // Create canvas for PDF content
-      const canvas = document.createElement('canvas')
-      canvas.className = 'pdf-canvas'
-      const context = canvas.getContext('2d')
-      if (!context) continue
+          // Create canvas for PDF content
+          const canvas = document.createElement('canvas')
+          canvas.className = 'pdf-canvas'
+          const context = canvas.getContext('2d')
+          if (!context) {
+            console.warn(`Could not get 2d context for page ${pageNum}`)
+            continue
+          }
 
-      canvas.height = viewport.height
-      canvas.width = viewport.width
+          canvas.height = viewport.height
+          canvas.width = viewport.width
 
-      // Render PDF page to canvas
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport,
-        canvas: canvas,
+          // Render PDF page to canvas
+          const renderContext = {
+            canvasContext: context,
+            viewport: viewport,
+            canvas: canvas,
+          }
+
+          await page.render(renderContext).promise
+          pageDiv.appendChild(canvas)
+          pagesContainer.appendChild(pageDiv)
+        } catch (pageErr: any) {
+          console.error(`Error rendering page ${pageNum}:`, pageErr)
+          // Continue with other pages
+        }
       }
 
-      await page.render(renderContext).promise
-      pageDiv.appendChild(canvas)
-      pagesContainer.appendChild(pageDiv)
+      if (pagesContainer.children.length > 0) {
+        containerRef.current.appendChild(pagesContainer)
+        console.log(`Successfully rendered ${pagesContainer.children.length} PDF pages`)
+      } else {
+        throw new Error('No pages were rendered')
+      }
+    } catch (renderErr: any) {
+      console.error('Error in renderPages:', renderErr)
+      throw renderErr
     }
-
-    containerRef.current.appendChild(pagesContainer)
   }
 
   const extractFormFields = async (pdfBytes: Uint8Array) => {
@@ -334,10 +439,16 @@ export default function PdfAcroFormViewer({
       {/* PDF Viewer Container */}
       <Card>
         <CardContent className="pt-6">
+          <div className="mb-2">
+            <p className="text-sm text-gray-600 font-medium">
+              {documentTitle || 'PDF Document'}
+              {numPages > 0 && ` (${numPages} page${numPages > 1 ? 's' : ''})`}
+            </p>
+          </div>
           <div
             ref={containerRef}
             className="pdf-container overflow-auto max-h-[800px] border border-gray-200 rounded-lg p-4 bg-gray-50"
-            style={{ minHeight: '400px' }}
+            style={{ minHeight: '400px', width: '100%' }}
           />
         </CardContent>
       </Card>
