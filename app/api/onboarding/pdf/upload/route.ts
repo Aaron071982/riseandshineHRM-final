@@ -75,27 +75,8 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await filledPdfBlob.arrayBuffer()
     const pdfBytes = new Uint8Array(arrayBuffer)
 
-    // Generate storage path: rbts/{rbtProfileId}/{documentId}/{timestamp}.pdf
-    const timestamp = Date.now()
-    const storagePath = `rbts/${user.rbtProfileId}/${documentId}/${timestamp}.pdf`
-
-    // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: false, // Don't overwrite existing files
-      })
-
-    if (uploadError) {
-      console.error('Supabase Storage upload error:', uploadError)
-      return NextResponse.json(
-        { error: `Failed to upload PDF to storage: ${uploadError.message}` },
-        { status: 500 }
-      )
-    }
-
     // Generate storage path with document slug: rbts/{rbtProfileId}/{documentId}/{documentSlug}-{timestamp}.pdf
+    const timestamp = Date.now()
     const storagePath = `rbts/${user.rbtProfileId}/${documentId}/${document.slug}-${timestamp}.pdf`
 
     // Upload to Supabase Storage
@@ -152,7 +133,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       storagePath,
-      signedUrl: signedUrlData?.signedUrl || null,
       completion,
     })
   } catch (error: any) {

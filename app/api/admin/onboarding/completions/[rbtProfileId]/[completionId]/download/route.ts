@@ -34,6 +34,7 @@ export async function GET(
         signedPdfUrl: true,
         signedPdfData: true,
         storageBucket: true,
+        storagePath: true,
         fieldValues: true,
         document: {
           select: {
@@ -74,12 +75,12 @@ export async function GET(
     const filename = `${sanitizedTitle}_${completion.rbtProfile.firstName}_${completion.rbtProfile.lastName}.pdf`
 
     // Check if PDF is stored in Supabase Storage
-    if (completion.signedPdfUrl && completion.storageBucket && supabaseAdmin) {
+    if (completion.storagePath && completion.storageBucket && supabaseAdmin) {
       try {
-        // Download file from Supabase Storage
+        // Download file from Supabase Storage using storagePath
         const { data: fileData, error: downloadError } = await supabaseAdmin.storage
           .from(completion.storageBucket)
-          .download(completion.signedPdfUrl)
+          .download(completion.storagePath)
 
         if (downloadError) {
           console.error('Supabase Storage download error:', downloadError)
