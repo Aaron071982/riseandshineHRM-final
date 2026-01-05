@@ -150,6 +150,7 @@ export default function FillablePdfFlow({
       onSaveDraft={handleSaveDraft}
       readOnly={isCompleted}
       documentTitle={document.title}
+      documentId={document.id}
     />
   )
 }

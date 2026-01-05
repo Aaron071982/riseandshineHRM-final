@@ -1,67 +1,71 @@
 <!-- 30bc10e4-c59d-4921-98b5-c8febab09cef a5721e3e-994a-4255-88c4-c59eed0c0770 -->
-# Debug RBT Dashboard 500 Error
+# Fix PDF Viewer Container Ref Infinite Loop and Loading Issues
 
-## Problem
+## Problem Analysis
 
-The `/rbt/dashboard` route is crashing in production with a 500 error. The error message doesn't reveal the root cause - need to add error handling to identify it.
+The console shows an infinite loop with repeated stack traces (a6, a4 pattern), indicating React re-renders. The root causes are:
 
-## Root Cause Analysis
+1. **Callback ref triggers state updates on every render**: The callback ref `(el) => { setContainerReady(true) }` is called on every render, causing infinite loop
+2. **useEffect dependency loop**: `containerReady` in useEffect dependencies causes re-runs when state updates
+3. **Container may not be ready when effect runs**: Even after fixing the loop, timing issues can prevent container from being available
+4. **No guard against multiple loads**: PDF could be loaded multiple times if effect re-runs
 
-This project uses **Prisma** (not Supabase JS client) to connect to Supabase Postgres. The crash is likely:
+## Solution
 
-1. Missing/incorrect `DATABASE_URL` environment variable in Vercel
-2. Prisma connection failure (P1001: Can't reach database server)
-3. Unhandled Prisma query errors
-4. Session validation failing due to DB connection
+Use a robust pattern with refs and guards instead of state:
 
-## Implementation Plan
+1. **Remove containerReady state entirely** - eliminate state updates from callback ref
+2. **Use standard ref assignment** - `ref={containerRef}` (no callback)
+3. **Add loadedKeyRef guard** - track what's been loaded to prevent reloads
+4. **Add loadingRef guard** - prevent concurrent load attempts
+5. **Use requestAnimationFrame** - ensure layout has settled before loading
+6. **Tighten effect dependencies** - only depend on stable values (pdfData, documentId)
+7. **Ensure container is always rendered** - check that container div isn't conditionally rendered
 
-### 1. Add Error Handling to RBT Dashboard Page
+## Implementation Steps
 
-- Wrap all Prisma queries in try-catch blocks in `app/rbt/dashboard/page.tsx`
-- Add environment variable validation at the top
-- Log detailed error information (without secrets) to console
-- Return user-friendly error pages instead of crashing
-- Check for DATABASE_URL presence and log status
+### File: `components/pdf/PdfAcroFormViewer.tsx`
 
-### 2. Enhance Prisma Error Handling
+1. Remove `containerReady` state variable
+2. Replace callback ref with standard ref: `ref={containerRef}`
+3. Add refs for loading guards:
 
-- Update `lib/prisma.ts` to add more detailed error logging
-- Log connection attempts and failures with metadata
-- Add fallback error messages
+- `const loadedKeyRef = useRef<string | null>(null)`
+- `const loadingRef = useRef(false)`
 
-### 3. Add Environment Variable Checks
+4. Add `documentId` prop (or derive from documentTitle) for stable load key
+5. Rewrite useEffect to:
 
-- Verify `DATABASE_URL` is set in production
-- Log which environment variables are present (booleans only, no values)
-- Provide clear error messages if env vars are missing
+- Check if container exists (return early if not)
+- Check if pdfData exists (return early if not)
+- Create stable load key: `${documentId || documentTitle}:${pdfData.length}`
+- Check if already loaded (loadedKeyRef.current === loadKey)
+- Check if currently loading (loadingRef.current)
+- Set loadingRef.current = true
+- Wrap loadPdf in requestAnimationFrame
+- Set loadedKeyRef.current = loadKey after success
+- Reset loadingRef.current = false in finally
 
-### 4. Create Debug Helper
+6. Update useEffect dependencies to only `[pdfData, documentId || documentTitle]`
+7. Ensure container div is always rendered (not conditionally)
 
-- Add a helper function to safely log error details
-- Include error type, message, and stack trace (if available)
-- Exclude sensitive information from logs
+### Changes Summary:
 
-### 5. Test Locally
+- Remove: `const [containerReady, setContainerReady] = useState(false)`
+- Remove: callback ref pattern `ref={(el) => { setContainerReady(true) }}`
+- Add: `const loadedKeyRef = useRef<string | null>(null)`
+- Add: `const loadingRef = useRef(false)`
+- Add: `documentId` prop (or use documentTitle as fallback)
+- Change: Standard ref `ref={containerRef}`
+- Rewrite: useEffect with guards and requestAnimationFrame
+- Update: Effect dependencies to `[pdfData, documentId]`
 
-- Test with missing DATABASE_URL to verify error handling
-- Test with invalid DATABASE_URL to catch connection errors
-- Ensure graceful degradation
+This approach eliminates the infinite loop and ensures PDF loads reliably when container is ready, even in StrictMode or when container is initially hidden/collapsed.
 
-### 6. Document Vercel Log Checking Steps
+### To-dos
 
-- Provide instructions for accessing Vercel deployment logs
-- Explain how to filter for `/rbt/dashboard` errors
-- Guide user on what to look for in logs
-
-## Files to Modify
-
-- `app/rbt/dashboard/page.tsx` - Add comprehensive error handling
-- `lib/prisma.ts` - Enhance error logging (optional, may already be good)
-
-## Expected Outcomes
-
-1. Production error will show detailed logs in Vercel instead of generic 500
-2. User will see a helpful error page instead of a blank crash
-3. Root cause can be identified from logs (env vars, connection, query errors)
-4. Can then apply targeted fix based on actual error
+- [x] Update PdfAcroFormViewer to render PDF pages with PDF.js (canvas)
+- [x] Extract form fields from PDF using pdf-lib
+- [x] Render HTML form inputs matching PDF fields
+- [x] Capture user input from HTML form inputs
+- [x] Fill PDF with captured values on finalize using pdf-lib

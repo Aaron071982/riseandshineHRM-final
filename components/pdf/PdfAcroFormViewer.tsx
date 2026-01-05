@@ -30,6 +30,7 @@ interface PdfAcroFormViewerProps {
   onSaveDraft?: (args: { fieldValues: Record<string, any> }) => Promise<void>
   readOnly?: boolean
   documentTitle?: string
+  documentId?: string // Optional: for stable load key (falls back to documentTitle)
 }
 
 export default function PdfAcroFormViewer({
@@ -39,6 +40,7 @@ export default function PdfAcroFormViewer({
   onSaveDraft,
   readOnly = false,
   documentTitle = 'PDF Document',
+  documentId,
 }: PdfAcroFormViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
@@ -49,14 +51,17 @@ export default function PdfAcroFormViewer({
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
-  const [containerReady, setContainerReady] = useState(false)
+  const loadedKeyRef = useRef<string | null>(null)
+  const loadingRef = useRef(false)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
 
   useEffect(() => {
-    console.log('[PdfAcroFormViewer] Component mounted/re-rendered')
-    console.log('[PdfAcroFormViewer] pdfData received:', pdfData ? `Present (${pdfData.length} chars)` : 'MISSING')
-    console.log('[PdfAcroFormViewer] documentTitle:', documentTitle)
-    
+    const container = containerRef.current
+    if (!container) {
+      console.log('[PdfAcroFormViewer] Container not yet available')
+      return
+    }
+
     if (!pdfData || pdfData.length === 0) {
       console.error('[PdfAcroFormViewer] PDF data is empty or missing')
       setError('PDF data not available. Please contact support.')
@@ -64,33 +69,46 @@ export default function PdfAcroFormViewer({
       return
     }
 
-    // Wait for container to be ready before loading PDF
-    let timer: NodeJS.Timeout | null = null
-    
-    if (containerReady && containerRef.current) {
-      console.log('[PdfAcroFormViewer] Container is ready, loading PDF')
-      loadPdf()
-    } else {
-      // If container not ready yet, wait a bit and try again
-      timer = setTimeout(() => {
-        if (containerRef.current) {
-          console.log('[PdfAcroFormViewer] Container ref is available after delay, loading PDF')
-          loadPdf()
-        } else {
-          console.error('[PdfAcroFormViewer] Container ref still not available after delay')
-          setError('PDF viewer container not available. Please refresh the page.')
-          setLoading(false)
-        }
-      }, 100) // Small delay to ensure ref is attached
+    // Create stable load key that changes only when document truly changes
+    const loadKey = `${documentId || documentTitle}:${pdfData.length}`
+
+    // Check if already loaded
+    if (loadedKeyRef.current === loadKey) {
+      console.log('[PdfAcroFormViewer] PDF already loaded for this document')
+      return
     }
 
-    // Store ref value for cleanup
-    const container = containerRef.current
+    // Check if currently loading
+    if (loadingRef.current) {
+      console.log('[PdfAcroFormViewer] PDF load already in progress')
+      return
+    }
 
-    return () => {
-      if (timer) {
-        clearTimeout(timer)
+    // Set loading guard
+    loadingRef.current = true
+    setLoading(true)
+    setError(null)
+
+    console.log('[PdfAcroFormViewer] Starting PDF load for key:', loadKey)
+
+    // Use requestAnimationFrame to ensure layout has settled
+    requestAnimationFrame(async () => {
+      try {
+        await loadPdf()
+        loadedKeyRef.current = loadKey
+        console.log('[PdfAcroFormViewer] PDF loaded successfully')
+      } catch (err: any) {
+        console.error('[PdfAcroFormViewer] Error loading PDF:', err)
+        setError(err.message || 'Failed to load PDF')
+        // Don't set loadedKeyRef on error so it can retry
+      } finally {
+        loadingRef.current = false
+        setLoading(false)
       }
+    })
+
+    // Cleanup function
+    return () => {
       // Cleanup blob URLs
       if (container) {
         if ((container as any).__pdfBlobUrl) {
@@ -98,57 +116,33 @@ export default function PdfAcroFormViewer({
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdfData, containerReady])
+  }, [pdfData, documentId || documentTitle])
 
   const loadPdf = async () => {
+    // Container and pdfData checks are done in useEffect
+    if (!containerRef.current || !pdfData || pdfData.length === 0) {
+      throw new Error('Container or PDF data not available')
+    }
+
     try {
-      setLoading(true)
-      setError(null)
-
-      if (!containerRef.current) {
-        console.error('Container ref not available')
-        setError('PDF viewer container not available')
-        setLoading(false)
-        return
-      }
-
-      if (!pdfData || pdfData.length === 0) {
-        console.error('PDF data is empty')
-        setError('PDF data not available')
-        setLoading(false)
-        return
-      }
-
       console.log('[PdfAcroFormViewer] Loading PDF, data length:', pdfData.length)
-      console.log('[PdfAcroFormViewer] First 100 chars of base64:', pdfData.substring(0, 100))
 
       // Decode base64 PDF
-      let binaryString: string
-      let pdfBytes: Uint8Array
-      try {
-        binaryString = atob(pdfData)
-        pdfBytes = new Uint8Array(binaryString.length)
-        for (let i = 0; i < binaryString.length; i++) {
+      const binaryString = atob(pdfData)
+      const pdfBytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
         pdfBytes[i] = binaryString.charCodeAt(i)
       }
       console.log('[PdfAcroFormViewer] PDF bytes decoded, length:', pdfBytes.length)
-      
+
       // Validate PDF bytes (should start with PDF magic bytes)
       if (pdfBytes.length < 4 || pdfBytes[0] !== 0x25 || pdfBytes[1] !== 0x50 || pdfBytes[2] !== 0x44 || pdfBytes[3] !== 0x46) {
         console.warn('[PdfAcroFormViewer] PDF bytes do not start with PDF magic bytes - may not be valid PDF')
       } else {
         console.log('[PdfAcroFormViewer] PDF bytes validated - valid PDF structure detected')
       }
-      } catch (decodeErr: any) {
-        console.error('Error decoding PDF data:', decodeErr)
-        setError('Failed to decode PDF data: ' + decodeErr.message)
-        setLoading(false)
-        return
-      }
 
       // Use data URL iframe first - most reliable for displaying PDFs
-      // This ensures the PDF is always visible
       console.log('[PdfAcroFormViewer] Using data URL iframe for display (most reliable)')
       await renderPdfWithDataUrl(pdfData)
 
@@ -168,12 +162,9 @@ export default function PdfAcroFormViewer({
       extractFormFields(pdfBytes).catch((err) => {
         console.warn('[PdfAcroFormViewer] Form field extraction failed (non-critical):', err)
       })
-
-      setLoading(false)
     } catch (err: any) {
-      console.error('Error loading PDF:', err)
-      setError(err.message || 'Failed to load PDF')
-      setLoading(false)
+      console.error('[PdfAcroFormViewer] Error in loadPdf:', err)
+      throw err // Re-throw so useEffect can handle it
     }
   }
 
@@ -229,7 +220,7 @@ export default function PdfAcroFormViewer({
     if (!containerRef.current) return
 
     console.log('[PdfAcroFormViewer] renderPdfWithDataUrl called')
-    
+
     // Clear container
     containerRef.current.innerHTML = ''
 
@@ -254,7 +245,7 @@ export default function PdfAcroFormViewer({
 
     containerRef.current.appendChild(iframe)
     console.log('[PdfAcroFormViewer] PDF iframe added with data URL, length:', base64Data.length)
-    
+
     // Try to extract form fields
     try {
       const binaryString = atob(base64Data)
@@ -323,7 +314,7 @@ export default function PdfAcroFormViewer({
         }
       }
 
-        if (pagesContainer.children.length > 0) {
+      if (pagesContainer.children.length > 0) {
         containerRef.current.appendChild(pagesContainer)
         console.log(`[PdfAcroFormViewer] Successfully rendered ${pagesContainer.children.length} PDF pages`)
       } else {
@@ -525,14 +516,7 @@ export default function PdfAcroFormViewer({
             )}
           </div>
           <div
-            ref={(el) => {
-              if (el) {
-                // Store ref in a way that works with TypeScript
-                ;(containerRef as any).current = el
-                setContainerReady(true)
-                console.log('[PdfAcroFormViewer] Container ref attached')
-              }
-            }}
+            ref={containerRef}
             className="pdf-container overflow-auto max-h-[800px] border-2 border-gray-300 rounded-lg p-4 bg-white"
             style={{ minHeight: '500px', width: '100%' }}
           />
