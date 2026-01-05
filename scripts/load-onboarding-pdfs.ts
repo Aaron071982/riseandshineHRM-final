@@ -22,23 +22,34 @@ async function loadOnboardingPDFs() {
 
   const pdfFolderPath = join(process.cwd(), 'onboarding documents')
 
-  for (const [filename, slug] of Object.entries(pdfFileMapping)) {
+  // Group by filename to handle cases where same PDF maps to multiple slugs
+  const filenameToSlugs = new Map<string, string[]>()
+  for (const [filename, slug] of pdfFileMapping) {
+    if (!filenameToSlugs.has(filename)) {
+      filenameToSlugs.set(filename, [])
+    }
+    filenameToSlugs.get(filename)!.push(slug)
+  }
+
+  // Load each unique filename once, then apply to all its slugs
+  for (const [filename, slugs] of filenameToSlugs.entries()) {
     try {
       const filePath = join(pdfFolderPath, filename)
       
-      // Read PDF file
+      // Read PDF file once
       const fileBuffer = await readFile(filePath)
       const base64Data = fileBuffer.toString('base64')
 
-      // Update document in database
-      await prisma.onboardingDocument.update({
-        where: { slug },
-        data: {
-          pdfData: base64Data,
-        },
-      })
-
-      console.log(`✅ Loaded ${filename} → ${slug}`)
+      // Update all documents that use this PDF
+      for (const slug of slugs) {
+        await prisma.onboardingDocument.update({
+          where: { slug },
+          data: {
+            pdfData: base64Data,
+          },
+        })
+        console.log(`✅ Loaded ${filename} → ${slug}`)
+      }
     } catch (error: any) {
       if (error.code === 'ENOENT') {
         console.warn(`⚠️  File not found: ${filename}`)
