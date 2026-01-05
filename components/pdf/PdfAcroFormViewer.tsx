@@ -53,6 +53,8 @@ export default function PdfAcroFormViewer({
   const [finalizing, setFinalizing] = useState(false)
   const loadedKeyRef = useRef<string | null>(null)
   const loadingRef = useRef(false)
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const retryCountRef = useRef(0)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
 
   useEffect(() => {
@@ -79,6 +81,9 @@ export default function PdfAcroFormViewer({
       return
     }
 
+    // Reset retry count for new document
+    retryCountRef.current = 0
+
     // Set loading guard
     loadingRef.current = true
     setLoading(true)
@@ -90,15 +95,27 @@ export default function PdfAcroFormViewer({
     const attemptLoad = () => {
       const container = containerRef.current
       if (!container) {
-        console.log('[PdfAcroFormViewer] Container not yet available, will retry')
+        retryCountRef.current++
+        if (retryCountRef.current > 20) {
+          // Max 20 retries (1 second total)
+          console.error('[PdfAcroFormViewer] Container not available after max retries')
+          setError('PDF viewer container not available. Please refresh the page.')
+          loadingRef.current = false
+          setLoading(false)
+          return
+        }
+        console.log(`[PdfAcroFormViewer] Container not yet available, retry ${retryCountRef.current}/20`)
         // Retry after a short delay
-        setTimeout(() => {
+        retryTimeoutRef.current = setTimeout(() => {
           if (loadingRef.current && loadedKeyRef.current !== loadKey) {
             attemptLoad()
           }
         }, 50)
         return
       }
+
+      // Container is available, proceed with loading
+      retryCountRef.current = 0
 
       // Use requestAnimationFrame to ensure layout has settled
       requestAnimationFrame(async () => {
@@ -117,12 +134,18 @@ export default function PdfAcroFormViewer({
       })
     }
 
-    // Start attempt
-    attemptLoad()
+    // Start attempt - use requestAnimationFrame to wait for next frame
+    requestAnimationFrame(() => {
+      attemptLoad()
+    })
 
     // Cleanup function
     return () => {
       loadingRef.current = false
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
+      }
       // Cleanup blob URLs
       const container = containerRef.current
       if (container) {
