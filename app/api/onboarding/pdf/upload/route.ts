@@ -95,15 +95,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get signed URL for private access (valid for 1 year)
-    const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin.storage
-      .from(STORAGE_BUCKET)
-      .createSignedUrl(storagePath, 60 * 60 * 24 * 365) // 1 year
+    // Generate storage path with document slug: rbts/{rbtProfileId}/{documentId}/{documentSlug}-{timestamp}.pdf
+    const storagePath = `rbts/${user.rbtProfileId}/${documentId}/${document.slug}-${timestamp}.pdf`
 
-    if (signedUrlError) {
-      console.warn('Failed to generate signed URL:', signedUrlError)
-      // Continue anyway, we still have the storage path
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .upload(storagePath, pdfBytes, {
+        contentType: 'application/pdf',
+        upsert: false, // Don't overwrite existing files
+      })
+
+    if (uploadError) {
+      console.error('Supabase Storage upload error:', uploadError)
+      return NextResponse.json(
+        { error: `Failed to upload PDF to storage: ${uploadError.message}` },
+        { status: 500 }
+      )
     }
+
+    // Get public URL (even for private buckets, this is the path for signed URLs)
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(storagePath)
 
     // Update or create OnboardingCompletion record
     const completion = await prisma.onboardingCompletion.upsert({
@@ -116,9 +130,10 @@ export async function POST(request: NextRequest) {
       update: {
         status: 'COMPLETED',
         completedAt: new Date(),
-        signedPdfUrl: storagePath,
+        signedPdfUrl: publicUrl,
         storageBucket: STORAGE_BUCKET,
-        fieldValues: fieldValues || undefined,
+        storagePath: storagePath,
+        fieldValues: fieldValues ? (fieldValues as Prisma.InputJsonValue) : Prisma.JsonNull,
         // Clear draft data now that it's finalized
         draftData: Prisma.JsonNull,
       },
@@ -127,9 +142,10 @@ export async function POST(request: NextRequest) {
         documentId: documentId,
         status: 'COMPLETED',
         completedAt: new Date(),
-        signedPdfUrl: storagePath,
+        signedPdfUrl: publicUrl,
         storageBucket: STORAGE_BUCKET,
-        fieldValues: fieldValues || undefined,
+        storagePath: storagePath,
+        fieldValues: fieldValues ? (fieldValues as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     })
 
