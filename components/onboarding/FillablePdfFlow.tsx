@@ -62,12 +62,12 @@ export default function FillablePdfFlow({
       
       // Create download link
       const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${document.slug || document.title.replace(/[^a-z0-9]/gi, '_')}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
+      const link = window.document.createElement('a')
+      link.href = url
+      link.download = `${document.slug || document.title.replace(/[^a-z0-9]/gi, '_')}.pdf`
+      window.document.body.appendChild(link)
+      link.click()
+      window.document.body.removeChild(link)
       URL.revokeObjectURL(url)
       
       showToast('PDF downloaded successfully', 'success')
