@@ -95,11 +95,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get public URL (even for private buckets, this is the path for signed URLs)
-    const { data: { publicUrl } } = supabaseAdmin.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(storagePath)
-
+    // Store the storage path in signedPdfUrl (per schema design)
     // Update or create OnboardingCompletion record
     const completion = await prisma.onboardingCompletion.upsert({
       where: {
@@ -111,9 +107,8 @@ export async function POST(request: NextRequest) {
       update: {
         status: 'COMPLETED',
         completedAt: new Date(),
-        signedPdfUrl: publicUrl,
+        signedPdfUrl: storagePath, // Store the storage path in signedPdfUrl field
         storageBucket: STORAGE_BUCKET,
-        storagePath: storagePath,
         fieldValues: fieldValues ? (fieldValues as Prisma.InputJsonValue) : Prisma.JsonNull,
         // Clear draft data now that it's finalized
         draftData: Prisma.JsonNull,
@@ -123,9 +118,8 @@ export async function POST(request: NextRequest) {
         documentId: documentId,
         status: 'COMPLETED',
         completedAt: new Date(),
-        signedPdfUrl: publicUrl,
+        signedPdfUrl: storagePath, // Store the storage path in signedPdfUrl field
         storageBucket: STORAGE_BUCKET,
-        storagePath: storagePath,
         fieldValues: fieldValues ? (fieldValues as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     })
