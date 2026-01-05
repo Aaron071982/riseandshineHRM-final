@@ -5,11 +5,12 @@ const prisma = new PrismaClient()
 async function fixOnboardingDocuments() {
   console.log('Fixing onboarding documents...')
 
-  // 1. Deactivate duplicate documents
+  // 1. Deactivate duplicate documents and Emergency/Incident Reporting Acknowledgment
   const duplicatesToRemove = [
     'employee-handbook-acknowledgment', // Remove Employee Handbook Acknowledgement (duplicate of Handbook)
     'hipaa-acknowledgment', // Remove HIPAA Acknowledgement (duplicate of HIPAA)
     'mandated-reporter-acknowledgment', // Remove Mandated Reporter Acknowledgement (duplicate of Mandated Reporter)
+    'emergency-incident-reporting-acknowledgment', // Remove Emergency/Incident Reporting Acknowledgment (duplicate of Emergency Policy)
   ]
 
   for (const slug of duplicatesToRemove) {

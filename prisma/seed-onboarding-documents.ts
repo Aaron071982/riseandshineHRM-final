@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 const onboardingDocuments = [
+  // 5 Acknowledgment forms
   {
     title: 'Handbook',
     slug: 'handbook',
@@ -38,6 +39,7 @@ const onboardingDocuments = [
     pdfUrl: null,
     sortOrder: 5,
   },
+  // 4 Fillable PDF forms
   {
     title: 'Background Check Authorization',
     slug: 'background-check-authorization',

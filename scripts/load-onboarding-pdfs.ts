@@ -5,14 +5,15 @@ import { join } from 'path'
 const prisma = new PrismaClient()
 
 // Map PDF filenames to document slugs
-// Note: Some PDFs may map to multiple slugs (same PDF file for different documents)
+// Final list: 5 acknowledgments + 4 fillable PDFs
 const pdfFileMapping: Array<[string, string]> = [
+  // 5 Acknowledgment forms
   ['Employee Handbook.pdf', 'handbook'],
   ['HIPAA Acknowledgment Form.pdf', 'hipaa'],
   ['Mandated Reporter Acknowledgment Form.pdf', 'mandated-reporter'],
-  ['Mandated Reporter Acknowledgment Form.pdf', 'emergency-incident-reporting-acknowledgment'], // Also map to Emergency/Incident Reporting Acknowledgment
   ['Non-Disclosure Agreement _NDA_.pdf', 'nda'],
   ['Emergency _ Incident Reporting Policy Acknowledgment.pdf', 'emergency-policy'],
+  // 4 Fillable PDF forms
   ['BackgroundCheckLetter.pdf', 'background-check-authorization'],
   ['I-9 Employment Eligibility Verification.pdf', 'i9'],
   ['2025 Form W-4.pdf', 'w4'],
