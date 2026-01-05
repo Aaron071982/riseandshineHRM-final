@@ -5,17 +5,19 @@ import { join } from 'path'
 const prisma = new PrismaClient()
 
 // Map PDF filenames to document slugs
-const pdfFileMapping: Record<string, string> = {
-  'Employee Handbook.pdf': 'handbook',
-  'HIPAA Acknowledgment Form.pdf': 'hipaa',
-  'Mandated Reporter Acknowledgment Form.pdf': 'mandated-reporter',
-  'Non-Disclosure Agreement _NDA_.pdf': 'nda',
-  'Emergency _ Incident Reporting Policy Acknowledgment.pdf': 'emergency-policy',
-  'BackgroundCheckLetter.pdf': 'background-check-authorization',
-  'I-9 Employment Eligibility Verification.pdf': 'i9',
-  '2025 Form W-4.pdf': 'w4',
-  'Direct Deposit Authorization Form.pdf': 'direct-deposit-authorization',
-}
+// Note: Some PDFs may map to multiple slugs (same PDF file for different documents)
+const pdfFileMapping: Array<[string, string]> = [
+  ['Employee Handbook.pdf', 'handbook'],
+  ['HIPAA Acknowledgment Form.pdf', 'hipaa'],
+  ['Mandated Reporter Acknowledgment Form.pdf', 'mandated-reporter'],
+  ['Mandated Reporter Acknowledgment Form.pdf', 'emergency-incident-reporting-acknowledgment'], // Also map to Emergency/Incident Reporting Acknowledgment
+  ['Non-Disclosure Agreement _NDA_.pdf', 'nda'],
+  ['Emergency _ Incident Reporting Policy Acknowledgment.pdf', 'emergency-policy'],
+  ['BackgroundCheckLetter.pdf', 'background-check-authorization'],
+  ['I-9 Employment Eligibility Verification.pdf', 'i9'],
+  ['2025 Form W-4.pdf', 'w4'],
+  ['Direct Deposit Authorization Form.pdf', 'direct-deposit-authorization'],
+]
 
 async function loadOnboardingPDFs() {
   console.log('Loading PDFs from onboarding documents folder...')
@@ -74,4 +76,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect()
   })
-
