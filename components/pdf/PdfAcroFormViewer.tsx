@@ -56,12 +56,6 @@ export default function PdfAcroFormViewer({
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
 
   useEffect(() => {
-    const container = containerRef.current
-    if (!container) {
-      console.log('[PdfAcroFormViewer] Container not yet available')
-      return
-    }
-
     if (!pdfData || pdfData.length === 0) {
       console.error('[PdfAcroFormViewer] PDF data is empty or missing')
       setError('PDF data not available. Please contact support.')
@@ -75,6 +69,7 @@ export default function PdfAcroFormViewer({
     // Check if already loaded
     if (loadedKeyRef.current === loadKey) {
       console.log('[PdfAcroFormViewer] PDF already loaded for this document')
+      setLoading(false)
       return
     }
 
@@ -91,25 +86,45 @@ export default function PdfAcroFormViewer({
 
     console.log('[PdfAcroFormViewer] Starting PDF load for key:', loadKey)
 
-    // Use requestAnimationFrame to ensure layout has settled
-    requestAnimationFrame(async () => {
-      try {
-        await loadPdf()
-        loadedKeyRef.current = loadKey
-        console.log('[PdfAcroFormViewer] PDF loaded successfully')
-      } catch (err: any) {
-        console.error('[PdfAcroFormViewer] Error loading PDF:', err)
-        setError(err.message || 'Failed to load PDF')
-        // Don't set loadedKeyRef on error so it can retry
-      } finally {
-        loadingRef.current = false
-        setLoading(false)
+    // Function to attempt loading
+    const attemptLoad = () => {
+      const container = containerRef.current
+      if (!container) {
+        console.log('[PdfAcroFormViewer] Container not yet available, will retry')
+        // Retry after a short delay
+        setTimeout(() => {
+          if (loadingRef.current && loadedKeyRef.current !== loadKey) {
+            attemptLoad()
+          }
+        }, 50)
+        return
       }
-    })
+
+      // Use requestAnimationFrame to ensure layout has settled
+      requestAnimationFrame(async () => {
+        try {
+          await loadPdf()
+          loadedKeyRef.current = loadKey
+          console.log('[PdfAcroFormViewer] PDF loaded successfully')
+        } catch (err: any) {
+          console.error('[PdfAcroFormViewer] Error loading PDF:', err)
+          setError(err.message || 'Failed to load PDF')
+          // Don't set loadedKeyRef on error so it can retry
+        } finally {
+          loadingRef.current = false
+          setLoading(false)
+        }
+      })
+    }
+
+    // Start attempt
+    attemptLoad()
 
     // Cleanup function
     return () => {
+      loadingRef.current = false
       // Cleanup blob URLs
+      const container = containerRef.current
       if (container) {
         if ((container as any).__pdfBlobUrl) {
           URL.revokeObjectURL((container as any).__pdfBlobUrl)
