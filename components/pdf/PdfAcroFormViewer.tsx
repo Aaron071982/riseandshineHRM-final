@@ -514,31 +514,8 @@ export default function PdfAcroFormViewer({
     }
   }
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-            <span className="ml-2 text-gray-600">Loading PDF...</span>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (error && !pdfDocRef.current) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-red-600 py-12">
-            <p>Error: {error}</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
+  // Always render the container div so the ref is attached
+  // Show loading/error states as overlays, not as replacements
   return (
     <div className="space-y-6">
       {/* PDF Viewer Container */}
@@ -549,15 +526,36 @@ export default function PdfAcroFormViewer({
               {documentTitle || 'PDF Document'}
               {numPages > 0 && ` (${numPages} page${numPages > 1 ? 's' : ''})`}
             </p>
-            {numPages === 0 && (
+            {numPages === 0 && loading && (
               <p className="text-xs text-gray-500 mt-1">Loading PDF...</p>
             )}
           </div>
-          <div
-            ref={containerRef}
-            className="pdf-container overflow-auto max-h-[800px] border-2 border-gray-300 rounded-lg p-4 bg-white"
-            style={{ minHeight: '500px', width: '100%' }}
-          />
+          <div className="relative">
+            {/* Container div - ALWAYS rendered so ref is attached */}
+            <div
+              ref={containerRef}
+              className="pdf-container overflow-auto max-h-[800px] border-2 border-gray-300 rounded-lg p-4 bg-white"
+              style={{ minHeight: '500px', width: '100%' }}
+            />
+            {/* Loading overlay */}
+            {loading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10 rounded-lg">
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  <span className="text-gray-600">Loading PDF...</span>
+                </div>
+              </div>
+            )}
+            {/* Error overlay */}
+            {error && !pdfDocRef.current && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10 rounded-lg">
+                <div className="text-center text-red-600 p-4">
+                  <p className="font-semibold">Error</p>
+                  <p className="text-sm mt-2">{error}</p>
+                </div>
+              </div>
+            )}
+          </div>
           {!loading && containerRef.current && containerRef.current.children.length === 0 && (
             <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
