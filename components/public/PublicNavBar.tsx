@@ -66,16 +66,25 @@ export default function PublicNavBar() {
           </div>
 
           {/* Login Button */}
-          <Link href="/login">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Button className="gradient-primary text-white border-0 rounded-button px-6 py-2 font-semibold shadow-button hover:shadow-buttonHover transition-all duration-200">
-                Login
-              </Button>
-            </motion.div>
-          </Link>
+          <div className="flex flex-col items-end gap-1">
+            <Link href="/login">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="relative"
+              >
+                <Button
+                  className="gradient-primary text-white border-0 rounded-button px-7 py-2.5 font-semibold shadow-button hover:shadow-buttonHover transition-all duration-200 hover:ring-2 hover:ring-primary/30"
+                  style={{
+                    boxShadow: '0 4px 12px rgba(228, 137, 61, 0.25)',
+                  }}
+                >
+                  Login
+                </Button>
+              </motion.div>
+            </Link>
+            <span className="hidden lg:block text-xs text-gray-500 font-medium">Returning RBTs</span>
+          </div>
         </div>
       </div>
     </motion.nav>

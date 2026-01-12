@@ -2,8 +2,18 @@
 
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { ArrowRight, CheckCircle, Users, Smile, TrendingUp, HeartHandshake, Clock, Shield } from 'lucide-react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  ArrowRight,
+  CheckCircle,
+  Users,
+  Smile,
+  TrendingUp,
+  HeartHandshake,
+  Clock,
+  Shield,
+  LogIn,
+} from 'lucide-react'
 import { motion } from 'framer-motion'
 import IconChip from './IconChip'
 
@@ -12,7 +22,7 @@ export default function HeroSection() {
     {
       icon: <Users className="h-4 w-4" />,
       label: 'Active Sessions',
-      value: '125+',
+      value: '54+',
       color: 'blue' as const,
     },
     {
@@ -106,6 +116,39 @@ export default function HeroSection() {
               </Link>
             </motion.div>
 
+            {/* Returning RBT Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.25 }}
+              className="pt-2"
+            >
+              <Card className="bg-gradient-to-br from-blue-50 to-orange-50 border border-primary/30 shadow-sm hover:shadow-md transition-all duration-200">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <IconChip icon={<LogIn className="h-5 w-5" />} size="md" color="orange" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 mb-1">
+                        Already part of Rise & Shine?
+                      </p>
+                      <p className="text-xs text-gray-600 mb-3">
+                        Log in to your HRM portal to access your dashboard, schedule, and documents.
+                      </p>
+                      <Link href="/login">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-2 border-primary/30 text-primary hover:bg-primary/10 rounded-button font-medium transition-all duration-200"
+                        >
+                          Log in
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
             {/* Key Differentiators */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -154,8 +197,17 @@ export default function HeroSection() {
                 style={{
                   background:
                     'linear-gradient(135deg, rgba(255, 245, 240, 0.8) 0%, rgba(227, 242, 253, 0.6) 100%)',
+                  boxShadow: '0 20px 40px rgba(228, 137, 61, 0.15), 0 0 0 1px rgba(228, 137, 61, 0.1)',
                 }}
               >
+                {/* Light highlight */}
+                <div
+                  className="absolute top-0 left-0 w-full h-full opacity-30 pointer-events-none"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, transparent 60%)',
+                  }}
+                />
                 <div className="relative z-10 text-center space-y-6">
                   <div className="flex justify-center">
                     <IconChip icon={<HeartHandshake className="h-7 w-7" />} size="lg" color="orange" />
@@ -189,7 +241,7 @@ export default function HeroSection() {
                       : index === 1
                         ? 'bottom-16 -left-8'
                         : 'top-1/2 -right-12'
-                  }`}
+                  } ${index === 0 ? 'bob-animation' : index === 1 ? 'bob-animation-delayed-1' : 'bob-animation-delayed-2'}`}
                 >
                   <Card className="bg-white rounded-card border border-gray-200 shadow-floating p-4 min-w-[140px]">
                     <CardContent className="p-0 space-y-2">

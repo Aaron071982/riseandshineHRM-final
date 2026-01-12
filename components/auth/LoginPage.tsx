@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Mail } from 'lucide-react'
 import { motion } from 'framer-motion'
 import PublicBackground from '@/components/public/PublicBackground'
+import PublicFooter from '@/components/public/PublicFooter'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -52,7 +54,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden bg-white">
-      <PublicBackground variant="subtle" />
+      <PublicBackground variant="page" />
 
       <div className="relative z-10 w-full max-w-md">
         <motion.div
@@ -83,10 +85,16 @@ export default function LoginPage() {
                   </motion.div>
                 </Link>
               </div>
-              <CardTitle className="text-3xl font-semibold text-gray-900">Welcome Back!</CardTitle>
-              <CardDescription className="text-base text-gray-600">
-                Enter your email address to receive a verification code
-              </CardDescription>
+              {/* RBT Portal Login Badge */}
+              <div className="flex flex-col items-center gap-2">
+                <Badge className="bg-primary/10 text-primary border border-primary/20 px-4 py-1.5 text-sm font-semibold">
+                  RBT Portal Login
+                </Badge>
+                <CardTitle className="text-3xl font-semibold text-gray-900">Welcome Back!</CardTitle>
+                <CardDescription className="text-base text-gray-600 max-w-sm">
+                  Use your work email to receive a verification code
+                </CardDescription>
+              </div>
             </CardHeader>
             <CardContent className="space-y-5">
               <form onSubmit={handleSubmit} className="space-y-5">
@@ -156,6 +164,7 @@ export default function LoginPage() {
           </Card>
         </motion.div>
       </div>
+      <PublicFooter />
     </div>
   )
 }

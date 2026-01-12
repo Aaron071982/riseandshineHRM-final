@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import WizardStepIndicator from './WizardStepIndicator'
 import PublicNavBar from './PublicNavBar'
 import PublicBackground from './PublicBackground'
+import PublicFooter from './PublicFooter'
 import { ArrowLeft, ArrowRight, Upload, FileText, CheckCircle, X, Paperclip, Lightbulb } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -996,6 +997,7 @@ export default function PublicRBTApplicationWizard() {
           </div>
         </div>
       </div>
+      <PublicFooter />
     </div>
   )
 }

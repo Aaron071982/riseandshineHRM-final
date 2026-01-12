@@ -67,6 +67,15 @@
     }
   }
   
+  @keyframes bob {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-3px);
+    }
+  }
+  
   @keyframes pulse {
     0%, 100% {
       opacity: 1;
@@ -263,5 +272,30 @@
     border-radius: 50%;
     pointer-events: none;
   }
+  
+  .bob-animation {
+    animation: bob 3s ease-in-out infinite;
+  }
+  
+  .bob-animation-delayed-1 {
+    animation: bob 3s ease-in-out infinite;
+    animation-delay: 0.5s;
+  }
+  
+  .bob-animation-delayed-2 {
+    animation: bob 3s ease-in-out infinite;
+    animation-delay: 1s;
+  }
+  
+  @media (prefers-reduced-motion: reduce) {
+    .bob-animation,
+    .bob-animation-delayed-1,
+    .bob-animation-delayed-2,
+    .bubble-animation,
+    .bubble-animation-delayed,
+    .bubble-animation-delayed-2,
+    .bubble-animation-delayed-3 {
+      animation: none;
+    }
+  }
 }
-

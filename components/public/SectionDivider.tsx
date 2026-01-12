@@ -7,7 +7,7 @@ interface SectionDividerProps {
 export default function SectionDivider({ variant = 'gradient' }: SectionDividerProps) {
   if (variant === 'wave') {
     return (
-      <div className="w-full h-12 overflow-hidden">
+      <div className="w-full h-16 overflow-hidden relative">
         <svg
           viewBox="0 0 1200 120"
           preserveAspectRatio="none"
@@ -25,7 +25,7 @@ export default function SectionDivider({ variant = 'gradient' }: SectionDividerP
 
   return (
     <div
-      className="w-full h-1"
+      className="w-full h-px"
       style={{
         background: 'linear-gradient(90deg, rgba(228, 137, 61, 0.05) 0%, rgba(255, 159, 90, 0.02) 50%, transparent 100%)',
       }}

@@ -7,6 +7,7 @@ import FeatureCards from './FeatureCards'
 import SectionHeader from './SectionHeader'
 import SectionDivider from './SectionDivider'
 import CTASection from './CTASection'
+import PublicFooter from './PublicFooter'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -185,7 +186,7 @@ export default function PublicCareersLandingPage() {
       {/* Hero Section */}
       <HeroSection />
 
-      <SectionDivider variant="gradient" />
+      <SectionDivider variant="wave" />
 
       {/* What RBTs Do */}
       <section
@@ -359,31 +360,7 @@ export default function PublicCareersLandingPage() {
       />
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8 border-t border-gray-800">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <div className="mb-4 md:mb-0">
-              <p className="text-gray-400 text-sm">
-                © {new Date().getFullYear()} Rise & Shine ABA. All rights reserved.
-              </p>
-            </div>
-            <div className="flex space-x-6">
-              <Link
-                href="/login"
-                className="text-gray-400 hover:text-white transition-colors duration-200 text-sm font-medium"
-              >
-                Login
-              </Link>
-              <Link
-                href="/apply"
-                className="text-gray-400 hover:text-white transition-colors duration-200 text-sm font-medium"
-              >
-                Apply Now
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   )
 }
