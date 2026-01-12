@@ -19,6 +19,7 @@ enum UserRole {
 enum RBTStatus {
   NEW
   REACH_OUT
+  REACH_OUT_EMAIL_SENT
   TO_INTERVIEW
   INTERVIEW_SCHEDULED
   INTERVIEW_COMPLETED
@@ -172,6 +173,7 @@ model RBTProfile {
   experienceYears          Int?
   transportation           Boolean?
   preferredHoursRange      String?
+  schedulingToken         String?              @unique
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
 
@@ -200,6 +202,7 @@ model Interview {
   decision        InterviewDecision @default(PENDING)
   meetingUrl      String?
   notes           String?
+  reminderSentAt  DateTime?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 

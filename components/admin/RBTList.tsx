@@ -42,6 +42,7 @@ interface RBTListProps {
 const statusColors: Record<string, { bg: string; text: string }> = {
   NEW: { bg: 'bg-gray-100', text: 'text-gray-700' },
   REACH_OUT: { bg: 'bg-blue-50', text: 'text-blue-700' },
+  REACH_OUT_EMAIL_SENT: { bg: 'bg-blue-100', text: 'text-blue-800' },
   TO_INTERVIEW: { bg: 'bg-amber-50', text: 'text-amber-700' },
   INTERVIEW_SCHEDULED: { bg: 'bg-purple-50', text: 'text-purple-700' },
   INTERVIEW_COMPLETED: { bg: 'bg-indigo-50', text: 'text-indigo-700' },

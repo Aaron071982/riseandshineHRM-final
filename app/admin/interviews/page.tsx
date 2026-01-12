@@ -2,10 +2,11 @@ import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDateTime } from '@/lib/utils'
-import { Calendar, Clock, User, Video } from 'lucide-react'
+import { Calendar, Clock, User, Video, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import InterviewNotesButton from '@/components/admin/InterviewNotesButton'
+import InterviewDeleteButton from '@/components/admin/InterviewDeleteButton'
 
 export default async function InterviewsPage() {
   const interviews = await prisma.interview.findMany({
@@ -149,6 +150,11 @@ export default async function InterviewsPage() {
                         <InterviewNotesButton
                           interviewId={interview.id}
                           rbtProfileId={interview.rbtProfile.id}
+                        />
+                        <InterviewDeleteButton
+                          interviewId={interview.id}
+                          rbtName={`${interview.rbtProfile.firstName} ${interview.rbtProfile.lastName}`}
+                          scheduledAt={interview.scheduledAt}
                         />
                         <Link href={`/admin/rbts/${interview.rbtProfile.id}`}>
                           <Button variant="outline" size="sm" className="rounded-lg border-2 hover:bg-blue-50">

@@ -5,7 +5,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/', '/verify-otp', '/login', '/apply', '/apply/success']
+  const publicRoutes = ['/', '/verify-otp', '/login', '/apply', '/apply/success', '/schedule-interview']
   const publicApiRoutes = ['/api/auth/send-otp', '/api/auth/verify-otp', '/api/auth/get-latest-otp']
   
   // Allow public API routes for application submission

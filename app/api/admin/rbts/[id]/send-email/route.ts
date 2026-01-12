@@ -8,6 +8,7 @@ import {
   generateRejectionEmail,
   EmailTemplateType,
 } from '@/lib/email'
+import { randomBytes } from 'crypto'
 
 export async function POST(
   request: NextRequest,
@@ -42,9 +43,23 @@ export async function POST(
 
     let emailContent
 
+    // Generate scheduling token for REACH_OUT emails
+    let schedulingToken: string | null = null
+    if (templateType === EmailTemplateType.REACH_OUT) {
+      schedulingToken = randomBytes(32).toString('hex')
+    }
+
     switch (templateType) {
       case EmailTemplateType.REACH_OUT:
-        emailContent = generateReachOutEmail(rbtProfile)
+        emailContent = generateReachOutEmail(
+          {
+            firstName: rbtProfile.firstName,
+            lastName: rbtProfile.lastName,
+            email: rbtProfile.email,
+            id: rbtProfile.id,
+          },
+          schedulingToken || ''
+        )
         break
       case EmailTemplateType.REJECTION:
         emailContent = generateRejectionEmail(rbtProfile)
@@ -78,6 +93,18 @@ export async function POST(
     }
 
     console.log(`✅ Email sent successfully to ${rbtProfile.email}`)
+
+    // Update RBT status and store scheduling token for REACH_OUT emails
+    if (templateType === EmailTemplateType.REACH_OUT && schedulingToken) {
+      await prisma.rBTProfile.update({
+        where: { id: rbtProfile.id },
+        data: {
+          status: 'REACH_OUT_EMAIL_SENT',
+          schedulingToken,
+        },
+      })
+      console.log(`✅ Updated RBT status to REACH_OUT_EMAIL_SENT and stored scheduling token`)
+    }
 
     return NextResponse.json({ 
       success: true,

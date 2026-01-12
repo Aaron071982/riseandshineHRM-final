@@ -22,7 +22,7 @@ import {
 import { useToast } from '@/components/ui/toast'
 import { Loader2 } from 'lucide-react'
 
-type RBTStatus = 'NEW' | 'REACH_OUT' | 'TO_INTERVIEW' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_COMPLETED' | 'HIRED' | 'REJECTED'
+type RBTStatus = 'NEW' | 'REACH_OUT' | 'REACH_OUT_EMAIL_SENT' | 'TO_INTERVIEW' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_COMPLETED' | 'HIRED' | 'REJECTED'
 
 interface StatusManagerProps {
   rbtId: string
@@ -33,6 +33,7 @@ interface StatusManagerProps {
 const ALLOWED_STATUSES: Array<{ value: RBTStatus; label: string }> = [
   { value: 'NEW', label: 'New' },
   { value: 'REACH_OUT', label: 'Reach Out' },
+  { value: 'REACH_OUT_EMAIL_SENT', label: 'Reach-Out Email Sent' },
   { value: 'TO_INTERVIEW', label: 'To Interview' },
   { value: 'INTERVIEW_SCHEDULED', label: 'Interview Scheduled' },
   { value: 'INTERVIEW_COMPLETED', label: 'Interview Completed' },
@@ -43,6 +44,7 @@ const ALLOWED_STATUSES: Array<{ value: RBTStatus; label: string }> = [
 const STATUS_LABELS: Record<RBTStatus, string> = {
   NEW: 'New',
   REACH_OUT: 'Reach Out',
+  REACH_OUT_EMAIL_SENT: 'Reach-Out Email Sent',
   TO_INTERVIEW: 'To Interview',
   INTERVIEW_SCHEDULED: 'Interview Scheduled',
   INTERVIEW_COMPLETED: 'Interview Completed',

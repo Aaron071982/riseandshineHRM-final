@@ -155,12 +155,21 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   }
 }
 
-export function generateReachOutEmail(rbtProfile: {
-  firstName: string
-  lastName: string
-  email: string | null
-}): { subject: string; html: string } {
-  const subject = 'Opportunity at Rise and Shine - We\'d Love to Connect!'
+export function generateReachOutEmail(
+  rbtProfile: {
+    firstName: string
+    lastName: string
+    email: string | null
+    id: string
+  },
+  schedulingToken: string
+): { subject: string; html: string } {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL || 'riseandshinehrm.com'}` 
+    : 'http://localhost:3000'
+  const scheduleUrl = `${baseUrl}/schedule-interview?token=${schedulingToken}&rbtId=${rbtProfile.id}`
+  
+  const subject = 'Opportunity at Rise and Shine - Schedule Your Interview!'
   const html = `
     <!DOCTYPE html>
     <html>
@@ -200,6 +209,28 @@ export function generateReachOutEmail(rbtProfile: {
         .content p {
           margin: 16px 0;
         }
+        .info-box {
+          background-color: #FFF5F0;
+          border-left: 4px solid #E4893D;
+          padding: 16px;
+          margin: 24px 0;
+          border-radius: 4px;
+        }
+        .info-box strong {
+          color: #E4893D;
+        }
+        .cta-button {
+          display: inline-block;
+          background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%);
+          color: white !important;
+          padding: 16px 32px;
+          text-decoration: none;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 16px;
+          margin: 24px 0;
+          text-align: center;
+        }
         .footer { 
           padding: 24px 20px; 
           text-align: center; 
@@ -220,8 +251,22 @@ export function generateReachOutEmail(rbtProfile: {
           <p>Hello <strong>${rbtProfile.firstName}</strong>,</p>
           <p>We hope this message finds you well. We came across your profile and believe you would be a great fit for our team at <strong>Rise and Shine</strong>.</p>
           <p>We are always looking for talented and dedicated individuals who share our passion for providing exceptional care. We would love to learn more about you and discuss potential opportunities that align with your skills and career goals.</p>
-          <p>Would you be available for a brief conversation at your convenience? We're excited about the possibility of you joining our team.</p>
-          <p>If you're interested in learning more, please reply to this email or contact us at your earliest convenience. We look forward to hearing from you!</p>
+          
+          <div class="info-box">
+            <p style="margin: 0 0 8px 0;"><strong>Next Steps:</strong></p>
+            <p style="margin: 0;">Schedule an interview with us! Interviews are available:</p>
+            <ul style="margin: 8px 0 0 20px; padding: 0;">
+              <li><strong>Days:</strong> Sunday through Thursday</li>
+              <li><strong>Time:</strong> 11:00 AM to 2:00 PM</li>
+              <li><strong>Duration:</strong> Approximately 30-60 minutes</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${scheduleUrl}" class="cta-button">Schedule Your Interview</a>
+          </div>
+          
+          <p>If you have any questions or prefer to schedule at a different time, please reply to this email and we'll work with you to find a suitable time.</p>
           <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
         </div>
         <div class="footer">
@@ -761,6 +806,163 @@ export function generateApplicationSubmissionConfirmationEmail(rbtProfile: {
         <div class="footer">
           <p><strong>Rise & Shine</strong> - HRM Portal</p>
           <p style="margin: 4px 0 0 0; font-size: 11px;">This is an automated confirmation email. Please do not reply directly.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}
+
+export function generateInterviewReminderEmail(
+  rbtProfile: {
+    firstName: string
+    lastName: string
+    email: string | null
+  },
+  interview: {
+    scheduledAt: Date
+    durationMinutes: number
+    interviewerName: string
+    meetingUrl: string | null
+  },
+  isForAdmin: boolean = false
+): { subject: string; html: string } {
+  const formattedDate = interview.scheduledAt.toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/New_York',
+  })
+
+  const subject = isForAdmin
+    ? `Interview Reminder: ${rbtProfile.firstName} ${rbtProfile.lastName} - ${formattedDate}`
+    : `Interview Reminder: Your interview is in 30 minutes`
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
+          line-height: 1.6; 
+          color: #333; 
+          margin: 0;
+          padding: 0;
+          background-color: #f5f5f5;
+        }
+        .container { 
+          max-width: 600px; 
+          margin: 0 auto; 
+          padding: 0;
+        }
+        .header { 
+          background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%);
+          color: white; 
+          padding: 40px 20px; 
+          text-align: center; 
+          border-radius: 12px 12px 0 0;
+        }
+        .header h1 {
+          margin: 0;
+          font-size: 28px;
+          font-weight: bold;
+        }
+        .content { 
+          padding: 30px 20px; 
+          background-color: #ffffff; 
+        }
+        .content p {
+          margin: 16px 0;
+        }
+        .reminder-box {
+          background-color: #FFF5F0;
+          border: 2px solid #E4893D;
+          border-radius: 8px;
+          padding: 20px;
+          margin: 24px 0;
+        }
+        .reminder-box strong {
+          color: #E4893D;
+          font-size: 16px;
+        }
+        .info-row {
+          margin: 12px 0;
+          padding: 8px 0;
+          border-bottom: 1px solid #eee;
+        }
+        .info-row:last-child {
+          border-bottom: none;
+        }
+        .info-label {
+          font-weight: 600;
+          color: #666;
+          display: inline-block;
+          width: 120px;
+        }
+        .cta-button {
+          display: inline-block;
+          background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%);
+          color: white !important;
+          padding: 16px 32px;
+          text-decoration: none;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 16px;
+          margin: 24px 0;
+          text-align: center;
+        }
+        .footer { 
+          padding: 24px 20px; 
+          text-align: center; 
+          font-size: 12px; 
+          color: #666;
+          background-color: #f9f9f9;
+          border-radius: 0 0 12px 12px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Rise and Shine</h1>
+          <p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.95;">HRM Portal</p>
+        </div>
+        <div class="content">
+          <div class="reminder-box">
+            <p style="margin: 0; font-size: 18px;"><strong>⏰ Interview Reminder</strong></p>
+            <p style="margin: 8px 0 0 0;">Your interview is scheduled in 30 minutes!</p>
+          </div>
+
+          ${isForAdmin ? `<p>Hello Admin,</p><p>This is a reminder that an interview is scheduled to begin in 30 minutes:</p>` : `<p>Hello <strong>${rbtProfile.firstName}</strong>,</p><p>This is a friendly reminder that your interview with Rise and Shine is scheduled to begin in 30 minutes.</p>`}
+
+          <div class="info-row">
+            <span class="info-label">Date & Time:</span>
+            <strong>${formattedDate}</strong>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Duration:</span>
+            <strong>${interview.durationMinutes} minutes</strong>
+          </div>
+          ${isForAdmin ? `<div class="info-row"><span class="info-label">Candidate:</span><strong>${rbtProfile.firstName} ${rbtProfile.lastName}</strong></div>` : `<div class="info-row"><span class="info-label">Interviewer:</span><strong>${interview.interviewerName}</strong></div>`}
+
+          ${interview.meetingUrl ? `
+            <div style="text-align: center; margin: 24px 0;">
+              <a href="${interview.meetingUrl}" class="cta-button">Join Meeting</a>
+            </div>
+          ` : ''}
+
+          <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise and Shine</strong> - HRM Portal</p>
+          <p style="margin: 4px 0 0 0; font-size: 11px;">This is an automated reminder email.</p>
         </div>
       </div>
     </body>

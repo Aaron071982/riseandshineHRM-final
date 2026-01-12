@@ -136,6 +136,7 @@ interface RBTProfileViewProps {
 const statusColors: Record<string, string> = {
   NEW: 'bg-gray-500',
   REACH_OUT: 'bg-blue-500',
+  REACH_OUT_EMAIL_SENT: 'bg-blue-600',
   TO_INTERVIEW: 'bg-yellow-500',
   INTERVIEW_SCHEDULED: 'bg-purple-500',
   INTERVIEW_COMPLETED: 'bg-indigo-500',
@@ -277,6 +278,31 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         console.error('Error deleting RBT:', error)
         showToast('An error occurred while deleting the RBT. Please try again.', 'error')
         // Keep dialog open on error so user can see the error message
+      }
+    })
+    setConfirmDialogOpen(true)
+  }
+
+  const handleCompleteInterview = (interviewId: string) => {
+    setConfirmMessage(`Are you sure you want to mark this interview as completed?`)
+    setConfirmAction(async () => {
+      try {
+        const response = await fetch(`/api/admin/interviews/${interviewId}/complete`, {
+          method: 'PATCH',
+        })
+
+        if (response.ok) {
+          showToast('Interview marked as completed!', 'success')
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
+          router.refresh()
+        } else {
+          const errorData = await response.json()
+          showToast(errorData.error || 'Failed to complete interview', 'error')
+        }
+      } catch (error) {
+        console.error('Error completing interview:', error)
+        showToast('An error occurred while completing the interview', 'error')
       }
     })
     setConfirmDialogOpen(true)
@@ -446,8 +472,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const canSendReachOut = rbtProfile.status === 'REACH_OUT' || rbtProfile.status === 'NEW'
-  const canScheduleInterview = rbtProfile.status === 'TO_INTERVIEW' || rbtProfile.status === 'REACH_OUT'
+  const canSendReachOut = rbtProfile.status === 'REACH_OUT' || rbtProfile.status === 'NEW' || rbtProfile.status === 'REACH_OUT_EMAIL_SENT'
+  const canScheduleInterview = rbtProfile.status === 'TO_INTERVIEW' || rbtProfile.status === 'REACH_OUT' || rbtProfile.status === 'REACH_OUT_EMAIL_SENT'
   const canHire = rbtProfile.status === 'INTERVIEW_COMPLETED'
   const canReject = rbtProfile.status !== 'HIRED' && rbtProfile.status !== 'REJECTED'
   const isHired = rbtProfile.status === 'HIRED'
@@ -459,6 +485,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   const statusConfig = {
     NEW: { color: 'from-gray-500 to-gray-400' },
     REACH_OUT: { color: 'from-blue-500 to-blue-400' },
+    REACH_OUT_EMAIL_SENT: { color: 'from-blue-600 to-blue-500' },
     TO_INTERVIEW: { color: 'from-yellow-500 to-yellow-400' },
     INTERVIEW_SCHEDULED: { color: 'from-purple-500 to-purple-400' },
     INTERVIEW_COMPLETED: { color: 'from-indigo-500 to-indigo-400' },
@@ -729,7 +756,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         <CardContent className="space-y-4">
           <StatusManager
             rbtId={rbtProfile.id}
-            initialStatus={rbtProfile.status as 'NEW' | 'REACH_OUT' | 'TO_INTERVIEW' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_COMPLETED' | 'HIRED' | 'REJECTED'}
+            initialStatus={rbtProfile.status as 'NEW' | 'REACH_OUT' | 'REACH_OUT_EMAIL_SENT' | 'TO_INTERVIEW' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_COMPLETED' | 'HIRED' | 'REJECTED'}
             onStatusChange={(newStatus) => {
               setRbtProfile({ ...rbtProfile, status: newStatus })
               router.refresh()
@@ -817,27 +844,67 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {rbtProfile.interviews.map((interview) => (
-                <div key={interview.id} className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium">
-                        {formatDateTime(interview.scheduledAt)} ({interview.durationMinutes} min)
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Interviewer: {interview.interviewerName}
-                      </p>
-                      {interview.notes && (
-                        <p className="text-sm text-gray-600 mt-2">{interview.notes}</p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <Badge variant="outline">{interview.status}</Badge>
-                      <Badge variant="outline">{interview.decision}</Badge>
+              {rbtProfile.interviews.map((interview) => {
+                const isScheduled = interview.status === 'SCHEDULED'
+                const isCompleted = interview.status === 'COMPLETED'
+                const isPast = new Date(interview.scheduledAt) < new Date()
+                const canMarkCompleted = isScheduled && isPast
+                const canHireOrReject = isCompleted && rbtProfile.status === 'INTERVIEW_COMPLETED'
+
+                return (
+                  <div key={interview.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <p className="font-medium">
+                          {formatDateTime(interview.scheduledAt)} ({interview.durationMinutes} min)
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Interviewer: {interview.interviewerName}
+                        </p>
+                        {interview.notes && (
+                          <p className="text-sm text-gray-600 mt-2">{interview.notes}</p>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2 items-end">
+                        <div className="flex gap-2">
+                          <Badge variant="outline">{interview.status}</Badge>
+                          <Badge variant="outline">{interview.decision}</Badge>
+                        </div>
+                        {canMarkCompleted && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleCompleteInterview(interview.id)}
+                            disabled={loading}
+                            className="gradient-blue text-white border-0"
+                          >
+                            Mark as Completed
+                          </Button>
+                        )}
+                        {canHireOrReject && (
+                          <div className="flex gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              onClick={handleHire}
+                              disabled={loading}
+                              className="gradient-green text-white border-0"
+                            >
+                              Hire
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleReject}
+                              disabled={loading}
+                              variant="destructive"
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </CardContent>
         </Card>
