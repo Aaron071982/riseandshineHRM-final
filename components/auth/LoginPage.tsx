@@ -10,7 +10,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Mail } from 'lucide-react'
 import { motion } from 'framer-motion'
-import SoftBackgroundBlobs from '@/components/public/SoftBackgroundBlobs'
+import PublicBackground from '@/components/public/PublicBackground'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -52,15 +52,20 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden bg-white">
-      <SoftBackgroundBlobs />
-      
+      <PublicBackground variant="subtle" />
+
       <div className="relative z-10 w-full max-w-md">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <Card className="bg-white rounded-cardLg border border-gray-200 shadow-cardHover relative overflow-hidden">
+          <Card
+            className="bg-white/95 backdrop-blur-md rounded-cardLg border border-gray-200 shadow-cardGlow relative overflow-hidden"
+            style={{
+              background: 'rgba(255, 255, 255, 0.95)',
+            }}
+          >
             <CardHeader className="text-center space-y-4 pb-6">
               <div className="flex justify-center mb-2">
                 <Link href="/">
@@ -120,9 +125,7 @@ export default function LoginPage() {
                     disabled={loading || !email.includes('@')}
                   >
                     {loading ? (
-                      <span className="flex items-center gap-2">
-                        Sending...
-                      </span>
+                      <span className="flex items-center gap-2">Sending...</span>
                     ) : (
                       <span className="flex items-center gap-2">
                         <Mail className="h-5 w-5" />
@@ -140,6 +143,14 @@ export default function LoginPage() {
                 >
                   ← Back to Careers
                 </Link>
+                <div className="mt-3 text-center">
+                  <Link
+                    href="/apply"
+                    className="text-sm text-gray-500 hover:text-primary transition-colors duration-200"
+                  >
+                    Need to apply?
+                  </Link>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -44,6 +44,14 @@ export const publicTheme = {
       DEFAULT: '#FFFFFF',
       offWhite: '#FEFEFE',
       subtle: '#FAFAFA',
+      base: '#FEFEFE',
+      gradientTop: 'linear-gradient(180deg, rgba(255, 245, 240, 0.8) 0%, rgba(255, 255, 255, 0) 100%)',
+      gradientSection: {
+        blue: 'linear-gradient(180deg, rgba(227, 242, 253, 0.4) 0%, rgba(255, 255, 255, 0) 100%)',
+        green: 'linear-gradient(180deg, rgba(232, 245, 233, 0.4) 0%, rgba(255, 255, 255, 0) 100%)',
+        purple: 'linear-gradient(180deg, rgba(243, 229, 245, 0.4) 0%, rgba(255, 255, 255, 0) 100%)',
+      },
+      noise: 'radial-gradient(circle at 2px 2px, rgba(0,0,0,0.02) 1px, transparent 0)',
     },
     // Text
     text: {
@@ -58,6 +66,8 @@ export const publicTheme = {
     primaryLight: 'linear-gradient(135deg, #FF9F5A 0%, #FFB884 100%)',
     hero: 'linear-gradient(135deg, #E4893D 0%, #FF9F5A 50%, #FFB884 100%)',
     background: 'linear-gradient(135deg, #FFFFFF 0%, #FEF5F0 100%)',
+    cardBorder: 'linear-gradient(135deg, rgba(228, 137, 61, 0.2) 0%, rgba(255, 159, 90, 0.1) 100%)',
+    cta: 'linear-gradient(135deg, rgba(228, 137, 61, 0.95) 0%, rgba(255, 159, 90, 0.95) 100%)',
   },
   spacing: {
     section: {
@@ -79,10 +89,21 @@ export const publicTheme = {
   },
   shadows: {
     card: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+    cardSoft: '0 2px 8px 0 rgba(0, 0, 0, 0.08), 0 1px 4px 0 rgba(0, 0, 0, 0.04)',
     cardHover: '0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
     cardLift: '0 20px 40px -4px rgba(228, 137, 61, 0.2)',
+    cardGlow: '0 0 20px rgba(228, 137, 61, 0.15), 0 4px 12px rgba(228, 137, 61, 0.1)',
     button: '0 4px 12px rgba(228, 137, 61, 0.3)',
     buttonHover: '0 6px 16px rgba(228, 137, 61, 0.4)',
+    buttonGlow: '0 0 0 4px rgba(228, 137, 61, 0.1)',
+    floating: '0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)',
+  },
+  borders: {
+    card: '1px solid rgba(0, 0, 0, 0.08)',
+    cardHover: '1px solid rgba(228, 137, 61, 0.2)',
+    button: '0',
+    buttonSecondary: '2px solid rgba(0, 0, 0, 0.1)',
+    gradient: '1px solid transparent',
   },
   animations: {
     duration: {
@@ -94,6 +115,11 @@ export const publicTheme = {
       default: 'cubic-bezier(0.4, 0, 0.2, 1)',
       spring: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
       easeOut: 'cubic-bezier(0.0, 0, 0.2, 1)',
+    },
+    stagger: {
+      fast: 0.05,
+      normal: 0.1,
+      slow: 0.15,
     },
   },
   typography: {
@@ -127,6 +153,18 @@ export const publicTheme = {
       tight: 1.25,
       normal: 1.5,
       relaxed: 1.75,
+    },
+  },
+  effects: {
+    glass: {
+      background: 'rgba(255, 255, 255, 0.85)',
+      backdropFilter: 'blur(20px)',
+      border: '1px solid rgba(255, 255, 255, 0.5)',
+    },
+    hover: {
+      lift: 'translateY(-4px)',
+      rotate: 'rotate(1deg)',
+      scale: 'scale(1.02)',
     },
   },
 } as const

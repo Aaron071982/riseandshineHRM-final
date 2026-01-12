@@ -113,6 +113,16 @@
     @apply scale-[0.96];
   }
   
+  .input-public {
+    @apply border-2 border-gray-200 rounded-input focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200;
+  }
+  
+  .card-glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  
   .gradient-blue {
     background: linear-gradient(135deg, #4A90E2 0%, #6BB3FF 100%);
   }

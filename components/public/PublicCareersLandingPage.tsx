@@ -1,120 +1,151 @@
 'use client'
 
 import PublicNavBar from './PublicNavBar'
-import SoftBackgroundBlobs from './SoftBackgroundBlobs'
+import PublicBackground from './PublicBackground'
 import HeroSection from './HeroSection'
 import FeatureCards from './FeatureCards'
+import SectionHeader from './SectionHeader'
+import SectionDivider from './SectionDivider'
+import CTASection from './CTASection'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import {
-  Heart,
+  HeartHandshake,
   Users,
   GraduationCap,
   DollarSign,
   Clock,
-  Shield,
+  ShieldCheck,
   CheckCircle,
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  ClipboardCheck,
+  CalendarDays,
+  Sparkles,
 } from 'lucide-react'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import IconChip from './IconChip'
 
 export default function PublicCareersLandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
   const whatRbtsDo = [
     {
-      icon: <Heart className="h-6 w-6" />,
+      icon: <HeartHandshake className="h-5 w-5" />,
       title: 'Work One-on-One',
       description:
         'Provide direct ABA therapy to children with autism, building meaningful relationships and supporting their development.',
+      color: 'orange' as const,
     },
     {
-      icon: <Users className="h-6 w-6" />,
+      icon: <Users className="h-5 w-5" />,
       title: 'Support Families',
       description:
         'Collaborate with parents and caregivers to ensure consistent support and progress across home and therapy settings.',
+      color: 'blue' as const,
     },
     {
-      icon: <GraduationCap className="h-6 w-6" />,
+      icon: <GraduationCap className="h-5 w-5" />,
       title: 'Implement Programs',
       description:
         'Follow individualized treatment plans designed by BCBAs, tracking progress and adapting strategies as needed.',
+      color: 'purple' as const,
     },
   ]
 
   const benefits = [
     {
-      icon: <DollarSign className="h-6 w-6" />,
+      icon: <DollarSign className="h-5 w-5" />,
       title: 'Competitive Pay',
       description: 'Fair compensation that recognizes your expertise and dedication to helping children thrive.',
+      color: 'green' as const,
+      featured: true,
     },
     {
-      icon: <GraduationCap className="h-6 w-6" />,
+      icon: <GraduationCap className="h-5 w-5" />,
       title: 'Mentorship & Growth',
       description:
         'Learn from experienced BCBAs and grow your career with ongoing training and professional development opportunities.',
+      color: 'purple' as const,
     },
     {
-      icon: <Users className="h-6 w-6" />,
+      icon: <Users className="h-5 w-5" />,
       title: 'Supportive Team',
       description:
         'Join a collaborative environment where your contributions matter and you receive the support you need to succeed.',
+      color: 'blue' as const,
     },
     {
-      icon: <Clock className="h-6 w-6" />,
+      icon: <Clock className="h-5 w-5" />,
       title: 'Flexible Scheduling',
       description:
         'Work schedules that accommodate your life, with most sessions occurring after school hours and on weekends.',
+      color: 'orange' as const,
     },
   ]
 
   const requirements = [
     {
-      icon: <Shield className="h-6 w-6" />,
+      icon: <ShieldCheck className="h-5 w-5" />,
       title: 'RBT Certification',
       description:
         'RBT certification or willingness to complete the 40-hour RBT course and obtain certification (we support this process).',
+      color: 'blue' as const,
     },
     {
-      icon: <CheckCircle className="h-6 w-6" />,
+      icon: <CheckCircle className="h-5 w-5" />,
       title: 'Background Check',
       description:
         'Ability to pass a comprehensive background check, including criminal history and reference verification.',
+      color: 'green' as const,
     },
     {
-      icon: <Clock className="h-6 w-6" />,
+      icon: <Clock className="h-5 w-5" />,
       title: 'Availability',
       description:
         'Available for sessions after 2PM on weekdays and/or weekends, as most therapy occurs during these times.',
+      color: 'orange' as const,
     },
     {
-      icon: <Heart className="h-6 w-6" />,
+      icon: <HeartHandshake className="h-5 w-5" />,
       title: 'Passion for Helping',
       description:
         'Genuine passion for working with children with autism and supporting their growth and development.',
+      color: 'pink' as const,
     },
   ]
 
   const howItWorks = [
-    { step: 1, title: 'Apply', description: 'Submit your application through our simple online form.' },
+    {
+      step: 1,
+      icon: <ClipboardCheck className="h-5 w-5" />,
+      title: 'Apply',
+      description: 'Submit your application through our simple online form.',
+      color: 'orange' as const,
+    },
     {
       step: 2,
+      icon: <Users className="h-5 w-5" />,
       title: 'Review',
       description: 'Our team reviews your application and qualifications.',
+      color: 'blue' as const,
     },
     {
       step: 3,
+      icon: <CalendarDays className="h-5 w-5" />,
       title: 'Interview',
       description: 'Meet with our team to discuss the role and your fit.',
+      color: 'purple' as const,
     },
     {
       step: 4,
+      icon: <GraduationCap className="h-5 w-5" />,
       title: 'Onboarding',
       description: 'Complete training and get ready to make a difference.',
+      color: 'green' as const,
     },
   ]
 
@@ -147,132 +178,124 @@ export default function PublicCareersLandingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-white">
-      <SoftBackgroundBlobs />
+    <div className="min-h-screen bg-white relative">
+      <PublicBackground variant="hero" />
       <PublicNavBar />
 
       {/* Hero Section */}
       <HeroSection />
 
+      <SectionDivider variant="gradient" />
+
       {/* What RBTs Do */}
-      <section id="about" className="py-16 md:py-20 px-4 sm:px-6 lg:px-8 bg-gray-50/50">
+      <section
+        id="about"
+        className="py-16 md:py-20 px-4 sm:px-6 lg:px-8 relative"
+        style={{
+          background: 'linear-gradient(180deg, rgba(227, 242, 253, 0.3) 0%, rgba(255, 255, 255, 0) 100%)',
+        }}
+      >
         <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-4xl font-semibold text-gray-900 mb-4">What RBTs Do</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-              As a Registered Behavior Technician, you&apos;ll play a vital role in helping children
-              with autism reach their full potential.
-            </p>
-          </motion.div>
-          <FeatureCards features={whatRbtsDo} />
+          <SectionHeader
+            title="What RBTs Do"
+            description="As a Registered Behavior Technician, you&apos;ll play a vital role in helping children with autism reach their full potential."
+          />
+          <FeatureCards features={whatRbtsDo} columns={3} />
         </div>
       </section>
+
+      <SectionDivider variant="gradient" />
 
       {/* Benefits */}
       <section id="benefits" className="py-16 md:py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-4xl font-semibold text-gray-900 mb-4">
-              Why Work With Rise & Shine?
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-              We&apos;re committed to supporting our team members and creating a positive work
-              environment.
-            </p>
-          </motion.div>
-          <FeatureCards features={benefits} />
+          <SectionHeader
+            title="Why Work With Rise & Shine?"
+            description="We&apos;re committed to supporting our team members and creating a positive work environment."
+          />
+          <FeatureCards features={benefits} columns={4} />
         </div>
       </section>
 
+      <SectionDivider variant="gradient" />
+
       {/* Requirements */}
-      <section id="requirements" className="py-16 md:py-20 px-4 sm:px-6 lg:px-8 bg-gray-50/50">
+      <section
+        id="requirements"
+        className="py-16 md:py-20 px-4 sm:px-6 lg:px-8 relative"
+        style={{
+          background: 'linear-gradient(180deg, rgba(232, 245, 233, 0.3) 0%, rgba(255, 255, 255, 0) 100%)',
+        }}
+      >
         <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-4xl font-semibold text-gray-900 mb-4">Requirements</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-              Here&apos;s what we&apos;re looking for in our RBT candidates.
-            </p>
-          </motion.div>
-          <FeatureCards features={requirements} />
+          <SectionHeader
+            title="Requirements"
+            description="Here&apos;s what we&apos;re looking for in our RBT candidates."
+          />
+          <FeatureCards features={requirements} columns={4} />
         </div>
       </section>
+
+      <SectionDivider variant="gradient" />
 
       {/* How It Works */}
       <section id="how-it-works" className="py-16 md:py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-4xl font-semibold text-gray-900 mb-4">How It Works</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-              Our simple application and hiring process makes it easy to get started.
-            </p>
-          </motion.div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {howItWorks.map((item, index) => (
-              <motion.div
-                key={item.step}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: index * 0.1 }}
-                whileHover={{ y: -4 }}
-              >
-                <Card className="text-center bg-white rounded-card border border-gray-200 shadow-sm hover:shadow-cardHover transition-all duration-250 h-full">
-                  <CardHeader>
-                    <div className="w-14 h-14 bg-primary text-white rounded-full flex items-center justify-center text-xl font-semibold mx-auto mb-4 shadow-button">
-                      {item.step}
-                    </div>
-                    <CardTitle className="font-semibold text-gray-900">{item.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-base text-gray-600 leading-relaxed">
-                      {item.description}
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+          <SectionHeader
+            title="How It Works"
+            description="Our simple application and hiring process makes it easy to get started."
+          />
+          <div className="relative">
+            {/* Timeline line */}
+            <div className="hidden md:block absolute top-12 left-0 right-0 h-0.5 bg-gradient-to-r from-orange-200 via-blue-200 to-green-200" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
+              {howItWorks.map((item, index) => (
+                <motion.div
+                  key={item.step}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                  whileHover={{ y: -4 }}
+                  className="relative"
+                >
+                  <Card className="bg-white rounded-card border border-gray-200 shadow-sm hover:shadow-cardHover transition-all duration-250 text-center h-full">
+                    <CardHeader>
+                      <div className="flex justify-center mb-4">
+                        <div className="relative">
+                          <IconChip icon={item.icon} size="lg" color={item.color} />
+                          <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm">
+                            {item.step}
+                          </div>
+                        </div>
+                      </div>
+                      <CardTitle className="font-semibold text-gray-900">{item.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <CardDescription className="text-base text-gray-600 leading-relaxed">
+                        {item.description}
+                      </CardDescription>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
+      <SectionDivider variant="gradient" />
+
       {/* FAQs */}
-      <section id="faq" className="py-16 md:py-20 px-4 sm:px-6 lg:px-8 bg-gray-50/50">
+      <section
+        id="faq"
+        className="py-16 md:py-20 px-4 sm:px-6 lg:px-8 relative"
+        style={{
+          background: 'linear-gradient(180deg, rgba(243, 229, 245, 0.2) 0%, rgba(255, 255, 255, 0) 100%)',
+        }}
+      >
         <div className="max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-3xl md:text-4xl font-semibold text-gray-900 mb-4">
-              Frequently Asked Questions
-            </h2>
-          </motion.div>
+          <SectionHeader title="Frequently Asked Questions" />
           <div className="space-y-4">
             {faqs.map((faq, index) => (
               <motion.div
@@ -284,12 +307,15 @@ export default function PublicCareersLandingPage() {
               >
                 <Card className="bg-white rounded-card border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
                   <CardHeader
-                    className="flex flex-row items-center justify-between pb-3"
+                    className="flex flex-row items-center justify-between pb-3 hover:bg-gray-50/50 transition-colors"
                     onClick={() => setOpenFaq(openFaq === index ? null : index)}
                   >
-                    <CardTitle className="text-left font-semibold text-gray-900 pr-4">
-                      {faq.question}
-                    </CardTitle>
+                    <div className="flex items-center gap-3 flex-1">
+                      <IconChip icon={<Sparkles className="h-4 w-4" />} size="sm" color="purple" />
+                      <CardTitle className="text-left font-semibold text-gray-900 pr-4">
+                        {faq.question}
+                      </CardTitle>
+                    </div>
                     <motion.div
                       animate={{ rotate: openFaq === index ? 180 : 0 }}
                       transition={{ duration: 0.2 }}
@@ -310,7 +336,7 @@ export default function PublicCareersLandingPage() {
                         transition={{ duration: 0.3 }}
                         className="overflow-hidden"
                       >
-                        <CardContent className="pt-0 pb-4">
+                        <CardContent className="pt-0 pb-4 pl-14">
                           <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
                         </CardContent>
                       </motion.div>
@@ -324,44 +350,13 @@ export default function PublicCareersLandingPage() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-16 md:py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <Card className="bg-white rounded-cardLg border-2 border-primary/20 shadow-cardHover bg-gradient-to-br from-white to-orange-50/30">
-              <CardHeader className="space-y-4 pb-6">
-                <CardTitle className="text-3xl md:text-4xl font-semibold text-gray-900">
-                  Ready to Make a Difference?
-                </CardTitle>
-                <CardDescription className="text-lg text-gray-600 leading-relaxed">
-                  Join our team and help children with autism reach their full potential. Start your
-                  application today.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link href="/apply">
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Button
-                      size="lg"
-                      className="gradient-primary text-white border-0 rounded-button px-8 py-6 text-lg font-semibold shadow-button hover:shadow-buttonHover transition-all duration-200"
-                    >
-                      Apply Now
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                  </motion.div>
-                </Link>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-      </section>
+      <CTASection
+        title="Ready to Make a Difference?"
+        description="Join our team and help children with autism reach their full potential. Start your application today."
+        ctaText="Apply Now"
+        ctaHref="/apply"
+        variant="gradient"
+      />
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8 border-t border-gray-800">

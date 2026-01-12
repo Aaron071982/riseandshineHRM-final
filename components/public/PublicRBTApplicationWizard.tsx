@@ -11,8 +11,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import WizardStepIndicator from './WizardStepIndicator'
 import PublicNavBar from './PublicNavBar'
-import SoftBackgroundBlobs from './SoftBackgroundBlobs'
-import { ArrowLeft, ArrowRight, Upload, FileText, CheckCircle, X } from 'lucide-react'
+import PublicBackground from './PublicBackground'
+import { ArrowLeft, ArrowRight, Upload, FileText, CheckCircle, X, Paperclip, Lightbulb } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -685,20 +685,48 @@ export default function PublicRBTApplicationWizard() {
               <div>
                 <Label htmlFor="resume">Resume * (PDF, DOC, or DOCX, max 10MB)</Label>
                 <div className="mt-2">
-                  <Input
-                    id="resume"
-                    type="file"
-                    accept=".pdf,.doc,.docx"
-                    onChange={(e) => handleFileChange('resume', e.target.files?.[0] || null)}
-                  />
-                  {data.resume && (
-                    <div className="mt-2 flex items-center space-x-2 text-sm text-gray-600">
-                      <FileText className="h-4 w-4" />
-                      <span>{data.resume.name}</span>
-                      <span className="text-gray-400">
-                        ({(data.resume.size / 1024 / 1024).toFixed(2)} MB)
-                      </span>
+                  <label
+                    htmlFor="resume"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-card bg-gray-50 hover:bg-gray-100 hover:border-primary/50 transition-colors cursor-pointer group"
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-2 text-gray-400 group-hover:text-primary transition-colors" />
+                      <p className="mb-2 text-sm text-gray-500">
+                        <span className="font-semibold">Click to upload</span> or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-500">PDF, DOC, or DOCX (MAX. 10MB)</p>
                     </div>
+                    <input
+                      id="resume"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={(e) => handleFileChange('resume', e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
+                  {data.resume && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-3 p-3 bg-white border border-gray-200 rounded-input flex items-center justify-between gap-3 shadow-sm"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Paperclip className="h-4 w-4 text-primary flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{data.resume.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {(data.resume.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleFileChange('resume', null)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                      >
+                        <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </motion.div>
                   )}
                 </div>
               </div>
@@ -744,7 +772,7 @@ export default function PublicRBTApplicationWizard() {
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-bold mb-2">Review & Submit</h2>
+              <h2 className="text-2xl font-semibold mb-2 text-gray-900">Review & Submit</h2>
               <p className="text-gray-600">Please review your information before submitting.</p>
             </div>
             <div className="space-y-6">
@@ -824,17 +852,32 @@ export default function PublicRBTApplicationWizard() {
     }
   }
 
+  const tips = [
+    'Have your resume ready (PDF, DOC, or DOCX format)',
+    'Most sessions occur after 2PM on weekdays and on weekends',
+    'Weekend availability is highly valued',
+    'If you don&apos;t have RBT certification, we can help you obtain it',
+  ]
+
   return (
-    <div className="min-h-screen bg-white">
-      <SoftBackgroundBlobs />
+    <div className="min-h-screen bg-white relative">
+      <PublicBackground variant="page" />
       <PublicNavBar />
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <Card className="bg-white rounded-cardLg border border-gray-200 shadow-cardHover">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Wizard Content */}
+          <div className="lg:col-span-2">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+            >
+              <Card
+                className="bg-white/90 backdrop-blur-md rounded-cardLg border border-gray-200/50 shadow-cardGlow relative overflow-hidden"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.85)',
+                }}
+              >
             <CardHeader className="pb-6">
               <CardTitle className="text-3xl text-center font-semibold text-gray-900">
                 RBT Application
@@ -916,6 +959,42 @@ export default function PublicRBTApplicationWizard() {
             </CardContent>
           </Card>
         </motion.div>
+      </div>
+
+          {/* Sidebar - Tips Card (Desktop only) */}
+          <div className="hidden lg:block">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+              className="sticky top-24"
+            >
+              <Card className="bg-gradient-to-br from-orange-50 to-blue-50 rounded-card border border-primary/20 shadow-cardHover">
+                <CardHeader>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Lightbulb className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-xl font-semibold text-gray-900">Tips Before You Apply</CardTitle>
+                  </div>
+                  <CardDescription className="text-sm text-gray-600">
+                    Helpful information to prepare your application
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    {tips.map((tip, index) => (
+                      <li key={index} className="flex items-start gap-3 text-sm text-gray-700">
+                        <div className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <CheckCircle className="h-3 w-3" />
+                        </div>
+                        <span className="leading-relaxed">{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        </div>
       </div>
     </div>
   )
