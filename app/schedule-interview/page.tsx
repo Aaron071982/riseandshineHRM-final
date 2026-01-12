@@ -133,8 +133,9 @@ export default function ScheduleInterviewPage() {
 
     try {
       const [hours, minutes] = selectedTime.split(':').map(Number)
-      const scheduledDateTime = new Date(selectedDate)
-      scheduledDateTime.setHours(hours, minutes, 0, 0)
+      // Parse date components to create date in local timezone (not UTC)
+      const [year, month, day] = selectedDate.split('-').map(Number)
+      const scheduledDateTime = new Date(year, month - 1, day, hours, minutes, 0, 0)
 
       const response = await fetch('/api/public/schedule-interview', {
         method: 'POST',

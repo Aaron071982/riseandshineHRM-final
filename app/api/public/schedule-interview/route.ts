@@ -33,13 +33,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Parse scheduled date
+    // Parse scheduled date (ISO string from client)
+    // The ISO string is in UTC, but represents a local time (e.g., 11:15 AM EST)
+    // We need to parse it and get the local time representation
     const scheduledDate = new Date(scheduledAt)
     const now = new Date()
     
+    // Format the date in America/New_York timezone to get the actual local time
+    const scheduledDateStr = scheduledDate.toLocaleString('en-US', { 
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    })
+    
+    // Parse the formatted string to get components (MM/DD/YYYY, HH:MM)
+    const [datePart, timePart] = scheduledDateStr.split(', ')
+    const [month, day, year] = datePart.split('/').map(Number)
+    const [hours, minutes] = timePart.split(':').map(Number)
+    
+    // Create a date object in NY timezone for validation
+    const scheduledDateNY = new Date(year, month - 1, day, hours, minutes)
+    
     // Get date-only for comparison (ignore time)
-    const scheduledDateOnly = new Date(scheduledDate.getFullYear(), scheduledDate.getMonth(), scheduledDate.getDate())
-    const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const scheduledDateOnly = new Date(year, month - 1, day)
+    const nowNY = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }))
+    const todayOnly = new Date(nowNY.getFullYear(), nowNY.getMonth(), nowNY.getDate())
 
     // Validate date is today or in the future
     if (scheduledDateOnly < todayOnly) {
@@ -58,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate day of week (Sunday = 0, Monday = 1, ..., Thursday = 4)
-    const dayOfWeek = scheduledDate.getDay()
+    const dayOfWeek = scheduledDateNY.getDay()
     if (dayOfWeek < 0 || dayOfWeek > 4) {
       return NextResponse.json(
         { error: 'Interviews are only available Sunday through Thursday' },
@@ -67,9 +89,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate time (11:00 AM - 2:00 PM, 15-minute intervals)
-    const hours = scheduledDate.getHours()
-    const minutes = scheduledDate.getMinutes()
-
     if (hours < 11 || hours > 14 || (hours === 14 && minutes > 0)) {
       return NextResponse.json(
         { error: 'Interview time must be between 11:00 AM and 2:00 PM' },
