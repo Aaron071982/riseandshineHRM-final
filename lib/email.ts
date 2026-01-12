@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import { prisma } from './prisma'
 import { formatPhoneNumber } from './sms'
+import { makePublicUrl } from './baseUrl'
 
 const resendApiKey = process.env.RESEND_API_KEY
 const emailFrom = process.env.EMAIL_FROM || 'noreply@riseandshinehrm.com'
@@ -164,10 +165,7 @@ export function generateReachOutEmail(
   },
   schedulingToken: string
 ): { subject: string; html: string } {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL 
-    ? `https://${process.env.VERCEL_URL || 'riseandshinehrm.com'}` 
-    : 'http://localhost:3000'
-  const scheduleUrl = `${baseUrl}/schedule-interview?token=${schedulingToken}&rbtId=${rbtProfile.id}`
+  const scheduleUrl = makePublicUrl(`/schedule-interview?token=${schedulingToken}&rbtId=${rbtProfile.id}`)
   
   const subject = 'Opportunity at Rise and Shine - Schedule Your Interview!'
   const html = `
@@ -467,9 +465,6 @@ export function generateOfferEmail(rbtProfile: {
   email: string | null
 }): { subject: string; html: string } {
   const subject = 'Welcome to Rise and Shine - You\'re Hired!'
-  const portalUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL 
-    ? `${process.env.NEXTAUTH_URL || `https://${process.env.VERCEL_URL}`}`
-    : 'http://localhost:3000'
   
   const html = `
     <!DOCTYPE html>
@@ -705,9 +700,7 @@ export function generateApplicationSubmissionInternalEmail(rbtProfile: {
   resumeUrl: string | null
 }): { subject: string; html: string } {
   const subject = `New RBT Application: ${rbtProfile.firstName} ${rbtProfile.lastName}`
-  const adminPortalUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
-    ? `${process.env.NEXTAUTH_URL || `https://${process.env.VERCEL_URL}`}/admin/rbts/${rbtProfile.id}`
-    : `http://localhost:3000/admin/rbts/${rbtProfile.id}`
+  const adminPortalUrl = makePublicUrl(`/admin/rbts/${rbtProfile.id}`)
   
   const html = `
     <!DOCTYPE html>
