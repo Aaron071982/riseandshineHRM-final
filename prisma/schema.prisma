@@ -97,6 +97,11 @@ enum OnboardingCompletionStatus {
   COMPLETED
 }
 
+enum ApplicationSource {
+  ADMIN_CREATED
+  PUBLIC_APPLICATION
+}
+
 model User {
   id          String   @id @default(cuid())
   name        String?
@@ -139,36 +144,47 @@ model OtpCode {
 }
 
 model RBTProfile {
-  id                   String    @id @default(cuid())
-  userId               String    @unique
-  firstName            String
-  lastName             String
-  phoneNumber          String
-  email                String?
-  locationCity         String?
-  locationState        String?
-  zipCode              String?
-  addressLine1         String?
-  addressLine2         String?
-  preferredServiceArea String?
-  notes                String?
-  gender               String?
-  fortyHourCourseCompleted Boolean @default(false)
-  status               RBTStatus @default(NEW)
-  scheduleCompleted    Boolean   @default(false)
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id                       String             @id @default(cuid())
+  userId                   String             @unique
+  firstName                String
+  lastName                 String
+  phoneNumber              String
+  email                    String?
+  locationCity             String?
+  locationState            String?
+  zipCode                  String?
+  addressLine1             String?
+  addressLine2             String?
+  preferredServiceArea     String?
+  notes                    String?
+  gender                   String?
+  fortyHourCourseCompleted Boolean            @default(false)
+  status                   RBTStatus          @default(NEW)
+  scheduleCompleted        Boolean            @default(false)
+  source                   ApplicationSource? @default(ADMIN_CREATED)
+  submittedAt              DateTime?
+  resumeUrl                String?            @db.Text
+  resumeFileName           String?
+  resumeMimeType           String?
+  resumeSize               Int?
+  availabilityJson         Json?
+  languagesJson            Json?
+  experienceYears          Int?
+  transportation           Boolean?
+  preferredHoursRange      String?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
 
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  interviews         Interview[]
-  onboardingTasks    OnboardingTask[]
-  shifts             Shift[]
-  timeEntries        TimeEntry[]
-  leaveRequests      LeaveRequest[]
-  interviewEmailLogs InterviewEmailLog[]
-  availabilitySlots  AvailabilitySlot[]
-  documents          RBTDocument[]
-  interviewNotes     InterviewNotes[]
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interviews            Interview[]
+  onboardingTasks       OnboardingTask[]
+  shifts                Shift[]
+  timeEntries           TimeEntry[]
+  leaveRequests         LeaveRequest[]
+  interviewEmailLogs    InterviewEmailLog[]
+  availabilitySlots     AvailabilitySlot[]
+  documents             RBTDocument[]
+  interviewNotes        InterviewNotes[]
   onboardingCompletions OnboardingCompletion[]
 
   @@map("rbt_profiles")
@@ -187,7 +203,7 @@ model Interview {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  rbtProfile     RBTProfile      @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
   interviewNotes InterviewNotes?
 
   @@map("interviews")
@@ -295,39 +311,39 @@ model AvailabilitySlot {
 }
 
 model InterviewNotes {
-  id              String   @id @default(cuid())
-  interviewId     String   @unique
-  rbtProfileId    String
-  scriptVersion   String   @default("1.0")
-  
+  id            String @id @default(cuid())
+  interviewId   String @unique
+  rbtProfileId  String
+  scriptVersion String @default("1.0")
+
   // Structured answers for each question
-  greetingAnswer          String? @db.Text
-  basicInfoAnswer         String? @db.Text
-  experienceAnswer        String? @db.Text
-  heardAboutAnswer        String? @db.Text
-  abaPlatformsAnswer      String? @db.Text
-  communicationAnswer     String? @db.Text
-  availabilityAnswer      String? @db.Text
-  payExpectationsAnswer   String? @db.Text
-  previousCompanyAnswer   String? @db.Text
-  expectationsAnswer      String? @db.Text
-  closingNotes            String? @db.Text
-  
+  greetingAnswer        String? @db.Text
+  basicInfoAnswer       String? @db.Text
+  experienceAnswer      String? @db.Text
+  heardAboutAnswer      String? @db.Text
+  abaPlatformsAnswer    String? @db.Text
+  communicationAnswer   String? @db.Text
+  availabilityAnswer    String? @db.Text
+  payExpectationsAnswer String? @db.Text
+  previousCompanyAnswer String? @db.Text
+  expectationsAnswer    String? @db.Text
+  closingNotes          String? @db.Text
+
   // Additional structured fields for basic info
-  fullName                String?
-  birthdate               String?
-  currentAddress          String? @db.Text
-  phoneNumber             String?
-  
+  fullName       String?
+  birthdate      String?
+  currentAddress String? @db.Text
+  phoneNumber    String?
+
   // Recommendation from interviewer (temporarily commented until migration is run)
   // recommendation          InterviewRecommendation?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  interview   Interview  @relation(fields: [interviewId], references: [id], onDelete: Cascade)
-  rbtProfile  RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  interview  Interview  @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
   @@map("interview_notes")
 }
 
@@ -335,9 +351,9 @@ model RBTDocument {
   id           String   @id @default(cuid())
   rbtProfileId String
   fileName     String
-  fileType     String   // MIME type
+  fileType     String // MIME type
   fileData     String   @db.Text // base64 encoded file
-  documentType String?  // 'RESUME', 'CERTIFICATION', 'OTHER'
+  documentType String? // 'RESUME', 'CERTIFICATION', 'OTHER'
   uploadedAt   DateTime @default(now())
 
   rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
@@ -363,23 +379,38 @@ model OnboardingDocument {
 }
 
 model OnboardingCompletion {
-  id               String                    @id @default(cuid())
-  rbtProfileId     String
-  documentId       String
-  status           OnboardingCompletionStatus @default(NOT_STARTED)
-  completedAt      DateTime?
-  acknowledgmentJson Json?                   // Stores acknowledgment data (name, checkboxes, timestamp, etc.)
-  signedPdfUrl     String?                   @db.Text // URL or path to the signed/completed PDF (Supabase Storage path)
-  signedPdfData    String?                   @db.Text // base64 encoded signed PDF (legacy/backward compatibility)
-  storageBucket    String?                   // Supabase Storage bucket name (e.g., 'onboarding-documents')
-  fieldValues      Json?                     // Stores extracted field values for debugging/audit
-  draftData        Json?                     // Stores draft form field data for fillable PDFs
-  createdAt        DateTime                  @default(now())
-  updatedAt        DateTime                  @updatedAt
+  id                 String                     @id @default(cuid())
+  rbtProfileId       String
+  documentId         String
+  status             OnboardingCompletionStatus @default(NOT_STARTED)
+  completedAt        DateTime?
+  acknowledgmentJson Json? // Stores acknowledgment data (name, checkboxes, timestamp, etc.)
+  signedPdfUrl       String?                    @db.Text // URL or path to the signed/completed PDF (Supabase Storage path)
+  signedPdfData      String?                    @db.Text // base64 encoded signed PDF (legacy/backward compatibility)
+  storageBucket      String? // Supabase Storage bucket name (e.g., 'onboarding-documents')
+  fieldValues        Json? // Stores extracted field values for debugging/audit
+  draftData          Json? // Stores draft form field data for fillable PDFs
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 
-  rbtProfile RBTProfile          @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
-  document   OnboardingDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  rbtProfile RBTProfile         @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  document   OnboardingDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@unique([rbtProfileId, documentId])
   @@map("onboarding_completions")
+}
+
+model CandidateApplicationDraft {
+  id        String    @id @default(cuid())
+  email     String
+  dataJson  Json
+  token     String    @unique
+  status    String    @default("IN_PROGRESS")
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([email, status])
+  @@index([token])
+  @@map("candidate_application_drafts")
 }

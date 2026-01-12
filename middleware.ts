@@ -5,15 +5,20 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/', '/verify-otp']
+  const publicRoutes = ['/', '/verify-otp', '/login', '/apply', '/apply/success']
   const publicApiRoutes = ['/api/auth/send-otp', '/api/auth/verify-otp', '/api/auth/get-latest-otp']
+  
+  // Allow public API routes for application submission
+  if (pathname.startsWith('/api/public/')) {
+    return NextResponse.next()
+  }
   
   if (publicRoutes.includes(pathname)) {
     return NextResponse.next()
   }
 
   if (pathname.startsWith('/api/')) {
-    // API routes will handle their own auth
+    // Other API routes will handle their own auth
     return NextResponse.next()
   }
   

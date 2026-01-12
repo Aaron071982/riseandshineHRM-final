@@ -1,4 +1,24 @@
-<!-- 30bc10e4-c59d-4921-98b5-c8febab09cef a5721e3e-994a-4255-88c4-c59eed0c0770 -->
+---
+name: Fix PDF Viewer Container Ref Infinite Loop and Loading Issues
+overview: ""
+todos:
+  - id: ec996c3e-a547-466c-b875-b35df82b0661
+    content: Update PdfAcroFormViewer to render PDF pages with PDF.js (canvas)
+    status: completed
+  - id: 2d9a1ae2-29cc-4113-972c-f82c368d2e85
+    content: Extract form fields from PDF using pdf-lib
+    status: completed
+  - id: 03e8a864-3cab-4deb-9f68-7a030e6c142f
+    content: Render HTML form inputs matching PDF fields
+    status: completed
+  - id: 115d371a-d6a7-47d1-81e9-2e4b785e2498
+    content: Capture user input from HTML form inputs
+    status: completed
+  - id: 4f737fc0-3495-4bd2-b193-88e5f31094a9
+    content: Fill PDF with captured values on finalize using pdf-lib
+    status: completed
+---
+
 # Fix PDF Viewer Container Ref Infinite Loop and Loading Issues
 
 ## Problem Analysis
@@ -61,11 +81,3 @@ Use a robust pattern with refs and guards instead of state:
 - Update: Effect dependencies to `[pdfData, documentId]`
 
 This approach eliminates the infinite loop and ensures PDF loads reliably when container is ready, even in StrictMode or when container is initially hidden/collapsed.
-
-### To-dos
-
-- [x] Update PdfAcroFormViewer to render PDF pages with PDF.js (canvas)
-- [x] Extract form fields from PDF using pdf-lib
-- [x] Render HTML form inputs matching PDF fields
-- [x] Capture user input from HTML form inputs
-- [x] Fill PDF with captured values on finalize using pdf-lib

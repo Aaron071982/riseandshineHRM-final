@@ -21,11 +21,11 @@ export const supabaseAdmin: SupabaseClient | null =
       })
     : null
 
-// Storage bucket name
+// Storage bucket names
 export const STORAGE_BUCKET = 'onboarding-documents'
+export const RESUMES_STORAGE_BUCKET = 'resumes'
 
 // Helper function to check if Supabase is configured
 export function isSupabaseConfigured(): boolean {
   return !!(supabaseUrl && supabaseAnonKey)
 }
-

@@ -651,3 +651,120 @@ export function generateRejectionEmail(rbtProfile: {
   return { subject, html }
 }
 
+
+export function generateApplicationSubmissionInternalEmail(rbtProfile: {
+  firstName: string
+  lastName: string
+  email: string | null
+  id: string
+  resumeUrl: string | null
+}): { subject: string; html: string } {
+  const subject = `New RBT Application: ${rbtProfile.firstName} ${rbtProfile.lastName}`
+  const adminPortalUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
+    ? `${process.env.NEXTAUTH_URL || `https://${process.env.VERCEL_URL}`}/admin/rbts/${rbtProfile.id}`
+    : `http://localhost:3000/admin/rbts/${rbtProfile.id}`
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: bold; }
+        .content { padding: 30px 20px; background-color: #ffffff; }
+        .content p { margin: 16px 0; }
+        .button { display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; text-decoration: none; border-radius: 8px; margin: 16px 0; font-weight: bold; box-shadow: 0 4px 12px rgba(228, 137, 61, 0.3); }
+        .info-box { background-color: #f8f9fa; border-left: 4px solid #E4893D; padding: 16px; margin: 20px 0; border-radius: 4px; }
+        .footer { padding: 24px 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>New RBT Application</h1>
+          <p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.95;">Rise and Shine HRM</p>
+        </div>
+        <div class="content">
+          <p>A new RBT application has been submitted through the public careers site.</p>
+          <div class="info-box">
+            <p style="margin: 0 0 8px 0;"><strong>Candidate:</strong></p>
+            <p style="margin: 0;"><strong>${rbtProfile.firstName} ${rbtProfile.lastName}</strong></p>
+            <p style="margin: 8px 0 0 0;"><strong>Email:</strong> ${rbtProfile.email || 'Not provided'}</p>
+            <p style="margin: 8px 0 0 0;"><strong>Application ID:</strong> ${rbtProfile.id}</p>
+          </div>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${adminPortalUrl}" class="button">View Application in HRM Portal</a>
+          </div>
+          <p>The candidate has been added to the RBT pipeline with status "NEW". You can review their application, download their resume, and proceed with the hiring process from the admin portal.</p>
+          <p style="margin-top: 32px;">Best regards,<br><strong>Rise and Shine HRM System</strong></p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise and Shine</strong> - HRM Portal</p>
+          <p style="margin: 4px 0 0 0; font-size: 11px;">This is an automated notification email.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}
+
+export function generateApplicationSubmissionConfirmationEmail(rbtProfile: {
+  firstName: string
+  lastName: string
+  email: string | null
+  id: string
+}): { subject: string; html: string } {
+  const subject = 'Thank You for Your Application - Rise & Shine'
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: bold; }
+        .content { padding: 30px 20px; background-color: #ffffff; }
+        .content p { margin: 16px 0; }
+        .reference-box { background-color: #f8f9fa; border: 2px dashed #E4893D; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center; }
+        .reference-box strong { color: #E4893D; font-size: 18px; }
+        .footer { padding: 24px 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Application Received</h1>
+          <p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.95;">Thank You, ${rbtProfile.firstName}!</p>
+        </div>
+        <div class="content">
+          <p>Hello <strong>${rbtProfile.firstName}</strong>,</p>
+          <p>Thank you for your interest in joining the <strong>Rise & Shine</strong> team. We have successfully received your application for the Registered Behavior Technician (RBT) position.</p>
+          <div class="reference-box">
+            <p style="margin: 0 0 8px 0;">Your Application Reference ID:</p>
+            <strong>${rbtProfile.id}</strong>
+          </div>
+          <p><strong>What happens next?</strong></p>
+          <ul>
+            <li>Our team will review your application carefully</li>
+            <li>If your qualifications align with our needs, we'll contact you to schedule an interview</li>
+            <li>Please check your email regularly for updates</li>
+          </ul>
+          <p>We appreciate the time you took to complete the application, and we look forward to learning more about you. If you have any questions, please don't hesitate to reach out to us.</p>
+          <p style="margin-top: 32px;">Best regards,<br><strong>The Rise & Shine Team</strong></p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise & Shine</strong> - HRM Portal</p>
+          <p style="margin: 4px 0 0 0; font-size: 11px;">This is an automated confirmation email. Please do not reply directly.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
-import LoginPage from '@/components/auth/LoginPage'
+import PublicCareersLandingPage from '@/components/public/PublicCareersLandingPage'
 
 export default async function Home() {
   const cookieStore = await cookies()
@@ -18,6 +18,5 @@ export default async function Home() {
     }
   }
 
-  return <LoginPage />
+  return <PublicCareersLandingPage />
 }
-

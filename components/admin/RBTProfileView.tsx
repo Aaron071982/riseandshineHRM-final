@@ -49,6 +49,17 @@ interface RBTProfile {
   fortyHourCourseCompleted: boolean
   status: string
   scheduleCompleted?: boolean
+  source: string | null
+  submittedAt: Date | null
+  resumeUrl: string | null
+  resumeFileName: string | null
+  resumeMimeType: string | null
+  resumeSize: number | null
+  availabilityJson: any
+  languagesJson: any
+  experienceYears: number | null
+  transportation: boolean | null
+  preferredHoursRange: string | null
   createdAt: Date
   updatedAt: Date
   user: {
@@ -557,6 +568,157 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           )}
         </CardContent>
       </Card>
+
+      {/* Public Application Info */}
+      {rbtProfile.source === 'PUBLIC_APPLICATION' && (
+        <Card className="border-2 border-orange-100 bg-gradient-to-br from-white to-orange-50/30 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 rounded-full -mr-20 -mt-20 bubble-animation" />
+          <CardHeader className="relative">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-2xl font-bold text-gray-900">Application Information</CardTitle>
+              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                Applied Online
+              </Badge>
+            </div>
+            {rbtProfile.submittedAt && (
+              <p className="text-sm text-gray-600 mt-1">
+                Submitted: {formatDateTime(rbtProfile.submittedAt)}
+              </p>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Resume Download */}
+            {rbtProfile.resumeUrl && (
+              <div className="flex items-center justify-between p-4 bg-white rounded-lg border-2 border-gray-200">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-8 w-8 text-primary" />
+                  <div>
+                    <p className="font-medium text-gray-900">Resume</p>
+                    <p className="text-sm text-gray-600">
+                      {rbtProfile.resumeFileName || 'Resume file'}
+                      {rbtProfile.resumeSize && ` (${(rbtProfile.resumeSize / 1024 / 1024).toFixed(2)} MB)`}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/resume`)
+                      if (response.ok) {
+                        const blob = await response.blob()
+                        const url = window.URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = rbtProfile.resumeFileName || 'resume.pdf'
+                        document.body.appendChild(a)
+                        a.click()
+                        window.URL.revokeObjectURL(url)
+                        document.body.removeChild(a)
+                        showToast('Resume downloaded successfully', 'success')
+                      } else {
+                        showToast('Failed to download resume', 'error')
+                      }
+                    } catch (error) {
+                      console.error('Error downloading resume:', error)
+                      showToast('An error occurred while downloading the resume', 'error')
+                    }
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Download Resume
+                </Button>
+              </div>
+            )}
+
+            {/* Availability */}
+            {rbtProfile.availabilityJson && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700">Availability</p>
+                <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
+                  {rbtProfile.availabilityJson?.weekday && Object.keys(rbtProfile.availabilityJson.weekday).length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Weekdays (after 2PM):</p>
+                      <p className="text-sm text-gray-600">
+                        {Object.keys(rbtProfile.availabilityJson.weekday)
+                          .filter((day: string) => rbtProfile.availabilityJson?.weekday?.[day])
+                          .join(', ') || 'None'}
+                      </p>
+                    </div>
+                  )}
+                  {rbtProfile.availabilityJson?.weekend && Object.keys(rbtProfile.availabilityJson.weekend).length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Weekends:</p>
+                      <p className="text-sm text-gray-600">
+                        {Object.keys(rbtProfile.availabilityJson.weekend)
+                          .filter((day: string) => rbtProfile.availabilityJson?.weekend?.[day])
+                          .join(', ') || 'None'}
+                      </p>
+                    </div>
+                  )}
+                  {rbtProfile.availabilityJson?.preferredHoursRange && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Preferred Hours:</p>
+                      <p className="text-sm text-gray-600">{(rbtProfile.availabilityJson as any).preferredHoursRange}</p>
+                    </div>
+                  )}
+                  {((rbtProfile.availabilityJson as any)?.earliestStartTime || (rbtProfile.availabilityJson as any)?.latestEndTime) && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Time Range:</p>
+                      <p className="text-sm text-gray-600">
+                        {(rbtProfile.availabilityJson as any).earliestStartTime || 'Not specified'} - {(rbtProfile.availabilityJson as any).latestEndTime || 'Not specified'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Languages */}
+            {rbtProfile.languagesJson && rbtProfile.languagesJson.languages && rbtProfile.languagesJson.languages.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700">Languages Spoken</p>
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <p className="text-sm text-gray-600">
+                    {[...rbtProfile.languagesJson.languages, rbtProfile.languagesJson.otherLanguage].filter(Boolean).join(', ')}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Experience */}
+            {rbtProfile.experienceYears !== null && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700">Years of Experience</p>
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <p className="text-sm text-gray-600">{rbtProfile.experienceYears} years</p>
+                </div>
+              </div>
+            )}
+
+            {/* Transportation */}
+            {rbtProfile.transportation !== null && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700">Reliable Transportation</p>
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <p className="text-sm text-gray-600">{rbtProfile.transportation ? 'Yes' : 'No'}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Preferred Hours Range */}
+            {rbtProfile.preferredHoursRange && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700">Preferred Weekly Hours</p>
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <p className="text-sm text-gray-600">{rbtProfile.preferredHoursRange}</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Status Management */}
       <Card className="border-2 border-blue-100 bg-gradient-to-br from-white to-blue-50/30 relative overflow-hidden">

@@ -27,6 +27,7 @@ interface RBTProfile {
   locationState: string | null
   zipCode: string | null
   status: string
+  source: string | null
   updatedAt: Date
   user: {
     role: string
@@ -200,13 +201,21 @@ export default function RBTList({ initialRbts }: RBTListProps) {
                       <h3 className="text-lg font-semibold text-gray-900">
                         {rbt.firstName} {rbt.lastName}
                       </h3>
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <Badge
                           variant="outline"
                           className={`${statusConfig.bg} ${statusConfig.text} border-0`}
                         >
                           {rbt.status.replace(/_/g, ' ')}
                         </Badge>
+                        {rbt.source === 'PUBLIC_APPLICATION' && (
+                          <Badge
+                            variant="outline"
+                            className="bg-orange-50 text-orange-700 border-orange-200"
+                          >
+                            Applied Online
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
