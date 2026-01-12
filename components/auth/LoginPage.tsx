@@ -54,8 +54,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #FFF5F0 0%, #FFFFFF 100%)' }}>
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #FFF5F0 0%, #FFFAF7 50%, #FFFFFF 100%)' }}>
       <PublicBackground variant="page" />
+      
+      {/* Additional orange gradient overlay for more depth */}
+      <div 
+        className="absolute inset-0 opacity-40 pointer-events-none"
+        style={{
+          background: 'radial-gradient(circle at 30% 50%, rgba(228, 137, 61, 0.15) 0%, transparent 50%), radial-gradient(circle at 70% 50%, rgba(255, 159, 90, 0.12) 0%, transparent 50%)'
+        }}
+      />
 
       <div className="relative z-10 w-full max-w-4xl mx-auto py-12">
         <motion.div
@@ -79,13 +87,15 @@ export default function LoginPage() {
             </motion.div>
           </Link>
           
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-gray-900 leading-tight mb-4">
-            Welcome to{' '}
-            <span className="text-primary">Rise & Shine</span>
-          </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Choose an option below to get started
-          </p>
+          <div className="space-y-4">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-gray-900 leading-tight">
+              Welcome to{' '}
+              <span className="text-primary">Rise & Shine</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto font-normal">
+              Choose an option below to get started
+            </p>
+          </div>
         </motion.div>
 
         {/* Two CTA Options */}
@@ -96,8 +106,17 @@ export default function LoginPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            <Card className="bg-white/95 backdrop-blur-md rounded-cardLg border-2 border-primary/20 shadow-cardGlow hover:shadow-buttonHover transition-all duration-200 h-full">
-              <CardContent className="p-8 flex flex-col items-center text-center">
+            <Card 
+              className="bg-white/98 backdrop-blur-md rounded-cardLg border-2 border-primary/30 shadow-cardGlow hover:shadow-buttonHover transition-all duration-200 h-full relative overflow-hidden"
+              style={{
+                boxShadow: '0 8px 24px rgba(228, 137, 61, 0.12), 0 0 0 1px rgba(228, 137, 61, 0.08)'
+              }}
+            >
+              {/* Subtle orange gradient overlay */}
+              <div 
+                className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-orange-400 to-primary opacity-30"
+              />
+              <CardContent className="p-8 flex flex-col items-center text-center relative z-10">
                 <IconChip icon={<UserPlus className="h-6 w-6" />} size="lg" color="orange" className="mb-4" />
                 <h2 className="text-2xl font-semibold text-gray-900 mb-3">Apply Now</h2>
                 <p className="text-gray-600 mb-6">
@@ -127,8 +146,17 @@ export default function LoginPage() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
-            <Card className="bg-white/95 backdrop-blur-md rounded-cardLg border-2 border-gray-200 shadow-cardGlow hover:shadow-md transition-all duration-200 h-full">
-              <CardContent className="p-8 flex flex-col items-center text-center">
+            <Card 
+              className="bg-white/98 backdrop-blur-md rounded-cardLg border-2 border-gray-300 shadow-cardGlow hover:shadow-md transition-all duration-200 h-full relative overflow-hidden"
+              style={{
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)'
+              }}
+            >
+              {/* Subtle blue gradient overlay */}
+              <div 
+                className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-400 via-blue-300 to-blue-400 opacity-20"
+              />
+              <CardContent className="p-8 flex flex-col items-center text-center relative z-10">
                 <IconChip icon={<LogIn className="h-6 w-6" />} size="lg" color="blue" className="mb-4" />
                 <h2 className="text-2xl font-semibold text-gray-900 mb-3">Log In</h2>
                 <p className="text-gray-600 mb-6">
