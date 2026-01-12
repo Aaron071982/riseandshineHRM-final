@@ -22,11 +22,17 @@ interface TimeSlot {
 
 const TIME_SLOTS: TimeSlot[] = [
   { value: '11:00', label: '11:00 AM' },
+  { value: '11:15', label: '11:15 AM' },
   { value: '11:30', label: '11:30 AM' },
+  { value: '11:45', label: '11:45 AM' },
   { value: '12:00', label: '12:00 PM' },
+  { value: '12:15', label: '12:15 PM' },
   { value: '12:30', label: '12:30 PM' },
+  { value: '12:45', label: '12:45 PM' },
   { value: '13:00', label: '1:00 PM' },
+  { value: '13:15', label: '1:15 PM' },
   { value: '13:30', label: '1:30 PM' },
+  { value: '13:45', label: '1:45 PM' },
   { value: '14:00', label: '2:00 PM' },
 ]
 
@@ -137,7 +143,7 @@ export default function ScheduleInterviewPage() {
           token,
           rbtId,
           scheduledAt: scheduledDateTime.toISOString(),
-          durationMinutes: 60,
+          durationMinutes: 15,
         }),
       })
 
@@ -282,7 +288,7 @@ export default function ScheduleInterviewPage() {
                     <Clock className="w-4 h-4 text-primary" />
                     <span><strong>Time:</strong> 11:00 AM to 2:00 PM</span>
                   </li>
-                  <li><strong>Duration:</strong> 60 minutes</li>
+                  <li><strong>Duration:</strong> 15 minutes</li>
                 </ul>
               </div>
             </CardHeader>

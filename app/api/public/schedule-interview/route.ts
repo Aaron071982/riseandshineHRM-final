@@ -36,11 +36,23 @@ export async function POST(request: NextRequest) {
     // Parse scheduled date
     const scheduledDate = new Date(scheduledAt)
     const now = new Date()
+    
+    // Get date-only for comparison (ignore time)
+    const scheduledDateOnly = new Date(scheduledDate.getFullYear(), scheduledDate.getMonth(), scheduledDate.getDate())
+    const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-    // Validate date is in the future
-    if (scheduledDate <= now) {
+    // Validate date is today or in the future
+    if (scheduledDateOnly < todayOnly) {
       return NextResponse.json(
-        { error: 'Interview date must be in the future' },
+        { error: 'Interview date must be today or in the future' },
+        { status: 400 }
+      )
+    }
+    
+    // If scheduled for today, ensure time is in the future
+    if (scheduledDateOnly.getTime() === todayOnly.getTime() && scheduledDate <= now) {
+      return NextResponse.json(
+        { error: 'Interview time must be in the future' },
         { status: 400 }
       )
     }
@@ -54,7 +66,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate time (11:00 AM - 2:00 PM)
+    // Validate time (11:00 AM - 2:00 PM, 15-minute intervals)
     const hours = scheduledDate.getHours()
     const minutes = scheduledDate.getMinutes()
 
@@ -64,15 +76,28 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    
+    // Validate 15-minute intervals (minutes must be 0, 15, 30, or 45)
+    if (minutes % 15 !== 0) {
+      return NextResponse.json(
+        { error: 'Interview time must be on a 15-minute interval (e.g., 11:00, 11:15, 11:30, 11:45)' },
+        { status: 400 }
+      )
+    }
 
-    // Check for conflicting interviews
+    // Round to 15-minute slot start time for capacity checking
+    const slotStartTime = new Date(scheduledDate)
+    slotStartTime.setSeconds(0, 0)
+    const slotEndTime = new Date(slotStartTime.getTime() + 15 * 60 * 1000) // 15 minutes later
+
+    // Check for conflicting interviews for this RBT
     const conflictingInterview = await prisma.interview.findFirst({
       where: {
         rbtProfileId: rbtId,
         status: 'SCHEDULED',
         scheduledAt: {
-          gte: new Date(scheduledDate.getTime() - 60 * 60 * 1000), // 1 hour before
-          lte: new Date(scheduledDate.getTime() + (durationMinutes || 60) * 60 * 1000), // Duration after
+          gte: slotStartTime,
+          lt: slotEndTime,
         },
       },
     })
@@ -80,6 +105,24 @@ export async function POST(request: NextRequest) {
     if (conflictingInterview) {
       return NextResponse.json(
         { error: 'You already have an interview scheduled at this time' },
+        { status: 400 }
+      )
+    }
+
+    // Check capacity: max 2 interviews per 15-minute slot
+    const slotInterviewCount = await prisma.interview.count({
+      where: {
+        status: 'SCHEDULED',
+        scheduledAt: {
+          gte: slotStartTime,
+          lt: slotEndTime,
+        },
+      },
+    })
+
+    if (slotInterviewCount >= 2) {
+      return NextResponse.json(
+        { error: 'This time slot is full. Please select another time.' },
         { status: 400 }
       )
     }
@@ -105,7 +148,7 @@ export async function POST(request: NextRequest) {
       data: {
         rbtProfileId: rbtId,
         scheduledAt: scheduledDate,
-        durationMinutes: durationMinutes || 60,
+        durationMinutes: durationMinutes || 15,
         interviewerName: 'Interviewer TBD', // Can be updated later by admin
         meetingUrl,
         status: 'SCHEDULED',
@@ -123,7 +166,7 @@ export async function POST(request: NextRequest) {
     if (rbtProfile.email) {
       const rbtEmailContent = generateInterviewInviteEmail(rbtProfile, {
         scheduledAt: scheduledDate,
-        durationMinutes: durationMinutes || 60,
+        durationMinutes: durationMinutes || 15,
         interviewerName: 'Interviewer TBD',
         meetingUrl,
       })

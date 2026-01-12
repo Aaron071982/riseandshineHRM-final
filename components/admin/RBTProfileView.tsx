@@ -1451,7 +1451,7 @@ function InterviewScheduleForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="duration">Duration (minutes)</Label>
-        <Input id="duration" name="duration" type="number" defaultValue={60} required />
+        <Input id="duration" name="duration" type="number" defaultValue={15} required />
       </div>
       <div className="space-y-2">
         <Label htmlFor="interviewerEmail">Interviewer Email</Label>

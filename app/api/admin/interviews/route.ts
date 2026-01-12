@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       data: {
         rbtProfileId: data.rbtProfileId,
         scheduledAt: new Date(data.scheduledAt),
-        durationMinutes: data.durationMinutes || 60,
+        durationMinutes: data.durationMinutes || 15,
         interviewerName: data.interviewerName,
         meetingUrl,
         status: 'SCHEDULED',
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       
       const emailContent = generateInterviewInviteEmail(rbtProfile, {
         scheduledAt: new Date(data.scheduledAt),
-        durationMinutes: data.durationMinutes || 60,
+        durationMinutes: data.durationMinutes || 15,
         interviewerName: data.interviewerName,
         meetingUrl,
       })

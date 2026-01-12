@@ -256,7 +256,7 @@ export function generateReachOutEmail(
             <ul style="margin: 8px 0 0 20px; padding: 0;">
               <li><strong>Days:</strong> Sunday through Thursday</li>
               <li><strong>Time:</strong> 11:00 AM to 2:00 PM</li>
-              <li><strong>Duration:</strong> Approximately 30-60 minutes</li>
+              <li><strong>Duration:</strong> 15 minutes</li>
             </ul>
           </div>
           
