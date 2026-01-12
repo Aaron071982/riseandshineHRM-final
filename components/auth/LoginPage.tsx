@@ -7,7 +7,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
-import { Mail, Sparkles } from 'lucide-react'
+import Link from 'next/link'
+import { Mail } from 'lucide-react'
+import { motion } from 'framer-motion'
+import SoftBackgroundBlobs from '@/components/public/SoftBackgroundBlobs'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -48,87 +51,99 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 colorful-bg relative overflow-hidden">
-      {/* Decorative bubbles in background */}
-      <div className="absolute top-20 left-10 w-32 h-32 bg-orange-200/30 rounded-full bubble-animation bubble-large" />
-      <div className="absolute bottom-20 right-10 w-40 h-40 bg-blue-200/30 rounded-full bubble-animation-delayed bubble-large" />
-      <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-purple-200/30 rounded-full bubble-animation-delayed-2 bubble-medium" />
-      <div className="absolute bottom-1/3 right-1/3 w-20 h-20 bg-green-200/30 rounded-full bubble-animation-delayed-3 bubble-medium" />
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden bg-white">
+      <SoftBackgroundBlobs />
       
       <div className="relative z-10 w-full max-w-md">
-        <Card className="border-2 border-orange-200 bg-gradient-to-br from-white to-orange-50/50 shadow-2xl relative overflow-hidden">
-          {/* Decorative bubbles on card */}
-          <div className="absolute top-0 right-0 w-24 h-24 bg-orange-100/40 rounded-full -mr-12 -mt-12 bubble-animation" />
-          <div className="absolute bottom-0 left-0 w-20 h-20 bg-blue-100/40 rounded-full -ml-10 -mb-10 bubble-animation-delayed" />
-          
-          <CardHeader className="text-center space-y-4 relative">
-            <div className="flex justify-center mb-2">
-              <div className="relative">
-                <Image
-                  src="/logo.png"
-                  alt="Rise and Shine"
-                  width={200}
-                  height={80}
-                  className="object-contain drop-shadow-lg"
-                />
-                <div className="absolute -top-2 -right-2">
-                  <Sparkles className="h-6 w-6 text-orange-400 animate-pulse" />
-                </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <Card className="bg-white rounded-cardLg border border-gray-200 shadow-cardHover relative overflow-hidden">
+            <CardHeader className="text-center space-y-4 pb-6">
+              <div className="flex justify-center mb-2">
+                <Link href="/">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Image
+                      src="/logo.png"
+                      alt="Rise and Shine"
+                      width={180}
+                      height={72}
+                      className="object-contain"
+                    />
+                  </motion.div>
+                </Link>
               </div>
-            </div>
-            <CardTitle className="text-3xl font-bold text-gradient">Welcome Back!</CardTitle>
-            <CardDescription className="text-base">
-              Enter your email address to receive a verification code
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="relative">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-orange-500" />
-                  Email Address
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="h-12 border-2 border-orange-200 focus:border-primary rounded-xl text-base"
-                />
-              </div>
-              {error && (
-                <div className="text-sm text-red-600 bg-red-50 border-2 border-red-200 p-3 rounded-xl">
-                  {error}
+              <CardTitle className="text-3xl font-semibold text-gray-900">Welcome Back!</CardTitle>
+              <CardDescription className="text-base text-gray-600">
+                Enter your email address to receive a verification code
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-primary" />
+                    Email Address
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={loading}
+                    className="h-12 border-2 border-gray-200 rounded-input focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                  />
                 </div>
-              )}
-              <Button 
-                type="submit" 
-                className="w-full h-12 gradient-primary text-white border-0 rounded-xl text-base font-semibold shine-effect glow-effect" 
-                disabled={loading || !email.includes('@')}
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    Sending...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Mail className="h-5 w-5" />
-                    Send Verification Code
-                  </span>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-sm text-red-600 bg-red-50 border-2 border-red-200 p-3 rounded-input"
+                  >
+                    {error}
+                  </motion.div>
                 )}
-              </Button>
-            </form>
-            
-            <div className="mt-6 pt-6 border-t border-orange-200">
-              <p className="text-xs text-center text-gray-500">
-                Secure login via email verification
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button
+                    type="submit"
+                    className="w-full h-12 gradient-primary text-white border-0 rounded-button font-semibold shadow-button hover:shadow-buttonHover transition-all duration-200"
+                    disabled={loading || !email.includes('@')}
+                  >
+                    {loading ? (
+                      <span className="flex items-center gap-2">
+                        Sending...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Mail className="h-5 w-5" />
+                        Send Verification Code
+                      </span>
+                    )}
+                  </Button>
+                </motion.div>
+              </form>
+
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <Link
+                  href="/"
+                  className="text-sm text-center text-gray-600 hover:text-primary transition-colors duration-200 flex items-center justify-center gap-1"
+                >
+                  ← Back to Careers
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   )

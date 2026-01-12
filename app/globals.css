@@ -93,6 +93,26 @@
     background: linear-gradient(135deg, #FF9F5A 0%, #FFB884 100%);
   }
   
+  .card-public {
+    @apply bg-white rounded-card border border-gray-200 shadow-sm transition-all duration-250;
+  }
+  
+  .card-public:hover {
+    @apply shadow-cardHover -translate-y-1;
+  }
+  
+  .btn-primary-public {
+    @apply gradient-primary text-white rounded-button px-6 py-3 font-semibold shadow-button transition-all duration-250;
+  }
+  
+  .btn-primary-public:hover {
+    @apply shadow-buttonHover scale-[0.98];
+  }
+  
+  .btn-primary-public:active {
+    @apply scale-[0.96];
+  }
+  
   .gradient-blue {
     background: linear-gradient(135deg, #4A90E2 0%, #6BB3FF 100%);
   }

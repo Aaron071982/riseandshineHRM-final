@@ -57,6 +57,9 @@ const config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        card: "1.125rem", // 18px
+        cardLg: "1.5rem", // 24px
+        pill: "9999px",
       },
       keyframes: {
         "accordion-down": {

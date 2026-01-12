@@ -14,6 +14,7 @@ import PublicNavBar from './PublicNavBar'
 import SoftBackgroundBlobs from './SoftBackgroundBlobs'
 import { ArrowLeft, ArrowRight, Upload, FileText, CheckCircle, X } from 'lucide-react'
 import Link from 'next/link'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface ApplicationData {
   // Step 1: Personal Info
@@ -293,8 +294,8 @@ export default function PublicRBTApplicationWizard() {
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-bold mb-2">Personal Information</h2>
-              <p className="text-gray-600">Please provide your basic information.</p>
+              <h2 className="text-2xl font-semibold mb-2 text-gray-900">Personal Information</h2>
+              <p className="text-gray-600 leading-relaxed">Please provide your basic information.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -400,7 +401,7 @@ export default function PublicRBTApplicationWizard() {
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-bold mb-2">RBT Readiness</h2>
+              <h2 className="text-2xl font-semibold mb-2 text-gray-900">RBT Readiness</h2>
               <p className="text-gray-600">Tell us about your RBT qualifications and experience.</p>
             </div>
             <div className="space-y-6">
@@ -518,7 +519,7 @@ export default function PublicRBTApplicationWizard() {
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-bold mb-2">Availability</h2>
+              <h2 className="text-2xl font-semibold mb-2 text-gray-900">Availability</h2>
               <p className="text-gray-600">
                 Most RBT sessions occur after 2PM on weekdays and on weekends. Please indicate your availability.
               </p>
@@ -677,7 +678,7 @@ export default function PublicRBTApplicationWizard() {
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-bold mb-2">Resume & Documents</h2>
+              <h2 className="text-2xl font-semibold mb-2 text-gray-900">Resume & Documents</h2>
               <p className="text-gray-600">Please upload your resume and any relevant documents.</p>
             </div>
             <div className="space-y-6">
@@ -747,9 +748,9 @@ export default function PublicRBTApplicationWizard() {
               <p className="text-gray-600">Please review your information before submitting.</p>
             </div>
             <div className="space-y-6">
-              <Card>
+              <Card className="bg-white rounded-card border border-gray-200 shadow-sm">
                 <CardHeader>
-                  <CardTitle>Personal Information</CardTitle>
+                  <CardTitle className="font-semibold text-gray-900">Personal Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <p><strong>Name:</strong> {data.firstName} {data.lastName}</p>
@@ -773,7 +774,7 @@ export default function PublicRBTApplicationWizard() {
               </Card>
               <Card>
                 <CardHeader>
-                  <CardTitle>Availability</CardTitle>
+                  <CardTitle className="font-semibold text-gray-900">Availability</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <p><strong>Weekday Availability:</strong> {Object.keys(data.weekdayAvailability).filter(k => data.weekdayAvailability[k]).join(', ') || 'None'}</p>
@@ -795,7 +796,7 @@ export default function PublicRBTApplicationWizard() {
               </Card>
               <Card>
                 <CardHeader>
-                  <CardTitle>Documents</CardTitle>
+                  <CardTitle className="font-semibold text-gray-900">Documents</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <p><strong>Resume:</strong> {data.resume ? data.resume.name : 'Not uploaded'}</p>
@@ -828,47 +829,93 @@ export default function PublicRBTApplicationWizard() {
       <SoftBackgroundBlobs />
       <PublicNavBar />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Card className="shadow-xl border-2 border-gray-100">
-          <CardHeader>
-            <CardTitle className="text-3xl text-center">RBT Application</CardTitle>
-            <CardDescription className="text-center">
-              Join our team and make a difference in children&apos;s lives
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <WizardStepIndicator currentStep={currentStep} totalSteps={STEPS.length} steps={STEPS} />
-            {error && (
-              <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-lg text-red-700">
-                {error}
-              </div>
-            )}
-            <div className="mb-8">{renderStep()}</div>
-            <div className="flex justify-between">
-              <Button
-                variant="outline"
-                onClick={handleBack}
-                disabled={currentStep === 1 || submitting}
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              {currentStep < STEPS.length ? (
-                <Button onClick={handleNext} disabled={submitting} className="gradient-primary text-white">
-                  Next
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="gradient-primary text-white"
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <Card className="bg-white rounded-cardLg border border-gray-200 shadow-cardHover">
+            <CardHeader className="pb-6">
+              <CardTitle className="text-3xl text-center font-semibold text-gray-900">
+                RBT Application
+              </CardTitle>
+              <CardDescription className="text-center text-base text-gray-600">
+                Join our team and make a difference in children&apos;s lives
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <WizardStepIndicator currentStep={currentStep} totalSteps={STEPS.length} steps={STEPS} />
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="p-4 bg-red-50 border-2 border-red-200 rounded-input text-red-700 text-sm"
+                  >
+                    {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentStep}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="mb-8"
                 >
-                  {submitting ? 'Submitting...' : 'Submit Application'}
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                  {renderStep()}
+                </motion.div>
+              </AnimatePresence>
+              <div className="flex justify-between pt-4 border-t border-gray-200">
+                <motion.div
+                  whileHover={{ scale: currentStep === 1 ? 1 : 1.02 }}
+                  whileTap={{ scale: currentStep === 1 ? 1 : 0.98 }}
+                >
+                  <Button
+                    variant="outline"
+                    onClick={handleBack}
+                    disabled={currentStep === 1 || submitting}
+                    className="rounded-button border-2 border-gray-300 hover:bg-gray-50 transition-all duration-200"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Button>
+                </motion.div>
+                {currentStep < STEPS.length ? (
+                  <motion.div
+                    whileHover={{ scale: submitting ? 1 : 1.02 }}
+                    whileTap={{ scale: submitting ? 1 : 0.98 }}
+                  >
+                    <Button
+                      onClick={handleNext}
+                      disabled={submitting}
+                      className="gradient-primary text-white border-0 rounded-button shadow-button hover:shadow-buttonHover transition-all duration-200"
+                    >
+                      Next
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    whileHover={{ scale: submitting ? 1 : 1.02 }}
+                    whileTap={{ scale: submitting ? 1 : 0.98 }}
+                  >
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={submitting}
+                      className="gradient-primary text-white border-0 rounded-button shadow-button hover:shadow-buttonHover transition-all duration-200"
+                    >
+                      {submitting ? 'Submitting...' : 'Submit Application'}
+                    </Button>
+                  </motion.div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   )
