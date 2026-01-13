@@ -12,6 +12,7 @@ import RBTScheduleView from './RBTScheduleView'
 import InterviewNotesButton from './InterviewNotesButton'
 import AdminOnboardingOverride from './AdminOnboardingOverride'
 import StatusManager from './StatusManager'
+import AuditLog from './AuditLog'
 import {
   Select,
   SelectContent,
@@ -1233,6 +1234,12 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           </CardContent>
         </Card>
       )}
+
+      {/* Audit Log Section */}
+      <AuditLog
+        rbtProfileId={rbtProfile.id}
+        rbtName={`${rbtProfile.firstName} ${rbtProfile.lastName}`}
+      />
 
       {/* Documents Section */}
       <Card className="border-2 border-blue-100 bg-gradient-to-br from-white to-blue-50/30 relative overflow-hidden">

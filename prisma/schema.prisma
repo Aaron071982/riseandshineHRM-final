@@ -188,6 +188,7 @@ model RBTProfile {
   documents             RBTDocument[]
   interviewNotes        InterviewNotes[]
   onboardingCompletions OnboardingCompletion[]
+  auditLogs             RBTAuditLog[]
 
   @@map("rbt_profiles")
 }
@@ -416,4 +417,20 @@ model CandidateApplicationDraft {
   @@index([email, status])
   @@index([token])
   @@map("candidate_application_drafts")
+}
+
+model RBTAuditLog {
+  id           String   @id @default(cuid())
+  rbtProfileId String
+  auditType    String   // 'PHONE_CALL', 'EMAIL', 'NOTE', etc.
+  dateTime     DateTime
+  notes        String?  @db.Text
+  createdBy    String?  // Admin user email or name
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId, dateTime])
+  @@map("rbt_audit_logs")
 }

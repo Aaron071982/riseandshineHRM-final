@@ -56,14 +56,29 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   console.log(`📧 Attempting to send email to ${options.to} via Resend...`)
 
   try {
+    // Create plain text version from HTML (simple strip)
+    const plainText = options.html
+      .replace(/<style[^>]*>.*?<\/style>/gis, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .trim()
+
     const result = await resend.emails.send({
       from: emailFrom,
       to: options.to,
       subject: options.subject,
       html: options.html,
-      reply_to: emailFrom, // Add reply-to header
+      text: plainText,
+      reply_to: 'info@riseandshine.nyc', // Use the support email for replies
       headers: {
         'X-Entity-Ref-ID': options.rbtProfileId, // Track emails per RBT
+        'List-Unsubscribe': '<mailto:info@riseandshine.nyc?subject=unsubscribe>',
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
       },
     })
     
@@ -266,6 +281,9 @@ export function generateReachOutEmail(
           
           <p>If you have any questions or prefer to schedule at a different time, please reply to this email and we'll work with you to find a suitable time.</p>
           <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
+          <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            If you have any questions, reach out to <a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a>
+          </p>
         </div>
         <div class="footer">
           <p><strong>Rise and Shine</strong> - HRM Portal</p>
@@ -447,6 +465,9 @@ export function generateInterviewInviteEmail(
           <p>We look forward to speaking with you, ${rbtProfile.firstName}!</p>
           
           <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
+          <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            If you have any questions, reach out to <a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a>
+          </p>
         </div>
         <div class="footer">
           <p><strong>Rise and Shine</strong> - HRM Portal</p>
@@ -602,6 +623,9 @@ export function generateOfferEmail(rbtProfile: {
           <p>Please log in at your earliest convenience to begin the onboarding process. We're excited to have you on the team, ${rbtProfile.firstName}!</p>
           
           <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
+          <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            If you have any questions, reach out to <a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a>
+          </p>
         </div>
         <div class="footer">
           <p><strong>Rise and Shine</strong> - HRM Portal</p>
@@ -679,6 +703,9 @@ export function generateRejectionEmail(rbtProfile: {
           <p>This decision was not easy, and we want you to know that we were impressed by your background and enthusiasm. We encourage you to continue pursuing opportunities in the field, as we believe you have much to offer.</p>
           <p>We wish you the very best in your career search and future endeavors. Please don't hesitate to reach out if you have any questions.</p>
           <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
+          <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            If you have any questions, reach out to <a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a>
+          </p>
         </div>
         <div class="footer">
           <p><strong>Rise and Shine</strong> - HRM Portal</p>
@@ -738,6 +765,9 @@ export function generateApplicationSubmissionInternalEmail(rbtProfile: {
           </div>
           <p>The candidate has been added to the RBT pipeline with status "NEW". You can review their application, download their resume, and proceed with the hiring process from the admin portal.</p>
           <p style="margin-top: 32px;">Best regards,<br><strong>Rise and Shine HRM System</strong></p>
+          <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            If you have any questions, reach out to <a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a>
+          </p>
         </div>
         <div class="footer">
           <p><strong>Rise and Shine</strong> - HRM Portal</p>
@@ -795,6 +825,9 @@ export function generateApplicationSubmissionConfirmationEmail(rbtProfile: {
           </ul>
           <p>We appreciate the time you took to complete the application, and we look forward to learning more about you. If you have any questions, please don't hesitate to reach out to us.</p>
           <p style="margin-top: 32px;">Best regards,<br><strong>The Rise & Shine Team</strong></p>
+          <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            If you have any questions, reach out to <a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a>
+          </p>
         </div>
         <div class="footer">
           <p><strong>Rise & Shine</strong> - HRM Portal</p>
@@ -952,6 +985,9 @@ export function generateInterviewReminderEmail(
           ` : ''}
 
           <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
+          <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            If you have any questions, reach out to <a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a>
+          </p>
         </div>
         <div class="footer">
           <p><strong>Rise and Shine</strong> - HRM Portal</p>
