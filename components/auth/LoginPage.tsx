@@ -54,7 +54,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #FFF5F0 0%, #FFFAF7 50%, #FFFFFF 100%)' }}>
+    <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #FFF5F0 0%, #FFFAF7 50%, #FFFFFF 100%)' }}>
       <PublicBackground variant="page" />
       
       {/* Additional orange gradient overlay for more depth */}
@@ -65,7 +65,8 @@ export default function LoginPage() {
         }}
       />
 
-      <div className="relative z-10 w-full max-w-4xl mx-auto py-12">
+      <div className="relative z-10 w-full max-w-4xl mx-auto py-12 px-4 flex-1 flex items-center">
+        <div className="w-full">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -250,6 +251,7 @@ export default function LoginPage() {
           >
             ← Back to Home
           </Link>
+        </div>
         </div>
       </div>
       <PublicFooter />

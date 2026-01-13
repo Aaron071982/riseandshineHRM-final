@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Instagram, Facebook, Linkedin, Mail, Phone, MapPin, Clock } from 'lucide-react'
+import { Instagram, Facebook, Linkedin, Mail, Phone, Clock } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export default function PublicFooter() {
@@ -16,26 +16,9 @@ export default function PublicFooter() {
     { name: 'Login', href: '/login' },
   ]
 
-  const states = ['New York', 'New Jersey', 'Pennsylvania', 'Connecticut', 'Florida']
-
-  const services = [
-    '1:1 ABA Therapy',
-    'Assessment & Evaluation',
-    'Family Training',
-    'School Collaboration',
-  ]
-
-  const resources = [
-    { name: 'Careers', href: '/apply' },
-    { name: 'FAQ', href: '#faq' },
-    { name: 'Insurance', href: '#' },
-    { name: 'Contact', href: '#' },
-  ]
-
   const contactInfo = {
     tollFree: '(888) 898-4774',
     company: '(929) 460-9600',
-    fax: '(888) 898-6260',
     email: 'info@riseandshine.nyc',
     hours: 'Mon–Sun: 9:00 AM – 7:00 PM',
   }
@@ -46,9 +29,6 @@ export default function PublicFooter() {
     { name: 'Terms of Service', href: '#' },
     { name: 'HIPAA Notice', href: '#' },
     { name: 'Accessibility', href: '#' },
-    { name: 'Disclaimer', href: '#' },
-    { name: 'Non-Discrimination Policy', href: '#' },
-    { name: 'Client Rights & Responsibilities', href: '#' },
   ]
 
   const socialLinks = [
@@ -58,48 +38,42 @@ export default function PublicFooter() {
   ]
 
   return (
-    <footer className="relative mt-20 bg-gradient-to-b from-[#E4893D] via-[#E4893D] to-[#D87A2E] text-white">
-      {/* Top divider */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
+    <footer className="relative bg-gray-900 text-white mt-auto">
       {/* Main footer content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
-          {/* Left column - Brand */}
-          <div className="lg:col-span-1">
-            <div className="space-y-4">
-              <h3 className="text-2xl font-semibold">Rise and Shine ABA</h3>
-              <p className="text-orange-50 text-sm leading-relaxed">
-                Empowering young children with autism through evidence-based ABA therapy and
-                comprehensive family support.
-              </p>
-              {/* Social icons */}
-              <div className="flex items-center gap-3 pt-2">
-                {socialLinks.map((social) => {
-                  const Icon = social.icon
-                  return (
-                    <Link
-                      key={social.name}
-                      href={social.href}
-                      className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors duration-200 group"
-                    >
-                      <Icon className="h-5 w-5 text-white group-hover:scale-110 transition-transform duration-200" />
-                    </Link>
-                  )
-                })}
-              </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
+          {/* Brand Column */}
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-white">Rise & Shine ABA</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Empowering young children with autism through evidence-based ABA therapy and comprehensive family support.
+            </p>
+            {/* Social icons */}
+            <div className="flex items-center gap-3 pt-2">
+              {socialLinks.map((social) => {
+                const Icon = social.icon
+                return (
+                  <Link
+                    key={social.name}
+                    href={social.href}
+                    className="w-9 h-9 rounded-full bg-gray-800 hover:bg-primary transition-colors duration-200 flex items-center justify-center group"
+                  >
+                    <Icon className="h-4 w-4 text-gray-300 group-hover:text-white transition-colors duration-200" />
+                  </Link>
+                )
+              })}
             </div>
           </div>
 
-          {/* Quick Links */}
+          {/* Quick Links Column */}
           <div>
-            <h4 className="font-semibold text-lg mb-4">Quick Links</h4>
-            <ul className="space-y-2">
+            <h4 className="font-semibold text-white mb-4">Quick Links</h4>
+            <ul className="space-y-2.5">
               {quickLinks.map((link) => (
                 <li key={link.name}>
                   <Link
                     href={link.href}
-                    className="text-orange-50 hover:text-white text-sm transition-colors duration-200 inline-block hover:translate-x-1 transition-transform duration-200"
+                    className="text-gray-400 hover:text-white text-sm transition-colors duration-200 inline-block"
                   >
                     {link.name}
                   </Link>
@@ -108,60 +82,39 @@ export default function PublicFooter() {
             </ul>
           </div>
 
-          {/* States We Serve */}
+          {/* Contact Column */}
           <div>
-            <h4 className="font-semibold text-lg mb-4">States We Serve</h4>
-            <ul className="space-y-2">
-              {states.map((state) => (
-                <li key={state}>
-                  <span className="text-orange-50 text-sm">{state}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Services */}
-          <div>
-            <h4 className="font-semibold text-lg mb-4">Services</h4>
-            <ul className="space-y-2">
-              {services.map((service) => (
-                <li key={service}>
-                  <span className="text-orange-50 text-sm">{service}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        {/* Contact Info Section */}
-        <div className="mt-12 pt-8 border-t border-white/20">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="flex items-start gap-3">
-              <Phone className="h-5 w-5 text-orange-200 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold mb-1">Toll-Free</p>
-                <p className="text-orange-50 text-sm">{contactInfo.tollFree}</p>
-                <p className="text-orange-50 text-sm mt-1">{contactInfo.company}</p>
-                <p className="text-orange-50 text-xs mt-1">Fax: {contactInfo.fax}</p>
+            <h4 className="font-semibold text-white mb-4">Contact Us</h4>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <Phone className="h-4 w-4 text-gray-400 flex-shrink-0 mt-1" />
+                <div>
+                  <a
+                    href={`tel:${contactInfo.tollFree.replace(/\s/g, '')}`}
+                    className="text-gray-400 hover:text-white text-sm transition-colors duration-200 block"
+                  >
+                    {contactInfo.tollFree}
+                  </a>
+                  <a
+                    href={`tel:${contactInfo.company.replace(/\s/g, '')}`}
+                    className="text-gray-400 hover:text-white text-sm transition-colors duration-200 block mt-1"
+                  >
+                    {contactInfo.company}
+                  </a>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <Mail className="h-5 w-5 text-orange-200 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold mb-1">Email</p>
+              <div className="flex items-start gap-3">
+                <Mail className="h-4 w-4 text-gray-400 flex-shrink-0 mt-1" />
                 <a
                   href={`mailto:${contactInfo.email}`}
-                  className="text-orange-50 hover:text-white text-sm transition-colors duration-200"
+                  className="text-gray-400 hover:text-white text-sm transition-colors duration-200"
                 >
                   {contactInfo.email}
                 </a>
               </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-orange-200 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold mb-1">Hours</p>
-                <p className="text-orange-50 text-sm">{contactInfo.hours}</p>
+              <div className="flex items-start gap-3">
+                <Clock className="h-4 w-4 text-gray-400 flex-shrink-0 mt-1" />
+                <p className="text-gray-400 text-sm">{contactInfo.hours}</p>
               </div>
             </div>
           </div>
@@ -169,29 +122,25 @@ export default function PublicFooter() {
       </div>
 
       {/* Bottom bar */}
-      <div className="border-t border-white/20 bg-orange-700/30">
+      <div className="border-t border-gray-800 bg-gray-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Legal links */}
-          <div className="flex flex-wrap items-center gap-4 text-xs text-orange-100 mb-4">
-            {legalLinks.map((link) => (
-              <Link
-                key={link.name}
-                href={link.href}
-                className="hover:text-white transition-colors duration-200"
-              >
-                {link.name}
-              </Link>
-            ))}
-          </div>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            {/* Legal links */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-400">
+              {legalLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  className="hover:text-white transition-colors duration-200"
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </div>
 
-          {/* Copyright + HIPAA notice */}
-          <div className="pt-4 border-t border-white/10">
-            <p className="text-xs text-orange-100 leading-relaxed">
+            {/* Copyright */}
+            <p className="text-xs text-gray-500">
               © {new Date().getFullYear()} Rise & Shine ABA. All rights reserved.
-            </p>
-            <p className="text-xs text-orange-100/80 mt-2 leading-relaxed">
-              All forms and documents on this website are protected under copyright and HIPAA
-              compliance. Unauthorized use, reproduction, or scraping is strictly prohibited.
             </p>
           </div>
         </div>
