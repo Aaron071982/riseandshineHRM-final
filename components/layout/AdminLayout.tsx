@@ -48,18 +48,23 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
-      <nav className="bg-white border-b border-gray-200">
+      <nav className="bg-gradient-to-r from-orange-50 via-white to-orange-50 border-b border-orange-200/70 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <Link href="/admin/dashboard" className="flex items-center space-x-3">
-                <Image
-                  src="/logo.png"
-                  alt="Rise and Shine"
-                  width={120}
-                  height={50}
-                  className="object-contain"
-                />
+                <div className="flex items-center space-x-2">
+                  <Image
+                    src="/new-real-logo.png"
+                    alt="Rise and Shine"
+                    width={48}
+                    height={48}
+                    className="object-contain"
+                  />
+                  <span className="text-base font-extrabold tracking-tight text-[#e36f1e] whitespace-nowrap">
+                    RISE AND SHINE HRM
+                  </span>
+                </div>
               </Link>
               <div className="hidden md:ml-10 md:flex md:space-x-1">
                 {navItems.map((item) => {
@@ -70,10 +75,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        'inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                        'inline-flex items-center px-3 py-2 rounded-md text-sm font-semibold transition-colors border border-transparent',
                         isActive
-                          ? 'bg-primary text-white'
-                          : 'text-gray-700 hover:bg-gray-100'
+                          ? 'text-[#e36f1e] bg-orange-50 border-orange-200 shadow-sm'
+                          : 'text-gray-800 hover:text-[#e36f1e] hover:bg-orange-50'
                       )}
                     >
                       <Icon className="w-4 h-4 mr-2" />
