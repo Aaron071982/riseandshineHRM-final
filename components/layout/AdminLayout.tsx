@@ -113,7 +113,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-gray-200">
+        <div className="md:hidden bg-white border-b border-orange-200/70">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon
@@ -124,10 +124,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    'flex items-center px-3 py-2 rounded-md text-base font-medium',
+                    'flex items-center px-3 py-2 rounded-md text-base font-semibold transition-colors border border-transparent',
                     isActive
-                      ? 'bg-primary text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
+                      ? 'text-[#e36f1e] bg-orange-50 border-orange-200 shadow-sm'
+                      : 'text-gray-800 hover:text-[#e36f1e] hover:bg-orange-50'
                   )}
                 >
                   <Icon className="w-4 h-4 mr-3" />
