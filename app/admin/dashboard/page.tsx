@@ -8,6 +8,9 @@ import { Plus, Users, Calendar, FileCheck, Clock, TrendingUp, UserPlus, CheckCir
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function AdminDashboard() {
   // Get current admin user
   const cookieStore = await cookies()

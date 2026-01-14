@@ -4,6 +4,9 @@ import { validateSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import OnboardingDocumentsAdmin from '@/components/admin/OnboardingDocumentsAdmin'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function OnboardingDocumentsAdminPage() {
   const cookieStore = await cookies()
   const sessionToken = cookieStore.get('session')?.value

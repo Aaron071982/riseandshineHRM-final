@@ -7,6 +7,9 @@ import RBTMainDashboard from '@/components/rbt/RBTMainDashboard'
 import ScheduleSetupWrapper from './ScheduleSetupWrapper'
 import { PrismaClientKnownRequestError, PrismaClientInitializationError } from '@prisma/client/runtime/library'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // Helper function to safely log errors without exposing secrets
 function logError(context: string, error: unknown) {
   const errorInfo: any = {

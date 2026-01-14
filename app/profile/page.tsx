@@ -5,6 +5,9 @@ import ProfilePage from '@/components/profile/ProfilePage'
 import AdminLayout from '@/components/layout/AdminLayout'
 import RBTLayout from '@/components/layout/RBTLayout'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 type Role = 'ADMIN' | 'RBT' | 'CANDIDATE'
 
 export default function ProfileRoute() {

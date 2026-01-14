@@ -3,6 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { Clock, Calendar, TrendingUp, User } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function AttendancePage() {
   const timeEntries = await prisma.timeEntry.findMany({
     include: {

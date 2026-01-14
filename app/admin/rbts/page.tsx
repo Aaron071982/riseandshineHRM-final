@@ -8,6 +8,9 @@ import { Plus, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import RBTList from '@/components/admin/RBTList'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 interface SearchParams {
   search?: string
   status?: string

@@ -1,25 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/toast'
 import {
-  Camera,
   Mail,
   MapPin,
   Phone,
@@ -48,7 +37,6 @@ interface ProfileData {
   emergencyContactName?: string | null
   emergencyContactRelationship?: string | null
   emergencyContactPhone?: string | null
-  profileImageUrl?: string | null
   employeeId?: string | null
   startDate?: string | null
   department?: string | null
@@ -84,10 +72,6 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editing, setEditing] = useState(false)
-  const [photoDialogOpen, setPhotoDialogOpen] = useState(false)
-  const [photoUploading, setPhotoUploading] = useState(false)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
 
   const [user, setUser] = useState<UserData | null>(null)
   const [profile, setProfile] = useState<ProfileData>({})
@@ -175,52 +159,6 @@ export default function ProfilePage() {
     setEditing(false)
   }
 
-  const handlePhotoSelect = (file: File) => {
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp']
-    if (!allowedTypes.includes(file.type)) {
-      showToast('Please upload a PNG, JPG, or WEBP image', 'error')
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Image size must be under 5MB', 'error')
-      return
-    }
-
-    setPhotoFile(file)
-    setPhotoPreview(URL.createObjectURL(file))
-  }
-
-  const handlePhotoUpload = async () => {
-    if (!photoFile) {
-      showToast('Please select a photo first', 'warning')
-      return
-    }
-    try {
-      setPhotoUploading(true)
-      const croppedFile = await cropToSquare(photoFile)
-      const formData = new FormData()
-      formData.append('file', croppedFile)
-      const response = await fetch('/api/profile/photo', {
-        method: 'POST',
-        body: formData,
-      })
-      if (!response.ok) {
-        const data = await response.json()
-        showToast(data.error || 'Failed to upload photo', 'error')
-        return
-      }
-      const data = await response.json()
-      setProfile((prev) => ({ ...prev, profileImageUrl: data.profileImageUrl }))
-      setPhotoDialogOpen(false)
-      showToast('Photo updated successfully', 'success')
-    } catch (error) {
-      console.error('Error uploading photo:', error)
-      showToast('Failed to upload photo', 'error')
-    } finally {
-      setPhotoUploading(false)
-    }
-  }
-
   const handleSignOutAll = async () => {
     try {
       const response = await fetch('/api/profile/sessions', { method: 'DELETE' })
@@ -272,19 +210,9 @@ export default function ProfilePage() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex items-center gap-5">
               <div className="relative">
-                {profile.profileImageUrl ? (
-                  <Image
-                    src={profile.profileImageUrl}
-                    alt="Profile photo"
-                    width={96}
-                    height={96}
-                    className="w-24 h-24 rounded-full object-cover border-2 border-white shadow"
-                  />
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-200 to-orange-100 flex items-center justify-center text-2xl font-bold text-orange-700 border-2 border-white shadow">
-                    {avatarFallback}
-                  </div>
-                )}
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-200 to-orange-100 flex items-center justify-center text-2xl font-bold text-orange-700 border-2 border-white shadow">
+                  {avatarFallback}
+                </div>
                 <div className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow">
                   <UserCircle className="w-4 h-4 text-gray-600" />
                 </div>
@@ -331,55 +259,6 @@ export default function ProfilePage() {
                   System Settings
                 </Button>
               )}
-              <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="rounded-xl px-6">
-                    <Camera className="w-4 h-4 mr-2" />
-                    Change Photo
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Update Profile Photo</DialogTitle>
-                    <DialogDescription>
-                      Upload a new photo (PNG, JPG, WEBP). We will auto-crop it to a square.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <Input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) handlePhotoSelect(file)
-                      }}
-                    />
-                    {photoPreview && (
-                      <div className="flex justify-center">
-                        <Image
-                          src={photoPreview}
-                          alt="Preview"
-                          width={140}
-                          height={140}
-                          className="rounded-full object-cover border"
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setPhotoDialogOpen(false)}
-                      disabled={photoUploading}
-                    >
-                      Cancel
-                    </Button>
-                    <Button onClick={handlePhotoUpload} disabled={photoUploading}>
-                      {photoUploading ? 'Uploading...' : 'Save Photo'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
               <Button
                 variant="ghost"
                 onClick={() => securityRef.current?.scrollIntoView({ behavior: 'smooth' })}
@@ -769,29 +648,3 @@ function parseCommaList(value: string): string[] {
     .filter(Boolean)
 }
 
-async function cropToSquare(file: File): Promise<File> {
-  const image = await loadImage(file)
-  const size = Math.min(image.width, image.height)
-  const startX = (image.width - size) / 2
-  const startY = (image.height - size) / 2
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return file
-  ctx.drawImage(image, startX, startY, size, size, 0, 0, size, size)
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/webp', 0.9)
-  )
-  if (!blob) return file
-  return new File([blob], file.name.replace(/\.\w+$/, '.webp'), { type: 'image/webp' })
-}
-
-function loadImage(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = reject
-    img.src = URL.createObjectURL(file)
-  })
-}

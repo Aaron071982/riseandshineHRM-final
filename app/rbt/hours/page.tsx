@@ -6,6 +6,9 @@ import { formatDate, formatDateTime } from '@/lib/utils'
 import { Clock, Calendar, TrendingUp, Award } from 'lucide-react'
 import { redirect } from 'next/navigation'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function HoursPage() {
   const cookieStore = await cookies()
   const sessionToken = cookieStore.get('session')?.value
