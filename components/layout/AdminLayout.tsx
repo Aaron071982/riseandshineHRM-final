@@ -12,7 +12,7 @@ import {
   FileCheck,
   Clock,
   CalendarDays,
-  Settings,
+  UserCircle,
   LogOut,
   Menu,
   X,
@@ -32,7 +32,7 @@ const navItems = [
   { href: '/admin/onboarding-documents', label: 'Onboarding Docs', icon: FileCheck },
   { href: '/admin/attendance', label: 'Attendance & Hours', icon: Clock },
   { href: '/admin/leave', label: 'Leave Requests', icon: CalendarDays },
-  { href: '/admin/settings', label: 'Settings', icon: Settings },
+  { href: '/profile', label: 'Profile', icon: UserCircle },
 ]
 
 export default function AdminLayout({ children }: AdminLayoutProps) {

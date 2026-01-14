@@ -1,7 +1,32 @@
+'use client'
+
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Settings, Mail, Database, Shield, Bell } from 'lucide-react'
+import { Settings, Mail, Database, Shield, Bell, AlertTriangle, Activity } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useToast } from '@/components/ui/toast'
 
 export default function SettingsPage() {
+  const { showToast } = useToast()
+  const [isWorking, setIsWorking] = useState(false)
+
+  const handleSignOutAllUsers = async () => {
+    setIsWorking(true)
+    try {
+      const response = await fetch('/api/admin/sessions', { method: 'DELETE' })
+      if (!response.ok) {
+        showToast('Failed to sign out all users', 'error')
+        return
+      }
+      showToast('All user sessions have been signed out', 'success')
+    } catch (error) {
+      console.error('Error signing out all users:', error)
+      showToast('Failed to sign out all users', 'error')
+    } finally {
+      setIsWorking(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header with gradient background */}
@@ -11,8 +36,8 @@ export default function SettingsPage() {
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12 bubble-animation-delayed" />
         
         <div className="relative">
-          <h1 className="text-4xl font-bold text-white mb-2">Settings</h1>
-          <p className="text-gray-100 text-lg">Manage system settings and configurations</p>
+          <h1 className="text-4xl font-bold text-white mb-2">System Settings</h1>
+          <p className="text-gray-100 text-lg">Admin-only system configuration overview</p>
         </div>
       </div>
 
@@ -112,6 +137,30 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Audit Logging */}
+        <Card className="border-2 border-indigo-200 bg-gradient-to-br from-white to-indigo-50 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-100/30 rounded-full -mr-12 -mt-12 bubble-animation-delayed" />
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Activity className="h-5 w-5 text-indigo-600" />
+              Audit Logging
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">Status</p>
+              <p className="text-sm text-gray-600">Enabled</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">Retention</p>
+              <p className="text-sm text-gray-600">Stored in database for compliance</p>
+            </div>
+            <div className="pt-4 border-t border-gray-200">
+              <p className="text-xs text-gray-500">Audit entries are visible across admins.</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Info Card */}
@@ -137,6 +186,33 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-500">
               For detailed setup instructions, please refer to the SETUP.md and COMPLETE_SETUP_GUIDE.md files in the project root.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Danger Zone */}
+      <Card className="border-2 border-red-200 bg-gradient-to-br from-white to-red-50">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+            Danger Zone
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Use these actions with caution. They affect all users in the system.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="destructive"
+              onClick={handleSignOutAllUsers}
+              disabled={isWorking}
+            >
+              {isWorking ? 'Signing out users...' : 'Sign out all users'}
+            </Button>
+            <Button variant="outline" disabled>
+              Maintenance mode (coming soon)
+            </Button>
           </div>
         </CardContent>
       </Card>

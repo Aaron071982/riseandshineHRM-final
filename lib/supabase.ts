@@ -24,6 +24,7 @@ export const supabaseAdmin: SupabaseClient | null =
 // Storage bucket names
 export const STORAGE_BUCKET = 'onboarding-documents'
 export const RESUMES_STORAGE_BUCKET = 'resumes'
+export const PROFILE_PHOTOS_STORAGE_BUCKET = 'profile-photos'
 
 // Helper function to check if Supabase is configured
 export function isSupabaseConfigured(): boolean {

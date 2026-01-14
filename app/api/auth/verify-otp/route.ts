@@ -120,8 +120,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const userAgent = request.headers.get('user-agent') || ''
+    const ipAddress =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      null
+
+    const { device, browser } = parseUserAgent(userAgent)
+
     // Create session
-    const sessionToken = await createSession(user.id)
+    const sessionToken = await createSession(user.id, {
+      device,
+      browser,
+      ipAddress,
+    })
     const cookieStore = await cookies()
     cookieStore.set('session', sessionToken, {
       httpOnly: true,
@@ -158,5 +170,24 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+function parseUserAgent(userAgent: string): { device: string | null; browser: string | null } {
+  const ua = userAgent.toLowerCase()
+  let device: string | null = null
+  let browser: string | null = null
+
+  if (ua.includes('android')) device = 'Android'
+  else if (ua.includes('iphone') || ua.includes('ipad')) device = 'iOS'
+  else if (ua.includes('mac os')) device = 'Mac'
+  else if (ua.includes('windows')) device = 'Windows'
+  else if (ua.includes('linux')) device = 'Linux'
+
+  if (ua.includes('edg/')) browser = 'Edge'
+  else if (ua.includes('chrome')) browser = 'Chrome'
+  else if (ua.includes('safari')) browser = 'Safari'
+  else if (ua.includes('firefox')) browser = 'Firefox'
+
+  return { device, browser }
 }
 

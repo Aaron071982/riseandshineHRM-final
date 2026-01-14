@@ -1,0 +1,40 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import ProfilePage from '@/components/profile/ProfilePage'
+import AdminLayout from '@/components/layout/AdminLayout'
+import RBTLayout from '@/components/layout/RBTLayout'
+
+type Role = 'ADMIN' | 'RBT' | 'CANDIDATE'
+
+export default function ProfileRoute() {
+  const [role, setRole] = useState<Role | null>(null)
+
+  useEffect(() => {
+    const loadRole = async () => {
+      const response = await fetch('/api/profile')
+      if (!response.ok) return
+      const data = await response.json()
+      setRole(data.user?.role || null)
+    }
+    loadRole()
+  }, [])
+
+  if (!role) {
+    return <ProfilePage />
+  }
+
+  if (role === 'ADMIN') {
+    return (
+      <AdminLayout>
+        <ProfilePage />
+      </AdminLayout>
+    )
+  }
+
+  return (
+    <RBTLayout>
+      <ProfilePage />
+    </RBTLayout>
+  )
+}

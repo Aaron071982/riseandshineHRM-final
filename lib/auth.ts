@@ -12,7 +12,14 @@ export interface SessionUser {
   rbtProfileId?: string | null
 }
 
-export async function createSession(userId: string): Promise<string> {
+export async function createSession(
+  userId: string,
+  metadata?: {
+    device?: string | null
+    browser?: string | null
+    ipAddress?: string | null
+  }
+): Promise<string> {
   const token = crypto.randomBytes(32).toString('hex')
   const expiresAt = new Date(Date.now() + SESSION_DURATION)
 
@@ -21,6 +28,10 @@ export async function createSession(userId: string): Promise<string> {
       userId,
       token,
       expiresAt,
+      device: metadata?.device || null,
+      browser: metadata?.browser || null,
+      ipAddress: metadata?.ipAddress || null,
+      lastActiveAt: new Date(),
     },
   })
 
