@@ -50,11 +50,11 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
                     className="object-contain"
                   />
                   <span className="text-lg font-bold tracking-normal text-[#e36f1e] whitespace-nowrap" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '0.01em', fontWeight: 700 }}>
-                    RISE AND SHINE HRM
+                    Rise and shine
                   </span>
                 </div>
               </Link>
-              <div className="hidden md:ml-20 lg:ml-24 md:flex md:space-x-1">
+              <div className="hidden md:ml-32 lg:ml-40 xl:ml-48 md:flex md:space-x-1">
                 {navItems.map((item) => {
                   const Icon = item.icon
                   const isActive = pathname === item.href
