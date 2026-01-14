@@ -54,7 +54,7 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
                   </span>
                 </div>
               </Link>
-              <div className="hidden md:ml-32 lg:ml-40 xl:ml-48 md:flex md:space-x-1">
+              <div className="hidden md:ml-12 lg:ml-16 md:flex md:space-x-1">
                 {navItems.map((item) => {
                   const Icon = item.icon
                   const isActive = pathname === item.href
@@ -63,10 +63,10 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        'inline-flex items-center px-3 py-2 rounded-md text-sm font-semibold transition-colors border border-transparent',
+                        'inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
                         isActive
-                          ? 'text-[#e36f1e] bg-orange-50 border-orange-200 shadow-sm'
-                          : 'text-gray-800 hover:text-[#e36f1e] hover:bg-orange-50'
+                          ? 'bg-primary text-white'
+                          : 'text-gray-700 hover:bg-gray-100'
                       )}
                     >
                       <Icon className="w-4 h-4 mr-2" />
@@ -112,10 +112,10 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    'flex items-center px-3 py-2 rounded-md text-base font-semibold transition-colors border border-transparent',
+                    'flex items-center px-3 py-2 rounded-md text-base font-medium',
                     isActive
-                      ? 'text-[#e36f1e] bg-orange-50 border-orange-200 shadow-sm'
-                      : 'text-gray-800 hover:text-[#e36f1e] hover:bg-orange-50'
+                      ? 'bg-primary text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
                   )}
                 >
                   <Icon className="w-4 h-4 mr-3" />
