@@ -52,8 +52,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link href="/admin/dashboard" className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
+              <Link href="/admin/dashboard" className="flex items-center">
+                <div className="flex items-center gap-4">
                   <Image
                     src="/new-real-logo.png"
                     alt="Rise and Shine"
@@ -61,12 +61,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     height={48}
                     className="object-contain"
                   />
-                  <span className="text-base font-extrabold tracking-tight text-[#e36f1e] whitespace-nowrap">
-                    RISE AND SHINE HRM
+                  <span className="text-lg font-bold tracking-normal text-[#e36f1e] whitespace-nowrap" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '0.01em', fontWeight: 700 }}>
+                    Rise and shine
                   </span>
                 </div>
               </Link>
-              <div className="hidden md:ml-10 md:flex md:space-x-1">
+              <div className="hidden md:ml-32 lg:ml-40 xl:ml-48 md:flex md:space-x-1">
                 {navItems.map((item) => {
                   const Icon = item.icon
                   const isActive = pathname === item.href
