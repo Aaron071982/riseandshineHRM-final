@@ -8,6 +8,9 @@ import LeaveRequestForm from '@/components/rbt/LeaveRequestForm'
 import { Calendar, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
 import { redirect } from 'next/navigation'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function LeavePage() {
   const cookieStore = await cookies()
   const sessionToken = cookieStore.get('session')?.value

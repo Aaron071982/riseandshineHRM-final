@@ -127,29 +127,28 @@ model User {
 }
 
 model UserProfile {
-  id                          String                 @id @default(cuid())
-  userId                      String                 @unique
-  fullName                    String?
-  preferredName               String?
+  id                           String                  @id @default(cuid())
+  userId                       String                  @unique
+  fullName                     String?
+  preferredName                String?
   phone                        String?
-  address                     String?
-  timezone                    String?
-  preferredContactMethod      PreferredContactMethod?
-  bio                         String?                @db.Text
-  skills                      String[]
-  languages                   String[]
-  emergencyContactName        String?
+  address                      String?
+  timezone                     String?
+  preferredContactMethod       PreferredContactMethod?
+  bio                          String?                 @db.Text
+  skills                       String[]
+  languages                    String[]
+  emergencyContactName         String?
   emergencyContactRelationship String?
-  emergencyContactPhone       String?
-  profileImageUrl             String?                @db.Text
-  employeeId                  String?
-  startDate                   DateTime?
-  department                  String?
-  title                       String?
-  rbtCertificationNumber      String?
-  rbtCertificationExpiresAt   DateTime?
-  createdAt                   DateTime               @default(now())
-  updatedAt                   DateTime               @updatedAt
+  emergencyContactPhone        String?
+  employeeId                   String?
+  startDate                    DateTime?
+  department                   String?
+  title                        String?
+  rbtCertificationNumber       String?
+  rbtCertificationExpiresAt    DateTime?
+  createdAt                    DateTime                @default(now())
+  updatedAt                    DateTime                @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -157,16 +156,16 @@ model UserProfile {
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  device    String?
-  browser   String?
-  ipAddress String?
+  id           String    @id @default(cuid())
+  userId       String
+  token        String    @unique
+  expiresAt    DateTime
+  device       String?
+  browser      String?
+  ipAddress    String?
   lastActiveAt DateTime?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
 }
@@ -214,7 +213,7 @@ model RBTProfile {
   experienceYears          Int?
   transportation           Boolean?
   preferredHoursRange      String?
-  schedulingToken         String?              @unique
+  schedulingToken          String?            @unique
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
 
@@ -463,10 +462,10 @@ model CandidateApplicationDraft {
 model RBTAuditLog {
   id           String   @id @default(cuid())
   rbtProfileId String
-  auditType    String   // 'PHONE_CALL', 'EMAIL', 'NOTE', etc.
+  auditType    String // 'PHONE_CALL', 'EMAIL', 'NOTE', etc.
   dateTime     DateTime
   notes        String?  @db.Text
-  createdBy    String?  // Admin user email or name
+  createdBy    String? // Admin user email or name
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

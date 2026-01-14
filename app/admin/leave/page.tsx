@@ -6,6 +6,9 @@ import { formatDate } from '@/lib/utils'
 import LeaveRequestActions from '@/components/admin/LeaveRequestActions'
 import { Calendar, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function LeaveRequestsPage() {
   const leaveRequests = await prisma.leaveRequest.findMany({
     include: {

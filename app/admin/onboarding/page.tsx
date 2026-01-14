@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { FileCheck, TrendingUp, Clock, CheckCircle } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function OnboardingPage() {
   const hiredRBTs = await prisma.rBTProfile.findMany({
     where: {

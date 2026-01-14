@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS "user_profiles" (
     "emergencyContactName" TEXT,
     "emergencyContactRelationship" TEXT,
     "emergencyContactPhone" TEXT,
-    "profileImageUrl" TEXT,
     "employeeId" TEXT,
     "startDate" TIMESTAMP(3),
     "department" TEXT,

@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button'
 import InterviewNotesButton from '@/components/admin/InterviewNotesButton'
 import InterviewDeleteButton from '@/components/admin/InterviewDeleteButton'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function InterviewsPage() {
   const interviews = await prisma.interview.findMany({
     include: {
