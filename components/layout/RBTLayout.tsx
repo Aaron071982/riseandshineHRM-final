@@ -40,8 +40,8 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link href="/rbt/dashboard" className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
+              <Link href="/rbt/dashboard" className="flex items-center">
+                <div className="flex items-center gap-4">
                   <Image
                     src="/new-real-logo.png"
                     alt="Rise and Shine"
@@ -49,12 +49,12 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
                     height={48}
                     className="object-contain"
                   />
-                  <span className="text-base font-extrabold tracking-tight text-[#e36f1e] whitespace-nowrap">
+                  <span className="text-lg font-bold tracking-normal text-[#e36f1e] whitespace-nowrap" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '0.01em', fontWeight: 700 }}>
                     RISE AND SHINE HRM
                   </span>
                 </div>
               </Link>
-              <div className="hidden md:ml-10 md:flex md:space-x-1">
+              <div className="hidden md:ml-20 lg:ml-24 md:flex md:space-x-1">
                 {navItems.map((item) => {
                   const Icon = item.icon
                   const isActive = pathname === item.href
