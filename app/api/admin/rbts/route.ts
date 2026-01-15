@@ -103,6 +103,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Track form submission
+    try {
+      const ipAddress =
+        request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+        request.headers.get('x-real-ip') ||
+        null
+
+      await prisma.activityLog.create({
+        data: {
+          userId: user.id,
+          activityType: 'FORM_SUBMISSION',
+          action: `Created RBT candidate: ${data.firstName} ${data.lastName}`,
+          resourceType: 'RBTProfile',
+          resourceId: rbtProfile.id,
+          ipAddress,
+          userAgent: request.headers.get('user-agent') || null,
+          metadata: {
+            email: data.email,
+            status: data.status,
+          },
+        },
+      })
+    } catch (error) {
+      console.error('Failed to track RBT creation:', error)
+    }
+
     return NextResponse.json({ id: rbtProfile.id, success: true })
   } catch (error: any) {
     console.error('Error creating RBT:', error)

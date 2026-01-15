@@ -118,6 +118,31 @@ export async function PATCH(request: NextRequest) {
       },
     })
 
+    // Track form submission
+    try {
+      const ipAddress =
+        request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+        request.headers.get('x-real-ip') ||
+        null
+
+      await prisma.activityLog.create({
+        data: {
+          userId: user.id,
+          activityType: 'FORM_SUBMISSION',
+          action: 'Updated profile',
+          resourceType: 'UserProfile',
+          resourceId: profile.id,
+          ipAddress,
+          userAgent: request.headers.get('user-agent') || null,
+          metadata: {
+            updatedFields: Object.keys(data),
+          },
+        },
+      })
+    } catch (error) {
+      console.error('Failed to track profile update:', error)
+    }
+
     return NextResponse.json({ profile })
   } catch (error) {
     console.error('Error updating profile:', error)

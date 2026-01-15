@@ -308,6 +308,33 @@ export async function POST(
       })
     }
 
+    // Track form submission
+    try {
+      const ipAddress =
+        request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+        request.headers.get('x-real-ip') ||
+        null
+
+      await prisma.activityLog.create({
+        data: {
+          userId: user.id,
+          activityType: 'FORM_SUBMISSION',
+          action: `Hired RBT: ${rbtProfile.firstName} ${rbtProfile.lastName}`,
+          resourceType: 'RBTProfile',
+          resourceId: id,
+          ipAddress,
+          userAgent: request.headers.get('user-agent') || null,
+          metadata: {
+            rbtEmail: rbtProfile.email,
+            previousStatus: rbtProfile.status,
+            newStatus: 'HIRED',
+          },
+        },
+      })
+    } catch (error) {
+      console.error('Failed to track hire action:', error)
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error hiring RBT:', error)

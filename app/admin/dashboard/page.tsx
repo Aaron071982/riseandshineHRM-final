@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import TrackedLink from '@/components/tracking/TrackedLink'
 import { formatDate } from '@/lib/utils'
 import { Plus, Users, Calendar, FileCheck, Clock, TrendingUp, UserPlus, CheckCircle } from 'lucide-react'
 import { cookies } from 'next/headers'
@@ -120,12 +121,12 @@ export default async function AdminDashboard() {
             <h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1>
             <p className="text-orange-50 text-lg">Welcome back! Here&apos;s an overview of your system.</p>
           </div>
-          <Link href="/admin/rbts/new">
+          <TrackedLink href="/admin/rbts/new">
             <Button className="bg-white text-primary hover:bg-orange-50 border-0 shadow-lg rounded-xl px-6 py-6 text-base font-semibold shine-effect">
               <Plus className="w-5 h-5 mr-2" />
               Add New RBT / Candidate
             </Button>
-          </Link>
+          </TrackedLink>
         </div>
       </div>
 
