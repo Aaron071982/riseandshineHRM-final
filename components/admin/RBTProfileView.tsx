@@ -13,6 +13,7 @@ import InterviewNotesButton from './InterviewNotesButton'
 import AdminOnboardingOverride from './AdminOnboardingOverride'
 import StatusManager from './StatusManager'
 import AuditLog from './AuditLog'
+import { trackButtonClick } from '@/lib/activity-tracker'
 import {
   Select,
   SelectContent,
@@ -169,6 +170,11 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   const handleSendReachOutEmail = () => {
     setConfirmMessage(`Are you sure you want to send a reach-out email to ${rbtProfile.firstName} ${rbtProfile.lastName}?`)
     setConfirmAction(async () => {
+      trackButtonClick('Send Reach-Out Email', {
+        resourceType: 'RBTProfile',
+        resourceId: rbtProfile.id,
+        rbtName: `${rbtProfile.firstName} ${rbtProfile.lastName}`,
+      })
       try {
         const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/send-email`, {
           method: 'POST',
@@ -197,6 +203,11 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   }
 
   const handleHire = () => {
+    trackButtonClick('Hire RBT', {
+      resourceType: 'RBTProfile',
+      resourceId: rbtProfile.id,
+      rbtName: `${rbtProfile.firstName} ${rbtProfile.lastName}`,
+    })
     setConfirmMessage('Are you sure you want to hire this candidate? This will send a welcome email and create onboarding tasks.')
     setConfirmAction(async () => {
       try {
@@ -226,6 +237,11 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   }
 
   const handleReject = () => {
+    trackButtonClick('Reject RBT', {
+      resourceType: 'RBTProfile',
+      resourceId: rbtProfile.id,
+      rbtName: `${rbtProfile.firstName} ${rbtProfile.lastName}`,
+    })
     setConfirmMessage('Are you sure you want to reject this candidate? This will send a rejection email and update their status to REJECTED.')
     setConfirmAction(async () => {
       try {

@@ -19,6 +19,9 @@ import {
   XCircle,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import SuperAdminActivityLogs from '@/components/admin/SuperAdminActivityLogs'
+import SuperAdminUserManagement from '@/components/admin/SuperAdminUserManagement'
+import SuperAdminCreateAdmin from '@/components/admin/SuperAdminCreateAdmin'
 
 interface ProfileData {
   id?: string
@@ -316,6 +319,33 @@ export default function ProfilePage() {
           </ul>
         </CardContent>
       </Card>
+
+      {/* Super Admin Controls - Only visible to aaronsiam21@gmail.com */}
+      {user?.email === 'aaronsiam21@gmail.com' && (
+        <div className="space-y-6">
+          <Card className="border-2 border-purple-200 bg-gradient-to-br from-white to-purple-50/30">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Shield className="w-6 h-6 text-purple-600" />
+                Super Admin Controls
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-3">
+                  <SuperAdminActivityLogs />
+                </div>
+                <div className="lg:col-span-2">
+                  <SuperAdminUserManagement />
+                </div>
+                <div>
+                  <SuperAdminCreateAdmin />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Edit Controls */}
       {editing && (

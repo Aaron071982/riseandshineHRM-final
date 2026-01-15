@@ -82,3 +82,7 @@ export async function cleanupExpiredSessions(): Promise<void> {
   })
 }
 
+export function isSuperAdmin(email: string | null | undefined): boolean {
+  return email === 'aaronsiam21@gmail.com'
+}
+

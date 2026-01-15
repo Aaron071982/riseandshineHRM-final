@@ -6,8 +6,9 @@ import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { LayoutDashboard, Calendar, Clock, CalendarDays, FileText, LogOut, Menu, X, UserCheck, UserCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import { trackPageView } from '@/lib/activity-tracker'
 
 interface RBTLayoutProps {
   children: React.ReactNode
@@ -27,6 +28,15 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Track page views
+  useEffect(() => {
+    if (pathname) {
+      trackPageView(pathname, {
+        timestamp: new Date().toISOString(),
+      })
+    }
+  }, [pathname])
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })

@@ -109,6 +109,15 @@ enum ApplicationSource {
   PUBLIC_APPLICATION
 }
 
+enum ActivityType {
+  PAGE_VIEW
+  LINK_CLICK
+  BUTTON_CLICK
+  FORM_SUBMISSION
+  LOGIN
+  LOGOUT
+}
+
 model User {
   id          String   @id @default(cuid())
   name        String?
@@ -122,6 +131,7 @@ model User {
   rbtProfile RBTProfile?
   profile    UserProfile?
   sessions   Session[]
+  activities ActivityLog[]
 
   @@map("users")
 }
@@ -473,4 +483,26 @@ model RBTAuditLog {
 
   @@index([rbtProfileId, dateTime])
   @@map("rbt_audit_logs")
+}
+
+model ActivityLog {
+  id           String       @id @default(cuid())
+  userId       String
+  activityType ActivityType
+  action       String
+  resourceType String?
+  resourceId   String?
+  url          String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
+  @@index([resourceType, resourceId])
+  @@map("activity_logs")
 }

@@ -143,6 +143,28 @@ export async function POST(request: NextRequest) {
       path: '/',
     })
 
+    // Track login activity
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: user.id,
+          activityType: 'LOGIN',
+          action: 'User logged in',
+          ipAddress,
+          userAgent: request.headers.get('user-agent') || null,
+          metadata: {
+            device,
+            browser,
+            email: user.email,
+            role: user.role,
+          },
+        },
+      })
+    } catch (error) {
+      // Don't fail login if activity tracking fails
+      console.error('Failed to track login activity:', error)
+    }
+
     return NextResponse.json({
       success: true,
       role: user.role,
