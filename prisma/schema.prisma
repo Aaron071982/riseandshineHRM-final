@@ -91,6 +91,7 @@ enum EmailTemplateType {
   INTERVIEW_INVITE
   OFFER
   REJECTION
+  MISSING_ONBOARDING
 }
 
 enum OnboardingDocumentType {

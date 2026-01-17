@@ -269,6 +269,39 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     setConfirmDialogOpen(true)
   }
 
+  const handleSendMissingOnboardingEmail = () => {
+    trackButtonClick('Send Missing Onboarding Reminder', {
+      resourceType: 'RBTProfile',
+      resourceId: rbtProfile.id,
+      rbtName: `${rbtProfile.firstName} ${rbtProfile.lastName}`,
+    })
+    setConfirmMessage(`Are you sure you want to send a missing onboarding reminder email to ${rbtProfile.firstName} ${rbtProfile.lastName}? This will list their incomplete onboarding tasks.`)
+    setConfirmAction(async () => {
+      try {
+        const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ templateType: 'MISSING_ONBOARDING' }),
+        })
+
+        const data = await response.json()
+
+        if (response.ok) {
+          showToast('Missing onboarding reminder email sent successfully!', 'success')
+          setConfirmDialogOpen(false)
+          setConfirmAction(null)
+          router.refresh()
+        } else {
+          showToast(`Failed to send email: ${data.error || 'Unknown error'}`, 'error')
+        }
+      } catch (error) {
+        console.error('Error sending email:', error)
+        showToast('An error occurred while sending the email', 'error')
+      }
+    })
+    setConfirmDialogOpen(true)
+  }
+
   const handleDeleteRBT = () => {
     setConfirmMessage(`Are you sure you want to delete ${rbtProfile.firstName} ${rbtProfile.lastName}? This will permanently delete the RBT profile and all associated data. This action cannot be undone.`)
     setConfirmAction(async () => {
@@ -832,6 +865,16 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 className="rounded-xl px-6"
               >
                 Reject Candidate
+              </Button>
+            )}
+            {isHired && incompleteTasks.length > 0 && (
+              <Button 
+                onClick={handleSendMissingOnboardingEmail} 
+                disabled={loading || !rbtProfile.email}
+                variant="outline"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400 rounded-xl px-6"
+              >
+                Send Missing Onboarding Reminder
               </Button>
             )}
           </div>

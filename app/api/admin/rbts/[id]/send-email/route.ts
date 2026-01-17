@@ -6,6 +6,7 @@ import {
   sendEmail,
   generateReachOutEmail,
   generateRejectionEmail,
+  generateMissingOnboardingEmail,
   EmailTemplateType,
 } from '@/lib/email'
 import { randomBytes } from 'crypto'
@@ -32,6 +33,9 @@ export async function POST(
 
     const rbtProfile = await prisma.rBTProfile.findUnique({
       where: { id },
+      include: {
+        onboardingTasks: true,
+      },
     })
 
     if (!rbtProfile || !rbtProfile.email) {
@@ -63,6 +67,25 @@ export async function POST(
         break
       case EmailTemplateType.REJECTION:
         emailContent = generateRejectionEmail(rbtProfile)
+        break
+      case EmailTemplateType.MISSING_ONBOARDING:
+        // Get incomplete onboarding tasks
+        const incompleteTasks = rbtProfile.onboardingTasks
+          .filter(task => !task.isCompleted)
+          .map(task => ({
+            title: task.title,
+            description: task.description,
+            taskType: task.taskType,
+          }))
+        
+        if (incompleteTasks.length === 0) {
+          return NextResponse.json(
+            { error: 'This RBT has no incomplete onboarding tasks' },
+            { status: 400 }
+          )
+        }
+        
+        emailContent = generateMissingOnboardingEmail(rbtProfile, incompleteTasks)
         break
       default:
         return NextResponse.json(

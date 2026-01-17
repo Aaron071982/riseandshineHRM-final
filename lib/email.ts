@@ -12,11 +12,21 @@ if (resendApiKey) {
   resend = new Resend(resendApiKey)
 }
 
+// Determine from email address based on template type
+function getFromEmail(templateType: EmailTemplateType, customFrom?: string): string {
+  if (customFrom) return customFrom
+  if (templateType === EmailTemplateType.MISSING_ONBOARDING) {
+    return 'info@riseandshine.nyc'
+  }
+  return emailFrom
+}
+
 export enum EmailTemplateType {
   REACH_OUT = 'REACH_OUT',
   INTERVIEW_INVITE = 'INTERVIEW_INVITE',
   OFFER = 'OFFER',
   REJECTION = 'REJECTION',
+  MISSING_ONBOARDING = 'MISSING_ONBOARDING',
 }
 
 interface EmailOptions {
@@ -25,6 +35,7 @@ interface EmailOptions {
   html: string
   templateType: EmailTemplateType
   rbtProfileId: string
+  fromEmail?: string
 }
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
@@ -68,8 +79,10 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       .replace(/&#39;/g, "'")
       .trim()
 
+    const fromEmail = getFromEmail(options.templateType, options.fromEmail)
+    
     const result = await resend.emails.send({
-      from: emailFrom,
+      from: fromEmail,
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -710,6 +723,163 @@ export function generateRejectionEmail(rbtProfile: {
         <div class="footer">
           <p><strong>Rise and Shine</strong> - HRM Portal</p>
           <p style="margin: 4px 0 0 0; font-size: 11px;">This is an automated email. Please do not reply directly.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}
+
+export function generateMissingOnboardingEmail(
+  rbtProfile: {
+    firstName: string
+    lastName: string
+    email: string | null
+  },
+  incompleteTasks: Array<{
+    title: string
+    description: string | null
+    taskType: string
+  }>
+): { subject: string; html: string } {
+  const dashboardUrl = makePublicUrl('/rbt/dashboard')
+  const subject = `Action Required: Complete Your Onboarding - ${rbtProfile.firstName}`
+  
+  const tasksList = incompleteTasks.length > 0
+    ? incompleteTasks.map(task => `<li><strong>${task.title}</strong>${task.description ? ` - ${task.description}` : ''}</li>`).join('\n')
+    : '<li>Complete all pending onboarding items</li>'
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
+          line-height: 1.6; 
+          color: #333; 
+          margin: 0;
+          padding: 0;
+          background-color: #f5f5f5;
+        }
+        .container { 
+          max-width: 600px; 
+          margin: 0 auto; 
+          padding: 0;
+        }
+        .header { 
+          background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%);
+          color: white; 
+          padding: 40px 20px; 
+          text-align: center; 
+          border-radius: 12px 12px 0 0;
+        }
+        .header h1 {
+          margin: 0;
+          font-size: 28px;
+          font-weight: bold;
+        }
+        .content { 
+          padding: 30px 20px; 
+          background-color: #ffffff; 
+        }
+        .content p {
+          margin: 16px 0;
+        }
+        .warning-box {
+          background-color: #FFF5F0;
+          border-left: 4px solid #E4893D;
+          padding: 16px;
+          margin: 24px 0;
+          border-radius: 4px;
+        }
+        .warning-box strong {
+          color: #E4893D;
+        }
+        .tasks-list {
+          background-color: #f9f9f9;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          padding: 20px;
+          margin: 24px 0;
+        }
+        .tasks-list ul {
+          margin: 0;
+          padding-left: 20px;
+        }
+        .tasks-list li {
+          margin: 12px 0;
+          color: #555;
+        }
+        .cta-button {
+          display: inline-block;
+          background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%);
+          color: white !important;
+          padding: 16px 32px;
+          text-decoration: none;
+          border-radius: 8px;
+          font-weight: 600;
+          font-size: 16px;
+          margin: 24px 0;
+          text-align: center;
+        }
+        .footer { 
+          padding: 24px 20px; 
+          text-align: center; 
+          font-size: 12px; 
+          color: #666;
+          background-color: #f9f9f9;
+          border-radius: 0 0 12px 12px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Rise and Shine</h1>
+          <p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.95;">HRM Portal</p>
+        </div>
+        <div class="content">
+          <p>Hello <strong>${rbtProfile.firstName}</strong>,</p>
+          <p>We noticed you haven't completed all onboarding requirements. Please complete the following items quickly:</p>
+          
+          <div class="warning-box">
+            <p style="margin: 0 0 8px 0;"><strong>Action Required:</strong></p>
+            <p style="margin: 0;">Please complete the missing onboarding items as soon as possible to ensure you're fully onboarded and ready to start.</p>
+          </div>
+          
+          <div class="tasks-list">
+            <p style="margin: 0 0 12px 0; font-weight: bold; color: #333;">Missing Onboarding Items:</p>
+            <ul>
+              ${tasksList}
+            </ul>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${dashboardUrl}" class="cta-button">Complete Onboarding Now</a>
+          </div>
+          
+          <p><strong>Login Instructions:</strong></p>
+          <ol>
+            <li>Visit <strong>riseandshinehrm.com</strong> in your web browser</li>
+            <li>Enter your email address: <strong>${rbtProfile.email || 'your registered email'}</strong></li>
+            <li>Check your email inbox for the verification code</li>
+            <li>Enter the 6-digit verification code to access your onboarding dashboard</li>
+          </ol>
+          
+          <p>Once you log in, you'll see all pending onboarding items and can complete them at your convenience.</p>
+          
+          <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
+          <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            If you have any questions, reach out to <a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a>
+          </p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise and Shine</strong> - HRM Portal</p>
+          <p style="margin: 4px 0 0 0; font-size: 11px;">This is an automated email. Please reply directly if you have any questions.</p>
         </div>
       </div>
     </body>
