@@ -867,12 +867,13 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 Reject Candidate
               </Button>
             )}
-            {isHired && incompleteTasks.length > 0 && (
+            {isHired && (
               <Button 
                 onClick={handleSendMissingOnboardingEmail} 
-                disabled={loading || !rbtProfile.email}
+                disabled={loading || !rbtProfile.email || incompleteTasks.length === 0}
                 variant="outline"
                 className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400 rounded-xl px-6"
+                title={incompleteTasks.length === 0 ? 'All onboarding tasks are complete' : 'Send reminder about missing onboarding items'}
               >
                 Send Missing Onboarding Reminder
               </Button>
