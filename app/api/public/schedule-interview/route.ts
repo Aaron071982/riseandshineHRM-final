@@ -159,8 +159,8 @@ export async function POST(request: NextRequest) {
 
     const adminEmails = admins.map((admin) => admin.email).filter(Boolean) as string[]
 
-    // Generate meeting URL (placeholder)
-    const meetingUrl = `https://meet.google.com/${Math.random().toString(36).substring(7)}`
+    // Use the standard meeting URL for all interviews
+    const meetingUrl = 'https://meet.google.com/gtz-kmij-tvd'
 
     // Create interview
     const interview = await prisma.interview.create({

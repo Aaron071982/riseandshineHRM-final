@@ -1502,7 +1502,6 @@ function InterviewScheduleForm({
       scheduledAt: nyTimeToUTC(dateStr, timeStr),
       durationMinutes: parseInt(formData.get('duration') as string, 10),
       interviewerName: interviewerEmail, // Use the selected email
-      meetingUrl: formData.get('meetingUrl') || null,
     })
   }
 
@@ -1531,10 +1530,6 @@ function InterviewScheduleForm({
             <SelectItem value="kazi@siyam.nyc">kazi@siyam.nyc</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="meetingUrl">Meeting URL (optional)</Label>
-        <Input id="meetingUrl" name="meetingUrl" type="url" placeholder="https://meet.google.com/..." />
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>

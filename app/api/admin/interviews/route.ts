@@ -24,9 +24,8 @@ export async function POST(request: NextRequest) {
 
     const data = await request.json()
 
-    // Generate a placeholder meeting URL if not provided
-    const meetingUrl =
-      data.meetingUrl || `https://meet.google.com/${Math.random().toString(36).substring(7)}`
+    // Use the standard meeting URL for all interviews
+    const meetingUrl = 'https://meet.google.com/gtz-kmij-tvd'
 
     // Create interview
     const interview = await prisma.interview.create({

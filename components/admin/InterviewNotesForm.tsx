@@ -6,13 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Loader2, Save } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 
 interface InterviewNotesFormProps {
   interviewId: string
@@ -36,7 +29,6 @@ interface InterviewNotesData {
   birthdate?: string
   currentAddress?: string
   phoneNumber?: string
-  recommendation?: 'SUGGEST_HIRING' | 'SUGGEST_REJECTING' | 'STALLING'
 }
 
 export default function InterviewNotesForm({
@@ -125,31 +117,6 @@ export default function InterviewNotesForm({
           )}
         </Button>
       </div>
-
-      {/* Recommendation Dropdown */}
-      <Card className="bg-gradient-to-r from-orange-50 to-orange-100 border-2 border-orange-200">
-        <CardHeader>
-          <CardTitle className="text-base">Recommendation</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label>What is your recommendation for this candidate?</Label>
-            <Select
-              value={notes.recommendation || ''}
-              onValueChange={(value) => updateField('recommendation', value as any)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select recommendation..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="SUGGEST_HIRING">Suggest Hiring</SelectItem>
-                <SelectItem value="SUGGEST_REJECTING">Suggest Rejecting</SelectItem>
-                <SelectItem value="STALLING">Stalling</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* 1. Greeting & Introduction */}
       <Card>

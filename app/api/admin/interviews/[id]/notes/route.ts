@@ -88,11 +88,6 @@ export async function POST(
       currentAddress: data.currentAddress || null,
       phoneNumber: data.phoneNumber || null,
     }
-    
-    // Only include recommendation if it exists in the data (and DB has the column)
-    if (data.recommendation !== undefined) {
-      updateData.recommendation = data.recommendation || null
-    }
 
     const notes = await prisma.interviewNotes.upsert({
       where: { interviewId: id },
