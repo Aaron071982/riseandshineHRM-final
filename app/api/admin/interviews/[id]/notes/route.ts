@@ -70,7 +70,7 @@ export async function POST(
       )
     }
 
-    // Upsert interview notes - use type assertion to handle recommendation field that may not exist in DB yet
+    // Upsert interview notes
     const updateData: any = {
       greetingAnswer: data.greetingAnswer || null,
       basicInfoAnswer: data.basicInfoAnswer || null,
