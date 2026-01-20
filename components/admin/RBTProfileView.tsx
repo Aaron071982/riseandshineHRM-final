@@ -867,12 +867,13 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 Reject Candidate
               </Button>
             )}
-            {isHired && incompleteTasks.length > 0 && (
+            {isHired && (
               <Button 
                 onClick={handleSendMissingOnboardingEmail} 
-                disabled={loading || !rbtProfile.email}
+                disabled={loading || !rbtProfile.email || incompleteTasks.length === 0}
                 variant="outline"
                 className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400 rounded-xl px-6"
+                title={incompleteTasks.length === 0 ? 'All onboarding tasks are complete' : 'Send reminder about missing onboarding items'}
               >
                 Send Missing Onboarding Reminder
               </Button>
@@ -1501,7 +1502,6 @@ function InterviewScheduleForm({
       scheduledAt: nyTimeToUTC(dateStr, timeStr),
       durationMinutes: parseInt(formData.get('duration') as string, 10),
       interviewerName: interviewerEmail, // Use the selected email
-      meetingUrl: formData.get('meetingUrl') || null,
     })
   }
 
@@ -1530,10 +1530,6 @@ function InterviewScheduleForm({
             <SelectItem value="kazi@siyam.nyc">kazi@siyam.nyc</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="meetingUrl">Meeting URL (optional)</Label>
-        <Input id="meetingUrl" name="meetingUrl" type="url" placeholder="https://meet.google.com/..." />
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>
