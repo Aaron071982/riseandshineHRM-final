@@ -176,6 +176,22 @@ export default function AddRBTForm() {
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="ethnicity">Ethnicity</Label>
+              <Select name="ethnicity">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select ethnicity (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="WHITE">White</SelectItem>
+                  <SelectItem value="ASIAN">Asian</SelectItem>
+                  <SelectItem value="BLACK">Black</SelectItem>
+                  <SelectItem value="HISPANIC">Hispanic</SelectItem>
+                  <SelectItem value="SOUTH_ASIAN">South Asian</SelectItem>
+                  <SelectItem value="MIDDLE_EASTERN">Middle Eastern</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="status">Initial Status *</Label>
               <Select name="status" required defaultValue="NEW">
                 <SelectTrigger>

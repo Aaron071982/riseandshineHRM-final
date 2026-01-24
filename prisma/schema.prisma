@@ -104,6 +104,15 @@ enum ApplicationSource {
   PUBLIC_APPLICATION
 }
 
+enum Ethnicity {
+  WHITE
+  ASIAN
+  BLACK
+  HISPANIC
+  SOUTH_ASIAN
+  MIDDLE_EASTERN
+}
+
 enum ActivityType {
   PAGE_VIEW
   LINK_CLICK
@@ -204,6 +213,7 @@ model RBTProfile {
   preferredServiceArea     String?
   notes                    String?
   gender                   String?
+  ethnicity                Ethnicity?
   fortyHourCourseCompleted Boolean            @default(false)
   status                   RBTStatus          @default(NEW)
   scheduleCompleted        Boolean            @default(false)

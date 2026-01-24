@@ -28,6 +28,7 @@ interface ApplicationData {
   zipCode: string
   addressLine1: string
   addressLine2: string
+  ethnicity: string
 
   // Step 2: RBT Readiness
   fortyHourCourseCompleted: string
@@ -81,6 +82,7 @@ export default function PublicRBTApplicationWizard() {
     zipCode: '',
     addressLine1: '',
     addressLine2: '',
+    ethnicity: '',
     fortyHourCourseCompleted: '',
     experienceYears: '',
     preferredAgeGroups: [],
@@ -381,6 +383,25 @@ export default function PublicRBTApplicationWizard() {
                   value={data.addressLine2}
                   onChange={(e) => setData({ ...data, addressLine2: e.target.value })}
                 />
+              </div>
+              <div>
+                <Label htmlFor="ethnicity">Ethnicity</Label>
+                <Select
+                  value={data.ethnicity}
+                  onValueChange={(value) => setData({ ...data, ethnicity: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select ethnicity (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="WHITE">White</SelectItem>
+                    <SelectItem value="ASIAN">Asian</SelectItem>
+                    <SelectItem value="BLACK">Black</SelectItem>
+                    <SelectItem value="HISPANIC">Hispanic</SelectItem>
+                    <SelectItem value="SOUTH_ASIAN">South Asian</SelectItem>
+                    <SelectItem value="MIDDLE_EASTERN">Middle Eastern</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             {/* Honeypot */}

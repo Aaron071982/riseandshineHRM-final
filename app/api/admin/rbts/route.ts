@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       preferredServiceArea: (formData.get('preferredServiceArea') as string) || null,
       notes: (formData.get('notes') as string) || null,
       gender: (formData.get('gender') as string) || null,
+      ethnicity: (formData.get('ethnicity') as string) || null,
       fortyHourCourseCompleted: formData.get('fortyHourCourseCompleted') === 'true',
       status: (formData.get('status') as string) || 'NEW',
     }
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
         preferredServiceArea: data.preferredServiceArea || null,
         notes: data.notes || null,
         gender: data.gender || null,
+        ethnicity: data.ethnicity ? (data.ethnicity as any) : null,
         fortyHourCourseCompleted: data.fortyHourCourseCompleted,
         status: data.status as any,
       },

@@ -162,6 +162,7 @@ export async function POST(request: NextRequest) {
         addressLine1: body.addressLine1,
         addressLine2: body.addressLine2 || null,
         gender: null, // Not collected in public application
+        ethnicity: body.ethnicity ? (body.ethnicity as any) : null,
         fortyHourCourseCompleted: body.fortyHourCourseCompleted === 'true',
         status: 'NEW',
         source: 'PUBLIC_APPLICATION',

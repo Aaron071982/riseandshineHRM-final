@@ -48,6 +48,7 @@ interface RBTProfile {
   preferredServiceArea: string | null
   notes: string | null
   gender: string | null
+  ethnicity: string | null
   fortyHourCourseCompleted: boolean
   status: string
   scheduleCompleted?: boolean
@@ -625,6 +626,18 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 <p className="text-sm text-gray-600">Preferred Service Area</p>
                 <p className="font-medium">{rbtProfile.preferredServiceArea || '—'}</p>
               </div>
+              {rbtProfile.gender && (
+                <div>
+                  <p className="text-sm text-gray-600">Gender</p>
+                  <p className="font-medium">{rbtProfile.gender}</p>
+                </div>
+              )}
+              {rbtProfile.ethnicity && (
+                <div>
+                  <p className="text-sm text-gray-600">Ethnicity</p>
+                  <p className="font-medium">{rbtProfile.ethnicity.replace(/_/g, ' ')}</p>
+                </div>
+              )}
               <div className="md:col-span-2">
                 <p className="text-sm text-gray-600">Address Line 1</p>
                 <p className="font-medium">{rbtProfile.addressLine1 || '—'}</p>

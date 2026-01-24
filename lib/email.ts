@@ -81,17 +81,29 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     const fromEmail = getFromEmail(options.templateType, options.fromEmail)
     
+    // Generate unique Message-ID for better tracking
+    const messageId = `<${Date.now()}-${Math.random().toString(36).substring(7)}@riseandshine.nyc>`
+    
+    // Format from address with name for better deliverability
+    const fromAddress = fromEmail.includes('@') 
+      ? `"Rise and Shine" <${fromEmail}>`
+      : fromEmail
+    
     const result = await resend.emails.send({
-      from: fromEmail,
+      from: fromAddress,
       to: options.to,
       subject: options.subject,
       html: options.html,
       text: plainText,
       reply_to: 'info@riseandshine.nyc', // Use the support email for replies
       headers: {
+        'Message-ID': messageId,
         'X-Entity-Ref-ID': options.rbtProfileId, // Track emails per RBT
+        'X-Mailer': 'Rise and Shine HRM',
+        'Precedence': 'bulk', // Helps with transactional email delivery
         'List-Unsubscribe': '<mailto:info@riseandshine.nyc?subject=unsubscribe>',
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        'X-Priority': '1', // High priority for important emails
       },
     })
     
