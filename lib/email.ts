@@ -1181,3 +1181,68 @@ export function generateInterviewReminderEmail(
   `
   return { subject, html }
 }
+
+/**
+ * 15-minute admin reminder email (Aaron + Kazi). Subject: "Interview in 15 minutes: {Candidate Name}"
+ */
+export function generateInterviewReminder15mEmail(
+  candidateName: string,
+  scheduledAt: Date,
+  interviewLink: string,
+  interviewerName?: string
+): { subject: string; html: string } {
+  const formattedTime = scheduledAt.toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/New_York',
+    timeZoneName: 'short',
+  })
+
+  const subject = `Interview in 15 minutes: ${candidateName}`
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; padding: 32px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: bold; }
+        .content { padding: 24px 20px; background-color: #ffffff; }
+        .content p { margin: 12px 0; }
+        .info-box { background-color: #FFF5F0; border-left: 4px solid #E4893D; padding: 16px; margin: 20px 0; border-radius: 4px; }
+        .cta-button { display: inline-block; background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white !important; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 16px 0; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Interview in 15 minutes</h1>
+        </div>
+        <div class="content">
+          <div class="info-box">
+            <p style="margin: 0 0 8px 0;"><strong>Candidate:</strong> ${candidateName}</p>
+            <p style="margin: 0 0 8px 0;"><strong>Time:</strong> ${formattedTime}</p>
+            ${interviewerName ? `<p style="margin: 0;"><strong>Interviewer:</strong> ${interviewerName}</p>` : ''}
+          </div>
+          <p>Please open the interview notes page and complete the scorecard.</p>
+          <p><a href="${interviewLink}" class="cta-button">Open interview notes</a></p>
+          <p style="margin-top: 24px; font-size: 14px; color: #666;">Best regards,<br><strong>Rise and Shine HRM</strong></p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise and Shine</strong> - HRM Portal</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}

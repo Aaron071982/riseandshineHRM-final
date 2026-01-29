@@ -79,6 +79,7 @@ interface RBTProfile {
     decision: string
     notes: string | null
     meetingUrl: string | null
+    reminder_15m_sent_at: Date | null
     interviewNotes?: {
       id: string
       greetingAnswer: string | null
@@ -1250,6 +1251,12 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                       </p>
                       <p className="text-sm text-gray-500">
                         Interviewer: {interview.interviewerName}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        15m reminder:{' '}
+                        {interview.reminder_15m_sent_at
+                          ? `Sent at ${formatDateTime(interview.reminder_15m_sent_at)}`
+                          : 'Not sent yet'}
                       </p>
                     </div>
                     <Badge variant="outline">
