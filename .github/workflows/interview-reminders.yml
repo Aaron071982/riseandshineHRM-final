@@ -1,0 +1,26 @@
+# 15-minute interview email reminders (runs every 5 minutes; Vercel Hobby allows only daily crons)
+# Add repo secret: CRON_SECRET (same value as in Vercel env). Optionally set repo variable REMINDER_APP_URL.
+name: Interview reminder cron
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger 15m interview reminders
+        env:
+          APP_URL: ${{ vars.REMINDER_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          base="${APP_URL:-https://riseandshinehrm.com}"
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET not set; skipping."
+            exit 0
+          fi
+          curl -sf -X GET "$base/api/cron/interview-reminders" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Accept: application/json" || true

@@ -1,8 +1,2 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/interview-reminders",
-      "schedule": "* * * * *"
-    }
-  ]
 }
