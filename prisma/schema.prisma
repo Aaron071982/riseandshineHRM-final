@@ -132,10 +132,11 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  rbtProfile RBTProfile?
-  profile    UserProfile?
-  sessions   Session[]
-  activities ActivityLog[]
+  rbtProfile          RBTProfile?
+  profile             UserProfile?
+  sessions            Session[]
+  activities          ActivityLog[]
+  interviewScorecards InterviewScorecard[]
 
   @@map("users")
 }
@@ -249,22 +250,25 @@ model RBTProfile {
 }
 
 model Interview {
-  id              String            @id @default(cuid())
-  rbtProfileId    String
-  scheduledAt     DateTime
-  durationMinutes Int               @default(60)
-  interviewerName String
-  status          InterviewStatus   @default(SCHEDULED)
-  decision        InterviewDecision @default(PENDING)
-  meetingUrl      String?
-  notes           String?
-  reminderSentAt  DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                   String            @id @default(cuid())
+  rbtProfileId         String
+  scheduledAt          DateTime
+  durationMinutes      Int               @default(60)
+  interviewerName     String
+  status               InterviewStatus   @default(SCHEDULED)
+  decision             InterviewDecision @default(PENDING)
+  meetingUrl           String?
+  notes                String?
+  reminderSentAt       DateTime?
+  reminder_15m_sent_at  DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
-  rbtProfile     RBTProfile      @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  rbtProfile     RBTProfile           @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
   interviewNotes InterviewNotes?
+  scorecards     InterviewScorecard[]
 
+  @@index([reminder_15m_sent_at])
   @@map("interviews")
 }
 
@@ -401,6 +405,23 @@ model InterviewNotes {
   rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
 
   @@map("interview_notes")
+}
+
+model InterviewScorecard {
+  id                String   @id @default(cuid())
+  interviewId       String
+  createdByUserId   String
+  scores            Json     @default("{}") // { communication: 4, adaptability: 3, ... }
+  comments          Json     @default("{}") // { communication: "...", ... }
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  interview      Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  createdByUser  User      @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@unique([interviewId, createdByUserId])
+  @@index([interviewId])
+  @@map("interview_scorecards")
 }
 
 model RBTDocument {
