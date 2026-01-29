@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Loader2, Save } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import Scorecard from './Scorecard'
 
 interface InterviewNotesFormProps {
   interviewId: string
@@ -267,6 +268,19 @@ export default function InterviewNotesForm({
               placeholder="Their familiarity with ABA platforms..."
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Scorecard (1–5) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Scorecard (1–5)</CardTitle>
+          <p className="text-sm text-gray-600 font-normal">
+            Rate core RBT skills for consistent hiring decisions.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Scorecard interviewId={interviewId} />
         </CardContent>
       </Card>
 
