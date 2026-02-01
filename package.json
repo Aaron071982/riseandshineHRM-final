@@ -16,7 +16,8 @@
     "db:studio": "prisma studio",
     "db:clear-rbts": "tsx scripts/clear-rbts.ts",
     "db:backfill-onboarding": "tsx scripts/backfill-onboarding-tasks.ts",
-    "fix:hired-rbts": "tsx scripts/fix-hired-rbts.ts"
+    "fix:hired-rbts": "tsx scripts/fix-hired-rbts.ts",
+    "db:add-admin": "tsx scripts/add-admin.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.7.1",

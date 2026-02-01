@@ -83,5 +83,6 @@ export async function cleanupExpiredSessions(): Promise<void> {
 }
 
 export function isSuperAdmin(email: string | null | undefined): boolean {
-  return email === 'aaronsiam21@gmail.com'
+  const superAdmins = ['aaronsiam21@gmail.com', 'alvi@riseandshiny.nyc']
+  return !!email && superAdmins.includes(email)
 }
