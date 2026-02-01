@@ -149,6 +149,7 @@ export async function POST(request: NextRequest) {
     const newUser = await prisma.user.create({
       data: {
         email,
+        name: fullName,
         role: 'ADMIN',
         isActive: true,
         profile: {
@@ -161,6 +162,8 @@ export async function POST(request: NextRequest) {
             startDate: startDate ? new Date(startDate) : null,
             department: department || null,
             title: title || null,
+            skills: [],
+            languages: [],
           },
         },
       },
@@ -189,8 +192,17 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ user: newUser }, { status: 201 })
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating admin user:', error)
-    return NextResponse.json({ error: 'Failed to create admin user' }, { status: 500 })
+    const message =
+      error instanceof Error ? error.message : 'Failed to create admin user'
+    const prismaCode = error && typeof error === 'object' && 'code' in error ? (error as { code: string }).code : null
+    if (prismaCode === 'P2002') {
+      return NextResponse.json({ error: 'A user with this email or phone number already exists' }, { status: 400 })
+    }
+    return NextResponse.json(
+      { error: message || 'Failed to create admin user' },
+      { status: 500 },
+    )
   }
 }
