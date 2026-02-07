@@ -164,7 +164,7 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
   }
 
   return (
-    <Card className="border-2 border-blue-100 bg-gradient-to-br from-white to-blue-50/30 relative overflow-hidden">
+    <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
       <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
       <CardHeader className="relative">
         <div className="flex items-center justify-between">
@@ -176,7 +176,7 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
             <DialogTrigger asChild>
               <Button
                 onClick={handleNew}
-                className="gradient-primary text-white border-0 rounded-xl px-6 shine-effect"
+                className="dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Audit Entry

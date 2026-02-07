@@ -185,72 +185,63 @@ export default async function AdminDashboard() {
         </TrackedLink>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards - calm, flat like RBTs & Candidates */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="card-hover border-2 border-orange-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-orange-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Total Candidates</p>
-                <p className="text-3xl font-bold text-gradient mt-2 dark:text-[var(--text-primary)]">{totalCandidates}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mt-2">{totalCandidates}</p>
                 <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1">All time</p>
               </div>
-              <div className="h-12 w-12 rounded-full gradient-primary dark:bg-[var(--orange-subtle)] flex items-center justify-center glow-effect">
-                <Users className="h-6 w-6 text-white dark:text-[var(--orange-primary)]" />
-              </div>
+              <Users className="h-8 w-8 text-gray-400 dark:text-[var(--text-tertiary)]" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-hover border-2 border-green-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-green-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Hired RBTs</p>
-                <p className="text-3xl font-bold text-green-600 dark:text-[var(--status-hired-text)] mt-2">{statusCounts['HIRED'] || 0}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-hired-text)] mt-2">{statusCounts['HIRED'] || 0}</p>
                 <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1">Active RBTs</p>
               </div>
-              <div className="h-12 w-12 rounded-full gradient-green dark:bg-[var(--status-hired-bg)] flex items-center justify-center glow-effect">
-                <CheckCircle className="h-6 w-6 text-white dark:text-[var(--status-hired-text)]" />
-              </div>
+              <CheckCircle className="h-8 w-8 text-green-500 dark:text-[var(--status-hired-text)]" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-hover border-2 border-blue-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-blue-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Upcoming Interviews</p>
-                <p className="text-3xl font-bold text-blue-600 dark:text-[var(--status-interview-text)] mt-2">{upcomingInterviews.length}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-interview-text)] mt-2">{upcomingInterviews.length}</p>
                 <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1">Next 5 interviews</p>
               </div>
-              <div className="h-12 w-12 rounded-full gradient-blue dark:bg-[var(--status-interview-bg)] flex items-center justify-center glow-effect">
-                <Calendar className="h-6 w-6 text-white dark:text-[var(--status-interview-text)]" />
-              </div>
+              <Calendar className="h-8 w-8 text-blue-500 dark:text-[var(--status-interview-text)]" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-hover border-2 border-purple-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Pending Onboarding</p>
-                <p className="text-3xl font-bold text-purple-600 dark:text-[var(--status-onboarding-text)] mt-2">{pendingOnboardingCount}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-onboarding-text)] mt-2">{pendingOnboardingCount}</p>
                 <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1">Incomplete tasks</p>
               </div>
-              <div className="h-12 w-12 rounded-full gradient-purple dark:bg-[var(--status-onboarding-bg)] flex items-center justify-center glow-effect">
-                <FileCheck className="h-6 w-6 text-white dark:text-[var(--status-onboarding-text)]" />
-              </div>
+              <FileCheck className="h-8 w-8 text-purple-500 dark:text-[var(--status-onboarding-text)]" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Candidates by Status */}
-      <Card className="border-2 border-orange-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-orange-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-20 -mt-20 bubble-animation dark:opacity-20" />
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Candidates by Status</CardTitle>
           <CardDescription className="dark:text-[var(--text-tertiary)]">Distribution of candidates across the hiring pipeline</CardDescription>
@@ -286,8 +277,7 @@ export default async function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upcoming Interviews */}
-        <Card className="border-2 border-blue-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-blue-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-200/20 dark:bg-[var(--status-interview-bg)] rounded-full -mr-16 -mt-16 bubble-animation-delayed dark:opacity-30" />
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
               <Calendar className="h-5 w-5 text-blue-600 dark:text-[var(--status-interview-text)]" />
@@ -310,7 +300,7 @@ export default async function AdminDashboard() {
                   return (
                     <div
                       key={interview.id}
-                      className="flex items-center justify-between p-4 border-2 border-blue-200 dark:border-[var(--border-subtle)] rounded-xl bg-white dark:bg-[var(--bg-elevated)] hover:shadow-md dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover"
+                      className="flex items-center justify-between p-4 border border-gray-200 dark:border-[var(--border-subtle)] rounded-lg bg-gray-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]"
                     >
                       <div>
                         <div className="font-bold text-gray-900 dark:text-[var(--text-primary)]">
@@ -334,13 +324,13 @@ export default async function AdminDashboard() {
                         <Link href={`/admin/rbts/${interview.rbtProfile.id}`}>
                           <Button variant="outline" size="sm" className="rounded-lg dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">Profile</Button>
                         </Link>
-                        <Badge className="gradient-blue text-white border-0 dark:bg-[var(--status-interview-bg)] dark:text-[var(--status-interview-text)]">{interview.status}</Badge>
+                        <Badge className="border-0 bg-blue-100 text-blue-800 dark:bg-[var(--status-interview-bg)] dark:text-[var(--status-interview-text)]">{interview.status}</Badge>
                       </div>
                     </div>
                   )
                 })}
                 <Link href="/admin/interviews">
-                  <Button variant="outline" className="w-full mt-4 border-2 border-blue-200 hover:bg-blue-50 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] rounded-xl">
+                  <Button variant="outline" className="w-full mt-4 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]">
                     View All Interviews
                   </Button>
                 </Link>
@@ -350,8 +340,7 @@ export default async function AdminDashboard() {
         </Card>
 
         {/* Recently Hired */}
-        <Card className="border-2 border-green-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-green-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-green-200/20 dark:bg-[var(--status-hired-bg)] rounded-full -mr-16 -mt-16 bubble-animation-delayed-2 dark:opacity-30" />
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-green-600 dark:text-[var(--status-hired-text)]" />
@@ -369,7 +358,7 @@ export default async function AdminDashboard() {
                 {recentHires.map((rbt) => (
                   <div
                     key={rbt.id}
-                    className="flex items-center justify-between p-4 border-2 border-green-200 dark:border-[var(--border-subtle)] rounded-xl bg-white dark:bg-[var(--bg-elevated)] hover:shadow-md dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover"
+                    className="flex items-center justify-between p-4 border border-gray-200 dark:border-[var(--border-subtle)] rounded-lg bg-gray-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]"
                   >
                     <div>
                       <div className="font-bold text-gray-900 dark:text-[var(--text-primary)]">
@@ -380,7 +369,7 @@ export default async function AdminDashboard() {
                       </div>
                     </div>
                     <Link href={`/admin/rbts/${rbt.id}`}>
-                      <Button className="gradient-green text-white border-0 rounded-lg px-4 shine-effect dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)] dark:hover:bg-[var(--status-hired-hover)]">
+                      <Button variant="outline" size="sm" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]">
                         View →
                       </Button>
                     </Link>

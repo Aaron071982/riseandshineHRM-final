@@ -62,7 +62,7 @@ export default function UserSettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-2 border-blue-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-blue-50/30 dark:bg-[var(--bg-elevated)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
               <Bell className="w-5 h-5 text-blue-600 dark:text-[var(--status-interview-text)]" />
@@ -92,7 +92,7 @@ export default function UserSettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-purple-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50/30 dark:bg-[var(--bg-elevated)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
               <Palette className="w-5 h-5 text-purple-600 dark:text-[var(--status-onboarding-text)]" />
@@ -106,7 +106,7 @@ export default function UserSettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-green-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-green-50/30 dark:bg-[var(--bg-elevated)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
               <Shield className="w-5 h-5 text-green-600 dark:text-[var(--status-hired-text)]" />
@@ -135,7 +135,7 @@ export default function UserSettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-orange-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-orange-50/30 dark:bg-[var(--bg-elevated)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
               <Monitor className="w-5 h-5 text-orange-600 dark:text-[var(--orange-primary)]" />
@@ -159,7 +159,7 @@ export default function UserSettingsPage() {
       </div>
 
       <div className="flex gap-3">
-        <Button onClick={handleSave} className="gradient-primary text-white dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0 rounded-xl px-6">
+        <Button onClick={handleSave} className="dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0">
           Save Preferences
         </Button>
         <Button variant="outline" onClick={() => router.push('/profile')} className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]">

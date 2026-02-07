@@ -89,68 +89,59 @@ export default async function OnboardingPage() {
         <p className="text-gray-600 dark:text-[var(--text-tertiary)]">Track onboarding progress for hired RBTs</p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - calm, flat like RBTs & Candidates */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="card-hover border-2 border-purple-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Total RBTs</p>
-                <p className="text-3xl font-bold text-purple-600 dark:text-[var(--status-onboarding-text)] mt-2">{totalRBTs}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mt-2">{totalRBTs}</p>
               </div>
-              <div className="h-12 w-12 rounded-full gradient-purple dark:bg-[var(--status-onboarding-bg)] flex items-center justify-center">
-                <FileCheck className="h-6 w-6 text-white dark:text-[var(--status-onboarding-text)]" />
-              </div>
+              <FileCheck className="h-8 w-8 text-purple-500 dark:text-[var(--status-onboarding-text)]" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-hover border-2 border-green-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-green-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Completed</p>
-                <p className="text-3xl font-bold text-green-600 dark:text-[var(--status-hired-text)] mt-2">{completedOnboarding}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-hired-text)] mt-2">{completedOnboarding}</p>
               </div>
-              <div className="h-12 w-12 rounded-full gradient-green dark:bg-[var(--status-hired-bg)] flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-white dark:text-[var(--status-hired-text)]" />
-              </div>
+              <CheckCircle className="h-8 w-8 text-green-500 dark:text-[var(--status-hired-text)]" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-hover border-2 border-yellow-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-yellow-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">In Progress</p>
-                <p className="text-3xl font-bold text-yellow-600 dark:text-[var(--status-warning-text)] mt-2">{inProgress}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-warning-text)] mt-2">{inProgress}</p>
               </div>
-              <div className="h-12 w-12 rounded-full gradient-yellow dark:bg-[var(--status-warning-bg)] flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white dark:text-[var(--status-warning-text)]" />
-              </div>
+              <Clock className="h-8 w-8 text-amber-500 dark:text-[var(--status-warning-text)]" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-hover border-2 border-blue-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-blue-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Not Started</p>
-                <p className="text-3xl font-bold text-blue-600 dark:text-[var(--status-interview-text)] mt-2">{notStarted}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-interview-text)] mt-2">{notStarted}</p>
               </div>
-              <div className="h-12 w-12 rounded-full gradient-blue dark:bg-[var(--status-interview-bg)] flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-white dark:text-[var(--status-interview-text)]" />
-              </div>
+              <TrendingUp className="h-8 w-8 text-blue-500 dark:text-[var(--status-interview-text)]" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Onboarding Progress Table */}
-      <Card className="border-2 border-purple-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-purple-200/20 dark:bg-[var(--status-onboarding-bg)] dark:opacity-20 rounded-full -mr-20 -mt-20 bubble-animation" />
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Onboarding Progress</CardTitle>
         </CardHeader>
@@ -165,12 +156,9 @@ export default async function OnboardingPage() {
               {rbtOnboardingData.map((rbt) => (
                 <div
                   key={rbt.id}
-                  className="border-2 border-gray-200 dark:border-[var(--border-subtle)] rounded-xl p-5 bg-white dark:bg-[var(--bg-elevated)] hover:shadow-lg dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover relative overflow-hidden"
+                  className="border border-gray-200 dark:border-[var(--border-subtle)] rounded-lg p-5 bg-gray-50 dark:bg-[var(--bg-elevated)] dark:hover:bg-[var(--bg-elevated-hover)]"
                 >
-                  {/* Decorative bubble */}
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-purple-100/30 dark:bg-[var(--status-onboarding-bg)] dark:opacity-20 rounded-full -mr-10 -mt-10" />
-                  
-                  <div className="relative grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
                     <div className="md:col-span-2">
                       <h3 className="font-bold text-lg text-gray-900 dark:text-[var(--text-primary)] mb-1">{rbt.name}</h3>
                       <div className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] space-y-1">
@@ -188,10 +176,10 @@ export default async function OnboardingPage() {
                         <div
                           className={`h-3 rounded-full transition-all ${
                             rbt.percentage === 100
-                              ? 'gradient-green'
+                              ? 'bg-green-500'
                               : rbt.percentage > 0
-                              ? 'gradient-yellow'
-                              : 'bg-gray-300'
+                              ? 'bg-amber-500'
+                              : 'bg-gray-300 dark:bg-[var(--bg-input)]'
                           }`}
                           style={{ width: `${rbt.percentage}%` }}
                         />
@@ -213,7 +201,7 @@ export default async function OnboardingPage() {
                     
                     <div className="flex justify-end">
                       <Link href={`/admin/rbts/${rbt.id}`}>
-                        <Button variant="outline" size="sm" className="rounded-lg border-2 hover:bg-purple-50 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]">
+                        <Button variant="outline" size="sm" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]">
                           View →
                         </Button>
                       </Link>

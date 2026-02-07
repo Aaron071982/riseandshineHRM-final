@@ -79,7 +79,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[var(--bg-primary)]">
       {/* Top Navigation */}
-      <nav className="nav-header bg-gradient-to-r from-orange-50 via-white to-orange-50 border-b border-orange-200/70 shadow-sm dark:shadow-none">
+      <nav className="nav-header bg-white border-b border-gray-200 dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -108,8 +108,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                       className={cn(
                         'inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
                         isActive
-                          ? 'bg-primary text-primary-foreground dark:bg-[var(--orange-subtle)] dark:text-[var(--orange-primary)]'
-                          : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-tertiary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-secondary)]'
+                          ? 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-primary)]'
                       )}
                     >
                       <Icon className="w-4 h-4 mr-2" />
@@ -153,7 +153,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white dark:bg-[var(--bg-elevated)] border-b border-orange-200/70 dark:border-[var(--border-subtle)]">
+        <div className="md:hidden bg-white dark:bg-[var(--bg-elevated)] border-b border-gray-200 dark:border-[var(--border-subtle)]">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon
@@ -166,8 +166,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   className={cn(
                     'flex items-center px-3 py-2 rounded-md text-base font-medium',
                     isActive
-                      ? 'bg-primary text-primary-foreground dark:bg-[var(--orange-subtle)] dark:text-[var(--orange-primary)]'
-                      : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-tertiary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-secondary)]'
+                      ? 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-primary)]'
                   )}
                 >
                   <Icon className="w-4 h-4 mr-3" />

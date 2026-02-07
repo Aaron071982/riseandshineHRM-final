@@ -607,9 +607,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       </div>
 
       {/* Profile Information */}
-      <Card className="border-2 border-orange-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-orange-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-20 -mt-20 bubble-animation dark:opacity-20" />
-        <CardHeader className="relative">
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Profile Information</CardTitle>
             <Button
@@ -702,9 +701,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
       {/* Public Application Info */}
       {rbtProfile.source === 'PUBLIC_APPLICATION' && (
-        <Card className="border-2 border-orange-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-orange-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-20 -mt-20 bubble-animation dark:opacity-20" />
-          <CardHeader className="relative">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+          <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Application Information</CardTitle>
               <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-[var(--orange-subtle)] dark:text-[var(--orange-primary)] dark:border-[var(--orange-border)]">
@@ -926,9 +924,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       )}
 
       {/* Status Management */}
-      <Card className="border-2 border-blue-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-blue-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 dark:bg-[var(--status-interview-bg)] dark:opacity-20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
-        <CardHeader className="relative">
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <CardHeader>
           <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Status Management</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -946,7 +943,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               <Button 
                 onClick={handleSendReachOutEmail} 
                 disabled={loading || !rbtProfile.email}
-                className="gradient-primary text-white dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0 rounded-xl px-6 shine-effect"
+                className="dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0"
               >
                 Send Reach-Out Email
               </Button>
@@ -956,7 +953,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 <DialogTrigger asChild>
                   <Button 
                     disabled={loading}
-                    className="gradient-blue text-white dark:bg-[var(--status-interview-bg)] dark:text-[var(--status-interview-text)] border-0 rounded-xl px-6 shine-effect"
+                    className="dark:bg-[var(--status-interview-bg)] dark:text-[var(--status-interview-text)] border-0"
                   >
                     Schedule Interview
                   </Button>
@@ -980,7 +977,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               <Button 
                 onClick={handleHire} 
                 disabled={loading} 
-                className="gradient-green text-white dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)] border-0 rounded-xl px-6 shine-effect glow-effect"
+                className="dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)] border-0"
               >
                 Mark as Hired
               </Button>
@@ -1036,9 +1033,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
       {/* Interviews */}
       {rbtProfile.interviews.length > 0 && (
-        <Card className="border-2 border-purple-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-purple-200/20 dark:bg-[var(--status-onboarding-bg)] dark:opacity-20 rounded-full -mr-20 -mt-20 bubble-animation-delayed-2" />
-          <CardHeader className="relative">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+          <CardHeader>
             <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Interview History</CardTitle>
           </CardHeader>
           <CardContent>
@@ -1074,7 +1070,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                             size="sm"
                             onClick={() => handleCompleteInterview(interview.id)}
                             disabled={loading}
-                            className="gradient-blue text-white dark:bg-[var(--status-interview-bg)] dark:text-[var(--status-interview-text)] border-0"
+                            className="dark:bg-[var(--status-interview-bg)] dark:text-[var(--status-interview-text)] border-0"
                           >
                             Mark as Completed
                           </Button>
@@ -1085,7 +1081,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                               size="sm"
                               onClick={handleHire}
                               disabled={loading}
-                              className="gradient-green text-white dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)] border-0"
+                              className="dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)] border-0"
                             >
                               Hire
                             </Button>
@@ -1357,9 +1353,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
       {/* Interview Notes Section */}
       {rbtProfile.interviews.some((i) => i.interviewNotes) && (
-        <Card className="border-2 border-purple-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-purple-200/20 dark:bg-[var(--status-onboarding-bg)] dark:opacity-20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
-          <CardHeader className="relative">
+        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+          <CardHeader>
             <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Interview Notes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1448,9 +1443,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       />
 
       {/* Documents Section */}
-      <Card className="border-2 border-blue-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-blue-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 dark:bg-[var(--status-interview-bg)] dark:opacity-20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
-        <CardHeader className="relative">
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <CardHeader>
           <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Documents</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">

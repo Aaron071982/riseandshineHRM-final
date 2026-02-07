@@ -173,13 +173,12 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="border-2 border-orange-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-orange-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-20 -mt-20 bubble-animation dark:opacity-30" />
-        <CardContent className="relative p-6 md:p-8">
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <CardContent className="p-6 md:p-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex items-center gap-5">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-200 to-orange-100 dark:bg-[var(--orange-subtle)] flex items-center justify-center text-2xl font-bold text-orange-700 dark:text-[var(--orange-primary)] border-2 border-white dark:border-[var(--border-subtle)] shadow">
+                <div className="w-24 h-24 rounded-full bg-gray-200 dark:bg-[var(--orange-subtle)] flex items-center justify-center text-2xl font-bold text-gray-700 dark:text-[var(--orange-primary)] border border-gray-300 dark:border-[var(--border-subtle)]">
                   {avatarFallback}
                 </div>
                 <div className="absolute bottom-0 right-0 bg-white dark:bg-[var(--bg-elevated)] rounded-full p-2 shadow">
@@ -214,7 +213,7 @@ export default function ProfilePage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => setEditing(!editing)}
-                className="gradient-primary text-white dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0 rounded-xl px-6"
+                className="dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0"
               >
                 <Pencil className="w-4 h-4 mr-2" />
                 {editing ? 'Editing' : 'Edit Profile'}
@@ -241,7 +240,7 @@ export default function ProfilePage() {
       </Card>
 
       {/* Personal Info */}
-      <Card className="border-2 border-gray-100 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
         <CardHeader>
           <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Personal Info</CardTitle>
         </CardHeader>
@@ -314,7 +313,7 @@ export default function ProfilePage() {
       </Card>
 
       {/* Appearance */}
-      <Card className="border-2 border-gray-100 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
         <CardHeader>
           <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
             <Palette className="w-5 h-5 text-primary dark:text-[var(--orange-primary)]" />
@@ -329,7 +328,7 @@ export default function ProfilePage() {
       </Card>
 
       {/* Roles & Permissions */}
-      <Card className="border-2 border-gray-100 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
         <CardHeader>
           <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Roles & Permissions</CardTitle>
         </CardHeader>
@@ -352,7 +351,7 @@ export default function ProfilePage() {
       {/* Super Admin Controls - Only visible to aaronsiam21@gmail.com */}
       {user?.email === 'aaronsiam21@gmail.com' && (
         <div className="space-y-6">
-          <Card className="border-2 border-purple-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50/30 dark:bg-[var(--bg-elevated)]">
+          <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
             <CardHeader>
               <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
                 <Shield className="w-6 h-6 text-purple-600 dark:text-[var(--status-onboarding-text)]" />
@@ -382,7 +381,7 @@ export default function ProfilePage() {
           <Button
             onClick={handleSave}
             disabled={!isDirty || saving}
-            className="gradient-primary text-white dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0 rounded-xl px-6"
+            className="dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0"
           >
             <Save className="w-4 h-4 mr-2" />
             {saving ? 'Saving...' : 'Save Changes'}
