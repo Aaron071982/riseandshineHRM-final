@@ -1,10 +1,15 @@
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { Clock, Calendar, TrendingUp, User } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+type TimeEntryWithRelations = Prisma.TimeEntryGetPayload<{
+  include: { rbtProfile: true; shift: true }
+}>
 
 function AttendanceError() {
   return (
@@ -16,7 +21,7 @@ function AttendanceError() {
 }
 
 export default async function AttendancePage() {
-  let timeEntries: Awaited<ReturnType<typeof prisma.timeEntry.findMany>>
+  let timeEntries: TimeEntryWithRelations[]
   try {
     timeEntries = await prisma.timeEntry.findMany({
       include: {

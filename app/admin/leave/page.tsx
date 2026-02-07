@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,10 @@ import { Calendar, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+type LeaveRequestWithProfile = Prisma.LeaveRequestGetPayload<{
+  include: { rbtProfile: true }
+}>
 
 function LeaveError() {
   return (
@@ -19,7 +24,7 @@ function LeaveError() {
 }
 
 export default async function LeaveRequestsPage() {
-  let leaveRequests: Awaited<ReturnType<typeof prisma.leaveRequest.findMany>>
+  let leaveRequests: LeaveRequestWithProfile[]
   try {
     leaveRequests = await prisma.leaveRequest.findMany({
       include: {
