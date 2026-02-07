@@ -172,23 +172,32 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('❌ Error verifying OTP:', {
-      message: error.message,
-      code: error.code,
-      meta: error.meta,
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+      stack: error?.stack,
     })
     
-    // Check if it's a Prisma connection error
-    if (error.code === 'P1001' || error.message?.includes('Can\'t reach database server')) {
-      console.error('🔴 Prisma P1001: Cannot reach database server')
-      console.error('   DATABASE_URL host:', process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'NOT SET')
+    // Prisma/DB connection errors – ask user to try again
+    const isDbError =
+      error?.code === 'P1001' ||
+      error?.code === 'P1002' ||
+      error?.code === 'P1017' ||
+      (error?.message && (
+        error.message.includes("Can't reach database") ||
+        error.message.includes('Connection') ||
+        error.message.includes('ECONNREFUSED') ||
+        error.message.includes('ETIMEDOUT')
+      ))
+    if (isDbError) {
       return NextResponse.json(
-        { error: 'Database connection failed. Please try again later.' },
+        { error: 'Server is temporarily unavailable. Please try again in a moment.' },
         { status: 503 }
       )
     }
     
     return NextResponse.json(
-      { error: 'Failed to verify code' },
+      { error: 'Something went wrong verifying your code. Please try again.' },
       { status: 500 }
     )
   }

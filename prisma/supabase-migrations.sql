@@ -48,3 +48,8 @@ END $$;
 -- 3) Add theme_preference to user_profiles (dark mode)
 ALTER TABLE "user_profiles"
 ADD COLUMN IF NOT EXISTS "themePreference" TEXT;
+
+-- 4) Align rbt_profiles with Prisma schema (fixes verify-otp / profile 500s if columns were missing)
+ALTER TABLE "rbt_profiles"
+ADD COLUMN IF NOT EXISTS "experienceYears" INTEGER,
+ADD COLUMN IF NOT EXISTS "experienceYearsDisplay" TEXT;
