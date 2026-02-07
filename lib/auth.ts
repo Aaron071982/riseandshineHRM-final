@@ -61,12 +61,18 @@ export async function validateSession(token: string): Promise<SessionUser | null
       message: msg.slice(0, 180),
     })
     if (msg.includes('rbt_profiles') || code === 'P2010') {
-      session = await prisma.session.findUnique({
-        where: { token },
-        include: { user: true },
-      })
+      try {
+        session = await prisma.session.findUnique({
+          where: { token },
+          include: { user: true },
+        })
+      } catch (fallbackErr) {
+        log('fallback session lookup failed', { message: (fallbackErr as Error)?.message?.slice(0, 120) })
+        return null
+      }
     } else {
-      throw err
+      log('session lookup failed, returning null', { message: msg.slice(0, 120) })
+      return null
     }
   }
 

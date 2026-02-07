@@ -75,27 +75,19 @@ export default async function AdminDashboard() {
     upcomingInterviews = results[2]
     recentHires = results[3]
     pendingOnboarding = results[4]
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string; meta?: unknown; stack?: string }
     console.error('❌ Database connection error in AdminDashboard:', {
-      message: error.message,
-      code: error.code,
-      meta: error.meta,
-      stack: error.stack,
+      message: err?.message,
+      code: err?.code,
+      meta: err?.meta,
+      stack: err?.stack,
     })
-    
-    // Check if it's a Prisma connection error
-    if (error.code === 'P1001' || error.message?.includes('Can\'t reach database server')) {
+    if (err?.code === 'P1001' || err?.message?.includes("Can't reach database server")) {
       console.error('🔴 Prisma P1001: Cannot reach database server')
       console.error('   DATABASE_URL host:', process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'NOT SET')
-      console.error('   This usually means:')
-      console.error('   1. DATABASE_URL is incorrect or not set in Vercel')
-      console.error('   2. Supabase network restrictions are blocking Vercel IPs')
-      console.error('   3. Database server is down or unreachable')
-      throw new Error('Database connection failed. Please check your DATABASE_URL configuration and Supabase network settings.')
     }
-    
-    // Re-throw other errors
-    throw error
+    // Do not rethrow: render dashboard with empty stats so the page loads; user can try again
   }
 
   const statusCounts = candidatesByStatus.reduce((acc, item) => {
