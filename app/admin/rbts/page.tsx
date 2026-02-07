@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -43,15 +44,21 @@ export default async function RBTPage({
     ]
   }
 
-  const rbts = await prisma.rBTProfile.findMany({
-    where,
-    include: {
-      user: true,
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-  })
+  type RBTWithUser = Prisma.RBTProfileGetPayload<{ include: { user: true } }>
+  let rbts: RBTWithUser[] = []
+  try {
+    rbts = await prisma.rBTProfile.findMany({
+      where,
+      include: {
+        user: true,
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    })
+  } catch (error) {
+    console.error('Admin rbts: failed to load', error)
+  }
 
   return (
     <div className="space-y-6">

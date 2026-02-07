@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDateTime } from '@/lib/utils'
@@ -12,14 +13,20 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function InterviewsPage() {
-  const interviews = await prisma.interview.findMany({
-    include: {
-      rbtProfile: true,
-    },
-    orderBy: {
-      scheduledAt: 'desc',
-    },
-  })
+  type InterviewWithRbtProfile = Prisma.InterviewGetPayload<{ include: { rbtProfile: true } }>
+  let interviews: InterviewWithRbtProfile[] = []
+  try {
+    interviews = await prisma.interview.findMany({
+      include: {
+        rbtProfile: true,
+      },
+      orderBy: {
+        scheduledAt: 'desc',
+      },
+    })
+  } catch (error) {
+    console.error('Admin interviews: failed to load', error)
+  }
 
   const statusColors: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {
     SCHEDULED: { bg: 'bg-blue-100', text: 'text-blue-700', darkBg: 'dark:bg-[var(--status-interview-bg)]', darkText: 'dark:text-[var(--status-interview-text)]' },

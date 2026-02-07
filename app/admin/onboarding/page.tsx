@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
@@ -9,18 +10,24 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function OnboardingPage() {
-  const hiredRBTs = await prisma.rBTProfile.findMany({
-    where: {
-      status: 'HIRED',
-    },
-    include: {
-      user: true,
-      onboardingTasks: true,
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-  })
+  type RBTWithTasks = Prisma.RBTProfileGetPayload<{ include: { user: true; onboardingTasks: true } }>
+  let hiredRBTs: RBTWithTasks[] = []
+  try {
+    hiredRBTs = await prisma.rBTProfile.findMany({
+      where: {
+        status: 'HIRED',
+      },
+      include: {
+        user: true,
+        onboardingTasks: true,
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    })
+  } catch (error) {
+    console.error('Admin onboarding: failed to load', error)
+  }
 
   const rbtOnboardingData = hiredRBTs.map((rbt) => {
     const tasks = rbt.onboardingTasks

@@ -25,14 +25,19 @@ export default async function InterviewsPage() {
   }
 
   // Get interviews for this RBT profile
-  const interviews = await prisma.interview.findMany({
-    where: {
-      rbtProfileId: user.rbtProfileId,
-    },
-    orderBy: {
-      scheduledAt: 'desc',
-    },
-  })
+  let interviews: Awaited<ReturnType<typeof prisma.interview.findMany>> = []
+  try {
+    interviews = await prisma.interview.findMany({
+      where: {
+        rbtProfileId: user.rbtProfileId,
+      },
+      orderBy: {
+        scheduledAt: 'desc',
+      },
+    })
+  } catch (error) {
+    console.error('RBT interviews: failed to load', error)
+  }
 
   const upcomingInterviews = interviews.filter(i => 
     new Date(i.scheduledAt) >= new Date() && i.status === 'SCHEDULED'

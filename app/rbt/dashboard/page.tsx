@@ -65,6 +65,24 @@ function checkEnvironmentVariables() {
 }
 
 export default async function RBTDashboardPage() {
+  try {
+    return await RBTDashboardPageInner()
+  } catch (error) {
+    logError('Unexpected error in RBT dashboard', error)
+    return (
+      <div className="container mx-auto p-6 max-w-4xl">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <h1 className="text-xl font-bold text-red-800 mb-2">Something went wrong</h1>
+          <p className="text-red-700">
+            We couldn’t load your dashboard. Please try again or contact support.
+          </p>
+        </div>
+      </div>
+    )
+  }
+}
+
+async function RBTDashboardPageInner() {
   // Check environment variables first
   const envCheck = checkEnvironmentVariables()
   if (!envCheck.hasDatabaseUrl) {

@@ -120,8 +120,11 @@
     min-height: 100vh;
   }
   .dark body {
-    background: var(--bg-primary);
+    background: var(--bg-primary) !important;
     color: var(--text-primary);
+  }
+  .dark .min-h-screen {
+    background-color: var(--bg-primary);
   }
   .dark .nav-header {
     background: var(--bg-header);
