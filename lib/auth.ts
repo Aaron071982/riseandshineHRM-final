@@ -39,30 +39,55 @@ export async function createSession(
 }
 
 export async function validateSession(token: string): Promise<SessionUser | null> {
-  const session = await prisma.session.findUnique({
-    where: { token },
-    include: {
-      user: {
-        include: {
-          rbtProfile: true,
+  const log = (msg: string, data?: object) =>
+    console.log('[auth][validateSession]', msg, data ?? '')
+  let session: Awaited<ReturnType<typeof prisma.session.findUnique>> = null
+  try {
+    session = await prisma.session.findUnique({
+      where: { token },
+      include: {
+        user: {
+          include: {
+            rbtProfile: true,
+          },
         },
       },
-    },
-  })
-
-  if (!session || session.expiresAt < new Date()) {
-    return null
+    })
+  } catch (err: unknown) {
+    const msg = (err as Error)?.message ?? ''
+    const code = (err as { code?: string })?.code
+    log('session lookup error, will retry without rbtProfile', {
+      prismaCode: code,
+      message: msg.slice(0, 180),
+    })
+    if (msg.includes('rbt_profiles') || code === 'P2010') {
+      session = await prisma.session.findUnique({
+        where: { token },
+        include: { user: true },
+      })
+    } else {
+      throw err
+    }
   }
 
-  const user = session.user
+  if (!session) {
+    log('no session found for token')
+    return null
+  }
+  if (session.expiresAt < new Date()) {
+    log('session expired', { expiresAt: session.expiresAt.toISOString() })
+    return null
+  }
+  log('valid', { userId: session.user.id, role: session.user.role })
 
+  const user = session.user as typeof session.user & { rbtProfile?: { id: string } | null }
   return {
     id: user.id,
     phoneNumber: user.phoneNumber,
     role: user.role as 'ADMIN' | 'RBT' | 'CANDIDATE',
     name: user.name,
     email: user.email,
-    rbtProfileId: user.rbtProfile?.id || null,
+    rbtProfileId: user.rbtProfile?.id ?? null,
   }
 }
 

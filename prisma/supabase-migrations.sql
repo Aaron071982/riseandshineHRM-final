@@ -53,3 +53,8 @@ ADD COLUMN IF NOT EXISTS "themePreference" TEXT;
 ALTER TABLE "rbt_profiles"
 ADD COLUMN IF NOT EXISTS "experienceYears" INTEGER,
 ADD COLUMN IF NOT EXISTS "experienceYearsDisplay" TEXT;
+
+-- 5) Ensure admin can log in: set aaronsiam21@gmail.com to ADMIN (safe to re-run)
+UPDATE "users"
+SET role = 'ADMIN', "isActive" = true
+WHERE email = 'aaronsiam21@gmail.com';

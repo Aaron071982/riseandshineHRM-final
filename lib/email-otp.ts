@@ -66,66 +66,69 @@ export async function sendOTPEmail(email: string, code: string): Promise<boolean
 }
 
 export async function storeOTPEmail(email: string, code: string): Promise<void> {
+  const cleanEmail = email?.trim().toLowerCase() ?? ''
+  const cleanCode = code?.trim().replace(/\s/g, '') || code
   try {
     const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000)
-
-    // Clean up old OTPs for this email
     await prisma.otpCode.deleteMany({
       where: {
-        email,
+        email: cleanEmail,
         OR: [
           { used: true },
           { expiresAt: { lt: new Date() } },
         ],
       },
     })
-
     await prisma.otpCode.create({
       data: {
-        email,
-        code,
+        email: cleanEmail,
+        code: cleanCode,
         expiresAt,
       },
     })
-  } catch (error: any) {
-    console.error('Error storing OTP email:', error)
-    console.error('Email:', email, 'Code:', code)
+  } catch (error: unknown) {
+    console.error('[auth][email-otp] storeOTPEmail error', (error as Error)?.message, error)
     throw error
   }
 }
 
 export async function verifyOTPEmail(email: string, code: string): Promise<boolean> {
+  const cleanEmail = email?.trim().toLowerCase() ?? ''
+  const cleanCode = code?.trim().replace(/\s/g, '') ?? '' // digits only, no spaces
   try {
-    // Find the OTP code
     const otp = await prisma.otpCode.findFirst({
       where: {
-        email,
-        code,
+        email: cleanEmail,
+        code: cleanCode,
         used: false,
       },
     })
 
     if (!otp) {
-      console.log(`No OTP found for email: ${email}, code: ${code}`)
+      console.log('[auth][email-otp] No OTP found', {
+        email: cleanEmail ? `${cleanEmail.slice(0, 3)}***` : '',
+        codeLength: cleanCode.length,
+        codePreview: cleanCode ? `${cleanCode.slice(0, 2)}****` : '',
+      })
       return false
     }
 
-    // Check if expired
     const now = new Date()
     if (otp.expiresAt < now) {
-      console.log(`OTP expired. Expires at: ${otp.expiresAt.toISOString()}, Now: ${now.toISOString()}`)
+      console.log('[auth][email-otp] OTP expired', {
+        expiresAt: otp.expiresAt.toISOString(),
+        now: now.toISOString(),
+      })
       return false
     }
 
-    // Mark as used
     await prisma.otpCode.update({
       where: { id: otp.id },
       data: { used: true },
     })
-
     return true
-  } catch (error: any) {
-    console.error('Error verifying OTP email:', error)
+  } catch (error: unknown) {
+    console.error('[auth][email-otp] verifyOTPEmail error', (error as Error)?.message, error)
     return false
   }
 }

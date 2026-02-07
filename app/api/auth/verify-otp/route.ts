@@ -4,11 +4,64 @@ import { createSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 
-export async function POST(request: NextRequest) {
+const LOG = (msg: string, data?: object) =>
+  console.log('[auth][verify-otp]', msg, data ?? '')
+
+/** Find user by email or id; include rbtProfile when possible (fallback without if rbt_profiles has schema issues so admins can still log in). */
+async function findUserByEmailWithProfile(
+  email: string | null,
+  userId?: string
+): Promise<{ id: string; email: string; role: string; isActive: boolean; rbtProfile?: { id: string; email: string | null; status: string } | null } | null> {
+  const include = { rbtProfile: true } as const
   try {
-    const { email, otp } = await request.json()
+    if (userId) {
+      return await prisma.user.findUnique({
+        where: { id: userId },
+        include,
+      })
+    }
+    if (!email) return null
+    return await prisma.user.findUnique({
+      where: { email },
+      include,
+    })
+  } catch (err: unknown) {
+    const msg = (err as Error)?.message ?? ''
+    const code = (err as { code?: string })?.code
+    LOG('findUserByEmailWithProfile error (will retry without rbtProfile)', {
+      email: email ?? undefined,
+      userId,
+      prismaCode: code,
+      message: msg.slice(0, 200),
+    })
+    if (msg.includes('rbt_profiles') || code === 'P2010') {
+      if (userId) {
+        return await prisma.user.findUnique({
+          where: { id: userId },
+          include: {},
+        })
+      }
+      if (!email) return null
+      return await prisma.user.findUnique({
+        where: { email },
+        include: {},
+      })
+    }
+    throw err
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const logId = `req_${Date.now().toString(36)}`
+  try {
+    const body = await request.json().catch(() => ({}))
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
+    const otp = typeof body?.otp === 'string' ? body.otp.trim() : ''
+
+    LOG(`${logId} start`, { email: email ? `${email.slice(0, 3)}***@${email.split('@')[1] ?? ''}` : '', otpLength: otp.length })
 
     if (!email || !otp) {
+      LOG(`${logId} bad request`, { hasEmail: !!email, hasOtp: !!otp })
       return NextResponse.json(
         { error: 'Email and OTP are required' },
         { status: 400 }
@@ -16,71 +69,71 @@ export async function POST(request: NextRequest) {
     }
 
     // Test account: allow any OTP for hrmtesting@gmail.com (or accept '000000')
-    const isTestAccount = email.toLowerCase() === 'hrmtesting@gmail.com'
+    const isTestAccount = email === 'hrmtesting@gmail.com'
     let isValid = false
-    
-    if (isTestAccount) {
-      // For test account, accept '000000' or verify normally
-      isValid = otp === '000000' || await verifyOTPEmail(email, otp)
-    } else {
-      // Verify OTP normally
-      isValid = await verifyOTPEmail(email, otp)
+
+    try {
+      if (isTestAccount) {
+        isValid = otp === '000000' || (await verifyOTPEmail(email, otp))
+      } else {
+        isValid = await verifyOTPEmail(email, otp)
+      }
+    } catch (verifyErr) {
+      LOG(`${logId} OTP verify threw`, { message: (verifyErr as Error)?.message })
+      throw verifyErr
     }
-    
+
     if (!isValid) {
-      // In dev mode, check if there's a valid code to help debug
       const recentCode = await prisma.otpCode.findFirst({
         where: { email },
         orderBy: { createdAt: 'desc' },
-      })
-      
+      }).catch(() => null)
+      const isExpired = recentCode ? new Date(recentCode.expiresAt) < new Date() : null
+      LOG(`${logId} OTP invalid`, { hasRecentCode: !!recentCode, isExpired })
       let errorMessage = 'Invalid or expired verification code'
       if (recentCode && process.env.NODE_ENV === 'development') {
-        const isExpired = new Date(recentCode.expiresAt) < new Date()
         errorMessage = isExpired
           ? `Code expired. Request a new code.`
           : `Invalid code. Check your terminal/console for the correct OTP.`
       }
-      
       return NextResponse.json(
         { error: errorMessage },
         { status: 401 }
       )
     }
 
-    // Find user by email
-    let user = await prisma.user.findUnique({
-      where: { email },
-      include: {
-        rbtProfile: true,
-      },
-    })
-
-    // Fallback: If not found by email, try finding via RBTProfile email
-    // This handles cases where User.email might not match RBTProfile.email
+    LOG(`${logId} OTP valid, looking up user`)
+    let user = await findUserByEmailWithProfile(email)
     if (!user) {
       const rbtProfile = await prisma.rBTProfile.findFirst({
         where: { email },
-        include: {
-          user: true,
-        },
+        select: { userId: true },
+      }).catch((e) => {
+        LOG(`${logId} rbtProfile lookup by email failed`, { message: (e as Error)?.message?.slice(0, 150) })
+        return null
       })
-      if (rbtProfile && rbtProfile.user) {
-        user = await prisma.user.findUnique({
-          where: { id: rbtProfile.user.id },
-          include: {
-            rbtProfile: true,
-          },
-        })
+      if (rbtProfile) {
+        user = await findUserByEmailWithProfile(null, rbtProfile.userId)
       }
     }
 
-    if (!user || !user.isActive) {
+    if (!user) {
+      LOG(`${logId} no user for email`, { email: `${email.slice(0, 3)}***` })
       return NextResponse.json(
         { error: 'Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.' },
         { status: 403 }
       )
     }
+
+    if (!user.isActive) {
+      LOG(`${logId} user inactive`, { userId: user.id, role: user.role })
+      return NextResponse.json(
+        { error: 'Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.' },
+        { status: 403 }
+      )
+    }
+
+    LOG(`${logId} user found`, { userId: user.id, role: user.role })
 
     // Check if user is a hired RBT or admin
     if (user.role === 'CANDIDATE') {
@@ -128,7 +181,7 @@ export async function POST(request: NextRequest) {
 
     const { device, browser } = parseUserAgent(userAgent)
 
-    // Create session
+    LOG(`${logId} creating session`)
     const sessionToken = await createSession(user.id, {
       device,
       browser,
@@ -143,7 +196,6 @@ export async function POST(request: NextRequest) {
       path: '/',
     })
 
-    // Track login activity
     try {
       await prisma.activityLog.create({
         data: {
@@ -161,33 +213,33 @@ export async function POST(request: NextRequest) {
         },
       })
     } catch (error) {
-      // Don't fail login if activity tracking fails
-      console.error('Failed to track login activity:', error)
+      console.error('[auth][verify-otp] Failed to track login activity', error)
     }
 
+    LOG(`${logId} success`, { userId: user.id, role: user.role })
     return NextResponse.json({
       success: true,
       role: user.role,
       userId: user.id,
     })
-  } catch (error: any) {
-    console.error('❌ Error verifying OTP:', {
-      message: error?.message,
-      code: error?.code,
-      meta: error?.meta,
-      stack: error?.stack,
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string; meta?: unknown; stack?: string }
+    console.error('[auth][verify-otp] Error verifying OTP', {
+      message: err?.message,
+      code: err?.code,
+      meta: err?.meta,
+      stack: err?.stack?.split('\n').slice(0, 5),
     })
     
-    // Prisma/DB connection errors – ask user to try again
     const isDbError =
-      error?.code === 'P1001' ||
-      error?.code === 'P1002' ||
-      error?.code === 'P1017' ||
-      (error?.message && (
-        error.message.includes("Can't reach database") ||
-        error.message.includes('Connection') ||
-        error.message.includes('ECONNREFUSED') ||
-        error.message.includes('ETIMEDOUT')
+      err?.code === 'P1001' ||
+      err?.code === 'P1002' ||
+      err?.code === 'P1017' ||
+      (err?.message && (
+        err.message.includes("Can't reach database") ||
+        err.message.includes('Connection') ||
+        err.message.includes('ECONNREFUSED') ||
+        err.message.includes('ETIMEDOUT')
       ))
     if (isDbError) {
       return NextResponse.json(
