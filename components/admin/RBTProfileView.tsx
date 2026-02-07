@@ -593,23 +593,17 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
   return (
     <div className="space-y-6">
-      {/* Header with gradient background */}
-      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-r ${statusConfig.color} dark:bg-[var(--bg-header)] p-8 shadow-lg dark:border dark:border-[var(--border-subtle)]`}>
-        {/* Decorative bubbles */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-16 -mt-16 bubble-animation dark:opacity-30" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -ml-12 -mb-12 bubble-animation-delayed dark:opacity-20" />
-        
-        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-4xl font-bold text-white dark:text-[var(--text-primary)] mb-2">
-              {rbtProfile.firstName} {rbtProfile.lastName}
-            </h1>
-            <p className="text-white/90 dark:text-[var(--text-tertiary)] text-lg">RBT Profile & Hiring Pipeline</p>
-          </div>
-          <Badge className="bg-white dark:bg-[var(--bg-elevated)] text-gray-900 dark:text-[var(--text-primary)] border-0 dark:border-[var(--border-subtle)] px-4 py-2 text-base font-semibold">
-            {rbtProfile.status.replace(/_/g, ' ')}
-          </Badge>
+      {/* Header (simple, like RBTs & Candidates) */}
+      <div className="pb-6 border-b dark:border-[var(--border-subtle)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mb-2">
+            {rbtProfile.firstName} {rbtProfile.lastName}
+          </h1>
+          <p className="text-gray-600 dark:text-[var(--text-tertiary)]">RBT Profile & Hiring Pipeline</p>
         </div>
+        <Badge className="bg-gray-100 dark:bg-[var(--bg-elevated)] text-gray-800 dark:text-[var(--text-primary)] border dark:border-[var(--border-subtle)] px-4 py-2 text-base font-semibold">
+          {rbtProfile.status.replace(/_/g, ' ')}
+        </Badge>
       </div>
 
       {/* Profile Information */}
@@ -621,7 +615,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             <Button
               variant="outline"
               onClick={() => setEditingProfile(!editingProfile)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]"
             >
               {editingProfile ? (
                 <>
@@ -726,7 +720,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           <CardContent className="space-y-4">
             {/* Resume Download */}
             {rbtProfile.resumeUrl && (
-              <div className="flex items-center justify-between p-4 bg-white dark:bg-[var(--bg-primary)] rounded-lg border-2 border-gray-200 dark:border-[var(--border-subtle)]">
+              <div className="flex items-center justify-between p-4 bg-white dark:bg-[var(--bg-elevated)] rounded-lg border-2 border-gray-200 dark:border-[var(--border-subtle)]">
                 <div className="flex items-center gap-3">
                   <FileText className="h-8 w-8 text-primary dark:text-[var(--orange-primary)]" />
                   <div>
@@ -739,6 +733,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 </div>
                 <Button
                   variant="outline"
+                  className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]"
                   onClick={async () => {
                     try {
                       const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/resume`)
@@ -772,7 +767,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             {/* 40-Hour RBT Course */}
             <div className="space-y-2">
               <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">40-Hour RBT Course Completed</p>
-              <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+              <div className="bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
                 <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">{rbtProfile.fortyHourCourseCompleted ? 'Yes' : 'No'}</p>
               </div>
             </div>
@@ -781,7 +776,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             {(rbtProfile.experienceYearsDisplay != null && rbtProfile.experienceYearsDisplay !== '') || rbtProfile.experienceYears !== null ? (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Years of Experience</p>
-                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+                <div className="bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
                   <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                     {rbtProfile.experienceYearsDisplay != null && rbtProfile.experienceYearsDisplay !== ''
                       ? rbtProfile.experienceYearsDisplay.includes('year') ? rbtProfile.experienceYearsDisplay : `${rbtProfile.experienceYearsDisplay} years`
@@ -795,7 +790,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             {rbtProfile.preferredAgeGroupsJson && Array.isArray(rbtProfile.preferredAgeGroupsJson) && (rbtProfile.preferredAgeGroupsJson as string[]).length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Preferred Client Age Groups</p>
-                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+                <div className="bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
                   <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">{(rbtProfile.preferredAgeGroupsJson as string[]).join(', ')}</p>
                 </div>
               </div>
@@ -805,7 +800,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             {rbtProfile.availabilityJson && (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Availability</p>
-                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4 space-y-2">
+                <div className="bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4 space-y-2">
                   {rbtProfile.availabilityJson?.weekday && Object.keys(rbtProfile.availabilityJson.weekday).length > 0 && (
                     <div>
                       <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Weekdays (after 2PM):</p>
@@ -850,7 +845,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             {rbtProfile.languagesJson && (rbtProfile.languagesJson as any).languages && (rbtProfile.languagesJson as any).languages.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Languages Spoken</p>
-                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+                <div className="bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
                   <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                     {[...((rbtProfile.languagesJson as any).languages || []), (rbtProfile.languagesJson as any).otherLanguage].filter(Boolean).join(', ')}
                   </p>
@@ -862,7 +857,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             {rbtProfile.transportation !== null && (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Reliable Transportation</p>
-                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+                <div className="bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
                   <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">{rbtProfile.transportation ? 'Yes' : 'No'}</p>
                 </div>
               </div>
@@ -872,7 +867,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             {(rbtProfile.authorizedToWork !== null || rbtProfile.canPassBackgroundCheck !== null || rbtProfile.cprFirstAidCertified) && (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Compliance & Eligibility</p>
-                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4 space-y-2">
+                <div className="bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4 space-y-2">
                   {rbtProfile.authorizedToWork !== null && (
                     <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Authorized to work in US: {rbtProfile.authorizedToWork ? 'Yes' : 'No'}</p>
                   )}
@@ -890,8 +885,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             {rbtProfile.notes && (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Additional Notes</p>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{rbtProfile.notes}</p>
+                <div className="bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] whitespace-pre-wrap">{rbtProfile.notes}</p>
                 </div>
               </div>
             )}
@@ -899,12 +894,12 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             {/* RBT Certificate & CPR Card from documents */}
             {documents.filter((d) => d.documentType === 'RBT_CERTIFICATE').length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">RBT Certificate</p>
+                <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">RBT Certificate</p>
                 <div className="space-y-2">
                   {documents.filter((d) => d.documentType === 'RBT_CERTIFICATE').map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
-                      <span className="text-sm text-gray-700">{doc.fileName}</span>
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(doc.id, doc.fileName)}>
+                    <div key={doc.id} className="flex items-center justify-between p-4 bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)]">
+                      <span className="text-sm text-gray-700 dark:text-[var(--text-primary)]">{doc.fileName}</span>
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(doc.id, doc.fileName)} className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]">
                         <Download className="h-4 w-4 mr-1" /> Download
                       </Button>
                     </div>
@@ -914,12 +909,12 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             )}
             {documents.filter((d) => d.documentType === 'CPR_CARD').length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">CPR/First Aid Card</p>
+                <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">CPR/First Aid Card</p>
                 <div className="space-y-2">
                   {documents.filter((d) => d.documentType === 'CPR_CARD').map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
-                      <span className="text-sm text-gray-700">{doc.fileName}</span>
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(doc.id, doc.fileName)}>
+                    <div key={doc.id} className="flex items-center justify-between p-4 bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)]">
+                      <span className="text-sm text-gray-700 dark:text-[var(--text-primary)]">{doc.fileName}</span>
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(doc.id, doc.fileName)} className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]">
                         <Download className="h-4 w-4 mr-1" /> Download
                       </Button>
                     </div>
@@ -932,10 +927,10 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       )}
 
       {/* Status Management */}
-      <Card className="border-2 border-blue-100 bg-gradient-to-br from-white to-blue-50/30 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
+      <Card className="border-2 border-blue-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-blue-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 dark:bg-[var(--status-interview-bg)] dark:opacity-20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
         <CardHeader className="relative">
-          <CardTitle className="text-2xl font-bold text-gray-900">Status Management</CardTitle>
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Status Management</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <StatusManager
@@ -952,7 +947,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               <Button 
                 onClick={handleSendReachOutEmail} 
                 disabled={loading || !rbtProfile.email}
-                className="gradient-primary text-white border-0 rounded-xl px-6 shine-effect"
+                className="gradient-primary text-white dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0 rounded-xl px-6 shine-effect"
               >
                 Send Reach-Out Email
               </Button>
@@ -962,7 +957,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 <DialogTrigger asChild>
                   <Button 
                     disabled={loading}
-                    className="gradient-blue text-white border-0 rounded-xl px-6 shine-effect"
+                    className="gradient-blue text-white dark:bg-[var(--status-interview-bg)] dark:text-[var(--status-interview-text)] border-0 rounded-xl px-6 shine-effect"
                   >
                     Schedule Interview
                   </Button>
@@ -986,7 +981,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               <Button 
                 onClick={handleHire} 
                 disabled={loading} 
-                className="gradient-green text-white border-0 rounded-xl px-6 shine-effect glow-effect"
+                className="gradient-green text-white dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)] border-0 rounded-xl px-6 shine-effect glow-effect"
               >
                 Mark as Hired
               </Button>
@@ -996,7 +991,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 onClick={handleStall} 
                 disabled={loading}
                 variant="outline"
-                className="border-amber-300 text-amber-700 hover:bg-amber-50 rounded-xl px-6"
+                className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-[var(--border-subtle)] dark:text-[var(--status-warning-text)] dark:hover:bg-[var(--status-warning-bg)] rounded-xl px-6"
               >
                 Mark as Stalled
               </Button>
@@ -1016,7 +1011,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 onClick={handleSendMissingOnboardingEmail} 
                 disabled={loading || !rbtProfile.email || incompleteTasks.length === 0}
                 variant="outline"
-                className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400 rounded-xl px-6"
+                className="border-orange-300 text-orange-700 hover:bg-orange-50 hover:border-orange-400 dark:border-[var(--border-subtle)] dark:text-[var(--orange-primary)] dark:hover:bg-[var(--bg-elevated-hover)] rounded-xl px-6"
                 title={incompleteTasks.length === 0 ? 'All onboarding tasks are complete' : 'Send reminder about missing onboarding items'}
               >
                 Send Missing Onboarding Reminder
@@ -1025,27 +1020,27 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           </div>
           
           {/* Delete RBT Section - Always Visible */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[var(--border-subtle)]">
             <Button 
               onClick={handleDeleteRBT} 
               disabled={loading}
               variant="outline"
-              className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 rounded-xl px-6 w-full sm:w-auto"
+              className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 dark:border-[var(--status-rejected-border)] dark:text-[var(--status-rejected-text)] dark:hover:bg-[var(--status-rejected-bg)] rounded-xl px-6 w-full sm:w-auto"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete RBT
             </Button>
-            <p className="text-xs text-gray-500 mt-2">This action cannot be undone. All RBT data will be permanently deleted.</p>
+            <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-2">This action cannot be undone. All RBT data will be permanently deleted.</p>
           </div>
         </CardContent>
       </Card>
 
       {/* Interviews */}
       {rbtProfile.interviews.length > 0 && (
-        <Card className="border-2 border-purple-100 bg-gradient-to-br from-white to-purple-50/30 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-purple-200/20 rounded-full -mr-20 -mt-20 bubble-animation-delayed-2" />
+        <Card className="border-2 border-purple-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-purple-200/20 dark:bg-[var(--status-onboarding-bg)] dark:opacity-20 rounded-full -mr-20 -mt-20 bubble-animation-delayed-2" />
           <CardHeader className="relative">
-            <CardTitle className="text-2xl font-bold text-gray-900">Interview History</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Interview History</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -1057,30 +1052,30 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 const canHireOrReject = isCompleted && rbtProfile.status === 'INTERVIEW_COMPLETED'
 
                 return (
-                  <div key={interview.id} className="border rounded-lg p-4">
+                  <div key={interview.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-elevated)]">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <p className="font-medium">
+                        <p className="font-medium dark:text-[var(--text-primary)]">
                           {formatDateTime(interview.scheduledAt)} ({interview.durationMinutes} min)
                         </p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                           Interviewer: {interview.interviewerName}
                         </p>
                         {interview.notes && (
-                          <p className="text-sm text-gray-600 mt-2">{interview.notes}</p>
+                          <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-2">{interview.notes}</p>
                         )}
                       </div>
                       <div className="flex flex-col gap-2 items-end">
                         <div className="flex gap-2">
-                          <Badge variant="outline">{interview.status}</Badge>
-                          <Badge variant="outline">{interview.decision}</Badge>
+                          <Badge variant="outline" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">{interview.status}</Badge>
+                          <Badge variant="outline" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">{interview.decision}</Badge>
                         </div>
                         {canMarkCompleted && (
                           <Button
                             size="sm"
                             onClick={() => handleCompleteInterview(interview.id)}
                             disabled={loading}
-                            className="gradient-blue text-white border-0"
+                            className="gradient-blue text-white dark:bg-[var(--status-interview-bg)] dark:text-[var(--status-interview-text)] border-0"
                           >
                             Mark as Completed
                           </Button>
@@ -1091,7 +1086,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                               size="sm"
                               onClick={handleHire}
                               disabled={loading}
-                              className="gradient-green text-white border-0"
+                              className="gradient-green text-white dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)] border-0"
                             >
                               Hire
                             </Button>
@@ -1127,21 +1122,21 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
       {/* Onboarding Progress */}
       {isHired && (
-        <Card>
+        <Card className="border-2 border-gray-200 dark:border-[var(--border-subtle)] dark:bg-[var(--bg-elevated)]">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold text-gray-900">Onboarding Progress</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Onboarding Progress</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {/* Progress Bar */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="font-medium">Overall Progress</span>
-                  <span className="font-bold">
+                  <span className="font-medium dark:text-[var(--text-tertiary)]">Overall Progress</span>
+                  <span className="font-bold dark:text-[var(--text-primary)]">
                     {completedOnboardingTasks} / {totalOnboardingTasks} tasks completed
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                <div className="w-full bg-gray-200 dark:bg-[var(--bg-input)] rounded-full h-4 overflow-hidden">
                   <div
                     className={`h-4 rounded-full transition-all ${
                       (completedOnboardingTasks / totalOnboardingTasks) * 100 === 100
@@ -1153,14 +1148,14 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                     }}
                   />
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600 dark:text-[var(--text-disabled)]">
                   {Math.round((completedOnboardingTasks / totalOnboardingTasks) * 100)}% complete
                 </div>
               </div>
 
               {/* Tasks List - hide "Download Onboarding Documents Folder" task */}
               <div className="space-y-3 mt-6">
-                <h3 className="font-semibold text-gray-900">Tasks</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-[var(--text-primary)]">Tasks</h3>
                 {rbtProfile.onboardingTasks
                   .filter(
                     (task) =>
@@ -1168,22 +1163,22 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                       !task.documentDownloadUrl?.includes('onboarding-package')
                   )
                   .map((task) => (
-                  <div key={task.id} className="border rounded-lg p-4">
+                  <div key={task.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-elevated)]">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           {task.isCompleted ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-500" />
+                            <CheckCircle2 className="w-5 h-5 text-green-500 dark:text-[var(--status-hired-text)]" />
                           ) : (
-                            <XCircle className="w-5 h-5 text-gray-400" />
+                            <XCircle className="w-5 h-5 text-gray-400 dark:text-[var(--text-disabled)]" />
                           )}
-                          <h4 className="font-medium">{task.title}</h4>
+                          <h4 className="font-medium dark:text-[var(--text-primary)]">{task.title}</h4>
                         </div>
                         {task.description && (
-                          <p className="text-sm text-gray-600 mt-1 ml-7">{task.description}</p>
+                          <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1 ml-7">{task.description}</p>
                         )}
                         {task.isCompleted && task.completedAt && (
-                          <p className="text-xs text-gray-500 mt-1 ml-7">
+                          <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1 ml-7">
                             Completed: {formatDateTime(task.completedAt)}
                           </p>
                         )}
@@ -1191,8 +1186,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                       <Badge
                         className={
                           task.isCompleted
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-600'
+                            ? 'bg-green-100 text-green-700 dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)]'
+                            : 'bg-gray-100 text-gray-600 dark:bg-[var(--bg-elevated)] dark:text-[var(--text-tertiary)]'
                         }
                       >
                         {task.isCompleted ? 'Completed' : 'Pending'}
@@ -1201,25 +1196,25 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
                     {/* Show Signature if available */}
                     {task.taskType === 'SIGNATURE' && task.isCompleted && task.uploadUrl && (
-                      <div className="mt-4 ml-7 p-4 bg-gray-50 rounded-lg">
-                        <p className="text-sm font-medium text-gray-700 mb-2">Digital Signature:</p>
+                      <div className="mt-4 ml-7 p-4 bg-gray-50 dark:bg-[var(--bg-input)] rounded-lg">
+                        <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)] mb-2">Digital Signature:</p>
                         {/* eslint-disable-next-line @next/next/no-img-element -- signature URL is dynamic/signed */}
                         <img
                           src={task.uploadUrl}
                           alt="Signature"
-                          className="max-w-md border border-gray-300 rounded bg-white p-2"
+                          className="max-w-md border border-gray-300 dark:border-[var(--border-subtle)] rounded bg-white dark:bg-[var(--bg-elevated)] p-2"
                         />
                       </div>
                     )}
 
                     {/* Show Package Upload confirmation (no download option) */}
                     {task.taskType === 'PACKAGE_UPLOAD' && task.isCompleted && task.uploadUrl && (
-                      <div className="mt-4 ml-7 p-4 bg-gray-50 rounded-lg">
+                      <div className="mt-4 ml-7 p-4 bg-gray-50 dark:bg-[var(--bg-input)] rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
-                          <FileText className="w-5 h-5 text-green-600" />
-                          <p className="text-sm font-medium text-gray-700">Uploaded Package:</p>
+                          <FileText className="w-5 h-5 text-green-600 dark:text-[var(--status-hired-text)]" />
+                          <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Uploaded Package:</p>
                         </div>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
                           Package uploaded and sent to administrator email
                         </p>
                       </div>
@@ -1234,38 +1229,38 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
       {/* Onboarding Documents - always visible for hired RBTs */}
       {isHired && (
-        <Card>
+        <Card className="border-2 border-gray-200 dark:border-[var(--border-subtle)] dark:bg-[var(--bg-elevated)]">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold text-gray-900">Onboarding Documents</CardTitle>
-            <p className="text-sm text-gray-600 mt-1">Acknowledgment and fillable PDF completions</p>
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Onboarding Documents</CardTitle>
+            <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1">Acknowledgment and fillable PDF completions</p>
           </CardHeader>
           <CardContent>
             {!rbtProfile.onboardingCompletions || rbtProfile.onboardingCompletions.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+              <div className="text-center py-8 text-gray-500 dark:text-[var(--text-tertiary)]">
+                <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-[var(--text-disabled)]" />
                 <p className="text-sm">No onboarding documents completed yet</p>
               </div>
             ) : (
             <div className="space-y-4">
               {rbtProfile.onboardingCompletions.map((completion) => (
-                <div key={completion.id} className="border rounded-lg p-4">
+                <div key={completion.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-elevated)]">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         {completion.status === 'COMPLETED' ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                          <CheckCircle2 className="w-5 h-5 text-green-500 dark:text-[var(--status-hired-text)]" />
                         ) : completion.status === 'IN_PROGRESS' ? (
-                          <XCircle className="w-5 h-5 text-yellow-500" />
+                          <XCircle className="w-5 h-5 text-yellow-500 dark:text-[var(--status-warning-text)]" />
                         ) : (
-                          <XCircle className="w-5 h-5 text-gray-400" />
+                          <XCircle className="w-5 h-5 text-gray-400 dark:text-[var(--text-disabled)]" />
                         )}
-                        <h4 className="font-medium">{completion.document.title}</h4>
-                        <Badge variant="outline" className="ml-2">
+                        <h4 className="font-medium dark:text-[var(--text-primary)]">{completion.document.title}</h4>
+                        <Badge variant="outline" className="ml-2 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
                           {completion.document.type === 'ACKNOWLEDGMENT' ? 'Acknowledgment' : 'Fillable PDF'}
                         </Badge>
                       </div>
                       {completion.completedAt && (
-                        <p className="text-xs text-gray-500 mt-1 ml-7">
+                        <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1 ml-7">
                           Completed: {formatDateTime(completion.completedAt)}
                         </p>
                       )}
@@ -1274,10 +1269,10 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                       <Badge
                         className={
                           completion.status === 'COMPLETED'
-                            ? 'bg-green-100 text-green-700'
+                            ? 'bg-green-100 text-green-700 dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)]'
                             : completion.status === 'IN_PROGRESS'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-gray-100 text-gray-600'
+                            ? 'bg-yellow-100 text-yellow-700 dark:bg-[var(--status-warning-bg)] dark:text-[var(--status-warning-text)]'
+                            : 'bg-gray-100 text-gray-600 dark:bg-[var(--bg-elevated)] dark:text-[var(--text-tertiary)]'
                         }
                       >
                         {completion.status === 'COMPLETED' ? 'Completed' : completion.status === 'IN_PROGRESS' ? 'In Progress' : 'Not Started'}
@@ -1288,6 +1283,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                             <Button
                               size="sm"
                               variant="outline"
+                              className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]"
                               onClick={async () => {
                                 try {
                                   const response = await fetch(
@@ -1323,8 +1319,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                             completion.acknowledgmentJson && (
                               <div className="flex flex-col gap-2">
                                 {(completion.acknowledgmentJson as any)?.signatureData && (
-                                  <div className="border rounded p-2 bg-gray-50">
-                                    <p className="text-xs text-gray-600 mb-1">Signature:</p>
+                                  <div className="border dark:border-[var(--border-subtle)] rounded p-2 bg-gray-50 dark:bg-[var(--bg-input)]">
+                                    <p className="text-xs text-gray-600 dark:text-[var(--text-tertiary)] mb-1">Signature:</p>
                                     {/* eslint-disable-next-line @next/next/no-img-element -- data URL from signature pad */}
                                     <img
                                       src={(completion.acknowledgmentJson as any).signatureData}
@@ -1334,7 +1330,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                                   </div>
                                 )}
                                 {(completion.acknowledgmentJson as any)?.typedName && (
-                                  <p className="text-sm text-gray-600">
+                                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                                     Signed: {(completion.acknowledgmentJson as any).typedName}
                                   </p>
                                 )}
@@ -1363,10 +1359,10 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
       {/* Interview Notes Section */}
       {rbtProfile.interviews.some((i) => i.interviewNotes) && (
-        <Card className="border-2 border-purple-100 bg-gradient-to-br from-white to-purple-50/30 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-purple-200/20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
+        <Card className="border-2 border-purple-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-purple-200/20 dark:bg-[var(--status-onboarding-bg)] dark:opacity-20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
           <CardHeader className="relative">
-            <CardTitle className="text-2xl font-bold text-gray-900">Interview Notes</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Interview Notes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {rbtProfile.interviews
@@ -1374,24 +1370,24 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               .map((interview) => (
                 <div
                   key={interview.id}
-                  className="p-4 bg-white rounded-lg border border-gray-200 space-y-3"
+                  className="p-4 bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] space-y-3"
                 >
-                  <div className="flex items-center justify-between border-b pb-2">
+                  <div className="flex items-center justify-between border-b dark:border-[var(--border-subtle)] pb-2">
                     <div>
-                      <p className="font-semibold text-gray-900">
+                      <p className="font-semibold text-gray-900 dark:text-[var(--text-primary)]">
                         Interview on {formatDateTime(interview.scheduledAt)}
                       </p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)]">
                         Interviewer: {interview.interviewerName}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-0.5">
                         15m reminder:{' '}
                         {interview.reminder_15m_sent_at
                           ? `Sent at ${formatDateTime(interview.reminder_15m_sent_at)}`
                           : 'Not sent yet'}
                       </p>
                     </div>
-                    <Badge variant="outline">
+                    <Badge variant="outline" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
                       {interview.status}
                     </Badge>
                   </div>
@@ -1399,41 +1395,41 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                     <div className="space-y-3 text-sm">
                       {interview.interviewNotes.fullName && (
                         <div>
-                          <span className="font-medium text-gray-700">Full Name: </span>
-                          <span className="text-gray-600">{interview.interviewNotes.fullName}</span>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Full Name: </span>
+                          <span className="text-gray-600 dark:text-[var(--text-tertiary)]">{interview.interviewNotes.fullName}</span>
                         </div>
                       )}
                       {interview.interviewNotes.phoneNumber && (
                         <div>
-                          <span className="font-medium text-gray-700">Phone: </span>
-                          <span className="text-gray-600">{interview.interviewNotes.phoneNumber}</span>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Phone: </span>
+                          <span className="text-gray-600 dark:text-[var(--text-tertiary)]">{interview.interviewNotes.phoneNumber}</span>
                         </div>
                       )}
                       {interview.interviewNotes.experienceAnswer && (
                         <div>
-                          <span className="font-medium text-gray-700">Experience: </span>
-                          <p className="text-gray-600 mt-1">{interview.interviewNotes.experienceAnswer}</p>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Experience: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.experienceAnswer}</p>
                         </div>
                       )}
                       {interview.interviewNotes.availabilityAnswer && (
                         <div>
-                          <span className="font-medium text-gray-700">Availability: </span>
-                          <p className="text-gray-600 mt-1">{interview.interviewNotes.availabilityAnswer}</p>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Availability: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.availabilityAnswer}</p>
                         </div>
                       )}
                       {interview.interviewNotes.payExpectationsAnswer && (
                         <div>
-                          <span className="font-medium text-gray-700">Pay Expectations: </span>
-                          <p className="text-gray-600 mt-1">{interview.interviewNotes.payExpectationsAnswer}</p>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Pay Expectations: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.payExpectationsAnswer}</p>
                         </div>
                       )}
                       {interview.interviewNotes.closingNotes && (
                         <div>
-                          <span className="font-medium text-gray-700">Closing Notes: </span>
-                          <p className="text-gray-600 mt-1">{interview.interviewNotes.closingNotes}</p>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Closing Notes: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.closingNotes}</p>
                         </div>
                       )}
-                      <div className="pt-2 border-t">
+                      <div className="pt-2 border-t dark:border-[var(--border-subtle)]">
                         <InterviewNotesButton
                           interviewId={interview.id}
                           rbtProfileId={rbtProfile.id}
@@ -1454,20 +1450,20 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       />
 
       {/* Documents Section */}
-      <Card className="border-2 border-blue-100 bg-gradient-to-br from-white to-blue-50/30 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
+      <Card className="border-2 border-blue-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-blue-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 dark:bg-[var(--status-interview-bg)] dark:opacity-20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
         <CardHeader className="relative">
-          <CardTitle className="text-2xl font-bold text-gray-900">Documents</CardTitle>
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Documents</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Upload Section */}
           <div className="space-y-3">
             <label
               htmlFor="document-upload"
-              className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-[var(--border-subtle)] rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)] transition-colors"
             >
-              <Upload className="w-5 h-5 text-gray-400" />
-              <span className="text-sm font-medium text-gray-700">
+              <Upload className="w-5 h-5 text-gray-400 dark:text-[var(--text-disabled)]" />
+              <span className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">
                 {uploadingDocuments ? 'Uploading...' : 'Upload Documents'}
               </span>
             </label>
@@ -1480,7 +1476,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
               disabled={uploadingDocuments || confirmDialogOpen}
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
               Upload resumes, certifications, or other relevant documents (PDF, DOC, DOCX, JPG, PNG)
             </p>
           </div>
@@ -1491,18 +1487,18 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               {documents.map((doc) => (
                 <div
                   key={doc.id}
-                  className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                  className="flex items-center gap-3 p-3 bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] hover:shadow-md dark:hover:bg-[var(--bg-elevated-hover)] transition-shadow"
                 >
-                  <FileText className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                  <FileText className="w-5 h-5 text-orange-500 dark:text-[var(--orange-primary)] flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-gray-900 dark:text-[var(--text-primary)] truncate">
                       {doc.fileName}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
                         {doc.documentType || 'OTHER'}
                       </Badge>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
                         {new Date(doc.uploadedAt).toLocaleDateString()}
                       </span>
                     </div>
@@ -1512,7 +1508,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                       variant="outline"
                       size="sm"
                       onClick={() => handleDownloadDocument(doc.id, doc.fileName)}
-                      className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                      className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:border-[var(--border-subtle)] dark:text-[var(--orange-primary)] dark:hover:bg-[var(--bg-elevated-hover)]"
                     >
                       <Download className="w-4 h-4 mr-1" />
                       Download
@@ -1521,7 +1517,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDeleteDocument(doc.id, doc.fileName)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-[var(--status-rejected-text)] dark:hover:bg-[var(--status-rejected-bg)]"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -1530,8 +1526,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+            <div className="text-center py-8 text-gray-500 dark:text-[var(--text-tertiary)]">
+              <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-[var(--text-disabled)]" />
               <p className="text-sm">No documents uploaded yet</p>
             </div>
           )}

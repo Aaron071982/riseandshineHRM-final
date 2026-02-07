@@ -171,25 +171,18 @@ export default async function AdminDashboard() {
           <p className="text-sm mt-1">Your data is still in the database. Run the migration in Supabase SQL Editor: open prisma/supabase-migrations.sql and run the whole file (or at least sections 4 and 5). Use the same Supabase project as your production DATABASE_URL. Then refresh.</p>
         </div>
       )}
-      {/* Header with gradient background */}
-      <div className="dashboard-banner relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-500 via-orange-400 to-orange-300 p-8 shadow-lg">
-        {/* Decorative bubbles */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-16 -mt-16 bubble-animation dark:opacity-30" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -ml-12 -mb-12 bubble-animation-delayed dark:opacity-20" />
-        <div className="absolute top-1/2 right-1/4 w-16 h-16 bg-white/15 dark:bg-[var(--orange-subtle)] rounded-full bubble-animation-delayed-2 dark:opacity-10" />
-        
-        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-4xl font-bold text-white dark:text-[var(--text-primary)] mb-2">Admin Dashboard</h1>
-            <p className="text-orange-50 dark:text-[var(--text-tertiary)] text-lg">Welcome back! Here&apos;s an overview of your system.</p>
-          </div>
-          <TrackedLink href="/admin/rbts/new">
-            <Button className="bg-white text-primary hover:bg-orange-50 dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0 shadow-lg rounded-xl px-6 py-6 text-base font-semibold shine-effect">
-              <Plus className="w-5 h-5 mr-2" />
-              Add New RBT / Candidate
-            </Button>
-          </TrackedLink>
+      {/* Header (simple, like RBTs & Candidates) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b dark:border-[var(--border-subtle)]">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mb-2">Admin Dashboard</h1>
+          <p className="text-gray-600 dark:text-[var(--text-tertiary)]">Welcome back! Here&apos;s an overview of your system.</p>
         </div>
+        <TrackedLink href="/admin/rbts/new">
+          <Button className="rounded-xl px-6 py-6 text-base font-semibold dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] dark:border-0">
+            <Plus className="w-5 h-5 mr-2" />
+            Add New RBT / Candidate
+          </Button>
+        </TrackedLink>
       </div>
 
       {/* Statistics Cards */}
@@ -317,7 +310,7 @@ export default async function AdminDashboard() {
                   return (
                     <div
                       key={interview.id}
-                      className="flex items-center justify-between p-4 border-2 border-blue-200 dark:border-[var(--border-subtle)] rounded-xl bg-white dark:bg-[var(--bg-primary)] hover:shadow-md dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover"
+                      className="flex items-center justify-between p-4 border-2 border-blue-200 dark:border-[var(--border-subtle)] rounded-xl bg-white dark:bg-[var(--bg-elevated)] hover:shadow-md dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover"
                     >
                       <div>
                         <div className="font-bold text-gray-900 dark:text-[var(--text-primary)]">
@@ -347,7 +340,7 @@ export default async function AdminDashboard() {
                   )
                 })}
                 <Link href="/admin/interviews">
-                  <Button variant="outline" className="w-full mt-4 border-2 border-blue-200 hover:bg-blue-50 dark:border-[var(--border-subtle)] dark:hover:bg-[var(--bg-elevated-hover)] rounded-xl">
+                  <Button variant="outline" className="w-full mt-4 border-2 border-blue-200 hover:bg-blue-50 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] rounded-xl">
                     View All Interviews
                   </Button>
                 </Link>
@@ -376,7 +369,7 @@ export default async function AdminDashboard() {
                 {recentHires.map((rbt) => (
                   <div
                     key={rbt.id}
-                    className="flex items-center justify-between p-4 border-2 border-green-200 dark:border-[var(--border-subtle)] rounded-xl bg-white dark:bg-[var(--bg-primary)] hover:shadow-md dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover"
+                    className="flex items-center justify-between p-4 border-2 border-green-200 dark:border-[var(--border-subtle)] rounded-xl bg-white dark:bg-[var(--bg-elevated)] hover:shadow-md dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover"
                   >
                     <div>
                       <div className="font-bold text-gray-900 dark:text-[var(--text-primary)]">

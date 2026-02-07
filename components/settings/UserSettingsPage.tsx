@@ -56,13 +56,9 @@ export default function UserSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="dashboard-banner relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 p-8 shadow-lg">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-16 -mt-16 bubble-animation dark:opacity-30" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -ml-12 -mb-12 bubble-animation-delayed dark:opacity-20" />
-        <div className="relative">
-          <h1 className="text-4xl font-bold text-white dark:text-[var(--text-primary)] mb-2">Settings</h1>
-          <p className="text-blue-50 dark:text-[var(--text-tertiary)] text-lg">Manage your personal preferences</p>
-        </div>
+      <div className="pb-6 border-b dark:border-[var(--border-subtle)]">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mb-2">Settings</h1>
+        <p className="text-gray-600 dark:text-[var(--text-tertiary)]">Manage your personal preferences</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -104,7 +100,7 @@ export default function UserSettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground dark:text-[var(--text-tertiary)]">
               Dark mode is available in the Admin panel only. Go to Admin → Dashboard and use the theme toggle in the header to switch.
             </p>
           </CardContent>
@@ -151,10 +147,10 @@ export default function UserSettingsPage() {
               Active sessions: <span className="font-semibold">{sessions.length}</span>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button onClick={handleSignOutAll} variant="outline">
+              <Button onClick={handleSignOutAll} variant="outline" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]">
                 Sign out all sessions
               </Button>
-              <Button onClick={() => router.push('/profile')} variant="ghost">
+              <Button onClick={() => router.push('/profile')} variant="ghost" className="dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-primary)]">
                 Manage devices
               </Button>
             </div>

@@ -82,16 +82,10 @@ export default async function InterviewsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with gradient background */}
-      <div className="dashboard-banner relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-500 via-blue-400 to-indigo-400 dark:bg-[var(--bg-header)] p-8 shadow-lg">
-        {/* Decorative bubbles */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-16 -mt-16 bubble-animation dark:opacity-30" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -ml-12 -mb-12 bubble-animation-delayed dark:opacity-20" />
-        
-        <div className="relative">
-          <h1 className="text-4xl font-bold text-white dark:text-[var(--text-primary)] mb-2">Interviews</h1>
-          <p className="text-blue-50 dark:text-[var(--text-tertiary)] text-lg">Manage all interviews and scheduling</p>
-        </div>
+      {/* Header (simple, like RBTs & Candidates) */}
+      <div className="pb-6 border-b dark:border-[var(--border-subtle)]">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mb-2">Interviews</h1>
+        <p className="text-gray-600 dark:text-[var(--text-tertiary)]">Manage all interviews and scheduling</p>
       </div>
 
       {/* Stats Cards */}
@@ -164,7 +158,7 @@ export default async function InterviewsPage() {
                       return (
                         <div
                           key={interview.id}
-                          className="border-2 border-gray-200 dark:border-[var(--border-subtle)] rounded-xl p-5 bg-white dark:bg-[var(--bg-primary)] hover:shadow-lg dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover relative overflow-hidden"
+                          className="border-2 border-gray-200 dark:border-[var(--border-subtle)] rounded-xl p-5 bg-white dark:bg-[var(--bg-elevated)] hover:shadow-lg dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover relative overflow-hidden"
                         >
                           <div className="absolute top-0 right-0 w-20 h-20 bg-blue-100/30 dark:bg-[var(--status-interview-bg)] rounded-full -mr-10 -mt-10 dark:opacity-30" />
                           <div className="relative grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
@@ -222,7 +216,7 @@ export default async function InterviewsPage() {
                       return (
                         <div
                           key={interview.id}
-                          className="border-2 border-gray-200 dark:border-[var(--border-subtle)] rounded-xl p-5 bg-white dark:bg-[var(--bg-primary)] hover:shadow-lg dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover relative overflow-hidden"
+                          className="border-2 border-gray-200 dark:border-[var(--border-subtle)] rounded-xl p-5 bg-white dark:bg-[var(--bg-elevated)] hover:shadow-lg dark:hover:bg-[var(--bg-elevated-hover)] transition-all card-hover relative overflow-hidden"
                         >
                           <div className="absolute top-0 right-0 w-20 h-20 bg-blue-100/30 dark:bg-[var(--status-interview-bg)] rounded-full -mr-10 -mt-10 dark:opacity-30" />
                           <div className="relative grid grid-cols-1 md:grid-cols-5 gap-4 items-center">

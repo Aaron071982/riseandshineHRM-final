@@ -247,7 +247,7 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <Label>Full Name</Label>
+            <Label className="dark:text-[var(--text-tertiary)]">Full Name</Label>
             <Input
               value={profile.fullName || ''}
               onChange={(e) => setProfile((prev) => ({ ...prev, fullName: e.target.value }))}
@@ -255,7 +255,7 @@ export default function ProfilePage() {
             />
           </div>
           <div className="space-y-2">
-            <Label>Preferred Name</Label>
+            <Label className="dark:text-[var(--text-tertiary)]">Preferred Name</Label>
             <Input
               value={profile.preferredName || ''}
               onChange={(e) => setProfile((prev) => ({ ...prev, preferredName: e.target.value }))}
@@ -263,11 +263,11 @@ export default function ProfilePage() {
             />
           </div>
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label className="dark:text-[var(--text-tertiary)]">Email</Label>
             <Input value={user?.email || ''} disabled />
           </div>
           <div className="space-y-2">
-            <Label>Phone Number</Label>
+            <Label className="dark:text-[var(--text-tertiary)]">Phone Number</Label>
             <Input
               value={profile.phone || ''}
               onChange={(e) => setProfile((prev) => ({ ...prev, phone: e.target.value }))}
@@ -275,7 +275,7 @@ export default function ProfilePage() {
             />
           </div>
           <div className="space-y-2 md:col-span-2">
-            <Label>Address</Label>
+            <Label className="dark:text-[var(--text-tertiary)]">Address</Label>
             <Input
               value={profile.address || ''}
               onChange={(e) => setProfile((prev) => ({ ...prev, address: e.target.value }))}
@@ -283,7 +283,7 @@ export default function ProfilePage() {
             />
           </div>
           <div className="space-y-2">
-            <Label>Timezone</Label>
+            <Label className="dark:text-[var(--text-tertiary)]">Timezone</Label>
             <Input
               value={profile.timezone || ''}
               onChange={(e) => setProfile((prev) => ({ ...prev, timezone: e.target.value }))}
@@ -292,7 +292,7 @@ export default function ProfilePage() {
             />
           </div>
           <div className="space-y-2">
-            <Label>Preferred Contact Method</Label>
+            <Label className="dark:text-[var(--text-tertiary)]">Preferred Contact Method</Label>
             <select
               value={profile.preferredContactMethod || ''}
               onChange={(e) =>
@@ -322,7 +322,7 @@ export default function ProfilePage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground dark:text-[var(--text-tertiary)]">
             Dark mode can be changed in the Admin panel (Dashboard → theme toggle in the header).
           </p>
         </CardContent>
