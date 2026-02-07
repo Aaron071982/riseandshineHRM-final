@@ -27,6 +27,29 @@ export default async function OnboardingPage() {
     })
   } catch (error) {
     console.error('Admin onboarding: failed to load', error)
+    try {
+      const rbts = await prisma.$queryRaw<
+        Array<{ id: string; firstName: string; lastName: string; email: string | null; phoneNumber: string; updatedAt: Date }>
+      >`SELECT id, "firstName", "lastName", email, "phoneNumber", "updatedAt" FROM rbt_profiles WHERE status = 'HIRED' ORDER BY "updatedAt" DESC`
+      const tasks = await prisma.$queryRaw<
+        Array<{ rbtProfileId: string; taskType: string; isCompleted: boolean }>
+      >`SELECT "rbtProfileId", "taskType", "isCompleted" FROM onboarding_tasks`
+      const tasksByRbt = tasks.reduce((acc, t) => {
+        if (!acc[t.rbtProfileId]) acc[t.rbtProfileId] = []
+        acc[t.rbtProfileId].push({ taskType: t.taskType, isCompleted: t.isCompleted })
+        return acc
+      }, {} as Record<string, Array<{ taskType: string; isCompleted: boolean }>>)
+      hiredRBTs = rbts.map((r) => ({
+        ...r,
+        user: {} as any,
+        onboardingTasks: (tasksByRbt[r.id] || []).map((t) => ({
+          taskType: t.taskType,
+          isCompleted: t.isCompleted,
+        })) as any,
+      })) as RBTWithTasks[]
+    } catch (rawErr) {
+      console.error('Admin onboarding: raw fallback failed', rawErr)
+    }
   }
 
   const rbtOnboardingData = hiredRBTs.map((rbt) => {

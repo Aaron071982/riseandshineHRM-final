@@ -3,6 +3,8 @@ import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import PublicCareersLandingPage from '@/components/public/PublicCareersLandingPage'
 
+export const dynamic = 'force-dynamic'
+
 export default async function Home() {
   try {
     const cookieStore = await cookies()

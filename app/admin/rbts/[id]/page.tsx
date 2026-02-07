@@ -43,7 +43,165 @@ export default async function RBTProfilePage({
     })
   } catch (error) {
     console.error('Admin rbts [id]: failed to load profile', error)
-    notFound()
+    // Fallback: load profile by id via raw SQL so profile page doesn't 404 when Prisma fails
+    try {
+      const [profileRow] = await prisma.$queryRaw<
+        Array<{
+          id: string
+          userId: string
+          firstName: string
+          lastName: string
+          phoneNumber: string
+          email: string | null
+          locationCity: string | null
+          locationState: string | null
+          zipCode: string | null
+          addressLine1: string | null
+          addressLine2: string | null
+          preferredServiceArea: string | null
+          notes: string | null
+          gender: string | null
+          ethnicity: string | null
+          fortyHourCourseCompleted: boolean
+          status: string
+          scheduleCompleted: boolean
+          source: string | null
+          submittedAt: Date | null
+          resumeUrl: string | null
+          resumeFileName: string | null
+          resumeMimeType: string | null
+          resumeSize: number | null
+          availabilityJson: unknown
+          languagesJson: unknown
+          createdAt: Date
+          updatedAt: Date
+          user_role: string
+          user_isActive: boolean
+        }>
+      >`
+        SELECT r.id, r."userId", r."firstName", r."lastName", r."phoneNumber", r.email,
+          r."locationCity", r."locationState", r."zipCode", r."addressLine1", r."addressLine2",
+          r."preferredServiceArea", r.notes, r.gender, r.ethnicity, r."fortyHourCourseCompleted",
+          r.status, r."scheduleCompleted", r.source, r."submittedAt", r."resumeUrl", r."resumeFileName",
+          r."resumeMimeType", r."resumeSize", r."availabilityJson", r."languagesJson",
+          r."createdAt", r."updatedAt", u.role as user_role, u."isActive" as user_isActive
+        FROM rbt_profiles r
+        JOIN users u ON u.id = r."userId"
+        WHERE r.id = ${id}
+      `
+      if (!profileRow) {
+        notFound()
+      }
+      const [interviewsRows, onboardingTasksRows] = await Promise.all([
+        prisma.$queryRaw<
+          Array<{
+            id: string
+            scheduledAt: Date
+            durationMinutes: number
+            interviewerName: string
+            status: string
+            decision: string
+            notes: string | null
+            meetingUrl: string | null
+            reminder_15m_sent_at: Date | null
+          }>
+        >`
+          SELECT id, "scheduledAt", "durationMinutes", "interviewerName", status, decision, notes, "meetingUrl", "reminder_15m_sent_at"
+          FROM interviews WHERE "rbtProfileId" = ${id} ORDER BY "scheduledAt" DESC
+        `,
+        prisma.$queryRaw<
+          Array<{
+            id: string
+            taskType: string
+            title: string
+            description: string | null
+            isCompleted: boolean
+            completedAt: Date | null
+            uploadUrl: string | null
+            documentDownloadUrl: string | null
+            sortOrder: number
+          }>
+        >`
+          SELECT id, "taskType", title, description, "isCompleted", "completedAt", "uploadUrl", "documentDownloadUrl", "sortOrder"
+          FROM onboarding_tasks WHERE "rbtProfileId" = ${id} ORDER BY "sortOrder" ASC
+        `,
+      ])
+      const interviews = (interviewsRows || []).map((i) => ({
+        id: i.id,
+        scheduledAt: i.scheduledAt,
+        durationMinutes: i.durationMinutes,
+        interviewerName: i.interviewerName,
+        status: i.status,
+        decision: i.decision,
+        notes: i.notes,
+        meetingUrl: i.meetingUrl,
+        reminder_15m_sent_at: i.reminder_15m_sent_at,
+        interviewNotes: null,
+      }))
+      const onboardingTasks = (onboardingTasksRows || []).map((t) => ({
+        ...t,
+        rbtProfileId: id,
+        taskType: t.taskType as any,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }))
+      rbtProfile = {
+        id: profileRow.id,
+        userId: profileRow.userId,
+        firstName: profileRow.firstName,
+        lastName: profileRow.lastName,
+        phoneNumber: profileRow.phoneNumber,
+        email: profileRow.email,
+        locationCity: profileRow.locationCity,
+        locationState: profileRow.locationState,
+        zipCode: profileRow.zipCode,
+        addressLine1: profileRow.addressLine1,
+        addressLine2: profileRow.addressLine2,
+        preferredServiceArea: profileRow.preferredServiceArea,
+        notes: profileRow.notes,
+        gender: profileRow.gender,
+        ethnicity: profileRow.ethnicity,
+        fortyHourCourseCompleted: profileRow.fortyHourCourseCompleted,
+        status: profileRow.status as any,
+        scheduleCompleted: profileRow.scheduleCompleted,
+        source: profileRow.source as any,
+        submittedAt: profileRow.submittedAt,
+        resumeUrl: profileRow.resumeUrl,
+        resumeFileName: profileRow.resumeFileName,
+        resumeMimeType: profileRow.resumeMimeType,
+        resumeSize: profileRow.resumeSize,
+        availabilityJson: profileRow.availabilityJson,
+        languagesJson: profileRow.languagesJson,
+        experienceYears: null,
+        experienceYearsDisplay: null,
+        preferredAgeGroupsJson: null,
+        authorizedToWork: null,
+        canPassBackgroundCheck: null,
+        cprFirstAidCertified: null,
+        transportation: null,
+        preferredHoursRange: null,
+        schedulingToken: null,
+        createdAt: profileRow.createdAt,
+        updatedAt: profileRow.updatedAt,
+        user: {
+          id: profileRow.userId,
+          role: profileRow.user_role as any,
+          isActive: profileRow.user_isActive,
+          name: null,
+          phoneNumber: null,
+          email: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        interviews,
+        onboardingTasks,
+        documents: [],
+        onboardingCompletions: [],
+      } as RBTProfileWithRelations
+    } catch (rawErr) {
+      console.error('Admin rbts [id]: raw fallback failed', rawErr)
+      notFound()
+    }
   }
 
   if (!rbtProfile) {

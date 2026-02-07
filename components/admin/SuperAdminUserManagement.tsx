@@ -32,21 +32,25 @@ export default function SuperAdminUserManagement() {
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<UserWithStats[]>([])
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchUsers = async () => {
     try {
       setLoading(true)
+      setError(null)
       const response = await fetch('/api/admin/users')
       if (!response.ok) {
-        showToast('Failed to load users', 'error')
+        setError(response.status === 403 ? 'Not authorized to view users.' : 'Failed to load users.')
+        setUsers([])
         return
       }
 
       const data = await response.json()
-      setUsers(data.users)
-    } catch (error) {
-      console.error('Error fetching users:', error)
-      showToast('Failed to load users', 'error')
+      setUsers(data.users ?? [])
+    } catch (err) {
+      console.error('Error fetching users:', err)
+      setError('Failed to load users.')
+      setUsers([])
     } finally {
       setLoading(false)
     }
@@ -76,11 +80,16 @@ export default function SuperAdminUserManagement() {
         <CardTitle className="text-xl font-bold text-gray-900">User Management</CardTitle>
       </CardHeader>
       <CardContent>
+        {error && (
+          <div className="rounded-md bg-amber-50 dark:bg-[var(--status-warning-bg)] border border-amber-200 dark:border-[var(--status-warning-border)] px-4 py-2 text-sm text-amber-800 dark:text-[var(--status-warning-text)] mb-4">
+            {error}
+          </div>
+        )}
         {loading ? (
           <div className="text-center py-8 text-gray-500">Loading...</div>
-        ) : users.length === 0 ? (
+        ) : users.length === 0 && !error ? (
           <div className="text-center py-8 text-gray-500">No users found</div>
-        ) : (
+        ) : users.length === 0 ? null : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

@@ -13,12 +13,12 @@ export async function POST(request: NextRequest) {
     const sessionToken = cookieStore.get('session')?.value
 
     if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ success: false })
     }
 
     const user = await validateSession(sessionToken)
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ success: false })
     }
 
     const body = await request.json()
@@ -39,23 +39,26 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || null
 
     // Create activity log entry
-    await prisma.activityLog.create({
-      data: {
-        userId: user.id,
-        activityType,
-        action,
-        resourceType: resourceType || null,
-        resourceId: resourceId || null,
-        url: url || null,
-        metadata: metadata || null,
-        ipAddress,
-        userAgent,
-      },
-    })
-
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId: user.id,
+          activityType,
+          action,
+          resourceType: resourceType || null,
+          resourceId: resourceId || null,
+          url: url || null,
+          metadata: metadata || null,
+          ipAddress,
+          userAgent,
+        },
+      })
+    } catch (err) {
+      console.error('Error tracking activity:', err)
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error tracking activity:', error)
-    return NextResponse.json({ error: 'Failed to track activity' }, { status: 500 })
+    console.error('Activity track error:', error)
+    return NextResponse.json({ success: false })
   }
 }

@@ -21,87 +21,92 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Get all users with their latest activity and stats
-    const users = await prisma.user.findMany({
-      include: {
-        profile: true,
-        sessions: {
-          where: {
-            expiresAt: {
-              gt: new Date(),
+    try {
+      // Get all users with their latest activity and stats
+      const users = await prisma.user.findMany({
+        include: {
+          profile: true,
+          sessions: {
+            where: {
+              expiresAt: {
+                gt: new Date(),
+              },
             },
+            orderBy: {
+              lastActiveAt: 'desc',
+            },
+            take: 1,
           },
-          orderBy: {
-            lastActiveAt: 'desc',
+          activities: {
+            orderBy: {
+              createdAt: 'desc',
+            },
+            take: 1,
           },
-          take: 1,
-        },
-        activities: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 1,
-        },
-        _count: {
-          select: {
-            activities: true,
-            sessions: {
-              where: {
-                expiresAt: {
-                  gt: new Date(),
+          _count: {
+            select: {
+              activities: true,
+              sessions: {
+                where: {
+                  expiresAt: {
+                    gt: new Date(),
+                  },
                 },
               },
             },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    })
-
-    // Get last login and last activity for each user
-    const usersWithStats = await Promise.all(
-      users.map(async (u) => {
-        const lastLogin = await prisma.activityLog.findFirst({
-          where: {
-            userId: u.id,
-            activityType: 'LOGIN',
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        })
-
-        const lastActivity = await prisma.activityLog.findFirst({
-          where: {
-            userId: u.id,
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        })
-
-        return {
-          id: u.id,
-          email: u.email,
-          name: u.name,
-          role: u.role,
-          isActive: u.isActive,
-          createdAt: u.createdAt,
-          profile: u.profile,
-          lastLogin: lastLogin?.createdAt || null,
-          lastActivity: lastActivity?.createdAt || null,
-          totalActivities: u._count.activities,
-          activeSessions: u._count.sessions,
-        }
+        orderBy: {
+          createdAt: 'desc',
+        },
       })
-    )
 
-    return NextResponse.json({ users: usersWithStats })
+      // Get last login and last activity for each user
+      const usersWithStats = await Promise.all(
+        users.map(async (u) => {
+          const lastLogin = await prisma.activityLog.findFirst({
+            where: {
+              userId: u.id,
+              activityType: 'LOGIN',
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          })
+
+          const lastActivity = await prisma.activityLog.findFirst({
+            where: {
+              userId: u.id,
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          })
+
+          return {
+            id: u.id,
+            email: u.email,
+            name: u.name,
+            role: u.role,
+            isActive: u.isActive,
+            createdAt: u.createdAt,
+            profile: u.profile,
+            lastLogin: lastLogin?.createdAt || null,
+            lastActivity: lastActivity?.createdAt || null,
+            totalActivities: u._count.activities,
+            activeSessions: u._count.sessions,
+          }
+        })
+      )
+
+      return NextResponse.json({ users: usersWithStats })
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      return NextResponse.json({ users: [] })
+    }
   } catch (error) {
-    console.error('Error fetching users:', error)
-    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
+    console.error('Admin users GET error:', error)
+    return NextResponse.json({ error: 'Unauthorized or forbidden' }, { status: 401 })
   }
 }
 

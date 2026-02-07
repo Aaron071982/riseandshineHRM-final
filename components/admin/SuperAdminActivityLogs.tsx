@@ -54,10 +54,12 @@ export default function SuperAdminActivityLogs() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [search, setSearch] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   const fetchActivities = async (page = 1) => {
     try {
       setLoading(true)
+      setError(null)
       const params = new URLSearchParams({
         page: page.toString(),
         limit: pagination.limit.toString(),
@@ -71,16 +73,19 @@ export default function SuperAdminActivityLogs() {
 
       const response = await fetch(`/api/admin/activity-logs?${params}`)
       if (!response.ok) {
-        showToast('Failed to load activity logs', 'error')
+        setError(response.status === 403 ? 'Not authorized to view activity logs.' : 'Failed to load activity logs.')
+        setActivities([])
+        setPagination({ page: 1, limit: 50, total: 0, totalPages: 0 })
         return
       }
 
       const data: ActivityLogsResponse = await response.json()
       setActivities(data.activities)
       setPagination(data.pagination)
-    } catch (error) {
-      console.error('Error fetching activities:', error)
-      showToast('Failed to load activity logs', 'error')
+    } catch (err) {
+      console.error('Error fetching activities:', err)
+      setError('Failed to load activity logs.')
+      setActivities([])
     } finally {
       setLoading(false)
     }
@@ -148,6 +153,11 @@ export default function SuperAdminActivityLogs() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {error && (
+          <div className="rounded-md bg-amber-50 dark:bg-[var(--status-warning-bg)] border border-amber-200 dark:border-[var(--status-warning-border)] px-4 py-2 text-sm text-amber-800 dark:text-[var(--status-warning-text)]">
+            {error}
+          </div>
+        )}
         {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <Input

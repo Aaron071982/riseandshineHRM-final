@@ -24,35 +24,66 @@ export async function GET(request: NextRequest) {
     }
 
     LOG(`${logId} session valid`, { userId: user.id })
-    await prisma.session.updateMany({
-      where: { token: sessionToken },
-      data: {
-        lastActiveAt: new Date(),
-        ipAddress:
-          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-          request.headers.get('x-real-ip') ||
-          undefined,
-      },
-    })
-
-    const dbUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      include: {
-        profile: true,
-        sessions: {
-          orderBy: { lastActiveAt: 'desc' },
+    try {
+      await prisma.session.updateMany({
+        where: { token: sessionToken },
+        data: {
+          lastActiveAt: new Date(),
+          ipAddress:
+            request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+            request.headers.get('x-real-ip') ||
+            undefined,
         },
-      },
-    })
+      })
+    } catch (_) {
+      // Non-fatal: continue with minimal response
+    }
+
+    let dbUser: Awaited<ReturnType<typeof prisma.user.findUnique<{ include: { profile: true; sessions: true } }>>> | null = null
+    try {
+      dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        include: {
+          profile: true,
+          sessions: {
+            orderBy: { lastActiveAt: 'desc' },
+          },
+        },
+      })
+    } catch (dbError) {
+      console.error('[auth][profile] GET Prisma error', dbError)
+      // Return minimal payload so Profile page still loads (role, email)
+      return NextResponse.json({
+        user: {
+          id: user.id,
+          email: user.email ?? null,
+          phoneNumber: user.phoneNumber ?? null,
+          role: user.role,
+          isActive: true,
+        },
+        profile: null,
+        sessions: [],
+      })
+    }
 
     if (!dbUser) {
       LOG(`${logId} user not found in DB`, { userId: user.id })
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({
+        user: {
+          id: user.id,
+          email: user.email ?? null,
+          phoneNumber: user.phoneNumber ?? null,
+          role: user.role,
+          isActive: true,
+        },
+        profile: null,
+        sessions: [],
+      })
     }
 
     LOG(`${logId} success`, { userId: dbUser.id, role: dbUser.role })
 
-    const sessions = dbUser.sessions.map((session) => ({
+    const sessions = (dbUser.sessions as Array<{ id: string; device: string | null; browser: string | null; ipAddress: string | null; lastActiveAt: Date | null; createdAt: Date; expiresAt: Date; token: string }>).map((session) => ({
       id: session.id,
       device: session.device,
       browser: session.browser,

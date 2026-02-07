@@ -37,6 +37,26 @@ export default async function InterviewsPage() {
     })
   } catch (error) {
     console.error('RBT interviews: failed to load', error)
+    try {
+      const raw = await prisma.$queryRaw<
+        Array<{ id: string; scheduledAt: Date; durationMinutes: number; interviewerName: string; status: string; decision: string; meetingUrl: string | null; notes: string | null }>
+      >`
+        SELECT id, "scheduledAt", "durationMinutes", "interviewerName", status, decision, "meetingUrl", notes
+        FROM interviews
+        WHERE "rbtProfileId" = ${user.rbtProfileId}
+        ORDER BY "scheduledAt" DESC
+      `
+      interviews = raw.map((r) => ({
+        ...r,
+        rbtProfileId: user.rbtProfileId!,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        reminderSentAt: null,
+        reminder_15m_sent_at: null,
+      }))
+    } catch (rawErr) {
+      console.error('RBT interviews: raw fallback failed', rawErr)
+    }
   }
 
   const upcomingInterviews = interviews.filter(i => 

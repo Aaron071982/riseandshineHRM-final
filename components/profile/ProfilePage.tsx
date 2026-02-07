@@ -68,12 +68,15 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>({})
   const [originalProfile, setOriginalProfile] = useState<ProfileData>({})
 
+  const [profileError, setProfileError] = useState<string | null>(null)
   const fetchProfile = useCallback(async () => {
     try {
       setLoading(true)
+      setProfileError(null)
       const response = await fetch('/api/profile')
       if (!response.ok) {
-        showToast('Failed to load profile', 'error')
+        const data = await response.json().catch(() => ({}))
+        setProfileError(data.error || 'Failed to load profile')
         return
       }
       const data = await response.json()
@@ -83,11 +86,11 @@ export default function ProfilePage() {
       setOriginalProfile(normalizedProfile)
     } catch (error) {
       console.error('Error loading profile:', error)
-      showToast('Failed to load profile', 'error')
+      setProfileError('Failed to load profile')
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [])
 
   useEffect(() => {
     fetchProfile()
@@ -149,10 +152,20 @@ export default function ProfilePage() {
   }
 
 
-  if (loading) {
+  if (loading && !user) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="text-gray-500 dark:text-[var(--text-tertiary)]">Loading profile...</div>
+      </div>
+    )
+  }
+
+  if (profileError && !user) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-[var(--status-warning-bg)] dark:border-[var(--status-warning-border)] p-6 text-center">
+        <p className="font-medium text-amber-800 dark:text-[var(--status-warning-text)]">{profileError}</p>
+        <p className="text-sm text-amber-700 dark:text-[var(--status-warning-text)] mt-2">Try refreshing the page or logging in again.</p>
+        <Button variant="outline" className="mt-4" onClick={() => fetchProfile()}>Retry</Button>
       </div>
     )
   }

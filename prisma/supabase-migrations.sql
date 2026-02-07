@@ -51,12 +51,26 @@ END $$;
 ALTER TABLE "user_profiles"
 ADD COLUMN IF NOT EXISTS "themePreference" TEXT;
 
--- 4) Align rbt_profiles with Prisma schema (fixes verify-otp / profile 500s if columns were missing)
+-- 4) Align rbt_profiles with Prisma schema (fixes "data could not be loaded" / 500s)
+--    Run this block in the SAME Supabase project as your app's DATABASE_URL.
 ALTER TABLE "rbt_profiles"
 ADD COLUMN IF NOT EXISTS "experienceYears" INTEGER,
-ADD COLUMN IF NOT EXISTS "experienceYearsDisplay" TEXT;
+ADD COLUMN IF NOT EXISTS "experienceYearsDisplay" TEXT,
+ADD COLUMN IF NOT EXISTS "preferredAgeGroupsJson" JSONB,
+ADD COLUMN IF NOT EXISTS "authorizedToWork" BOOLEAN,
+ADD COLUMN IF NOT EXISTS "canPassBackgroundCheck" BOOLEAN,
+ADD COLUMN IF NOT EXISTS "cprFirstAidCertified" TEXT,
+ADD COLUMN IF NOT EXISTS "transportation" BOOLEAN,
+ADD COLUMN IF NOT EXISTS "preferredHoursRange" TEXT,
+ADD COLUMN IF NOT EXISTS "schedulingToken" TEXT;
 
 -- 5) Ensure admin can log in: set aaronsiam21@gmail.com to ADMIN (safe to re-run)
 UPDATE "users"
 SET role = 'ADMIN', "isActive" = true
 WHERE email = 'aaronsiam21@gmail.com';
+
+-- 6) Verify data (optional: run to confirm row counts)
+-- SELECT 'rbt_profiles' AS tbl, COUNT(*) AS cnt FROM rbt_profiles
+-- UNION ALL SELECT 'onboarding_tasks', COUNT(*) FROM onboarding_tasks
+-- UNION ALL SELECT 'interviews', COUNT(*) FROM interviews
+-- UNION ALL SELECT 'onboarding_completions', COUNT(*) FROM onboarding_completions;

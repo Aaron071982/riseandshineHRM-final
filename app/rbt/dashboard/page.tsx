@@ -132,7 +132,7 @@ async function RBTDashboardPageInner() {
   }
 
   // Check if onboarding is complete with error handling
-  let onboardingTasks = []
+  let onboardingTasks: Awaited<ReturnType<typeof prisma.onboardingTask.findMany>> = []
   try {
     onboardingTasks = await prisma.onboardingTask.findMany({
       where: {
@@ -144,19 +144,40 @@ async function RBTDashboardPageInner() {
     })
   } catch (error) {
     logError('Failed to fetch onboarding tasks', error)
-    return (
-      <div className="container mx-auto p-6 max-w-4xl">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <h1 className="text-xl font-bold text-red-800 mb-2">Database Error</h1>
-          <p className="text-red-700">
-            Unable to load your onboarding tasks. Please try refreshing the page.
-          </p>
-          <p className="text-sm text-red-600 mt-2">
-            If this problem persists, please contact support.
-          </p>
+    try {
+      const raw = await prisma.$queryRaw<
+        Array<{ id: string; taskType: string; title: string | null; description: string | null; isCompleted: boolean; sortOrder: number; documentDownloadUrl: string | null }>
+      >`
+        SELECT id, "taskType", title, description, "isCompleted", "sortOrder", "documentDownloadUrl"
+        FROM onboarding_tasks
+        WHERE "rbtProfileId" = ${user.rbtProfileId}
+        ORDER BY "sortOrder" ASC
+      `
+      onboardingTasks = raw.map((r) => ({
+        id: r.id,
+        rbtProfileId: user.rbtProfileId!,
+        taskType: r.taskType as any,
+        title: r.title,
+        description: r.description,
+        isCompleted: r.isCompleted,
+        sortOrder: r.sortOrder,
+        documentDownloadUrl: r.documentDownloadUrl,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }))
+    } catch (rawErr) {
+      logError('Raw fallback for onboarding tasks failed', rawErr)
+      return (
+        <div className="container mx-auto p-6 max-w-4xl">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 dark:bg-[var(--status-warning-bg)] dark:border-[var(--status-warning-border)]">
+            <h1 className="text-xl font-bold text-amber-800 dark:text-[var(--status-warning-text)] mb-2">Data loading issue</h1>
+            <p className="text-amber-700 dark:text-[var(--status-warning-text)]">
+              Your data is still in the database. Ask your admin to run the migration in Supabase (prisma/supabase-migrations.sql, sections 4 and 5), then refresh.
+            </p>
+          </div>
         </div>
-      </div>
-    )
+      )
+    }
   }
 
   // If no tasks exist but RBT is hired, create them (safety check)

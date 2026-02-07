@@ -26,6 +26,45 @@ export default async function InterviewsPage() {
     })
   } catch (error) {
     console.error('Admin interviews: failed to load', error)
+    try {
+      const raw = await prisma.$queryRaw<
+        Array<{
+          id: string
+          scheduledAt: Date
+          durationMinutes: number
+          interviewerName: string
+          status: string
+          decision: string
+          meetingUrl: string | null
+          rbtProfileId: string
+          firstName: string
+          lastName: string
+        }>
+      >`
+        SELECT i.id, i."scheduledAt", i."durationMinutes", i."interviewerName", i.status, i.decision, i."meetingUrl", i."rbtProfileId",
+               r."firstName", r."lastName"
+        FROM interviews i
+        JOIN rbt_profiles r ON r.id = i."rbtProfileId"
+        ORDER BY i."scheduledAt" DESC
+      `
+      interviews = raw.map((row) => ({
+        id: row.id,
+        scheduledAt: row.scheduledAt,
+        durationMinutes: row.durationMinutes,
+        interviewerName: row.interviewerName,
+        status: row.status,
+        decision: row.decision,
+        meetingUrl: row.meetingUrl,
+        rbtProfileId: row.rbtProfileId,
+        rbtProfile: {
+          id: row.rbtProfileId,
+          firstName: row.firstName,
+          lastName: row.lastName,
+        } as any,
+      })) as InterviewWithRbtProfile[]
+    } catch (rawErr) {
+      console.error('Admin interviews: raw fallback failed', rawErr)
+    }
   }
 
   const statusColors: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {

@@ -88,7 +88,72 @@ export default async function AdminDashboard() {
       console.error('🔴 Prisma P1001: Cannot reach database server')
       console.error('   DATABASE_URL host:', process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'NOT SET')
     }
-    dashboardLoadError = true
+    // Fallback: load dashboard stats via raw SQL when Prisma fails (e.g. missing columns)
+    try {
+      const now = new Date()
+      const [totalRows, statusRows, interviewRows, hireRows, onboardingRows] = await Promise.all([
+        prisma.$queryRaw<[{ count: bigint }]>`SELECT COUNT(*) as count FROM rbt_profiles`,
+        prisma.$queryRaw<Array<{ status: string; _count: bigint }>>`
+          SELECT status, COUNT(*)::bigint as _count FROM rbt_profiles GROUP BY status
+        `,
+        prisma.$queryRaw<
+          Array<{
+            id: string
+            scheduledAt: Date
+            durationMinutes: number
+            interviewerName: string
+            status: string
+            meetingUrl: string | null
+            rbtProfileId: string
+            firstName: string
+            lastName: string
+          }>
+        >`
+          SELECT i.id, i."scheduledAt", i."durationMinutes", i."interviewerName", i.status, i."meetingUrl", i."rbtProfileId",
+                 r."firstName", r."lastName"
+          FROM interviews i
+          JOIN rbt_profiles r ON r.id = i."rbtProfileId"
+          WHERE i.status = 'SCHEDULED' AND i."scheduledAt" >= ${now}
+          ORDER BY i."scheduledAt" ASC
+          LIMIT 50
+        `,
+        prisma.$queryRaw<
+          Array<{ id: string; firstName: string; lastName: string; email: string | null; updatedAt: Date }>
+        >`
+          SELECT id, "firstName", "lastName", email, "updatedAt"
+          FROM rbt_profiles
+          WHERE status = 'HIRED'
+          ORDER BY "updatedAt" DESC
+          LIMIT 5
+        `,
+        prisma.$queryRaw<Array<{ rbtProfileId: string }>>`
+          SELECT "rbtProfileId" FROM onboarding_tasks WHERE "isCompleted" = false GROUP BY "rbtProfileId"
+        `,
+      ])
+      totalCandidates = Number(totalRows[0]?.count ?? 0)
+      candidatesByStatus = statusRows.map((r) => ({ status: r.status, _count: Number(r._count) }))
+      upcomingInterviews = interviewRows.map((row) => ({
+        id: row.id,
+        scheduledAt: row.scheduledAt,
+        durationMinutes: row.durationMinutes,
+        interviewerName: row.interviewerName,
+        status: row.status,
+        meetingUrl: row.meetingUrl,
+        rbtProfileId: row.rbtProfileId,
+        rbtProfile: { id: row.rbtProfileId, firstName: row.firstName, lastName: row.lastName },
+      }))
+      recentHires = hireRows.map((row) => ({
+        id: row.id,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        email: row.email,
+        updatedAt: row.updatedAt,
+      }))
+      pendingOnboarding = onboardingRows.map((r) => ({ rbtProfileId: r.rbtProfileId, _count: { id: 1 } }))
+    } catch (rawError) {
+      console.error('Dashboard raw fallback failed', rawError)
+      dashboardLoadError = true
+    }
   }
 
   const statusCounts = candidatesByStatus.reduce((acc, item) => {
