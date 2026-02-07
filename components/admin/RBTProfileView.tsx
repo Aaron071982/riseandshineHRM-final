@@ -309,18 +309,13 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     setConfirmDialogOpen(true)
   }
 
-  const deleteConfirmMatch =
-    deleteConfirmInput.trim().toUpperCase() === 'DELETE' ||
-    deleteConfirmInput.trim() === `${rbtProfile.firstName} ${rbtProfile.lastName}` ||
-    (rbtProfile.email && deleteConfirmInput.trim().toLowerCase() === rbtProfile.email.toLowerCase())
-
   const handleDeleteRBT = () => {
     setDeleteStep(1)
     setDeleteConfirmInput('')
     setConfirmMessage(
       `This will permanently delete ${rbtProfile.firstName} ${rbtProfile.lastName} and all associated data (interviews, documents, audit log). This action cannot be undone. Click "Continue" to confirm.`
     )
-    setConfirmAction(() => {
+    setConfirmAction(async () => {
       setDeleteStep(2)
       setConfirmMessage(`Type DELETE or the candidate's full name or email to enable the delete button.`)
       setConfirmAction(null)
@@ -463,6 +458,11 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   const [pendingDocumentUpload, setPendingDocumentUpload] = useState<File[]>([])
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0)
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
+
+  const deleteConfirmMatch =
+    deleteConfirmInput.trim().toUpperCase() === 'DELETE' ||
+    deleteConfirmInput.trim() === `${rbtProfile.firstName} ${rbtProfile.lastName}` ||
+    (rbtProfile.email && deleteConfirmInput.trim().toLowerCase() === rbtProfile.email.toLowerCase())
 
   const handleDocumentUploadClick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
