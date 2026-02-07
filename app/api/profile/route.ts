@@ -39,7 +39,14 @@ export async function GET(request: NextRequest) {
       // Non-fatal: continue with minimal response
     }
 
-    let dbUser: Awaited<ReturnType<typeof prisma.user.findUnique<{ include: { profile: true; sessions: true } }>>> | null = null
+    let dbUser: Awaited<
+      ReturnType<
+        typeof prisma.user.findUnique<{
+          where: { id: string }
+          include: { profile: true; sessions: true }
+        }>
+      >
+    > | null = null
     try {
       dbUser = await prisma.user.findUnique({
         where: { id: user.id },

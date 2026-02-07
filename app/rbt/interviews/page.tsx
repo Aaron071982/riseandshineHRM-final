@@ -53,7 +53,7 @@ export default async function InterviewsPage() {
         updatedAt: new Date(),
         reminderSentAt: null,
         reminder_15m_sent_at: null,
-      }))
+      })) as typeof interviews
     } catch (rawErr) {
       console.error('RBT interviews: raw fallback failed', rawErr)
     }
