@@ -11,7 +11,7 @@ const LOG = (msg: string, data?: object) =>
 async function findUserByEmailWithProfile(
   email: string | null,
   userId?: string
-): Promise<{ id: string; email: string; role: string; isActive: boolean; rbtProfile?: { id: string; email: string | null; status: string } | null } | null> {
+): Promise<{ id: string; email: string | null; role: string; isActive: boolean; rbtProfile?: { id: string; email: string | null; status: string } | null } | null> {
   const include = { rbtProfile: true } as const
   try {
     if (userId) {

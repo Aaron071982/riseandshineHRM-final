@@ -78,9 +78,13 @@ export async function validateSession(token: string): Promise<SessionUser | null
     log('session expired', { expiresAt: session.expiresAt.toISOString() })
     return null
   }
-  log('valid', { userId: session.user.id, role: session.user.role })
+  type SessionWithUser = typeof session & {
+    user: { id: string; role: string; phoneNumber: string | null; name: string | null; email: string | null; rbtProfile?: { id: string } | null }
+  }
+  const sessionWithUser = session as SessionWithUser
+  log('valid', { userId: sessionWithUser.user.id, role: sessionWithUser.user.role })
 
-  const user = session.user as typeof session.user & { rbtProfile?: { id: string } | null }
+  const { user } = sessionWithUser
   return {
     id: user.id,
     phoneNumber: user.phoneNumber,

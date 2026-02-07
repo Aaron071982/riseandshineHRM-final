@@ -57,6 +57,7 @@ export default function PdfAcroFormViewer({
   const retryCountRef = useRef(0)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
 
+  const loadKeyStable = documentId ?? documentTitle ?? 'default'
   useEffect(() => {
     if (!pdfData || pdfData.length === 0) {
       console.error('[PdfAcroFormViewer] PDF data is empty or missing')
@@ -66,7 +67,7 @@ export default function PdfAcroFormViewer({
     }
 
     // Create stable load key that changes only when document truly changes
-    const loadKey = `${documentId || documentTitle}:${pdfData.length}`
+    const loadKey = `${loadKeyStable}:${pdfData.length}`
 
     // Check if already loaded
     if (loadedKeyRef.current === loadKey) {
@@ -91,9 +92,13 @@ export default function PdfAcroFormViewer({
 
     console.log('[PdfAcroFormViewer] Starting PDF load for key:', loadKey)
 
+    // Capture container ref for cleanup (ref may change by the time cleanup runs)
+    let containerForCleanup: HTMLDivElement | null = null
+
     // Function to attempt loading
     const attemptLoad = () => {
       const container = containerRef.current
+      if (container) containerForCleanup = container
       if (!container) {
         retryCountRef.current++
         if (retryCountRef.current > 20) {
@@ -139,22 +144,20 @@ export default function PdfAcroFormViewer({
       attemptLoad()
     })
 
-    // Cleanup function
+    // Cleanup function (use containerForCleanup captured during effect run)
     return () => {
       loadingRef.current = false
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current)
         retryTimeoutRef.current = null
       }
-      // Cleanup blob URLs
-      const container = containerRef.current
-      if (container) {
-        if ((container as any).__pdfBlobUrl) {
-          URL.revokeObjectURL((container as any).__pdfBlobUrl)
-        }
+      if (containerForCleanup && (containerForCleanup as any).__pdfBlobUrl) {
+        URL.revokeObjectURL((containerForCleanup as any).__pdfBlobUrl)
       }
     }
-  }, [pdfData, documentId || documentTitle])
+    // Intentionally omit loadPdf to avoid effect re-running on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadKeyStable, pdfData drive reload
+  }, [pdfData, loadKeyStable])
 
   const loadPdf = async () => {
     // Container and pdfData checks are done in useEffect

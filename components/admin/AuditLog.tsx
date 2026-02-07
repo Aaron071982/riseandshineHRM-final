@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,11 +49,7 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
     notes: '',
   })
 
-  useEffect(() => {
-    fetchAuditLogs()
-  }, [rbtProfileId])
-
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/admin/rbts/${rbtProfileId}/audit-logs`)
@@ -69,7 +65,11 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [rbtProfileId, showToast])
+
+  useEffect(() => {
+    fetchAuditLogs()
+  }, [fetchAuditLogs])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

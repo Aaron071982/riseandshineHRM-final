@@ -489,6 +489,7 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
                   {task.isCompleted && task.uploadUrl && (
                     <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                       <p className="text-sm text-gray-600 mb-2">Your signature:</p>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- signature URL is dynamic/signed */}
                       <img
                         src={task.uploadUrl}
                         alt="Signature"

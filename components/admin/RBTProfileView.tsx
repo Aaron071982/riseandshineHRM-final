@@ -1203,6 +1203,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                     {task.taskType === 'SIGNATURE' && task.isCompleted && task.uploadUrl && (
                       <div className="mt-4 ml-7 p-4 bg-gray-50 rounded-lg">
                         <p className="text-sm font-medium text-gray-700 mb-2">Digital Signature:</p>
+                        {/* eslint-disable-next-line @next/next/no-img-element -- signature URL is dynamic/signed */}
                         <img
                           src={task.uploadUrl}
                           alt="Signature"
@@ -1324,6 +1325,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                                 {(completion.acknowledgmentJson as any)?.signatureData && (
                                   <div className="border rounded p-2 bg-gray-50">
                                     <p className="text-xs text-gray-600 mb-1">Signature:</p>
+                                    {/* eslint-disable-next-line @next/next/no-img-element -- data URL from signature pad */}
                                     <img
                                       src={(completion.acknowledgmentJson as any).signatureData}
                                       alt="Signature"

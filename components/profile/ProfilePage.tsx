@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,11 +68,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>({})
   const [originalProfile, setOriginalProfile] = useState<ProfileData>({})
 
-  useEffect(() => {
-    fetchProfile()
-  }, [])
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/profile')
@@ -91,7 +87,11 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [showToast])
+
+  useEffect(() => {
+    fetchProfile()
+  }, [fetchProfile])
 
   const isDirty = useMemo(
     () => JSON.stringify(profile) !== JSON.stringify(originalProfile),

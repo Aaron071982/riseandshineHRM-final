@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -104,17 +104,7 @@ export default function PublicRBTApplicationWizard() {
     cprCard: null,
   })
 
-  // Auto-save draft
-  useEffect(() => {
-    if (currentStep > 1 && data.email) {
-      const timeoutId = setTimeout(async () => {
-        await saveDraft()
-      }, 1000)
-      return () => clearTimeout(timeoutId)
-    }
-  }, [data, currentStep])
-
-  const saveDraft = async () => {
+  const saveDraft = useCallback(async () => {
     try {
       const response = await fetch('/api/public/apply/draft', {
         method: 'POST',
@@ -135,7 +125,17 @@ export default function PublicRBTApplicationWizard() {
     } catch (error) {
       console.error('Error saving draft:', error)
     }
-  }
+  }, [data, draftToken])
+
+  // Auto-save draft
+  useEffect(() => {
+    if (currentStep > 1 && data.email) {
+      const timeoutId = setTimeout(() => {
+        saveDraft()
+      }, 1000)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [currentStep, data.email, saveDraft])
 
   const validateStep = (step: number): boolean => {
     setError('')
