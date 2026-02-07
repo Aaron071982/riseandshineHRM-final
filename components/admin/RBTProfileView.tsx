@@ -733,7 +733,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 </div>
                 <Button
                   variant="outline"
-                  className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]"
+                  className="flex items-center gap-2 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]"
                   onClick={async () => {
                     try {
                       const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/resume`)
@@ -756,7 +756,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                       showToast('An error occurred while downloading the resume', 'error')
                     }
                   }}
-                  className="flex items-center gap-2"
                 >
                   <Download className="h-4 w-4" />
                   Download Resume
@@ -1283,7 +1282,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                             <Button
                               size="sm"
                               variant="outline"
-                              className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]"
+                              className="flex items-center gap-2 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]"
                               onClick={async () => {
                                 try {
                                   const response = await fetch(
@@ -1309,7 +1308,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                                   showToast('An error occurred while downloading the PDF', 'error')
                                 }
                               }}
-                              className="flex items-center gap-2"
                             >
                               <Download className="w-4 h-4" />
                               Download PDF
