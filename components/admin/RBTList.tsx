@@ -37,6 +37,7 @@ interface RBTProfile {
 
 interface RBTListProps {
   initialRbts: RBTProfile[]
+  loadError?: boolean
 }
 
 const statusColors: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {
@@ -50,7 +51,7 @@ const statusColors: Record<string, { bg: string; text: string; darkBg: string; d
   REJECTED: { bg: 'bg-red-50', text: 'text-red-700', darkBg: 'dark:bg-[var(--status-rejected-bg)]', darkText: 'dark:text-[var(--status-rejected-text)]' },
 }
 
-export default function RBTList({ initialRbts }: RBTListProps) {
+export default function RBTList({ initialRbts, loadError }: RBTListProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('search') || '')
@@ -183,8 +184,17 @@ export default function RBTList({ initialRbts }: RBTListProps) {
       {filteredRbts.length === 0 ? (
         <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
           <CardContent className="p-12 text-center">
-            <p className="text-lg font-medium text-gray-700 dark:text-[var(--text-secondary)] mb-2">No candidates found</p>
-            <p className="text-gray-500 dark:text-[var(--text-tertiary)]">Try adjusting your search or filter criteria</p>
+            {loadError ? (
+              <>
+                <p className="text-lg font-medium text-amber-700 dark:text-[var(--status-warning-text)] mb-2">Data failed to load</p>
+                <p className="text-gray-500 dark:text-[var(--text-tertiary)]">Run the migration in Supabase (prisma/supabase-migrations.sql, sections 4 and 5), then refresh.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-medium text-gray-700 dark:text-[var(--text-secondary)] mb-2">No candidates found</p>
+                <p className="text-gray-500 dark:text-[var(--text-tertiary)]">Try adjusting your search or filter criteria</p>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (

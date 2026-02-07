@@ -1,4 +1,6 @@
--- Run this in Supabase SQL Editor (Dashboard → SQL Editor → New query).
+-- Run this ENTIRE file in Supabase SQL Editor (Dashboard → SQL Editor → New query).
+-- Use the SAME Supabase project that your production app uses (check DATABASE_URL in Vercel).
+-- If RBTs/candidates show as zero, run at least sections 4 and 5—your data is still in the DB.
 -- Order matters: add column first, then create table with FKs.
 
 -- 1) Add 15m reminder column to interviews

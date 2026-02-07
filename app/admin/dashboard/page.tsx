@@ -30,6 +30,7 @@ export default async function AdminDashboard() {
   let upcomingInterviews: any[] = []
   let recentHires: any[] = []
   let pendingOnboarding: Array<{ rbtProfileId: string; _count: { id: number } }> = []
+  let dashboardLoadError = false
 
   try {
     const results = await Promise.all([
@@ -87,7 +88,7 @@ export default async function AdminDashboard() {
       console.error('🔴 Prisma P1001: Cannot reach database server')
       console.error('   DATABASE_URL host:', process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'NOT SET')
     }
-    // Do not rethrow: render dashboard with empty stats so the page loads; user can try again
+    dashboardLoadError = true
   }
 
   const statusCounts = candidatesByStatus.reduce((acc, item) => {
@@ -99,6 +100,12 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-8">
+      {dashboardLoadError && (
+        <div className="rounded-lg border-2 border-amber-200 bg-amber-50 dark:bg-[var(--status-warning-bg)] dark:border-[var(--status-warning-border)] p-4 text-amber-900 dark:text-[var(--status-warning-text)]">
+          <p className="font-semibold">Data could not be loaded</p>
+          <p className="text-sm mt-1">Your data is still in the database. Run the migration in Supabase SQL Editor: open prisma/supabase-migrations.sql and run the whole file (or at least sections 4 and 5). Use the same Supabase project as your production DATABASE_URL. Then refresh.</p>
+        </div>
+      )}
       {/* Header with gradient background */}
       <div className="dashboard-banner relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-500 via-orange-400 to-orange-300 p-8 shadow-lg">
         {/* Decorative bubbles */}
