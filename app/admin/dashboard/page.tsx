@@ -13,10 +13,15 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function AdminDashboard() {
-  // Get current admin user
-  const cookieStore = await cookies()
-  const sessionToken = cookieStore.get('session')?.value
-  const user = sessionToken ? await validateSession(sessionToken) : null
+  // Get current admin user (guard so session/DB failure doesn't crash the page)
+  let user: Awaited<ReturnType<typeof validateSession>> = null
+  try {
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get('session')?.value
+    user = sessionToken ? await validateSession(sessionToken) : null
+  } catch (e) {
+    console.error('Admin dashboard: session check failed', e)
+  }
   const adminEmail = user?.email || ''
 
   // Fetch statistics with error handling

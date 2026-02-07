@@ -8,18 +8,23 @@ export default async function AdminLayoutWrapper({
 }: {
   children: React.ReactNode
 }) {
-  const cookieStore = await cookies()
-  const sessionToken = cookieStore.get('session')?.value
+  try {
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get('session')?.value
 
-  if (!sessionToken) {
+    if (!sessionToken) {
+      redirect('/')
+    }
+
+    const user = await validateSession(sessionToken)
+    if (!user || user.role !== 'ADMIN') {
+      redirect('/')
+    }
+
+    return <AdminLayout>{children}</AdminLayout>
+  } catch (e) {
+    console.error('Admin layout: session validation failed', e)
     redirect('/')
   }
-
-  const user = await validateSession(sessionToken)
-  if (!user || user.role !== 'ADMIN') {
-    redirect('/')
-  }
-
-  return <AdminLayout>{children}</AdminLayout>
 }
 
