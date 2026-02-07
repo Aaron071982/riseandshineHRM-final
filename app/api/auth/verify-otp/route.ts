@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTPEmail } from '@/lib/email-otp'
 import { createSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
 
 const LOG = (msg: string, data?: object) =>
   console.log('[auth][verify-otp]', msg, data ?? '')
@@ -187,14 +186,6 @@ export async function POST(request: NextRequest) {
       browser,
       ipAddress,
     })
-    const cookieStore = await cookies()
-    cookieStore.set('session', sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60, // 30 days
-      path: '/',
-    })
 
     try {
       await prisma.activityLog.create({
@@ -217,11 +208,20 @@ export async function POST(request: NextRequest) {
     }
 
     LOG(`${logId} success`, { userId: user.id, role: user.role })
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       role: user.role,
       userId: user.id,
     })
+    // Set cookie on the response we return so it is always sent (avoids redirect-to-home bug)
+    response.cookies.set('session', sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60, // 30 days
+      path: '/',
+    })
+    return response
   } catch (error: unknown) {
     const err = error as { message?: string; code?: string; meta?: unknown; stack?: string }
     console.error('[auth][verify-otp] Error verifying OTP', {

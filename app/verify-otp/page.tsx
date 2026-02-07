@@ -48,12 +48,16 @@ export default function VerifyOTPPage() {
       sessionStorage.removeItem('pendingEmail')
       sessionStorage.removeItem('devOTP')
 
-      // Redirect based on role
+      // Full-page redirect so the browser sends the new session cookie (router.push can miss it)
       if (data.role === 'ADMIN') {
-        router.push('/admin/dashboard')
-      } else if (data.role === 'RBT') {
-        router.push('/rbt/dashboard')
-      } else {
+        window.location.href = '/admin/dashboard'
+        return
+      }
+      if (data.role === 'RBT') {
+        window.location.href = '/rbt/dashboard'
+        return
+      }
+      {
         setError('Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.')
         setLoading(false)
       }
