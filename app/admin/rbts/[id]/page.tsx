@@ -128,6 +128,7 @@ export default async function RBTProfilePage({
       ])
       const interviews = (interviewsRows || []).map((i) => ({
         id: i.id,
+        rbtProfileId: id,
         scheduledAt: i.scheduledAt,
         durationMinutes: i.durationMinutes,
         interviewerName: i.interviewerName,
@@ -135,7 +136,10 @@ export default async function RBTProfilePage({
         decision: i.decision,
         notes: i.notes,
         meetingUrl: i.meetingUrl,
+        reminderSentAt: null,
         reminder_15m_sent_at: i.reminder_15m_sent_at,
+        createdAt: new Date(),
+        updatedAt: new Date(),
         interviewNotes: null,
       }))
       const onboardingTasks = (onboardingTasksRows || []).map((t) => ({
@@ -197,7 +201,7 @@ export default async function RBTProfilePage({
         onboardingTasks,
         documents: [],
         onboardingCompletions: [],
-      } as RBTProfileWithRelations
+      } as unknown as RBTProfileWithRelations
     } catch (rawErr) {
       console.error('Admin rbts [id]: raw fallback failed', rawErr)
       notFound()
