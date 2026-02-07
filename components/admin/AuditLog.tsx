@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,8 +37,12 @@ interface AuditLogProps {
 export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
   const router = useRouter()
   const { showToast } = useToast()
+  const showToastRef = useRef(showToast)
+  showToastRef.current = showToast
+
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingLog, setEditingLog] = useState<AuditLog | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -52,20 +56,24 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
   const fetchAuditLogs = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/admin/rbts/${rbtProfileId}/audit-logs`)
+      setFetchError(null)
+      const response = await fetch(`/api/admin/rbts/${rbtProfileId}/audit-logs`, { credentials: 'include' })
       if (response.ok) {
         const logs = await response.json()
         setAuditLogs(logs)
       } else {
-        showToast('Failed to load audit logs', 'error')
+        const msg = response.status === 403 ? 'You don’t have permission to view audit logs.' : 'Failed to load audit logs.'
+        setFetchError(msg)
+        showToastRef.current('Failed to load audit logs', 'error')
       }
     } catch (error) {
       console.error('Error fetching audit logs:', error)
-      showToast('Error loading audit logs', 'error')
+      setFetchError('Failed to load audit logs.')
+      showToastRef.current('Error loading audit logs', 'error')
     } finally {
       setLoading(false)
     }
-  }, [rbtProfileId, showToast])
+  }, [rbtProfileId])
 
   useEffect(() => {
     fetchAuditLogs()
@@ -271,11 +279,18 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
+        ) : fetchError ? (
+          <div className="text-center py-8 text-amber-700 dark:text-[var(--status-warning-text)] bg-amber-50 dark:bg-[var(--status-warning-bg)] rounded-lg border border-amber-200 dark:border-[var(--status-warning-border)] px-4">
+            <p className="text-sm font-medium">{fetchError}</p>
+            <Button variant="outline" size="sm" className="mt-3 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]" onClick={() => fetchAuditLogs()}>
+              Try again
+            </Button>
+          </div>
         ) : auditLogs.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Phone className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+          <div className="text-center py-8 text-gray-500 dark:text-[var(--text-tertiary)]">
+            <Phone className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-[var(--text-disabled)]" />
             <p className="text-sm">No audit logs yet</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 dark:text-[var(--text-disabled)] mt-1">
               Click &quot;Add Audit Entry&quot; to create one
             </p>
           </div>
