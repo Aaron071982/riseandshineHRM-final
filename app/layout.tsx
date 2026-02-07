@@ -21,8 +21,11 @@ export const metadata: Metadata = {
 const themeScript = `
 (function() {
   try {
+    var path = window.location.pathname;
+    var onAdmin = path.indexOf('/admin') === 0;
     var t = localStorage.getItem('theme');
-    var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var dark = onAdmin && (t === 'dark' || (t !== 'light' && systemDark));
     document.documentElement.classList.toggle('dark', dark);
   } catch (e) {}
 })();

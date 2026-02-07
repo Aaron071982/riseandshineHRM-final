@@ -6,7 +6,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/toast'
-import { useTheme } from '@/components/theme/ThemeProvider'
 import { Bell, Palette, Shield, Monitor } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -25,8 +24,6 @@ export default function UserSettingsPage() {
     statusChanges: true,
     announcements: true,
   })
-  const { theme, setTheme } = useTheme()
-  const [themeSynced, setThemeSynced] = useState(false)
   const [privacy, setPrivacy] = useState({
     showPhone: true,
     showAddress: false,
@@ -39,17 +36,9 @@ export default function UserSettingsPage() {
       if (!response.ok) return
       const data = await response.json()
       setSessions(data.sessions || [])
-      // Apply profile theme preference on first load (ThemeProvider may have already done this; ensure UI is in sync)
-      if (!themeSynced && data.profile?.themePreference) {
-        const pref = data.profile.themePreference
-        if (pref === 'light' || pref === 'dark' || pref === 'system') {
-          setTheme(pref)
-          setThemeSynced(true)
-        }
-      }
     }
     loadSessions()
-  }, [themeSynced, setTheme])
+  }, [])
 
   const handleSave = () => {
     showToast('Settings saved for this device', 'success')
@@ -114,32 +103,10 @@ export default function UserSettingsPage() {
               Appearance
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Label>Theme</Label>
-            <div className="flex gap-2">
-              {(['light', 'dark', 'system'] as const).map((option) => (
-                <Button
-                  key={option}
-                  variant={theme === option ? 'default' : 'outline'}
-                  onClick={async () => {
-                    setTheme(option)
-                    try {
-                      await fetch('/api/profile', {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ themePreference: option }),
-                      })
-                    } catch {
-                      // Theme is still applied locally
-                    }
-                  }}
-                  className="capitalize"
-                >
-                  {option}
-                </Button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">Theme is saved automatically and persists across sessions.</p>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Dark mode is available in the Admin panel only. Go to Admin → Dashboard and use the theme toggle in the header to switch.
+            </p>
           </CardContent>
         </Card>
 

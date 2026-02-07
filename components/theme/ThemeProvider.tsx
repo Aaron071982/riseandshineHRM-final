@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from 'react'
+import { usePathname } from 'next/navigation'
 
 const THEME_KEY = 'theme'
 
@@ -44,9 +45,12 @@ function applyDark(dark: boolean) {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   const [theme, setThemeState] = useState<Theme>('system')
   const [resolvedDark, setResolvedDark] = useState(false)
   const [mounted, setMounted] = useState(false)
+
+  const onAdmin = pathname?.startsWith('/admin') ?? false
 
   useEffect(() => {
     setMounted(true)
@@ -68,30 +72,33 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!mounted) return
-    const dark = resolveDark(theme)
-    setResolvedDark(dark)
-    applyDark(dark)
-  }, [theme, mounted])
+    const darkPreference = resolveDark(theme)
+    const shouldBeDark = onAdmin && darkPreference
+    setResolvedDark(darkPreference)
+    applyDark(shouldBeDark)
+  }, [theme, mounted, onAdmin])
 
   useEffect(() => {
     if (!mounted || theme !== 'system') return
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const handle = () => {
-      setResolvedDark(mq.matches)
-      applyDark(mq.matches)
+      const darkPreference = mq.matches
+      setResolvedDark(darkPreference)
+      applyDark(onAdmin && darkPreference)
     }
     mq.addEventListener('change', handle)
     return () => mq.removeEventListener('change', handle)
-  }, [theme, mounted])
+  }, [theme, mounted, onAdmin])
 
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next)
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(THEME_KEY, next)
     }
-    const dark = next === 'dark' || (next === 'system' && getSystemDark())
-    setResolvedDark(dark)
-    applyDark(dark)
+    const darkPreference = next === 'dark' || (next === 'system' && getSystemDark())
+    setResolvedDark(darkPreference)
+    const path = typeof window !== 'undefined' ? window.location.pathname : ''
+    applyDark(path.indexOf('/admin') === 0 && darkPreference)
   }, [])
 
   const value = useMemo<ThemeContextValue>(

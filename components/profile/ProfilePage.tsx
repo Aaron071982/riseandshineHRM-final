@@ -20,8 +20,6 @@ import {
   Palette,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { useTheme } from '@/components/theme/ThemeProvider'
 import SuperAdminActivityLogs from '@/components/admin/SuperAdminActivityLogs'
 import SuperAdminUserManagement from '@/components/admin/SuperAdminUserManagement'
 import SuperAdminCreateAdmin from '@/components/admin/SuperAdminCreateAdmin'
@@ -61,7 +59,6 @@ interface UserData {
 export default function ProfilePage() {
   const router = useRouter()
   const { showToast } = useToast()
-  const { theme, setTheme } = useTheme()
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -311,36 +308,9 @@ export default function ProfilePage() {
             Appearance
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {(['light', 'dark', 'system'] as const).map((option) => (
-              <Button
-                key={option}
-                variant={theme === option ? 'default' : 'outline'}
-                size="sm"
-                onClick={async () => {
-                  setTheme(option)
-                  try {
-                    await fetch('/api/profile', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ themePreference: option }),
-                    })
-                  } catch {
-                    // Theme is still applied locally
-                  }
-                }}
-                className="capitalize"
-              >
-                {option}
-              </Button>
-            ))}
-          </div>
+        <CardContent>
           <p className="text-sm text-muted-foreground">
-            <Link href="/settings" className="text-primary dark:text-[var(--orange-primary)] hover:underline">
-              More settings
-            </Link>
-            {' '}→ Notification and privacy preferences
+            Dark mode can be changed in the Admin panel (Dashboard → theme toggle in the header).
           </p>
         </CardContent>
       </Card>

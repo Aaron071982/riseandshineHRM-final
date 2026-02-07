@@ -5,11 +5,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Calendar, Clock, CalendarDays, FileText, LogOut, Menu, X, UserCheck, UserCircle, Settings, Sun, Moon, Monitor } from 'lucide-react'
+import { LayoutDashboard, Calendar, Clock, CalendarDays, FileText, LogOut, Menu, X, UserCheck, UserCircle, Settings } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { trackPageView } from '@/lib/activity-tracker'
-import { useTheme } from '@/components/theme/ThemeProvider'
 
 interface RBTLayoutProps {
   children: React.ReactNode
@@ -26,26 +25,10 @@ const navItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
-const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
-
 export default function RBTLayout({ children }: RBTLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { theme, setTheme } = useTheme()
-
-  const cycleTheme = () => {
-    const idx = themeOrder.indexOf(theme)
-    const next = themeOrder[(idx + 1) % themeOrder.length]
-    setTheme(next)
-    fetch('/api/profile', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ themePreference: next }),
-    }).catch(() => {})
-  }
-
-  const ThemeIcon = theme === 'dark' ? Moon : theme === 'system' ? Monitor : Sun
 
   // Track page views
   useEffect(() => {
@@ -104,16 +87,7 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
                 })}
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={cycleTheme}
-                className="text-gray-700 dark:text-[var(--text-tertiary)] dark:hover:text-[var(--text-secondary)]"
-                title={`Theme: ${theme} (click to cycle)`}
-              >
-                <ThemeIcon className="w-5 h-5" />
-              </Button>
+            <div className="flex items-center">
               <Button
                 variant="ghost"
                 size="sm"
