@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,10 +16,18 @@ import IconChip from '@/components/public/IconChip'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showLoginForm, setShowLoginForm] = useState(false)
+
+  const sessionError = searchParams.get('session_error')
+  useEffect(() => {
+    if (sessionError === '1') {
+      setError('Your session expired or could not be verified. Please log in again.')
+    }
+  }, [sessionError])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

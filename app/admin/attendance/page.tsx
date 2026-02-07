@@ -6,17 +6,40 @@ import { Clock, Calendar, TrendingUp, User } from 'lucide-react'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+function AttendanceError() {
+  return (
+    <div className="rounded-lg border-2 border-amber-200 bg-amber-50 dark:bg-[var(--status-warning-bg)] dark:border-[var(--status-warning-border)] p-6 text-center">
+      <p className="font-semibold text-amber-900 dark:text-[var(--status-warning-text)]">Could not load attendance data</p>
+      <p className="text-sm text-amber-700 dark:text-[var(--status-warning-text)] mt-2">The database may be temporarily unavailable. Try refreshing the page.</p>
+    </div>
+  )
+}
+
 export default async function AttendancePage() {
-  const timeEntries = await prisma.timeEntry.findMany({
-    include: {
-      rbtProfile: true,
-      shift: true,
-    },
-    orderBy: {
-      clockInTime: 'desc',
-    },
-    take: 50,
-  })
+  let timeEntries: Awaited<ReturnType<typeof prisma.timeEntry.findMany>>
+  try {
+    timeEntries = await prisma.timeEntry.findMany({
+      include: {
+        rbtProfile: true,
+        shift: true,
+      },
+      orderBy: {
+        clockInTime: 'desc',
+      },
+      take: 50,
+    })
+  } catch (error) {
+    console.error('Admin attendance: failed to load', error)
+    return (
+      <div className="space-y-6">
+        <div className="pb-6 border-b dark:border-[var(--border-subtle)]">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Attendance & Hours</h1>
+          <p className="text-gray-600 dark:text-[var(--text-tertiary)]">View time entries and hours worked</p>
+        </div>
+        <AttendanceError />
+      </div>
+    )
+  }
 
   // Calculate statistics
   const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.totalHours || 0), 0)

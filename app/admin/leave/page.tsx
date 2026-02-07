@@ -9,15 +9,38 @@ import { Calendar, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+function LeaveError() {
+  return (
+    <div className="rounded-lg border-2 border-amber-200 bg-amber-50 dark:bg-[var(--status-warning-bg)] dark:border-[var(--status-warning-border)] p-6 text-center">
+      <p className="font-semibold text-amber-900 dark:text-[var(--status-warning-text)]">Could not load leave requests</p>
+      <p className="text-sm text-amber-700 dark:text-[var(--status-warning-text)] mt-2">The database may be temporarily unavailable. Try refreshing the page.</p>
+    </div>
+  )
+}
+
 export default async function LeaveRequestsPage() {
-  const leaveRequests = await prisma.leaveRequest.findMany({
-    include: {
-      rbtProfile: true,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  })
+  let leaveRequests: Awaited<ReturnType<typeof prisma.leaveRequest.findMany>>
+  try {
+    leaveRequests = await prisma.leaveRequest.findMany({
+      include: {
+        rbtProfile: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
+  } catch (error) {
+    console.error('Admin leave: failed to load', error)
+    return (
+      <div className="space-y-6">
+        <div className="pb-6 border-b dark:border-[var(--border-subtle)]">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Leave Requests</h1>
+          <p className="text-gray-600 dark:text-[var(--text-tertiary)]">Review and manage RBT leave requests</p>
+        </div>
+        <LeaveError />
+      </div>
+    )
+  }
 
   const statusColors: Record<string, { bg: string; text: string }> = {
     PENDING: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
