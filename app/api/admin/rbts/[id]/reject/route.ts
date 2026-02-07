@@ -34,10 +34,19 @@ export async function POST(
       )
     }
 
-    // Update RBT profile status to REJECTED
+    const previousStatus = rbtProfile.status
     await prisma.rBTProfile.update({
       where: { id },
       data: { status: 'REJECTED' },
+    })
+    await prisma.rBTAuditLog.create({
+      data: {
+        rbtProfileId: id,
+        auditType: 'STATUS_CHANGE',
+        dateTime: new Date(),
+        notes: `Candidate rejected. Status changed from ${previousStatus} to REJECTED`,
+        createdBy: user?.email || user?.name || 'Admin',
+      },
     })
 
     // Optionally update user role to CANDIDATE if they were in another role

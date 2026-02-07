@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
+import { parseLocalTimeAsNY } from '@/lib/utils'
 
 // DELETE - Delete an audit log
 export async function DELETE(
@@ -86,7 +87,9 @@ export async function PATCH(
       where: { id: auditId },
       data: {
         ...(auditType && { auditType }),
-        ...(dateTime && { dateTime: new Date(dateTime) }),
+        ...(dateTime && {
+          dateTime: typeof dateTime === 'string' && dateTime.length <= 20 ? parseLocalTimeAsNY(dateTime) : new Date(dateTime),
+        }),
         ...(notes !== undefined && { notes }),
       },
     })

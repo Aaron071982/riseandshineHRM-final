@@ -88,60 +88,49 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate time (11:00 AM - 2:00 PM, 15-minute intervals)
+    // Validate time (11:00 AM - 2:00 PM, 30-minute intervals only)
     if (hours < 11 || hours > 14 || (hours === 14 && minutes > 0)) {
       return NextResponse.json(
         { error: 'Interview time must be between 11:00 AM and 2:00 PM' },
         { status: 400 }
       )
     }
-    
-    // Validate 15-minute intervals (minutes must be 0, 15, 30, or 45)
-    if (minutes % 15 !== 0) {
+
+    if (minutes !== 0 && minutes !== 30) {
       return NextResponse.json(
-        { error: 'Interview time must be on a 15-minute interval (e.g., 11:00, 11:15, 11:30, 11:45)' },
+        { error: 'Interview time must be on a 30-minute interval (e.g., 11:00, 11:30, 12:00)' },
         { status: 400 }
       )
     }
 
-    // Round to 15-minute slot start time for capacity checking
     const slotStartTime = new Date(scheduledDate)
     slotStartTime.setSeconds(0, 0)
-    const slotEndTime = new Date(slotStartTime.getTime() + 15 * 60 * 1000) // 15 minutes later
+    const slotEndTime = new Date(slotStartTime.getTime() + 30 * 60 * 1000)
 
-    // Check for conflicting interviews for this RBT
-    const conflictingInterview = await prisma.interview.findFirst({
+    const conflictingForRbt = await prisma.interview.findFirst({
       where: {
         rbtProfileId: rbtId,
         status: 'SCHEDULED',
-        scheduledAt: {
-          gte: slotStartTime,
-          lt: slotEndTime,
-        },
+        scheduledAt: { gte: slotStartTime, lt: slotEndTime },
       },
     })
-
-    if (conflictingInterview) {
+    if (conflictingForRbt) {
       return NextResponse.json(
         { error: 'You already have an interview scheduled at this time' },
         { status: 400 }
       )
     }
 
-    // Check capacity: max 2 interviews per 15-minute slot
-    const slotInterviewCount = await prisma.interview.count({
+    const slotStartMinus30 = new Date(slotStartTime.getTime() - 30 * 60 * 1000)
+    const overlapping = await prisma.interview.findFirst({
       where: {
         status: 'SCHEDULED',
-        scheduledAt: {
-          gte: slotStartTime,
-          lt: slotEndTime,
-        },
+        scheduledAt: { gt: slotStartMinus30, lt: slotEndTime },
       },
     })
-
-    if (slotInterviewCount >= 2) {
+    if (overlapping) {
       return NextResponse.json(
-        { error: 'This time slot is full. Please select another time.' },
+        { error: 'This time slot is already taken. Please choose another 30-minute slot.' },
         { status: 400 }
       )
     }
@@ -162,12 +151,11 @@ export async function POST(request: NextRequest) {
     // Use the standard meeting URL for all interviews
     const meetingUrl = 'https://meet.google.com/gtz-kmij-tvd'
 
-    // Create interview
     const interview = await prisma.interview.create({
       data: {
         rbtProfileId: rbtId,
         scheduledAt: scheduledDate,
-        durationMinutes: durationMinutes || 15,
+        durationMinutes: durationMinutes || 30,
         interviewerName: 'Interviewer TBD', // Can be updated later by admin
         meetingUrl,
         status: 'SCHEDULED',
@@ -185,7 +173,7 @@ export async function POST(request: NextRequest) {
     if (rbtProfile.email) {
       const rbtEmailContent = generateInterviewInviteEmail(rbtProfile, {
         scheduledAt: scheduledDate,
-        durationMinutes: durationMinutes || 15,
+        durationMinutes: durationMinutes || 30,
         interviewerName: 'Interviewer TBD',
         meetingUrl,
       })

@@ -263,6 +263,40 @@ export default function PublicRBTApplicationWizard() {
         resumeUrl = uploadResult.url
       }
 
+      let rbtCertificateUrl: string | null = null
+      let rbtCertificateFileName: string | null = null
+      let rbtCertificateMimeType: string | null = null
+      if (data.rbtCertificate) {
+        const certForm = new FormData()
+        certForm.append('file', data.rbtCertificate)
+        certForm.append('documentType', 'RBT_CERTIFICATE')
+        if (draftToken) certForm.append('token', draftToken)
+        const certRes = await fetch('/api/public/apply/upload', { method: 'POST', body: certForm })
+        if (certRes.ok) {
+          const certResult = await certRes.json()
+          rbtCertificateUrl = certResult.url
+          rbtCertificateFileName = certResult.fileName || data.rbtCertificate.name
+          rbtCertificateMimeType = certResult.mimeType || data.rbtCertificate.type
+        }
+      }
+
+      let cprCardUrl: string | null = null
+      let cprCardFileName: string | null = null
+      let cprCardMimeType: string | null = null
+      if (data.cprCard) {
+        const cprForm = new FormData()
+        cprForm.append('file', data.cprCard)
+        cprForm.append('documentType', 'CPR_CARD')
+        if (draftToken) cprForm.append('token', draftToken)
+        const cprRes = await fetch('/api/public/apply/upload', { method: 'POST', body: cprForm })
+        if (cprRes.ok) {
+          const cprResult = await cprRes.json()
+          cprCardUrl = cprResult.url
+          cprCardFileName = cprResult.fileName || data.cprCard.name
+          cprCardMimeType = cprResult.mimeType || data.cprCard.type
+        }
+      }
+
       // Submit application
       const submitResponse = await fetch('/api/public/apply/submit', {
         method: 'POST',
@@ -273,6 +307,17 @@ export default function PublicRBTApplicationWizard() {
           resumeFileName: data.resume?.name || null,
           resumeMimeType: data.resume?.type || null,
           resumeSize: data.resume?.size || null,
+          experienceYearsDisplay: data.experienceYears,
+          preferredAgeGroups: data.preferredAgeGroups,
+          authorizedToWork: data.authorizedToWork,
+          canPassBackgroundCheck: data.canPassBackgroundCheck,
+          cprFirstAidCertified: data.cprFirstAidCertified,
+          rbtCertificateUrl: rbtCertificateUrl || undefined,
+          rbtCertificateFileName: rbtCertificateFileName || undefined,
+          rbtCertificateMimeType: rbtCertificateMimeType || undefined,
+          cprCardUrl: cprCardUrl || undefined,
+          cprCardFileName: cprCardFileName || undefined,
+          cprCardMimeType: cprCardMimeType || undefined,
           draftToken: draftToken,
           website: data.website || '', // Honeypot
         }),

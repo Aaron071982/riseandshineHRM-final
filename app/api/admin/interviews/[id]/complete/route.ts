@@ -45,10 +45,19 @@ export async function PATCH(
       data: { status: 'COMPLETED' },
     })
 
-    // Update RBT status to INTERVIEW_COMPLETED
+    const previousStatus = interview.rbtProfile.status
     await prisma.rBTProfile.update({
       where: { id: interview.rbtProfileId },
       data: { status: 'INTERVIEW_COMPLETED' },
+    })
+    await prisma.rBTAuditLog.create({
+      data: {
+        rbtProfileId: interview.rbtProfileId,
+        auditType: 'STATUS_CHANGE',
+        dateTime: new Date(),
+        notes: `Interview marked completed. Status changed from ${previousStatus} to INTERVIEW_COMPLETED`,
+        createdBy: user?.email || user?.name || 'Admin',
+      },
     })
 
     return NextResponse.json({

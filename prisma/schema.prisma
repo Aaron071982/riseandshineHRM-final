@@ -30,6 +30,7 @@ enum RBTStatus {
   INTERVIEW_SCHEDULED
   INTERVIEW_COMPLETED
   HIRED
+  STALLED
   REJECTED
 }
 
@@ -162,6 +163,7 @@ model UserProfile {
   title                        String?
   rbtCertificationNumber       String?
   rbtCertificationExpiresAt    DateTime?
+  themePreference              String?                 // "light" | "dark" | "system"
   createdAt                    DateTime                @default(now())
   updatedAt                    DateTime                @updatedAt
 
@@ -227,6 +229,11 @@ model RBTProfile {
   availabilityJson         Json?
   languagesJson            Json?
   experienceYears          Int?
+  experienceYearsDisplay   String?
+  preferredAgeGroupsJson   Json?
+  authorizedToWork          Boolean?
+  canPassBackgroundCheck   Boolean?
+  cprFirstAidCertified     String?
   transportation           Boolean?
   preferredHoursRange      String?
   schedulingToken          String?            @unique
@@ -253,7 +260,7 @@ model Interview {
   id                   String            @id @default(cuid())
   rbtProfileId         String
   scheduledAt          DateTime
-  durationMinutes      Int               @default(60)
+  durationMinutes      Int               @default(30)
   interviewerName     String
   status               InterviewStatus   @default(SCHEDULED)
   decision             InterviewDecision @default(PENDING)
@@ -429,8 +436,9 @@ model RBTDocument {
   rbtProfileId String
   fileName     String
   fileType     String // MIME type
-  fileData     String   @db.Text // base64 encoded file
-  documentType String? // 'RESUME', 'CERTIFICATION', 'OTHER'
+  fileData     String   @db.Text // base64 encoded file (empty when filePath is set)
+  filePath     String?  @db.Text // Supabase storage path for application uploads
+  documentType String? // 'RESUME', 'RBT_CERTIFICATE', 'CPR_CARD', 'OTHER'
   uploadedAt   DateTime @default(now())
 
   rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)

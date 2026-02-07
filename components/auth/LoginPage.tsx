@@ -54,12 +54,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(180deg, #FFF5F0 0%, #FFFAF7 50%, #FFFFFF 100%)' }}>
+    <div className="login-page-bg min-h-screen flex flex-col relative overflow-hidden">
       <PublicBackground variant="page" />
       
-      {/* Additional orange gradient overlay for more depth */}
+      {/* Additional orange gradient overlay for more depth (hidden in dark) */}
       <div 
-        className="absolute inset-0 opacity-40 pointer-events-none"
+        className="absolute inset-0 opacity-40 pointer-events-none dark:opacity-0"
         style={{
           background: 'radial-gradient(circle at 30% 50%, rgba(228, 137, 61, 0.15) 0%, transparent 50%), radial-gradient(circle at 70% 50%, rgba(255, 159, 90, 0.12) 0%, transparent 50%)'
         }}
@@ -89,11 +89,11 @@ export default function LoginPage() {
           </Link>
           
           <div className="space-y-4">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-gray-900 leading-tight">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-gray-900 dark:text-[var(--text-primary)] leading-tight">
               Welcome to{' '}
-              <span className="text-primary">Rise & Shine</span>
+              <span className="text-primary dark:text-[var(--orange-primary)]">Rise & Shine</span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto font-normal">
+            <p className="text-xl md:text-2xl text-gray-600 dark:text-[var(--text-tertiary)] max-w-2xl mx-auto font-normal">
               Choose an option below to get started
             </p>
           </div>
@@ -108,19 +108,16 @@ export default function LoginPage() {
             transition={{ duration: 0.5, delay: 0.2 }}
           >
             <Card 
-              className="bg-white/98 backdrop-blur-md rounded-cardLg border-2 border-primary/30 shadow-cardGlow hover:shadow-buttonHover transition-all duration-200 h-full relative overflow-hidden"
-              style={{
-                boxShadow: '0 8px 24px rgba(228, 137, 61, 0.12), 0 0 0 1px rgba(228, 137, 61, 0.08)'
-              }}
+              className="bg-white/98 dark:bg-[var(--bg-elevated)] backdrop-blur-md rounded-cardLg border-2 border-primary/30 dark:border-[var(--border-subtle)] shadow-cardGlow hover:shadow-buttonHover dark:shadow-none transition-all duration-200 h-full relative overflow-hidden"
             >
               {/* Subtle orange gradient overlay */}
               <div 
-                className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-orange-400 to-primary opacity-30"
+                className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-orange-400 to-primary opacity-30 dark:bg-[var(--orange-subtle)] dark:opacity-50"
               />
               <CardContent className="p-8 flex flex-col items-center text-center relative z-10">
                 <IconChip icon={<UserPlus className="h-6 w-6" />} size="lg" color="orange" className="mb-4" />
-                <h2 className="text-2xl font-semibold text-gray-900 mb-3">Apply Now</h2>
-                <p className="text-gray-600 mb-6">
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-[var(--text-primary)] mb-3">Apply Now</h2>
+                <p className="text-gray-600 dark:text-[var(--text-secondary)] mb-6">
                   Join our team as a Registered Behavior Technician
                 </p>
                 <Link href="/apply" className="w-full">
@@ -130,7 +127,7 @@ export default function LoginPage() {
                   >
                     <Button
                       size="lg"
-                      className="w-full gradient-primary text-white border-0 rounded-button px-8 py-6 text-lg font-semibold shadow-button hover:shadow-buttonHover transition-all duration-200"
+                      className="w-full gradient-primary dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] text-white border-0 rounded-button px-8 py-6 text-lg font-semibold shadow-button hover:shadow-buttonHover transition-all duration-200"
                     >
                       Apply Now
                       <ArrowRight className="ml-2 h-5 w-5" />
@@ -148,19 +145,16 @@ export default function LoginPage() {
             transition={{ duration: 0.5, delay: 0.3 }}
           >
             <Card 
-              className="bg-white/98 backdrop-blur-md rounded-cardLg border-2 border-gray-300 shadow-cardGlow hover:shadow-md transition-all duration-200 h-full relative overflow-hidden"
-              style={{
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04)'
-              }}
+              className="bg-white/98 dark:bg-[var(--bg-elevated)] backdrop-blur-md rounded-cardLg border-2 border-gray-300 dark:border-[var(--border-subtle)] shadow-cardGlow hover:shadow-md dark:shadow-none transition-all duration-200 h-full relative overflow-hidden"
             >
               {/* Subtle blue gradient overlay */}
               <div 
-                className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-400 via-blue-300 to-blue-400 opacity-20"
+                className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-400 via-blue-300 to-blue-400 opacity-20 dark:bg-[var(--status-interview-bg)] dark:opacity-40"
               />
               <CardContent className="p-8 flex flex-col items-center text-center relative z-10">
                 <IconChip icon={<LogIn className="h-6 w-6" />} size="lg" color="blue" className="mb-4" />
-                <h2 className="text-2xl font-semibold text-gray-900 mb-3">Log In</h2>
-                <p className="text-gray-600 mb-6">
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-[var(--text-primary)] mb-3">Log In</h2>
+                <p className="text-gray-600 dark:text-[var(--text-secondary)] mb-6">
                   Access your HRM portal with your work email
                 </p>
                 {!showLoginForm ? (
@@ -172,7 +166,7 @@ export default function LoginPage() {
                       size="lg"
                       variant="outline"
                       onClick={() => setShowLoginForm(true)}
-                      className="w-full border-2 border-gray-300 rounded-button px-8 py-6 text-lg font-semibold bg-white hover:bg-gray-50 transition-all duration-200"
+                      className="w-full border-2 border-gray-300 dark:border-[var(--border-medium)] rounded-button px-8 py-6 text-lg font-semibold bg-white dark:bg-[var(--bg-input)] hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)] dark:text-[var(--text-primary)] transition-all duration-200"
                     >
                       <LogIn className="mr-2 h-5 w-5" />
                       Log In
@@ -182,8 +176,8 @@ export default function LoginPage() {
                   <div className="w-full space-y-4">
                     <form onSubmit={handleSubmit} className="space-y-4">
                       <div className="space-y-2 text-left">
-                        <Label htmlFor="email" className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-primary" />
+                        <Label htmlFor="email" className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)] flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-primary dark:text-[var(--orange-primary)]" />
                           Email Address
                         </Label>
                         <Input
@@ -194,14 +188,14 @@ export default function LoginPage() {
                           onChange={(e) => setEmail(e.target.value)}
                           required
                           disabled={loading}
-                          className="h-12 border-2 border-gray-200 rounded-input focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                          className="h-12 border-2 border-gray-200 dark:border-[var(--border-subtle)] dark:bg-[var(--bg-input)] dark:text-[var(--text-primary)] rounded-input focus:border-primary focus:ring-2 focus:ring-primary/20 dark:focus:border-[var(--border-focus)] transition-all duration-200"
                         />
                       </div>
                       {error && (
                         <motion.div
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="text-sm text-red-600 bg-red-50 border-2 border-red-200 p-3 rounded-input text-left"
+                          className="text-sm text-red-600 dark:text-[var(--status-rejected-text)] bg-red-50 dark:bg-[var(--status-rejected-bg)] border-2 border-red-200 dark:border-[var(--status-rejected-border)] p-3 rounded-input text-left"
                         >
                           {error}
                         </motion.div>
@@ -212,7 +206,7 @@ export default function LoginPage() {
                       >
                         <Button
                           type="submit"
-                          className="w-full h-12 gradient-primary text-white border-0 rounded-button font-semibold shadow-button hover:shadow-buttonHover transition-all duration-200"
+                          className="w-full h-12 gradient-primary dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] text-white border-0 rounded-button font-semibold shadow-button hover:shadow-buttonHover transition-all duration-200"
                           disabled={loading || !email.includes('@')}
                         >
                           {loading ? (
@@ -233,7 +227,7 @@ export default function LoginPage() {
                         setError('')
                         setEmail('')
                       }}
-                      className="w-full text-sm text-gray-500 hover:text-gray-700"
+                      className="w-full text-sm text-gray-500 dark:text-[var(--text-tertiary)] hover:text-gray-700 dark:hover:text-[var(--text-primary)]"
                     >
                       Cancel
                     </Button>
@@ -247,7 +241,7 @@ export default function LoginPage() {
         <div className="text-center">
           <Link
             href="/"
-            className="text-sm text-gray-500 hover:text-primary transition-colors duration-200"
+            className="text-sm text-gray-500 dark:text-[var(--text-tertiary)] hover:text-primary dark:hover:text-[var(--orange-primary)] transition-colors duration-200"
           >
             ← Back to Home
           </Link>

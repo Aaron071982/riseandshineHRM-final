@@ -33,8 +33,18 @@ export async function DELETE(
       return NextResponse.json({ error: 'RBT profile not found' }, { status: 404 })
     }
 
-    // Delete the RBT profile first (this will cascade delete related records like interviews, tasks, etc.)
-    // Then delete the associated user
+    const candidateLabel = `${rbtProfile.firstName} ${rbtProfile.lastName} (${rbtProfile.email || rbtProfile.phoneNumber})`
+    await prisma.rBTAuditLog.create({
+      data: {
+        rbtProfileId: id,
+        auditType: 'RBT_DELETED',
+        dateTime: new Date(),
+        notes: `RBT permanently deleted: ${candidateLabel}`,
+        createdBy: user?.email || user?.name || 'Admin',
+      },
+    })
+
+    // Delete the RBT profile first (cascade deletes related records including audit logs - so audit must be created before)
     await prisma.rBTProfile.delete({
       where: { id },
     })

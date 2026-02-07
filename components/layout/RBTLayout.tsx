@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Calendar, Clock, CalendarDays, FileText, LogOut, Menu, X, UserCheck, UserCircle } from 'lucide-react'
+import { LayoutDashboard, Calendar, Clock, CalendarDays, FileText, LogOut, Menu, X, UserCheck, UserCircle, Settings, Sun, Moon, Monitor } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { trackPageView } from '@/lib/activity-tracker'
+import { useTheme } from '@/components/theme/ThemeProvider'
 
 interface RBTLayoutProps {
   children: React.ReactNode
@@ -22,12 +23,29 @@ const navItems = [
   { href: '/rbt/leave', label: 'Leave Requests', icon: CalendarDays },
   { href: '/rbt/documents', label: 'Documents', icon: FileText },
   { href: '/profile', label: 'Profile', icon: UserCircle },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ]
+
+const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
 
 export default function RBTLayout({ children }: RBTLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { theme, setTheme } = useTheme()
+
+  const cycleTheme = () => {
+    const idx = themeOrder.indexOf(theme)
+    const next = themeOrder[(idx + 1) % themeOrder.length]
+    setTheme(next)
+    fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ themePreference: next }),
+    }).catch(() => {})
+  }
+
+  const ThemeIcon = theme === 'dark' ? Moon : theme === 'system' ? Monitor : Sun
 
   // Track page views
   useEffect(() => {
@@ -44,9 +62,9 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[var(--bg-primary)]">
       {/* Top Navigation */}
-      <nav className="bg-gradient-to-r from-orange-50 via-white to-orange-50 border-b border-orange-200/70 shadow-sm">
+      <nav className="nav-header bg-gradient-to-r from-orange-50 via-white to-orange-50 border-b border-orange-200/70 shadow-sm dark:shadow-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -59,7 +77,7 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
                     height={48}
                     className="object-contain"
                   />
-                  <span className="text-lg font-bold tracking-normal text-[#e36f1e] whitespace-nowrap" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '0.01em', fontWeight: 700 }}>
+                  <span className="text-lg font-bold tracking-normal text-[#e36f1e] dark:text-[var(--text-primary)] whitespace-nowrap" style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', letterSpacing: '0.01em', fontWeight: 700 }}>
                     Rise and shine
                   </span>
                 </div>
@@ -75,8 +93,8 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
                       className={cn(
                         'inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
                         isActive
-                          ? 'bg-primary text-white'
-                          : 'text-gray-700 hover:bg-gray-100'
+                          ? 'bg-primary text-primary-foreground dark:bg-[var(--orange-subtle)] dark:text-[var(--orange-primary)]'
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-tertiary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-secondary)]'
                       )}
                     >
                       <Icon className="w-4 h-4 mr-2" />
@@ -86,12 +104,21 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
                 })}
               </div>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={cycleTheme}
+                className="text-gray-700 dark:text-[var(--text-tertiary)] dark:hover:text-[var(--text-secondary)]"
+                title={`Theme: ${theme} (click to cycle)`}
+              >
+                <ThemeIcon className="w-5 h-5" />
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
-                className="text-gray-700"
+                className="text-gray-700 dark:text-[var(--text-tertiary)] dark:hover:text-[var(--text-secondary)]"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 <span className="hidden sm:inline">Logout</span>
@@ -99,7 +126,7 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden ml-2"
+                className="md:hidden ml-2 dark:text-[var(--text-tertiary)]"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -111,7 +138,7 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-orange-200/70">
+        <div className="md:hidden bg-white dark:bg-[var(--bg-elevated)] border-b border-orange-200/70 dark:border-[var(--border-subtle)]">
           <div className="px-2 pt-2 pb-3 space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon
@@ -124,8 +151,8 @@ export default function RBTLayout({ children }: RBTLayoutProps) {
                   className={cn(
                     'flex items-center px-3 py-2 rounded-md text-base font-medium',
                     isActive
-                      ? 'bg-primary text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
+                      ? 'bg-primary text-primary-foreground dark:bg-[var(--orange-subtle)] dark:text-[var(--orange-primary)]'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-tertiary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-secondary)]'
                   )}
                 >
                   <Icon className="w-4 h-4 mr-3" />

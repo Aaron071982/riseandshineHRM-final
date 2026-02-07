@@ -321,7 +321,11 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
   const progressPercentage = totalTasksCount > 0 ? (totalCompletedCount / totalTasksCount) * 100 : 0
   const allTasksCompleted = totalTasksCount > 0 && totalCompletedCount === totalTasksCount
 
-  const documentTasks = regularTasks.filter((t) => t.taskType === 'DOWNLOAD_DOC')
+  const documentTasks = regularTasks.filter(
+    (t) =>
+      t.taskType === 'DOWNLOAD_DOC' &&
+      !(t.documentDownloadUrl?.includes('onboarding-package') || t.title?.toLowerCase().includes('download onboarding documents folder'))
+  )
   const signatureTasks = regularTasks.filter((t) => t.taskType === 'SIGNATURE')
   const fortyHourCourseTasks = regularTasks.filter((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
 

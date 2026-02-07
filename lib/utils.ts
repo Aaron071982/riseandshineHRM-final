@@ -35,3 +35,26 @@ export function formatDateTime(date: Date | string): string {
   })
 }
 
+/**
+ * Parses a datetime-local value (YYYY-MM-DDTHH:mm) as America/New_York and returns a Date in UTC for storage.
+ */
+export function parseLocalTimeAsNY(dateTimeLocal: string): Date {
+  if (!dateTimeLocal || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dateTimeLocal)) {
+    return new Date(dateTimeLocal)
+  }
+  const [datePart, timePart] = dateTimeLocal.split('T')
+  const [y, m, d] = datePart.split('-').map(Number)
+  const [h, min] = timePart.split(':').map(Number)
+  const utcNoon = Date.UTC(y, m - 1, d, 12, 0, 0)
+  const nyHour = parseInt(
+    new Date(utcNoon).toLocaleString('en-US', {
+      timeZone: 'America/New_York',
+      hour: '2-digit',
+      hour12: false,
+    }),
+    10
+  )
+  const offsetHours = 12 - nyHour
+  return new Date(Date.UTC(y, m - 1, d, h + offsetHours, min, 0))
+}
+

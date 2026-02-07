@@ -156,8 +156,7 @@ export default async function RBTDashboardPage() {
           { taskType: 'DOWNLOAD_DOC', title: 'Download HIPAA Basics PDF', description: 'Download and review the HIPAA Basics for Providers document from CMS', documentDownloadUrl: 'https://www.cms.gov/files/document/mln909001-hipaa-basics-providers-privacy-security-breach-notification-rules.pdf', sortOrder: 1 },
           { taskType: 'DOWNLOAD_DOC', title: 'Review HHS HIPAA Portal', description: 'Review the HHS HIPAA for Professionals portal for comprehensive information', documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/index.html', sortOrder: 2 },
           { taskType: 'DOWNLOAD_DOC', title: 'Download Confidentiality Agreement Templates', description: 'Download and review the HIPAA Confidentiality Agreement templates', documentDownloadUrl: 'https://www.sampleforms.com/hipaa-confidentiality-agreement-forms.html', sortOrder: 3 },
-          { taskType: 'DOWNLOAD_DOC', title: 'Download Onboarding Documents Folder', description: 'Download the complete onboarding documents folder for reference.', documentDownloadUrl: '/api/rbt/onboarding-package/download', sortOrder: 4 },
-          { taskType: 'SIGNATURE', title: 'Digital Signature Confirmation', description: 'Sign to confirm you have read and understood all HIPAA documents and training materials', sortOrder: 5 },
+          { taskType: 'SIGNATURE', title: 'Digital Signature Confirmation', description: 'Sign to confirm you have read and understood all HIPAA documents and training materials', sortOrder: 4 },
         ]
         
         await Promise.all(

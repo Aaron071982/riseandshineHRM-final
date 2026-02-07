@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const token = formData.get('token') as string | null
+    const documentType = (formData.get('documentType') as string) || 'resume'
 
     if (!file) {
       return NextResponse.json(
@@ -67,15 +68,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate file type
-    const allowedTypes = [
+    // Validate file type: resume = PDF/DOC/DOCX; RBT_CERTIFICATE/CPR_CARD = PDF or images
+    const resumeTypes = [
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ]
+    const optionalDocTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+    ]
+    const allowedTypes =
+      documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD'
+        ? optionalDocTypes
+        : resumeTypes
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Please upload a PDF, DOC, or DOCX file.' },
+        {
+          error:
+            documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD'
+              ? 'Invalid file type. Please upload a PDF, JPG, or PNG file.'
+              : 'Invalid file type. Please upload a PDF, DOC, or DOCX file.',
+        },
         { status: 400 }
       )
     }

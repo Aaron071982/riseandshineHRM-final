@@ -17,8 +17,11 @@ import {
   Pencil,
   Save,
   XCircle,
+  Palette,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useTheme } from '@/components/theme/ThemeProvider'
 import SuperAdminActivityLogs from '@/components/admin/SuperAdminActivityLogs'
 import SuperAdminUserManagement from '@/components/admin/SuperAdminUserManagement'
 import SuperAdminCreateAdmin from '@/components/admin/SuperAdminCreateAdmin'
@@ -58,6 +61,7 @@ interface UserData {
 export default function ProfilePage() {
   const router = useRouter()
   const { showToast } = useToast()
+  const { theme, setTheme } = useTheme()
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -151,7 +155,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="text-gray-500">Loading profile...</div>
+        <div className="text-gray-500 dark:text-[var(--text-tertiary)]">Loading profile...</div>
       </div>
     )
   }
@@ -159,39 +163,39 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <Card className="border-2 border-orange-100 bg-gradient-to-br from-white to-orange-50/30 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 rounded-full -mr-20 -mt-20 bubble-animation" />
+      <Card className="border-2 border-orange-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-orange-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-20 -mt-20 bubble-animation dark:opacity-30" />
         <CardContent className="relative p-6 md:p-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div className="flex items-center gap-5">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-200 to-orange-100 flex items-center justify-center text-2xl font-bold text-orange-700 border-2 border-white shadow">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-200 to-orange-100 dark:bg-[var(--orange-subtle)] flex items-center justify-center text-2xl font-bold text-orange-700 dark:text-[var(--orange-primary)] border-2 border-white dark:border-[var(--border-subtle)] shadow">
                   {avatarFallback}
                 </div>
-                <div className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow">
-                  <UserCircle className="w-4 h-4 text-gray-600" />
+                <div className="absolute bottom-0 right-0 bg-white dark:bg-[var(--bg-elevated)] rounded-full p-2 shadow">
+                  <UserCircle className="w-4 h-4 text-gray-600 dark:text-[var(--text-tertiary)]" />
                 </div>
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold text-gray-900">
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
                     {profile.fullName || user?.email || 'Profile'}
                   </h1>
-                  <Badge className="bg-white text-gray-800 border border-gray-200">
+                  <Badge className="bg-white text-gray-800 border border-gray-200 dark:bg-[var(--bg-elevated)] dark:text-[var(--text-primary)] dark:border-[var(--border-subtle)]">
                     {roleLabel}
                   </Badge>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mt-2">
+                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-2">
                   <span className="inline-flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-gray-400" />
+                    <Mail className="w-4 h-4 text-gray-400 dark:text-[var(--text-disabled)]" />
                     {user?.email || '—'}
                   </span>
                   <span className="inline-flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-gray-400" />
+                    <Phone className="w-4 h-4 text-gray-400 dark:text-[var(--text-disabled)]" />
                     {profile.phone || user?.phoneNumber || '—'}
                   </span>
                   <span className="inline-flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400" />
+                    <MapPin className="w-4 h-4 text-gray-400 dark:text-[var(--text-disabled)]" />
                     {profile.timezone || 'Timezone not set'}
                   </span>
                 </div>
@@ -200,7 +204,7 @@ export default function ProfilePage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => setEditing(!editing)}
-                className="gradient-primary text-white border-0 rounded-xl px-6"
+                className="gradient-primary text-white dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0 rounded-xl px-6"
               >
                 <Pencil className="w-4 h-4 mr-2" />
                 {editing ? 'Editing' : 'Edit Profile'}
@@ -208,7 +212,7 @@ export default function ProfilePage() {
               <Button
                 variant="outline"
                 onClick={() => router.push('/settings')}
-                className="rounded-xl px-6"
+                className="rounded-xl px-6 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]"
               >
                 Settings
               </Button>
@@ -216,7 +220,7 @@ export default function ProfilePage() {
                 <Button
                   variant="outline"
                   onClick={() => router.push('/admin/settings')}
-                  className="rounded-xl px-6"
+                  className="rounded-xl px-6 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]"
                 >
                   System Settings
                 </Button>
@@ -227,9 +231,9 @@ export default function ProfilePage() {
       </Card>
 
       {/* Personal Info */}
-      <Card className="border-2 border-gray-100 bg-white">
+      <Card className="border-2 border-gray-100 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
         <CardHeader>
-          <CardTitle className="text-xl font-bold text-gray-900">Personal Info</CardTitle>
+          <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Personal Info</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
@@ -288,7 +292,7 @@ export default function ProfilePage() {
                 }))
               }
               disabled={!editing}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="flex h-10 w-full rounded-md border border-input bg-background dark:bg-[var(--bg-input)] dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] px-3 py-2 text-sm"
             >
               <option value="">Select</option>
               <option value="EMAIL">Email</option>
@@ -299,20 +303,62 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Roles & Permissions */}
-      <Card className="border-2 border-gray-100 bg-white">
+      {/* Appearance */}
+      <Card className="border-2 border-gray-100 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
         <CardHeader>
-          <CardTitle className="text-xl font-bold text-gray-900">Roles & Permissions</CardTitle>
+          <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
+            <Palette className="w-5 h-5 text-primary dark:text-[var(--orange-primary)]" />
+            Appearance
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {(['light', 'dark', 'system'] as const).map((option) => (
+              <Button
+                key={option}
+                variant={theme === option ? 'default' : 'outline'}
+                size="sm"
+                onClick={async () => {
+                  setTheme(option)
+                  try {
+                    await fetch('/api/profile', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ themePreference: option }),
+                    })
+                  } catch {
+                    // Theme is still applied locally
+                  }
+                }}
+                className="capitalize"
+              >
+                {option}
+              </Button>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            <Link href="/settings" className="text-primary dark:text-[var(--orange-primary)] hover:underline">
+              More settings
+            </Link>
+            {' '}→ Notification and privacy preferences
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Roles & Permissions */}
+      <Card className="border-2 border-gray-100 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <CardHeader>
+          <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Roles & Permissions</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3 mb-4">
-            <Badge className="bg-primary text-white border-0">{roleLabel}</Badge>
-            <span className="text-sm text-gray-600">Access summary for your role</span>
+            <Badge className="bg-primary text-white border-0 dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]">{roleLabel}</Badge>
+            <span className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Access summary for your role</span>
           </div>
-          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-700">
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-700 dark:text-[var(--text-secondary)]">
             {permissions.map((perm) => (
               <li key={perm} className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-primary" />
+                <Shield className="w-4 h-4 text-primary dark:text-[var(--orange-primary)]" />
                 {perm}
               </li>
             ))}
@@ -323,10 +369,10 @@ export default function ProfilePage() {
       {/* Super Admin Controls - Only visible to aaronsiam21@gmail.com */}
       {user?.email === 'aaronsiam21@gmail.com' && (
         <div className="space-y-6">
-          <Card className="border-2 border-purple-200 bg-gradient-to-br from-white to-purple-50/30">
+          <Card className="border-2 border-purple-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50/30 dark:bg-[var(--bg-elevated)]">
             <CardHeader>
-              <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Shield className="w-6 h-6 text-purple-600" />
+              <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
+                <Shield className="w-6 h-6 text-purple-600 dark:text-[var(--status-onboarding-text)]" />
                 Super Admin Controls
               </CardTitle>
             </CardHeader>
@@ -353,12 +399,12 @@ export default function ProfilePage() {
           <Button
             onClick={handleSave}
             disabled={!isDirty || saving}
-            className="gradient-primary text-white border-0 rounded-xl px-6"
+            className="gradient-primary text-white dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0 rounded-xl px-6"
           >
             <Save className="w-4 h-4 mr-2" />
             {saving ? 'Saving...' : 'Save Changes'}
           </Button>
-          <Button variant="outline" onClick={handleCancel} disabled={saving}>
+          <Button variant="outline" onClick={handleCancel} disabled={saving} className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
             <XCircle className="w-4 h-4 mr-2" />
             Cancel
           </Button>

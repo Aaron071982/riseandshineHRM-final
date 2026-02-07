@@ -127,11 +127,10 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Prepare availability JSON
+    // Prepare availability JSON (do not duplicate preferredHoursRange here; use profile field only)
     const availabilityJson = {
       weekday: body.weekdayAvailability || {},
       weekend: body.weekendAvailability || {},
-      preferredHoursRange: body.preferredHoursRange,
       earliestStartTime: body.earliestStartTime,
       latestEndTime: body.latestEndTime,
     }
@@ -142,42 +141,114 @@ export async function POST(request: NextRequest) {
       otherLanguage: body.otherLanguage || '',
     }
 
+    // Preferred age groups (array from wizard)
+    const preferredAgeGroupsJson = Array.isArray(body.preferredAgeGroups)
+      ? body.preferredAgeGroups
+      : null
+
+    // Experience years: display string + optional int for filtering
+    const experienceYearsDisplay =
+      body.experienceYearsDisplay ?? body.experienceYears ?? null
+    const experienceYearsRaw = experienceYearsDisplay || body.experienceYears
+    let experienceYears: number | null = null
+    if (typeof experienceYearsRaw === 'string') {
+      const parsed = parseInt(experienceYearsRaw, 10)
+      if (!Number.isNaN(parsed)) experienceYears = parsed
+      else if (experienceYearsRaw === '6-10') experienceYears = 6
+      else if (experienceYearsRaw === '10+') experienceYears = 10
+    }
+
     // Parse resume URL to get filename and metadata
     const resumePath = body.resumeUrl
     const resumeFileName = body.resumeFileName || resumePath?.split('/').pop() || null
     const resumeMimeType = body.resumeMimeType || 'application/pdf'
-    const resumeSize = body.resumeSize || null
+    const resumeSize = body.resumeSize ?? null
 
-    // Create RBT profile
-    const rbtProfile = await prisma.rBTProfile.create({
-      data: {
-        userId: userRecord.id,
-        firstName: body.firstName,
-        lastName: body.lastName,
-        phoneNumber: body.phoneNumber,
-        email: body.email,
-        locationCity: body.city || null,
-        locationState: body.state || null,
-        zipCode: body.zipCode,
-        addressLine1: body.addressLine1,
-        addressLine2: body.addressLine2 || null,
-        gender: null, // Not collected in public application
-        ethnicity: body.ethnicity ? (body.ethnicity as any) : null,
-        fortyHourCourseCompleted: body.fortyHourCourseCompleted === 'true',
-        status: 'NEW',
-        source: 'PUBLIC_APPLICATION',
-        submittedAt: new Date(),
-        resumeUrl: resumePath,
-        resumeFileName: resumeFileName,
-        resumeMimeType: resumeMimeType,
-        resumeSize: resumeSize,
-        availabilityJson: availabilityJson,
-        languagesJson: languagesJson,
-        experienceYears: body.experienceYears ? parseInt(body.experienceYears) : null,
-        transportation: body.transportation === 'true' ? true : body.transportation === 'false' ? false : null,
-        preferredHoursRange: body.preferredHoursRange || null,
-        notes: body.notes || null,
-      },
+    const authorizedToWork =
+      body.authorizedToWork === 'true'
+        ? true
+        : body.authorizedToWork === 'false'
+          ? false
+          : null
+    const canPassBackgroundCheck =
+      body.canPassBackgroundCheck === 'true'
+        ? true
+        : body.canPassBackgroundCheck === 'false'
+          ? false
+          : null
+    const cprFirstAidCertified =
+      typeof body.cprFirstAidCertified === 'string' && body.cprFirstAidCertified
+        ? body.cprFirstAidCertified
+        : null
+
+    // Create RBT profile and optional documents in a transaction
+    const rbtProfile = await prisma.$transaction(async (tx) => {
+      const profile = await tx.rBTProfile.create({
+        data: {
+          userId: userRecord.id,
+          firstName: body.firstName,
+          lastName: body.lastName,
+          phoneNumber: body.phoneNumber,
+          email: body.email,
+          locationCity: body.city || null,
+          locationState: body.state || null,
+          zipCode: body.zipCode,
+          addressLine1: body.addressLine1,
+          addressLine2: body.addressLine2 || null,
+          gender: null,
+          ethnicity: body.ethnicity ? (body.ethnicity as any) : null,
+          fortyHourCourseCompleted: body.fortyHourCourseCompleted === 'true',
+          status: 'NEW',
+          source: 'PUBLIC_APPLICATION',
+          submittedAt: new Date(),
+          resumeUrl: resumePath,
+          resumeFileName: resumeFileName,
+          resumeMimeType: resumeMimeType,
+          resumeSize: resumeSize,
+          availabilityJson: availabilityJson,
+          languagesJson: languagesJson,
+          experienceYears,
+          experienceYearsDisplay: experienceYearsDisplay || null,
+          preferredAgeGroupsJson: preferredAgeGroupsJson as any,
+          authorizedToWork,
+          canPassBackgroundCheck,
+          cprFirstAidCertified,
+          transportation:
+            body.transportation === 'true'
+              ? true
+              : body.transportation === 'false'
+                ? false
+                : null,
+          preferredHoursRange: body.preferredHoursRange || null,
+          notes: body.notes || null,
+        },
+      })
+
+      if (body.rbtCertificateUrl) {
+        await tx.rBTDocument.create({
+          data: {
+            rbtProfileId: profile.id,
+            fileName: body.rbtCertificateFileName || 'rbt-certificate',
+            fileType: body.rbtCertificateMimeType || 'application/pdf',
+            fileData: '',
+            filePath: body.rbtCertificateUrl,
+            documentType: 'RBT_CERTIFICATE',
+          },
+        })
+      }
+      if (body.cprCardUrl) {
+        await tx.rBTDocument.create({
+          data: {
+            rbtProfileId: profile.id,
+            fileName: body.cprCardFileName || 'cpr-card',
+            fileType: body.cprCardMimeType || 'application/pdf',
+            fileData: '',
+            filePath: body.cprCardUrl,
+            documentType: 'CPR_CARD',
+          },
+        })
+      }
+      return profile
     })
 
     // Mark draft as submitted if token exists

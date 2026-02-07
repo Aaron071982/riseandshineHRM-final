@@ -23,16 +23,45 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json()
+    const scheduledAt = new Date(data.scheduledAt)
+    const durationMinutes = data.durationMinutes ?? 30
 
-    // Use the standard meeting URL for all interviews
+    if (durationMinutes !== 30) {
+      return NextResponse.json(
+        { error: 'Interviews must be 30 minutes. Please use 30-minute slots only.' },
+        { status: 400 }
+      )
+    }
+
     const meetingUrl = 'https://meet.google.com/gtz-kmij-tvd'
+    const slotEnd = new Date(scheduledAt.getTime() + 30 * 60 * 1000)
+    const slotStartMinus30 = new Date(scheduledAt.getTime() - 30 * 60 * 1000)
 
-    // Create interview
+    const overlapping = await prisma.interview.findFirst({
+      where: {
+        status: 'SCHEDULED',
+        scheduledAt: { gt: slotStartMinus30, lt: slotEnd },
+      },
+    })
+
+    if (overlapping) {
+      return NextResponse.json(
+        { error: 'This time slot is already taken. Please choose another 30-minute slot (e.g. 11:00, 11:30, 12:00).' },
+        { status: 400 }
+      )
+    }
+
+    const rbtBefore = await prisma.rBTProfile.findUnique({
+      where: { id: data.rbtProfileId },
+      select: { status: true },
+    })
+    const previousStatus = rbtBefore?.status ?? 'UNKNOWN'
+
     const interview = await prisma.interview.create({
       data: {
         rbtProfileId: data.rbtProfileId,
-        scheduledAt: new Date(data.scheduledAt),
-        durationMinutes: data.durationMinutes || 15,
+        scheduledAt,
+        durationMinutes: 30,
         interviewerName: data.interviewerName,
         meetingUrl,
         status: 'SCHEDULED',
@@ -40,10 +69,18 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Update RBT profile status to INTERVIEW_SCHEDULED
     await prisma.rBTProfile.update({
       where: { id: data.rbtProfileId },
       data: { status: 'INTERVIEW_SCHEDULED' },
+    })
+    await prisma.rBTAuditLog.create({
+      data: {
+        rbtProfileId: data.rbtProfileId,
+        auditType: 'STATUS_CHANGE',
+        dateTime: new Date(),
+        notes: `Interview scheduled. Status changed from ${previousStatus} to INTERVIEW_SCHEDULED`,
+        createdBy: user?.email || user?.name || 'Admin',
+      },
     })
 
     // Send interview invite email
@@ -56,7 +93,7 @@ export async function POST(request: NextRequest) {
       
       const emailContent = generateInterviewInviteEmail(rbtProfile, {
         scheduledAt: new Date(data.scheduledAt),
-        durationMinutes: data.durationMinutes || 15,
+        durationMinutes: 30,
         interviewerName: data.interviewerName,
         meetingUrl,
       })

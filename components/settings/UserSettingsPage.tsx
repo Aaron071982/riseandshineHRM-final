@@ -6,6 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/toast'
+import { useTheme } from '@/components/theme/ThemeProvider'
 import { Bell, Palette, Shield, Monitor } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -24,7 +25,8 @@ export default function UserSettingsPage() {
     statusChanges: true,
     announcements: true,
   })
-  const [appearance, setAppearance] = useState('system')
+  const { theme, setTheme } = useTheme()
+  const [themeSynced, setThemeSynced] = useState(false)
   const [privacy, setPrivacy] = useState({
     showPhone: true,
     showAddress: false,
@@ -37,9 +39,17 @@ export default function UserSettingsPage() {
       if (!response.ok) return
       const data = await response.json()
       setSessions(data.sessions || [])
+      // Apply profile theme preference on first load (ThemeProvider may have already done this; ensure UI is in sync)
+      if (!themeSynced && data.profile?.themePreference) {
+        const pref = data.profile.themePreference
+        if (pref === 'light' || pref === 'dark' || pref === 'system') {
+          setTheme(pref)
+          setThemeSynced(true)
+        }
+      }
     }
     loadSessions()
-  }, [])
+  }, [themeSynced, setTheme])
 
   const handleSave = () => {
     showToast('Settings saved for this device', 'success')
@@ -57,20 +67,20 @@ export default function UserSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 p-8 shadow-lg">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16 bubble-animation" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12 bubble-animation-delayed" />
+      <div className="dashboard-banner relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 p-8 shadow-lg">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-16 -mt-16 bubble-animation dark:opacity-30" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -ml-12 -mb-12 bubble-animation-delayed dark:opacity-20" />
         <div className="relative">
-          <h1 className="text-4xl font-bold text-white mb-2">Settings</h1>
-          <p className="text-blue-50 text-lg">Manage your personal preferences</p>
+          <h1 className="text-4xl font-bold text-white dark:text-[var(--text-primary)] mb-2">Settings</h1>
+          <p className="text-blue-50 dark:text-[var(--text-tertiary)] text-lg">Manage your personal preferences</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-2 border-blue-100 bg-gradient-to-br from-white to-blue-50/30">
+        <Card className="border-2 border-blue-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-blue-50/30 dark:bg-[var(--bg-elevated)]">
           <CardHeader>
-            <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Bell className="w-5 h-5 text-blue-600" />
+            <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
+              <Bell className="w-5 h-5 text-blue-600 dark:text-[var(--status-interview-text)]" />
               Notifications
             </CardTitle>
           </CardHeader>
@@ -81,7 +91,7 @@ export default function UserSettingsPage() {
               { key: 'statusChanges', label: 'Status changes' },
               { key: 'announcements', label: 'System announcements' },
             ].map((item) => (
-              <label key={item.key} className="flex items-center gap-3 text-sm text-gray-700">
+              <label key={item.key} className="flex items-center gap-3 text-sm text-gray-700 dark:text-[var(--text-secondary)]">
                 <Checkbox
                   checked={notifications[item.key as keyof typeof notifications]}
                   onCheckedChange={(checked) =>
@@ -97,35 +107,46 @@ export default function UserSettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-purple-100 bg-gradient-to-br from-white to-purple-50/30">
+        <Card className="border-2 border-purple-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-purple-50/30 dark:bg-[var(--bg-elevated)]">
           <CardHeader>
-            <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Palette className="w-5 h-5 text-purple-600" />
+            <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
+              <Palette className="w-5 h-5 text-purple-600 dark:text-[var(--status-onboarding-text)]" />
               Appearance
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Label>Theme</Label>
             <div className="flex gap-2">
-              {['light', 'dark', 'system'].map((option) => (
+              {(['light', 'dark', 'system'] as const).map((option) => (
                 <Button
                   key={option}
-                  variant={appearance === option ? 'default' : 'outline'}
-                  onClick={() => setAppearance(option)}
+                  variant={theme === option ? 'default' : 'outline'}
+                  onClick={async () => {
+                    setTheme(option)
+                    try {
+                      await fetch('/api/profile', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ themePreference: option }),
+                      })
+                    } catch {
+                      // Theme is still applied locally
+                    }
+                  }}
                   className="capitalize"
                 >
                   {option}
                 </Button>
               ))}
             </div>
-            <p className="text-xs text-gray-500">Theme preference is saved locally for now.</p>
+            <p className="text-xs text-muted-foreground">Theme is saved automatically and persists across sessions.</p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-green-100 bg-gradient-to-br from-white to-green-50/30">
+        <Card className="border-2 border-green-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-green-50/30 dark:bg-[var(--bg-elevated)]">
           <CardHeader>
-            <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-green-600" />
+            <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
+              <Shield className="w-5 h-5 text-green-600 dark:text-[var(--status-hired-text)]" />
               Privacy
             </CardTitle>
           </CardHeader>
@@ -135,7 +156,7 @@ export default function UserSettingsPage() {
               { key: 'showAddress', label: 'Show address to admins' },
               { key: 'showTimezone', label: 'Show timezone to admins' },
             ].map((item) => (
-              <label key={item.key} className="flex items-center gap-3 text-sm text-gray-700">
+              <label key={item.key} className="flex items-center gap-3 text-sm text-gray-700 dark:text-[var(--text-secondary)]">
                 <Checkbox
                   checked={privacy[item.key as keyof typeof privacy]}
                   onCheckedChange={(checked) =>
@@ -151,15 +172,15 @@ export default function UserSettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-orange-100 bg-gradient-to-br from-white to-orange-50/30">
+        <Card className="border-2 border-orange-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-orange-50/30 dark:bg-[var(--bg-elevated)]">
           <CardHeader>
-            <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Monitor className="w-5 h-5 text-orange-600" />
+            <CardTitle className="text-xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
+              <Monitor className="w-5 h-5 text-orange-600 dark:text-[var(--orange-primary)]" />
               Security Shortcuts
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-gray-700 dark:text-[var(--text-secondary)]">
               Active sessions: <span className="font-semibold">{sessions.length}</span>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -175,10 +196,10 @@ export default function UserSettingsPage() {
       </div>
 
       <div className="flex gap-3">
-        <Button onClick={handleSave} className="gradient-primary text-white border-0 rounded-xl px-6">
+        <Button onClick={handleSave} className="gradient-primary text-white dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0 rounded-xl px-6">
           Save Preferences
         </Button>
-        <Button variant="outline" onClick={() => router.push('/profile')}>
+        <Button variant="outline" onClick={() => router.push('/profile')} className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]">
           Back to Profile
         </Button>
       </div>

@@ -110,14 +110,14 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
           Hi, {rbtProfile.firstName}! Here&apos;s your schedule and work summary.
         </h1>
       </div>
 
       {/* Hours Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
+        <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Hours This Week</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -127,7 +127,7 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Hours This Month</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -147,11 +147,11 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
           <CardContent>
             <div className="space-y-3">
               {upcomingInterviews.map((interview) => (
-                <div key={interview.id} className="border rounded-lg p-4 bg-blue-50/50">
+                <div key={interview.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 bg-blue-50/50 dark:bg-[var(--status-scheduled-bg)]">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">Interview with {interview.interviewerName}</p>
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="font-medium text-gray-900 dark:text-[var(--text-primary)]">Interview with {interview.interviewerName}</p>
+                      <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1">
                         {formatDateTime(interview.scheduledAt)} • {interview.durationMinutes} min
                       </p>
                       {interview.meetingUrl && (
@@ -159,20 +159,20 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
                           href={interview.meetingUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:text-blue-700 mt-2 inline-block"
+                          className="text-sm text-blue-600 hover:text-blue-700 dark:text-[var(--orange-primary)] dark:hover:text-[var(--orange-hover)] mt-2 inline-block"
                         >
                           Join Meeting →
                         </a>
                       )}
                     </div>
-                    <Badge className="bg-blue-100 text-blue-700 border-0">Scheduled</Badge>
+                    <Badge className="bg-blue-100 text-blue-700 dark:bg-[var(--status-scheduled-bg)] dark:text-[var(--status-scheduled-text)] border-0">Scheduled</Badge>
                   </div>
                 </div>
               ))}
             </div>
             <div className="mt-4">
               <Link href="/rbt/interviews">
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
                   View All Interviews
                 </Button>
               </Link>
@@ -182,25 +182,25 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
       )}
 
       {/* Today's Schedule */}
-      <Card>
+      <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
         <CardHeader>
-          <CardTitle>Today&apos;s Schedule</CardTitle>
+          <CardTitle className="dark:text-[var(--text-primary)]">Today&apos;s Schedule</CardTitle>
         </CardHeader>
         <CardContent>
           {todayShifts.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No shifts scheduled for today</p>
+            <p className="text-gray-500 dark:text-[var(--text-tertiary)] text-center py-4">No shifts scheduled for today</p>
           ) : (
             <div className="space-y-4">
               {todayShifts.map((shift) => (
-                <div key={shift.id} className="border rounded-lg p-4">
+                <div key={shift.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-primary)]">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-medium">{shift.clientName}</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="font-medium dark:text-[var(--text-primary)]">{shift.clientName}</p>
+                      <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                         {formatDateTime(shift.startTime)} - {formatDateTime(shift.endTime)}
                       </p>
                       {shift.locationAddress && (
-                        <p className="text-sm text-gray-600 mt-1">{shift.locationAddress}</p>
+                        <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{shift.locationAddress}</p>
                       )}
                     </div>
                     <Badge
@@ -217,21 +217,21 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
       </Card>
 
       {/* Upcoming Shifts */}
-      <Card>
+      <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
         <CardHeader>
-          <CardTitle>Upcoming Shifts</CardTitle>
+          <CardTitle className="dark:text-[var(--text-primary)]">Upcoming Shifts</CardTitle>
         </CardHeader>
         <CardContent>
           {upcomingShifts.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No upcoming shifts</p>
+            <p className="text-gray-500 dark:text-[var(--text-tertiary)] text-center py-4">No upcoming shifts</p>
           ) : (
             <div className="space-y-4">
               {upcomingShifts.map((shift) => (
-                <div key={shift.id} className="border rounded-lg p-4">
+                <div key={shift.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-primary)]">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-medium">{shift.clientName}</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="font-medium dark:text-[var(--text-primary)]">{shift.clientName}</p>
+                      <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                         {formatDate(shift.startTime)} • {new Date(shift.startTime).toLocaleTimeString([], {
                           hour: 'numeric',
                           minute: '2-digit',
@@ -258,7 +258,7 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
           {upcomingShifts.length > 0 && (
             <div className="mt-4">
               <Link href="/rbt/schedule">
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
                   View Full Schedule
                 </Button>
               </Link>
@@ -268,25 +268,25 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
       </Card>
 
       {/* Leave Requests */}
-      <Card>
+      <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
         <CardHeader>
-          <CardTitle>Leave Requests</CardTitle>
+          <CardTitle className="dark:text-[var(--text-primary)]">Leave Requests</CardTitle>
         </CardHeader>
         <CardContent>
           {leaveRequests.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No leave requests</p>
+            <p className="text-gray-500 dark:text-[var(--text-tertiary)] text-center py-4">No leave requests</p>
           ) : (
             <div className="space-y-4">
               {leaveRequests.map((request) => (
-                <div key={request.id} className="border rounded-lg p-4">
+                <div key={request.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-primary)]">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-medium">{request.type}</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="font-medium dark:text-[var(--text-primary)]">{request.type}</p>
+                      <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                         {formatDate(request.startDate)} - {formatDate(request.endDate)}
                       </p>
                       {request.reason && (
-                        <p className="text-sm text-gray-600 mt-1">{request.reason}</p>
+                        <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{request.reason}</p>
                       )}
                     </div>
                     <Badge
@@ -301,7 +301,7 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
           )}
           <div className="mt-4">
             <Link href="/rbt/leave">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
                 Request Time Off
               </Button>
             </Link>
@@ -314,12 +314,12 @@ export default async function RBTMainDashboard({ rbtProfileId }: RBTMainDashboar
     console.error('[RBTMainDashboard] Error loading dashboard:', error)
     return (
       <div className="container mx-auto p-6 max-w-4xl">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-          <h1 className="text-xl font-bold text-red-800 mb-2">Error Loading Dashboard</h1>
-          <p className="text-red-700">
+        <div className="bg-red-50 dark:bg-[var(--status-rejected-bg)] border border-red-200 dark:border-[var(--status-rejected-border)] rounded-lg p-6">
+          <h1 className="text-xl font-bold text-red-800 dark:text-[var(--status-rejected-text)] mb-2">Error Loading Dashboard</h1>
+          <p className="text-red-700 dark:text-[var(--status-rejected-text)]">
             Unable to load your dashboard data. Please try refreshing the page.
           </p>
-          <p className="text-sm text-red-600 mt-2">
+          <p className="text-sm text-red-600 dark:text-[var(--text-tertiary)] mt-2">
             Error: {error?.message || 'Unknown error'}
           </p>
         </div>

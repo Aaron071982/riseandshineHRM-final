@@ -117,13 +117,22 @@ export async function POST(
 
     console.log(`✅ Email sent successfully to ${rbtProfile.email}`)
 
-    // Update RBT status and store scheduling token for REACH_OUT emails
     if (templateType === EmailTemplateType.REACH_OUT && schedulingToken) {
+      const previousStatus = rbtProfile.status
       await prisma.rBTProfile.update({
         where: { id: rbtProfile.id },
         data: {
           status: 'REACH_OUT_EMAIL_SENT',
           schedulingToken,
+        },
+      })
+      await prisma.rBTAuditLog.create({
+        data: {
+          rbtProfileId: rbtProfile.id,
+          auditType: 'STATUS_CHANGE',
+          dateTime: new Date(),
+          notes: `Reach-out email sent. Status changed from ${previousStatus} to REACH_OUT_EMAIL_SENT`,
+          createdBy: user?.email || user?.name || 'Admin',
         },
       })
       console.log(`✅ Updated RBT status to REACH_OUT_EMAIL_SENT and stored scheduling token`)

@@ -100,10 +100,19 @@ export async function POST(
       }
     }
 
-    // Update RBT profile status to HIRED
+    const previousStatus = rbtProfile.status
     await prisma.rBTProfile.update({
       where: { id },
       data: { status: 'HIRED' },
+    })
+    await prisma.rBTAuditLog.create({
+      data: {
+        rbtProfileId: id,
+        auditType: 'STATUS_CHANGE',
+        dateTime: new Date(),
+        notes: `Candidate hired. Status changed from ${previousStatus} to HIRED`,
+        createdBy: user?.email || user?.name || 'Admin',
+      },
     })
 
     // ALWAYS ensure onboarding tasks exist (create if missing, skip if already exist)
@@ -154,13 +163,6 @@ export async function POST(
           documentDownloadUrl: 'https://www.healthit.gov/topic/health-it-resources/guide-privacy-security-electronic-health-information',
           sortOrder: 5,
         },
-        {
-          taskType: 'DOWNLOAD_DOC',
-          title: 'Download Onboarding Documents Folder',
-          description: 'Download the complete onboarding documents folder. You will need to fill out all documents and re-upload them as a folder after logging in.',
-          documentDownloadUrl: '/api/rbt/onboarding-package/download', // Downloads the onboarding documents folder as a zip
-          sortOrder: needsFortyHourCourse ? 7 : 6,
-        },
         ...(needsFortyHourCourse ? [{
           taskType: 'FORTY_HOUR_COURSE_CERTIFICATE',
           title: 'Complete 40-Hour RBT Course & Upload Certificate',
@@ -172,7 +174,7 @@ export async function POST(
           taskType: 'SIGNATURE',
           title: 'Digital Signature Confirmation',
           description: 'Sign to confirm you have read and understood all HIPAA documents and training materials',
-          sortOrder: needsFortyHourCourse ? 8 : 7,
+          sortOrder: needsFortyHourCourse ? 7 : 6,
         },
       ]
 
@@ -200,7 +202,7 @@ export async function POST(
     } else {
       // Tasks already exist - check if they match expected structure
       const needsFortyHourCourse = !(rbtProfile.fortyHourCourseCompleted === true)
-      const expectedTaskCount = needsFortyHourCourse ? 9 : 8
+      const expectedTaskCount = needsFortyHourCourse ? 8 : 7
       const hasFortyHourCourseTask = existingTasks.some(t => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
       console.log(`RBT ${rbtProfile.id} - Existing tasks: ${existingTasks.length}, Expected: ${expectedTaskCount}, Has 40-hour task: ${hasFortyHourCourseTask}, Needs course: ${needsFortyHourCourse}, fortyHourCourseCompleted value: ${rbtProfile.fortyHourCourseCompleted}`)
       
@@ -250,13 +252,6 @@ export async function POST(
             documentDownloadUrl: 'https://www.healthit.gov/topic/health-it-resources/guide-privacy-security-electronic-health-information',
             sortOrder: 5,
           },
-          {
-            taskType: 'DOWNLOAD_DOC',
-            title: 'Download Onboarding Documents Folder',
-            description: 'Download the complete onboarding documents folder. You will need to fill out all documents and re-upload them as a folder after logging in.',
-            documentDownloadUrl: '/api/rbt/onboarding-package/download',
-            sortOrder: needsFortyHourCourse ? 7 : 6,
-          },
           ...(needsFortyHourCourse ? [{
             taskType: 'FORTY_HOUR_COURSE_CERTIFICATE',
             title: 'Complete 40-Hour RBT Course & Upload Certificate',
@@ -268,7 +263,7 @@ export async function POST(
             taskType: 'SIGNATURE',
             title: 'Digital Signature Confirmation',
             description: 'Sign to confirm you have read and understood all HIPAA documents and training materials',
-            sortOrder: needsFortyHourCourse ? 8 : 7,
+            sortOrder: needsFortyHourCourse ? 7 : 6,
           },
         ]
 

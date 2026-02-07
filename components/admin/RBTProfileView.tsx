@@ -61,6 +61,11 @@ interface RBTProfile {
   availabilityJson: any
   languagesJson: any
   experienceYears: number | null
+  experienceYearsDisplay: string | null
+  preferredAgeGroupsJson: any
+  authorizedToWork: boolean | null
+  canPassBackgroundCheck: boolean | null
+  cprFirstAidCertified: string | null
   transportation: boolean | null
   preferredHoursRange: string | null
   createdAt: Date
@@ -304,32 +309,69 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     setConfirmDialogOpen(true)
   }
 
+  const deleteConfirmMatch =
+    deleteConfirmInput.trim().toUpperCase() === 'DELETE' ||
+    deleteConfirmInput.trim() === `${rbtProfile.firstName} ${rbtProfile.lastName}` ||
+    (rbtProfile.email && deleteConfirmInput.trim().toLowerCase() === rbtProfile.email.toLowerCase())
+
   const handleDeleteRBT = () => {
-    setConfirmMessage(`Are you sure you want to delete ${rbtProfile.firstName} ${rbtProfile.lastName}? This will permanently delete the RBT profile and all associated data. This action cannot be undone.`)
+    setDeleteStep(1)
+    setDeleteConfirmInput('')
+    setConfirmMessage(
+      `This will permanently delete ${rbtProfile.firstName} ${rbtProfile.lastName} and all associated data (interviews, documents, audit log). This action cannot be undone. Click "Continue" to confirm.`
+    )
+    setConfirmAction(() => {
+      setDeleteStep(2)
+      setConfirmMessage(`Type DELETE or the candidate's full name or email to enable the delete button.`)
+      setConfirmAction(null)
+    })
+    setConfirmDialogOpen(true)
+  }
+
+  const handleDeletePermanently = async () => {
+    if (!deleteConfirmMatch) return
+    try {
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/delete`, { method: 'DELETE' })
+      if (response.ok) {
+        showToast('RBT deleted successfully', 'success')
+        setConfirmDialogOpen(false)
+        setConfirmAction(null)
+        setDeleteStep(0)
+        setDeleteConfirmInput('')
+        router.refresh()
+        setTimeout(() => router.push('/admin/rbts'), 100)
+      } else {
+        const errorData = await response.json()
+        showToast(`Failed to delete RBT: ${errorData.error || 'Unknown error'}`, 'error')
+      }
+    } catch (error) {
+      console.error('Error deleting RBT:', error)
+      showToast('An error occurred while deleting the RBT. Please try again.', 'error')
+    }
+  }
+
+  const handleStall = () => {
+    setConfirmMessage(`Mark ${rbtProfile.firstName} ${rbtProfile.lastName} as Stalled? This will set their status to Stalled (e.g. no response, on hold).`)
     setConfirmAction(async () => {
       try {
-        const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/delete`, {
-          method: 'DELETE',
+        const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'STALLED' }),
         })
-
         if (response.ok) {
-          showToast('RBT deleted successfully', 'success')
+          setRbtProfile({ ...rbtProfile, status: 'STALLED' })
+          showToast('Candidate marked as Stalled.', 'success')
           setConfirmDialogOpen(false)
           setConfirmAction(null)
-          // Force refresh and redirect
           router.refresh()
-          setTimeout(() => {
-            router.push('/admin/rbts')
-          }, 100)
         } else {
-          const errorData = await response.json()
-          showToast(`Failed to delete RBT: ${errorData.error || 'Unknown error'}`, 'error')
-          // Keep dialog open on error so user can see the error message
+          const data = await response.json()
+          showToast(data.error || 'Failed to update status', 'error')
         }
       } catch (error) {
-        console.error('Error deleting RBT:', error)
-        showToast('An error occurred while deleting the RBT. Please try again.', 'error')
-        // Keep dialog open on error so user can see the error message
+        console.error('Error marking stalled:', error)
+        showToast('An error occurred. Please try again.', 'error')
       }
     })
     setConfirmDialogOpen(true)
@@ -419,6 +461,8 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   }
 
   const [pendingDocumentUpload, setPendingDocumentUpload] = useState<File[]>([])
+  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0)
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
 
   const handleDocumentUploadClick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -527,6 +571,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   const canSendReachOut = rbtProfile.status === 'REACH_OUT' || rbtProfile.status === 'NEW' || rbtProfile.status === 'REACH_OUT_EMAIL_SENT'
   const canScheduleInterview = rbtProfile.status === 'TO_INTERVIEW' || rbtProfile.status === 'REACH_OUT' || rbtProfile.status === 'REACH_OUT_EMAIL_SENT'
   const canHire = rbtProfile.status === 'INTERVIEW_COMPLETED'
+  const canStall = rbtProfile.status === 'INTERVIEW_COMPLETED'
   const canReject = rbtProfile.status !== 'HIRED' && rbtProfile.status !== 'REJECTED'
   const isHired = rbtProfile.status === 'HIRED'
 
@@ -542,36 +587,37 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     INTERVIEW_SCHEDULED: { color: 'from-purple-500 to-purple-400' },
     INTERVIEW_COMPLETED: { color: 'from-indigo-500 to-indigo-400' },
     HIRED: { color: 'from-green-500 to-green-400' },
+    STALLED: { color: 'from-amber-500 to-amber-400' },
     REJECTED: { color: 'from-red-500 to-red-400' },
   }[rbtProfile.status] || { color: 'from-gray-500 to-gray-400' }
 
   return (
     <div className="space-y-6">
       {/* Header with gradient background */}
-      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-r ${statusConfig.color} p-8 shadow-lg`}>
+      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-r ${statusConfig.color} dark:bg-[var(--bg-header)] p-8 shadow-lg dark:border dark:border-[var(--border-subtle)]`}>
         {/* Decorative bubbles */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16 bubble-animation" />
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12 bubble-animation-delayed" />
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-16 -mt-16 bubble-animation dark:opacity-30" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 dark:bg-[var(--orange-subtle)] rounded-full -ml-12 -mb-12 bubble-animation-delayed dark:opacity-20" />
         
         <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">
+            <h1 className="text-4xl font-bold text-white dark:text-[var(--text-primary)] mb-2">
               {rbtProfile.firstName} {rbtProfile.lastName}
             </h1>
-            <p className="text-white/90 text-lg">RBT Profile & Hiring Pipeline</p>
+            <p className="text-white/90 dark:text-[var(--text-tertiary)] text-lg">RBT Profile & Hiring Pipeline</p>
           </div>
-          <Badge className="bg-white text-gray-900 border-0 px-4 py-2 text-base font-semibold">
+          <Badge className="bg-white dark:bg-[var(--bg-elevated)] text-gray-900 dark:text-[var(--text-primary)] border-0 dark:border-[var(--border-subtle)] px-4 py-2 text-base font-semibold">
             {rbtProfile.status.replace(/_/g, ' ')}
           </Badge>
         </div>
       </div>
 
       {/* Profile Information */}
-      <Card className="border-2 border-orange-100 bg-gradient-to-br from-white to-orange-50/30 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 rounded-full -mr-20 -mt-20 bubble-animation" />
+      <Card className="border-2 border-orange-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-orange-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-20 -mt-20 bubble-animation dark:opacity-20" />
         <CardHeader className="relative">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-2xl font-bold text-gray-900">Profile Information</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Profile Information</CardTitle>
             <Button
               variant="outline"
               onClick={() => setEditingProfile(!editingProfile)}
@@ -604,55 +650,55 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-gray-600">Phone Number</p>
-                <p className="font-medium">{rbtProfile.phoneNumber}</p>
+                <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Phone Number</p>
+                <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.phoneNumber}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Email</p>
-                <p className="font-medium">{rbtProfile.email || '—'}</p>
+                <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Email</p>
+                <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.email || '—'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">City</p>
-                <p className="font-medium">{rbtProfile.locationCity || '—'}</p>
+                <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">City</p>
+                <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.locationCity || '—'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">State</p>
-                <p className="font-medium">{rbtProfile.locationState || '—'}</p>
+                <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">State</p>
+                <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.locationState || '—'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Zip Code</p>
-                <p className="font-medium">{rbtProfile.zipCode || '—'}</p>
+                <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Zip Code</p>
+                <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.zipCode || '—'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Preferred Service Area</p>
-                <p className="font-medium">{rbtProfile.preferredServiceArea || '—'}</p>
+                <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Preferred Service Area</p>
+                <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.preferredServiceArea || '—'}</p>
               </div>
               {rbtProfile.gender && (
                 <div>
-                  <p className="text-sm text-gray-600">Gender</p>
-                  <p className="font-medium">{rbtProfile.gender}</p>
+                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Gender</p>
+                  <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.gender}</p>
                 </div>
               )}
               {rbtProfile.ethnicity && (
                 <div>
-                  <p className="text-sm text-gray-600">Ethnicity</p>
-                  <p className="font-medium">{rbtProfile.ethnicity.replace(/_/g, ' ')}</p>
+                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Ethnicity</p>
+                  <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.ethnicity.replace(/_/g, ' ')}</p>
                 </div>
               )}
               <div className="md:col-span-2">
-                <p className="text-sm text-gray-600">Address Line 1</p>
-                <p className="font-medium">{rbtProfile.addressLine1 || '—'}</p>
+                <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Address Line 1</p>
+                <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.addressLine1 || '—'}</p>
               </div>
               {rbtProfile.addressLine2 && (
                 <div className="md:col-span-2">
-                  <p className="text-sm text-gray-600">Address Line 2</p>
-                  <p className="font-medium">{rbtProfile.addressLine2}</p>
+                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Address Line 2</p>
+                  <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.addressLine2}</p>
                 </div>
               )}
               {rbtProfile.notes && (
                 <div className="md:col-span-2">
-                  <p className="text-sm text-gray-600">Notes</p>
-                  <p className="font-medium whitespace-pre-wrap">{rbtProfile.notes}</p>
+                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Notes</p>
+                  <p className="font-medium dark:text-[var(--text-primary)] whitespace-pre-wrap">{rbtProfile.notes}</p>
                 </div>
               )}
             </div>
@@ -662,17 +708,17 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
       {/* Public Application Info */}
       {rbtProfile.source === 'PUBLIC_APPLICATION' && (
-        <Card className="border-2 border-orange-100 bg-gradient-to-br from-white to-orange-50/30 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 rounded-full -mr-20 -mt-20 bubble-animation" />
+        <Card className="border-2 border-orange-100 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-orange-50/30 dark:bg-[var(--bg-elevated)] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 dark:bg-[var(--orange-subtle)] rounded-full -mr-20 -mt-20 bubble-animation dark:opacity-20" />
           <CardHeader className="relative">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-2xl font-bold text-gray-900">Application Information</CardTitle>
-              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+              <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Application Information</CardTitle>
+              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-[var(--orange-subtle)] dark:text-[var(--orange-primary)] dark:border-[var(--orange-border)]">
                 Applied Online
               </Badge>
             </div>
             {rbtProfile.submittedAt && (
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1">
                 Submitted: {formatDateTime(rbtProfile.submittedAt)}
               </p>
             )}
@@ -680,12 +726,12 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           <CardContent className="space-y-4">
             {/* Resume Download */}
             {rbtProfile.resumeUrl && (
-              <div className="flex items-center justify-between p-4 bg-white rounded-lg border-2 border-gray-200">
+              <div className="flex items-center justify-between p-4 bg-white dark:bg-[var(--bg-primary)] rounded-lg border-2 border-gray-200 dark:border-[var(--border-subtle)]">
                 <div className="flex items-center gap-3">
-                  <FileText className="h-8 w-8 text-primary" />
+                  <FileText className="h-8 w-8 text-primary dark:text-[var(--orange-primary)]" />
                   <div>
-                    <p className="font-medium text-gray-900">Resume</p>
-                    <p className="text-sm text-gray-600">
+                    <p className="font-medium text-gray-900 dark:text-[var(--text-primary)]">Resume</p>
+                    <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                       {rbtProfile.resumeFileName || 'Resume file'}
                       {rbtProfile.resumeSize && ` (${(rbtProfile.resumeSize / 1024 / 1024).toFixed(2)} MB)`}
                     </p>
@@ -723,42 +769,76 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               </div>
             )}
 
-            {/* Availability */}
+            {/* 40-Hour RBT Course */}
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">40-Hour RBT Course Completed</p>
+              <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+                <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">{rbtProfile.fortyHourCourseCompleted ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+
+            {/* Years of Experience */}
+            {(rbtProfile.experienceYearsDisplay != null && rbtProfile.experienceYearsDisplay !== '') || rbtProfile.experienceYears !== null ? (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Years of Experience</p>
+                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+                    {rbtProfile.experienceYearsDisplay != null && rbtProfile.experienceYearsDisplay !== ''
+                      ? rbtProfile.experienceYearsDisplay.includes('year') ? rbtProfile.experienceYearsDisplay : `${rbtProfile.experienceYearsDisplay} years`
+                      : rbtProfile.experienceYears != null ? `${rbtProfile.experienceYears} years` : '—'}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Preferred Client Age Groups */}
+            {rbtProfile.preferredAgeGroupsJson && Array.isArray(rbtProfile.preferredAgeGroupsJson) && (rbtProfile.preferredAgeGroupsJson as string[]).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Preferred Client Age Groups</p>
+                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">{(rbtProfile.preferredAgeGroupsJson as string[]).join(', ')}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Availability: single box, one Preferred Weekly Hours, time range from availabilityJson */}
             {rbtProfile.availabilityJson && (
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">Availability</p>
-                <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2">
+                <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Availability</p>
+                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4 space-y-2">
                   {rbtProfile.availabilityJson?.weekday && Object.keys(rbtProfile.availabilityJson.weekday).length > 0 && (
                     <div>
-                      <p className="text-sm font-medium text-gray-700">Weekdays (after 2PM):</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Weekdays (after 2PM):</p>
+                      <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                         {Object.keys(rbtProfile.availabilityJson.weekday)
                           .filter((day: string) => rbtProfile.availabilityJson?.weekday?.[day])
+                          .sort()
                           .join(', ') || 'None'}
                       </p>
                     </div>
                   )}
                   {rbtProfile.availabilityJson?.weekend && Object.keys(rbtProfile.availabilityJson.weekend).length > 0 && (
                     <div>
-                      <p className="text-sm font-medium text-gray-700">Weekends:</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Weekends:</p>
+                      <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                         {Object.keys(rbtProfile.availabilityJson.weekend)
                           .filter((day: string) => rbtProfile.availabilityJson?.weekend?.[day])
+                          .sort()
                           .join(', ') || 'None'}
                       </p>
                     </div>
                   )}
-                  {rbtProfile.availabilityJson?.preferredHoursRange && (
+                  {rbtProfile.preferredHoursRange && (
                     <div>
-                      <p className="text-sm font-medium text-gray-700">Preferred Hours:</p>
-                      <p className="text-sm text-gray-600">{(rbtProfile.availabilityJson as any).preferredHoursRange}</p>
+                      <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Preferred Weekly Hours:</p>
+                      <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">{rbtProfile.preferredHoursRange}</p>
                     </div>
                   )}
                   {((rbtProfile.availabilityJson as any)?.earliestStartTime || (rbtProfile.availabilityJson as any)?.latestEndTime) && (
                     <div>
-                      <p className="text-sm font-medium text-gray-700">Time Range:</p>
-                      <p className="text-sm text-gray-600">
-                        {(rbtProfile.availabilityJson as any).earliestStartTime || 'Not specified'} - {(rbtProfile.availabilityJson as any).latestEndTime || 'Not specified'}
+                      <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Time Range:</p>
+                      <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+                        {(rbtProfile.availabilityJson as any).earliestStartTime || '—'} – {(rbtProfile.availabilityJson as any).latestEndTime || '—'}
                       </p>
                     </div>
                   )}
@@ -767,23 +847,13 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             )}
 
             {/* Languages */}
-            {rbtProfile.languagesJson && rbtProfile.languagesJson.languages && rbtProfile.languagesJson.languages.length > 0 && (
+            {rbtProfile.languagesJson && (rbtProfile.languagesJson as any).languages && (rbtProfile.languagesJson as any).languages.length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">Languages Spoken</p>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <p className="text-sm text-gray-600">
-                    {[...rbtProfile.languagesJson.languages, rbtProfile.languagesJson.otherLanguage].filter(Boolean).join(', ')}
+                <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Languages Spoken</p>
+                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+                    {[...((rbtProfile.languagesJson as any).languages || []), (rbtProfile.languagesJson as any).otherLanguage].filter(Boolean).join(', ')}
                   </p>
-                </div>
-              </div>
-            )}
-
-            {/* Experience */}
-            {rbtProfile.experienceYears !== null && (
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">Years of Experience</p>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <p className="text-sm text-gray-600">{rbtProfile.experienceYears} years</p>
                 </div>
               </div>
             )}
@@ -791,19 +861,69 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             {/* Transportation */}
             {rbtProfile.transportation !== null && (
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">Reliable Transportation</p>
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <p className="text-sm text-gray-600">{rbtProfile.transportation ? 'Yes' : 'No'}</p>
+                <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Reliable Transportation</p>
+                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4">
+                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">{rbtProfile.transportation ? 'Yes' : 'No'}</p>
                 </div>
               </div>
             )}
 
-            {/* Preferred Hours Range */}
-            {rbtProfile.preferredHoursRange && (
+            {/* Compliance */}
+            {(rbtProfile.authorizedToWork !== null || rbtProfile.canPassBackgroundCheck !== null || rbtProfile.cprFirstAidCertified) && (
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-700">Preferred Weekly Hours</p>
+                <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Compliance & Eligibility</p>
+                <div className="bg-white dark:bg-[var(--bg-primary)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4 space-y-2">
+                  {rbtProfile.authorizedToWork !== null && (
+                    <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Authorized to work in US: {rbtProfile.authorizedToWork ? 'Yes' : 'No'}</p>
+                  )}
+                  {rbtProfile.canPassBackgroundCheck !== null && (
+                    <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Can pass background check: {rbtProfile.canPassBackgroundCheck ? 'Yes' : 'No'}</p>
+                  )}
+                  {rbtProfile.cprFirstAidCertified && (
+                    <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">CPR/First Aid certified: {rbtProfile.cprFirstAidCertified === 'true' ? 'Yes' : rbtProfile.cprFirstAidCertified === 'false' ? 'No' : rbtProfile.cprFirstAidCertified}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Additional Notes */}
+            {rbtProfile.notes && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Additional Notes</p>
                 <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <p className="text-sm text-gray-600">{rbtProfile.preferredHoursRange}</p>
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{rbtProfile.notes}</p>
+                </div>
+              </div>
+            )}
+
+            {/* RBT Certificate & CPR Card from documents */}
+            {documents.filter((d) => d.documentType === 'RBT_CERTIFICATE').length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700">RBT Certificate</p>
+                <div className="space-y-2">
+                  {documents.filter((d) => d.documentType === 'RBT_CERTIFICATE').map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
+                      <span className="text-sm text-gray-700">{doc.fileName}</span>
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(doc.id, doc.fileName)}>
+                        <Download className="h-4 w-4 mr-1" /> Download
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {documents.filter((d) => d.documentType === 'CPR_CARD').length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700">CPR/First Aid Card</p>
+                <div className="space-y-2">
+                  {documents.filter((d) => d.documentType === 'CPR_CARD').map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
+                      <span className="text-sm text-gray-700">{doc.fileName}</span>
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(doc.id, doc.fileName)}>
+                        <Download className="h-4 w-4 mr-1" /> Download
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -869,6 +989,16 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 className="gradient-green text-white border-0 rounded-xl px-6 shine-effect glow-effect"
               >
                 Mark as Hired
+              </Button>
+            )}
+            {canStall && (
+              <Button 
+                onClick={handleStall} 
+                disabled={loading}
+                variant="outline"
+                className="border-amber-300 text-amber-700 hover:bg-amber-50 rounded-xl px-6"
+              >
+                Mark as Stalled
               </Button>
             )}
             {canReject && (
@@ -1028,10 +1158,16 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 </div>
               </div>
 
-              {/* Tasks List */}
+              {/* Tasks List - hide "Download Onboarding Documents Folder" task */}
               <div className="space-y-3 mt-6">
                 <h3 className="font-semibold text-gray-900">Tasks</h3>
-                {rbtProfile.onboardingTasks.map((task) => (
+                {rbtProfile.onboardingTasks
+                  .filter(
+                    (task) =>
+                      !task.title?.toLowerCase().includes('download onboarding documents folder') &&
+                      !task.documentDownloadUrl?.includes('onboarding-package')
+                  )
+                  .map((task) => (
                   <div key={task.id} className="border rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -1075,30 +1211,16 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                       </div>
                     )}
 
-                    {/* Show Package Download if available */}
+                    {/* Show Package Upload confirmation (no download option) */}
                     {task.taskType === 'PACKAGE_UPLOAD' && task.isCompleted && task.uploadUrl && (
                       <div className="mt-4 ml-7 p-4 bg-gray-50 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
                           <FileText className="w-5 h-5 text-green-600" />
                           <p className="text-sm font-medium text-gray-700">Uploaded Package:</p>
                         </div>
-                        <p className="text-xs text-gray-500 mb-3">
+                        <p className="text-xs text-gray-500">
                           Package uploaded and sent to administrator email
                         </p>
-                        <a
-                          href={`/api/admin/rbts/${rbtProfile.id}/download-package`}
-                          download
-                        >
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            type="button"
-                            className="flex items-center gap-2"
-                          >
-                            <Download className="w-4 h-4" />
-                            Download Onboarding Package
-                          </Button>
-                        </a>
                       </div>
                     )}
                   </div>
@@ -1109,13 +1231,20 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         </Card>
       )}
 
-      {/* Onboarding Documents */}
-      {isHired && rbtProfile.onboardingCompletions && rbtProfile.onboardingCompletions.length > 0 && (
+      {/* Onboarding Documents - always visible for hired RBTs */}
+      {isHired && (
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-gray-900">Onboarding Documents</CardTitle>
+            <p className="text-sm text-gray-600 mt-1">Acknowledgment and fillable PDF completions</p>
           </CardHeader>
           <CardContent>
+            {!rbtProfile.onboardingCompletions || rbtProfile.onboardingCompletions.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">No onboarding documents completed yet</p>
+              </div>
+            ) : (
             <div className="space-y-4">
               {rbtProfile.onboardingCompletions.map((completion) => (
                 <div key={completion.id} className="border rounded-lg p-4">
@@ -1217,6 +1346,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 </div>
               ))}
             </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -1410,18 +1540,32 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       <Dialog 
         open={confirmDialogOpen} 
         onOpenChange={(open) => {
-          // Prevent closing during loading
           if (!open && !confirmLoading) {
             setConfirmDialogOpen(false)
             setConfirmAction(null)
+            setDeleteStep(0)
+            setDeleteConfirmInput('')
           }
         }}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Confirm Action</DialogTitle>
+            <DialogTitle>{deleteStep === 2 ? 'Confirm permanent delete' : 'Confirm Action'}</DialogTitle>
             <DialogDescription>{confirmMessage}</DialogDescription>
           </DialogHeader>
+          {deleteStep === 2 && (
+            <div className="space-y-3 py-2">
+              <Label htmlFor="delete-confirm">Type DELETE or the candidate&apos;s full name or email</Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmInput}
+                onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                placeholder="DELETE"
+                className="font-mono"
+                autoComplete="off"
+              />
+            </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
@@ -1429,37 +1573,50 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 setConfirmDialogOpen(false)
                 setConfirmAction(null)
                 setConfirmLoading(false)
+                setDeleteStep(0)
+                setDeleteConfirmInput('')
               }}
               disabled={confirmLoading}
             >
               Cancel
             </Button>
-            <Button
-              onClick={async () => {
-                if (confirmAction) {
-                  setConfirmLoading(true)
-                  try {
-                    await confirmAction()
-                    // Reset loading state after action completes (success or failure)
-                    setConfirmLoading(false)
-                  } catch (error) {
-                    // Error already handled in confirmAction, but reset loading state
-                    setConfirmLoading(false)
+            {deleteStep === 2 ? (
+              <Button
+                onClick={handleDeletePermanently}
+                disabled={!deleteConfirmMatch || confirmLoading}
+                variant="destructive"
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {confirmLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete permanently'}
+              </Button>
+            ) : (
+              <Button
+                onClick={async () => {
+                  if (confirmAction) {
+                    setConfirmLoading(true)
+                    try {
+                      await confirmAction()
+                      setConfirmLoading(false)
+                    } catch {
+                      setConfirmLoading(false)
+                    }
                   }
-                }
-              }}
-              disabled={confirmLoading}
-              className="bg-orange-500 hover:bg-orange-600 text-white"
-            >
-              {confirmLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                'Confirm'
-              )}
-            </Button>
+                }}
+                disabled={confirmLoading}
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                {confirmLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : deleteStep === 1 ? (
+                  'Continue'
+                ) : (
+                  'Confirm'
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1520,7 +1677,7 @@ function InterviewScheduleForm({
     // Treat input as New York time and convert to UTC for storage
     onSubmit({
       scheduledAt: nyTimeToUTC(dateStr, timeStr),
-      durationMinutes: parseInt(formData.get('duration') as string, 10),
+      durationMinutes: 30,
       interviewerName: interviewerEmail, // Use the selected email
     })
   }
@@ -1533,11 +1690,11 @@ function InterviewScheduleForm({
       </div>
       <div className="space-y-2">
         <Label htmlFor="time">Time</Label>
-        <Input id="time" name="time" type="time" required />
+        <Input id="time" name="time" type="time" step="1800" required />
       </div>
       <div className="space-y-2">
         <Label htmlFor="duration">Duration (minutes)</Label>
-        <Input id="duration" name="duration" type="number" defaultValue={15} required />
+        <Input id="duration" name="duration" type="number" defaultValue={30} readOnly className="bg-gray-50" />
       </div>
       <div className="space-y-2">
         <Label htmlFor="interviewerEmail">Interviewer Email</Label>

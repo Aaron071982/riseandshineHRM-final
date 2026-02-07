@@ -86,27 +86,37 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json()
 
+    const themePreference = body.themePreference
+    const validTheme = themePreference === 'light' || themePreference === 'dark' || themePreference === 'system'
+      ? themePreference
+      : undefined
+
+    const existing = await prisma.userProfile.findUnique({
+      where: { userId: user.id },
+    })
+
     const data = {
-      fullName: body.fullName || null,
-      preferredName: body.preferredName || null,
-      phone: body.phone || null,
-      address: body.address || null,
-      timezone: body.timezone || null,
-      preferredContactMethod: body.preferredContactMethod || null,
-      bio: body.bio || null,
-      skills: normalizeStringArray(body.skills),
-      languages: normalizeStringArray(body.languages),
-      emergencyContactName: body.emergencyContactName || null,
-      emergencyContactRelationship: body.emergencyContactRelationship || null,
-      emergencyContactPhone: body.emergencyContactPhone || null,
-      employeeId: body.employeeId || null,
-      startDate: body.startDate ? new Date(body.startDate) : null,
-      department: body.department || null,
-      title: body.title || null,
-      rbtCertificationNumber: body.rbtCertificationNumber || null,
-      rbtCertificationExpiresAt: body.rbtCertificationExpiresAt
-        ? new Date(body.rbtCertificationExpiresAt)
-        : null,
+      fullName: body.fullName !== undefined ? body.fullName || null : existing?.fullName ?? null,
+      preferredName: body.preferredName !== undefined ? body.preferredName || null : existing?.preferredName ?? null,
+      phone: body.phone !== undefined ? body.phone || null : existing?.phone ?? null,
+      address: body.address !== undefined ? body.address || null : existing?.address ?? null,
+      timezone: body.timezone !== undefined ? body.timezone || null : existing?.timezone ?? null,
+      preferredContactMethod: body.preferredContactMethod !== undefined ? body.preferredContactMethod || null : existing?.preferredContactMethod ?? null,
+      bio: body.bio !== undefined ? body.bio || null : existing?.bio ?? null,
+      skills: body.skills !== undefined ? normalizeStringArray(body.skills) : existing?.skills ?? [],
+      languages: body.languages !== undefined ? normalizeStringArray(body.languages) : existing?.languages ?? [],
+      emergencyContactName: body.emergencyContactName !== undefined ? body.emergencyContactName || null : existing?.emergencyContactName ?? null,
+      emergencyContactRelationship: body.emergencyContactRelationship !== undefined ? body.emergencyContactRelationship || null : existing?.emergencyContactRelationship ?? null,
+      emergencyContactPhone: body.emergencyContactPhone !== undefined ? body.emergencyContactPhone || null : existing?.emergencyContactPhone ?? null,
+      employeeId: body.employeeId !== undefined ? body.employeeId || null : existing?.employeeId ?? null,
+      startDate: body.startDate !== undefined ? (body.startDate ? new Date(body.startDate) : null) : existing?.startDate ?? null,
+      department: body.department !== undefined ? body.department || null : existing?.department ?? null,
+      title: body.title !== undefined ? body.title || null : existing?.title ?? null,
+      rbtCertificationNumber: body.rbtCertificationNumber !== undefined ? body.rbtCertificationNumber || null : existing?.rbtCertificationNumber ?? null,
+      rbtCertificationExpiresAt: body.rbtCertificationExpiresAt !== undefined
+        ? (body.rbtCertificationExpiresAt ? new Date(body.rbtCertificationExpiresAt) : null)
+        : existing?.rbtCertificationExpiresAt ?? null,
+      themePreference: validTheme !== undefined ? validTheme : existing?.themePreference ?? null,
     }
 
     const profile = await prisma.userProfile.upsert({

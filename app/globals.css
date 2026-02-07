@@ -25,6 +25,89 @@
     --ring: 22 72% 58%;
     --radius: 0.75rem;
   }
+
+  /* Dark mode palette – spec variables + Tailwind semantic overrides */
+  .dark {
+    /* Backgrounds */
+    --bg-primary: #0a0a0a;
+    --bg-elevated: #1e1e1e;
+    --bg-elevated-hover: #252525;
+    --bg-elevated-active: #2a2a2a;
+    --bg-input: #1a1a1a;
+    --bg-header: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+    /* Borders */
+    --border-subtle: #2a2a2a;
+    --border-medium: #404040;
+    --border-focus: #fb923c;
+    /* Text */
+    --text-primary: #fafafa;
+    --text-secondary: #e5e5e5;
+    --text-tertiary: #a3a3a3;
+    --text-disabled: #737373;
+    --text-on-orange: #fafafa;
+    /* Orange */
+    --orange-primary: #fb923c;
+    --orange-hover: #f97316;
+    --orange-pressed: #ea580c;
+    --orange-subtle: rgba(251, 146, 60, 0.15);
+    --orange-border: rgba(251, 146, 60, 0.4);
+    /* Status – hired */
+    --status-hired-text: #10b981;
+    --status-hired-bg: rgba(16, 185, 129, 0.15);
+    --status-hired-border: rgba(16, 185, 129, 0.4);
+    --status-hired-hover: rgba(16, 185, 129, 0.25);
+    /* Status – interview */
+    --status-interview-text: #3b82f6;
+    --status-interview-bg: rgba(59, 130, 246, 0.15);
+    --status-interview-border: rgba(59, 130, 246, 0.4);
+    --status-interview-hover: rgba(59, 130, 246, 0.25);
+    /* Status – scheduled */
+    --status-scheduled-text: #60a5fa;
+    --status-scheduled-bg: rgba(96, 165, 250, 0.15);
+    --status-scheduled-border: rgba(96, 165, 250, 0.4);
+    --status-scheduled-hover: rgba(96, 165, 250, 0.25);
+    /* Status – warning */
+    --status-warning-text: #f59e0b;
+    --status-warning-bg: rgba(245, 158, 11, 0.15);
+    --status-warning-border: rgba(245, 158, 11, 0.4);
+    --status-warning-hover: rgba(245, 158, 11, 0.25);
+    /* Status – onboarding */
+    --status-onboarding-text: #8b5cf6;
+    --status-onboarding-bg: rgba(139, 92, 246, 0.15);
+    --status-onboarding-border: rgba(139, 92, 246, 0.4);
+    --status-onboarding-hover: rgba(139, 92, 246, 0.25);
+    /* Status – rejected */
+    --status-rejected-text: #fb7185;
+    --status-rejected-bg: rgba(251, 113, 133, 0.15);
+    --status-rejected-border: rgba(251, 113, 133, 0.4);
+    --status-rejected-hover: rgba(251, 113, 133, 0.25);
+    /* Status – reach out */
+    --status-reachout-text: #06b6d4;
+    --status-reachout-bg: rgba(6, 182, 212, 0.15);
+    --status-reachout-border: rgba(6, 182, 212, 0.4);
+    --status-reachout-hover: rgba(6, 182, 212, 0.25);
+
+    /* Tailwind semantic vars (HSL for bg-background, etc.) */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 25 95% 61%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 14.5%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 0 0% 14.5%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 0 0% 14.5%;
+    --accent-foreground: 0 0% 90%;
+    --destructive: 351 89% 72%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 16.5%;
+    --input: 0 0% 10%;
+    --ring: 25 95% 61%;
+  }
 }
 
 @layer base {
@@ -35,6 +118,31 @@
     @apply bg-background text-foreground;
     background: linear-gradient(135deg, #ffffff 0%, #fef5f0 100%);
     min-height: 100vh;
+  }
+  .dark body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+  .dark .nav-header {
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .dark .dashboard-banner {
+    background: var(--bg-header);
+    border: 1px solid var(--border-subtle);
+  }
+  .dark input:focus,
+  .dark textarea:focus,
+  .dark [data-state="open"]:focus-visible {
+    border-color: var(--border-focus);
+    outline: 2px solid var(--orange-subtle);
+    outline-offset: 2px;
+  }
+  .login-page-bg {
+    background: linear-gradient(180deg, #FFF5F0 0%, #FFFAF7 50%, #FFFFFF 100%);
+  }
+  .dark .login-page-bg {
+    background: var(--bg-primary) !important;
   }
 }
 
@@ -105,9 +213,15 @@
   .card-public {
     @apply bg-white rounded-card border border-gray-200 shadow-sm transition-all duration-250;
   }
-  
+  .dark .card-public {
+    background: var(--bg-elevated);
+    border-color: var(--border-subtle);
+  }
   .card-public:hover {
     @apply shadow-cardHover -translate-y-1;
+  }
+  .dark .card-public:hover {
+    background: var(--bg-elevated-hover);
   }
   
   .btn-primary-public {
@@ -130,6 +244,10 @@
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+  .dark .card-glass {
+    background: rgba(30, 30, 30, 0.9);
+    border: 1px solid var(--border-subtle);
   }
   
   .gradient-blue {
@@ -242,11 +360,18 @@
   .colorful-bg {
     background: linear-gradient(135deg, #ffffff 0%, #fef5f0 50%, #fff5f0 100%);
   }
+  .dark .colorful-bg {
+    background: var(--bg-primary);
+  }
   
   .glass-effect {
     background: rgba(255, 255, 255, 0.8);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  .dark .glass-effect {
+    background: rgba(30, 30, 30, 0.9);
+    border: 1px solid var(--border-subtle);
   }
   
   .decorative-shapes::before {

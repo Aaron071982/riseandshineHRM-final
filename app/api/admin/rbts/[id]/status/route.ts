@@ -23,25 +23,36 @@ export async function PATCH(
 
     const { status } = await request.json()
 
+    const previous = await prisma.rBTProfile.findUnique({
+      where: { id },
+      select: { status: true },
+    })
+    if (!previous) {
+      return NextResponse.json({ error: 'RBT profile not found' }, { status: 404 })
+    }
+
     // Use transaction to ensure both updates happen atomically
     const result = await prisma.$transaction(async (tx) => {
-      // If marking interview as completed, also update all scheduled interviews to COMPLETED
       if (status === 'INTERVIEW_COMPLETED') {
-        // Update all scheduled interviews for this RBT to COMPLETED
         await tx.interview.updateMany({
-          where: {
-            rbtProfileId: id,
-            status: 'SCHEDULED',
-          },
-          data: {
-            status: 'COMPLETED',
-          },
+          where: { rbtProfileId: id, status: 'SCHEDULED' },
+          data: { status: 'COMPLETED' },
         })
       }
 
       const rbtProfile = await tx.rBTProfile.update({
         where: { id },
         data: { status },
+      })
+
+      await tx.rBTAuditLog.create({
+        data: {
+          rbtProfileId: id,
+          auditType: 'STATUS_CHANGE',
+          dateTime: new Date(),
+          notes: `Status changed from ${previous.status} to ${status}`,
+          createdBy: user?.email || user?.name || 'Admin',
+        },
       })
 
       return rbtProfile

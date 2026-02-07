@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
+import { parseLocalTimeAsNY } from '@/lib/utils'
 
 // GET - Fetch all audit logs for an RBT
 export async function GET(
@@ -82,7 +83,7 @@ export async function POST(
       data: {
         rbtProfileId: id,
         auditType,
-        dateTime: new Date(dateTime),
+        dateTime: typeof dateTime === 'string' && dateTime.length <= 20 ? parseLocalTimeAsNY(dateTime) : new Date(dateTime),
         notes: notes || null,
         createdBy: createdBy || user.email || user.name || 'Admin',
       },
