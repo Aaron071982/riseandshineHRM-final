@@ -27,13 +27,23 @@ ON "interview_scorecards" ("interviewId", "createdByUserId");
 CREATE INDEX IF NOT EXISTS "interview_scorecards_interviewId_idx"
 ON "interview_scorecards" ("interviewId");
 
-ALTER TABLE "interview_scorecards"
-ADD CONSTRAINT "interview_scorecards_interviewId_fkey"
-FOREIGN KEY ("interviewId") REFERENCES "interviews"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE "interview_scorecards"
-ADD CONSTRAINT "interview_scorecards_createdByUserId_fkey"
-FOREIGN KEY ("createdByUserId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- Add FKs only if they don't exist (safe to re-run)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'interview_scorecards_interviewId_fkey') THEN
+    ALTER TABLE "interview_scorecards"
+    ADD CONSTRAINT "interview_scorecards_interviewId_fkey"
+    FOREIGN KEY ("interviewId") REFERENCES "interviews"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'interview_scorecards_createdByUserId_fkey') THEN
+    ALTER TABLE "interview_scorecards"
+    ADD CONSTRAINT "interview_scorecards_createdByUserId_fkey"
+    FOREIGN KEY ("createdByUserId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
 
 -- 3) Add theme_preference to user_profiles (dark mode)
 ALTER TABLE "user_profiles"
