@@ -2,6 +2,11 @@
 -- Use the SAME Supabase project that your production app uses (check DATABASE_URL in Vercel).
 -- If RBTs/candidates show as zero, run at least sections 4 and 5—your data is still in the DB.
 -- Order matters: add column first, then create table with FKs.
+--
+-- PRODUCTION CHECKLIST (run at least these so login and RBT data work):
+--   Section 3b: creates otp_codes (required for Send Verification Code / login; prevents 503).
+--   Section 4:  adds missing rbt_profiles columns (prevents "Profile unavailable" / load errors).
+--   Section 5:  ensures admin email is ADMIN and active (so you can log in).
 
 -- 1) Add 15m reminder column to interviews
 ALTER TABLE "interviews"

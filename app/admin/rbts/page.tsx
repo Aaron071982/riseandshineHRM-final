@@ -29,7 +29,7 @@ export default async function RBTPage({
 
   if (statusFilter) {
     // Validate that statusFilter is a valid RBTStatus enum value
-    const validStatuses = ['NEW', 'REACH_OUT', 'TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'HIRED', 'REJECTED']
+    const validStatuses = ['NEW', 'REACH_OUT', 'REACH_OUT_EMAIL_SENT', 'TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'HIRED', 'REJECTED']
     if (validStatuses.includes(statusFilter)) {
       where.status = statusFilter
     }

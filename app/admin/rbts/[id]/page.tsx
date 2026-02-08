@@ -30,7 +30,138 @@ type RBTProfileWithRelations = Prisma.RBTProfileGetPayload<{ include: typeof rbt
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-/** Load RBT profile by id via raw SQL when Prisma fails or returns null but row exists. Returns null on error. */
+/** Minimal raw query using only columns the list page uses (resilient when full query fails). */
+async function loadRbtProfileMinimalRaw(
+  id: string
+): Promise<RBTProfileWithRelations | null> {
+  try {
+    const [profileRow] = await prisma.$queryRaw<
+      Array<{
+        id: string
+        firstName: string
+        lastName: string
+        phoneNumber: string
+        email: string | null
+        locationCity: string | null
+        locationState: string | null
+        zipCode: string | null
+        status: string
+        source: string | null
+        updatedAt: Date
+        userId: string
+        user_role: string
+        user_isActive: boolean
+      }>
+    >`
+      SELECT r.id, r."firstName", r."lastName", r."phoneNumber", r.email,
+        r."locationCity", r."locationState", r."zipCode", r.status, r.source, r."updatedAt", r."userId",
+        u.role as user_role, u."isActive" as user_isActive
+      FROM rbt_profiles r
+      JOIN users u ON u.id = r."userId"
+      WHERE r.id = ${id}
+    `
+    if (!profileRow) return null
+    let interviewsRows: Array<{ id: string; scheduledAt: Date; durationMinutes: number; interviewerName: string; status: string; decision: string; notes: string | null; meetingUrl: string | null }> = []
+    let onboardingTasksRows: Array<{ id: string; taskType: string; title: string; description: string | null; isCompleted: boolean; completedAt: Date | null; uploadUrl: string | null; documentDownloadUrl: string | null; sortOrder: number }> = []
+    try {
+      interviewsRows = await prisma.$queryRaw`
+        SELECT id, "scheduledAt", "durationMinutes", "interviewerName", status, decision, notes, "meetingUrl"
+        FROM interviews WHERE "rbtProfileId" = ${id} ORDER BY "scheduledAt" DESC
+      `
+    } catch (e) {
+      console.error('Admin rbts [id]: minimal raw interviews failed', e)
+    }
+    try {
+      onboardingTasksRows = await prisma.$queryRaw`
+        SELECT id, "taskType", title, description, "isCompleted", "completedAt", "uploadUrl", "documentDownloadUrl", "sortOrder"
+        FROM onboarding_tasks WHERE "rbtProfileId" = ${id} ORDER BY "sortOrder" ASC
+      `
+    } catch (e) {
+      console.error('Admin rbts [id]: minimal raw onboarding_tasks failed', e)
+    }
+    const interviews = (interviewsRows || []).map((i) => ({
+      id: i.id,
+      rbtProfileId: id,
+      scheduledAt: i.scheduledAt,
+      durationMinutes: i.durationMinutes,
+      interviewerName: i.interviewerName,
+      status: i.status,
+      decision: i.decision,
+      notes: i.notes,
+      meetingUrl: i.meetingUrl,
+      reminderSentAt: null,
+      reminder_15m_sent_at: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      interviewNotes: null,
+    }))
+    const onboardingTasks = (onboardingTasksRows || []).map((t) => ({
+      ...t,
+      rbtProfileId: id,
+      taskType: t.taskType as any,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }))
+    return {
+      id: profileRow.id,
+      userId: profileRow.userId,
+      firstName: profileRow.firstName,
+      lastName: profileRow.lastName,
+      phoneNumber: profileRow.phoneNumber,
+      email: profileRow.email,
+      locationCity: profileRow.locationCity,
+      locationState: profileRow.locationState,
+      zipCode: profileRow.zipCode,
+      addressLine1: null,
+      addressLine2: null,
+      preferredServiceArea: null,
+      notes: null,
+      gender: null,
+      ethnicity: null,
+      fortyHourCourseCompleted: false,
+      status: profileRow.status as any,
+      scheduleCompleted: false,
+      source: profileRow.source as any,
+      submittedAt: null,
+      resumeUrl: null,
+      resumeFileName: null,
+      resumeMimeType: null,
+      resumeSize: null,
+      availabilityJson: null,
+      languagesJson: null,
+      experienceYears: null,
+      experienceYearsDisplay: null,
+      preferredAgeGroupsJson: null,
+      authorizedToWork: null,
+      canPassBackgroundCheck: null,
+      cprFirstAidCertified: null,
+      transportation: null,
+      preferredHoursRange: null,
+      schedulingToken: null,
+      createdAt: profileRow.updatedAt,
+      updatedAt: profileRow.updatedAt,
+      user: {
+        id: profileRow.userId,
+        role: profileRow.user_role as any,
+        isActive: profileRow.user_isActive,
+        name: null,
+        phoneNumber: null,
+        email: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      interviews,
+      onboardingTasks,
+      documents: [],
+      onboardingCompletions: [],
+    } as unknown as RBTProfileWithRelations
+  } catch (err) {
+    console.error('Admin rbts [id]: loadRbtProfileMinimalRaw failed', err)
+    return null
+  }
+}
+
+/** Load RBT profile by id via raw SQL when Prisma fails or returns null but row exists. Returns null on error. Tries full columns first, then minimal (list-page) columns. */
 async function loadRbtProfileRaw(
   id: string
 ): Promise<RBTProfileWithRelations | null> {
@@ -176,7 +307,7 @@ async function loadRbtProfileRaw(
     } as unknown as RBTProfileWithRelations
   } catch (err) {
     console.error('Admin rbts [id]: loadRbtProfileRaw failed', err)
-    return null
+    return loadRbtProfileMinimalRaw(id)
   }
 }
 
