@@ -52,26 +52,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const onAdmin = pathname?.startsWith('/admin') ?? false
 
-  const publicPaths = ['/', '/login', '/verify-otp', '/apply', '/apply/success', '/schedule-interview']
-  const isPublicPath = pathname != null && publicPaths.some((p) => p === pathname || (p !== '/' && pathname.startsWith(p + '/')))
   useEffect(() => {
     setMounted(true)
     setThemeState(getStoredTheme())
-    // Sync from profile when logged in (skip on public routes to avoid 401 in console)
-    if (isPublicPath) return
-    fetch('/api/profile', { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        const pref = data?.profile?.themePreference
-        if (pref === 'light' || pref === 'dark' || pref === 'system') {
-          setThemeState(pref)
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(THEME_KEY, pref)
-          }
-        }
-      })
-      .catch(() => {})
-  }, [isPublicPath])
+  }, [])
 
   useEffect(() => {
     if (!mounted) return

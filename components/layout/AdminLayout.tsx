@@ -12,8 +12,6 @@ import {
   FileCheck,
   Clock,
   CalendarDays,
-  UserCircle,
-  Settings,
   LogOut,
   Menu,
   X,
@@ -37,8 +35,6 @@ const navItems = [
   { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
   { href: '/admin/attendance', label: 'Attendance & Hours', icon: Clock },
   { href: '/admin/leave', label: 'Leave Requests', icon: CalendarDays },
-  { href: '/profile', label: 'Profile', icon: UserCircle },
-  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
 const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
@@ -53,12 +49,6 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     const idx = themeOrder.indexOf(theme)
     const next = themeOrder[(idx + 1) % themeOrder.length]
     setTheme(next)
-    fetch('/api/profile', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ themePreference: next }),
-      credentials: 'include',
-    }).catch(() => {})
   }
 
   const ThemeIcon = theme === 'dark' ? Moon : theme === 'system' ? Monitor : Sun

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Calendar, Clock, CalendarDays, FileText, LogOut, Menu, X, UserCheck, UserCircle, Settings } from 'lucide-react'
+import { LayoutDashboard, Calendar, Clock, CalendarDays, FileText, LogOut, Menu, X, UserCheck } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { trackPageView } from '@/lib/activity-tracker'
@@ -21,8 +21,6 @@ const navItems = [
   { href: '/rbt/hours', label: 'Hours', icon: Clock },
   { href: '/rbt/leave', label: 'Leave Requests', icon: CalendarDays },
   { href: '/rbt/documents', label: 'Documents', icon: FileText },
-  { href: '/profile', label: 'Profile', icon: UserCircle },
-  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export default function RBTLayout({ children }: RBTLayoutProps) {
