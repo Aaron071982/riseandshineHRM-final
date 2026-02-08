@@ -38,6 +38,34 @@ export async function createSession(
   return token
 }
 
+/** Raw SQL fallback when Prisma fails (e.g. schema/connection issues). */
+async function validateSessionRawSql(token: string): Promise<SessionUser | null> {
+  try {
+    const rows = await prisma.$queryRaw<
+      Array<{ id: string; role: string; email: string | null; phoneNumber: string | null; name: string | null; expiresAt: Date }>
+    >`
+      SELECT u.id, u.role, u.email, u."phoneNumber", u.name, s."expiresAt"
+      FROM sessions s
+      JOIN users u ON u.id = s."userId"
+      WHERE s.token = ${token}
+      LIMIT 1
+    `
+    const row = rows?.[0]
+    if (!row || row.expiresAt < new Date()) return null
+    return {
+      id: row.id,
+      phoneNumber: row.phoneNumber,
+      role: row.role as 'ADMIN' | 'RBT' | 'CANDIDATE',
+      name: row.name,
+      email: row.email,
+      rbtProfileId: null,
+    }
+  } catch (err) {
+    console.error('[auth][validateSessionRawSql]', (err as Error)?.message?.slice(0, 200))
+    return null
+  }
+}
+
 export async function validateSession(token: string): Promise<SessionUser | null> {
   const log = (msg: string, data?: object) =>
     console.log('[auth][validateSession]', msg, data ?? '')
@@ -67,12 +95,14 @@ export async function validateSession(token: string): Promise<SessionUser | null
           include: { user: true },
         })
       } catch (fallbackErr) {
-        log('fallback session lookup failed', { message: (fallbackErr as Error)?.message?.slice(0, 120) })
-        return null
+        log('fallback session lookup failed, trying raw SQL', { message: (fallbackErr as Error)?.message?.slice(0, 120) })
+        const rawUser = await validateSessionRawSql(token)
+        return rawUser
       }
     } else {
-      log('session lookup failed, returning null', { message: msg.slice(0, 120) })
-      return null
+      log('session lookup failed, trying raw SQL', { message: msg.slice(0, 120) })
+      const rawUser = await validateSessionRawSql(token)
+      return rawUser
     }
   }
 

@@ -23,11 +23,14 @@ export default function LoginPage() {
   const [showLoginForm, setShowLoginForm] = useState(false)
 
   const sessionError = searchParams.get('session_error')
+  const sessionExpired = searchParams.get('session_expired')
   useEffect(() => {
     if (sessionError === '1') {
       setError('Your session expired or could not be verified. Please log in again.')
+    } else if (sessionExpired === '1') {
+      setError('Your session expired. Please log in again.')
     }
-  }, [sessionError])
+  }, [sessionError, sessionExpired])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,6 +42,7 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
+        credentials: 'include',
       })
 
       const data = await response.json()

@@ -32,7 +32,7 @@ export default function UserSettingsPage() {
 
   useEffect(() => {
     const loadSessions = async () => {
-      const response = await fetch('/api/profile')
+      const response = await fetch('/api/profile', { credentials: 'include' })
       if (!response.ok) return
       const data = await response.json()
       setSessions(data.sessions || [])
@@ -45,12 +45,12 @@ export default function UserSettingsPage() {
   }
 
   const handleSignOutAll = async () => {
-    const response = await fetch('/api/profile/sessions', { method: 'DELETE' })
+    const response = await fetch('/api/profile/sessions', { method: 'DELETE', credentials: 'include' })
     if (!response.ok) {
       showToast('Failed to sign out all sessions', 'error')
       return
     }
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     router.push('/')
   }
 

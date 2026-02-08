@@ -73,7 +73,11 @@ export default function ProfilePage() {
     try {
       setLoading(true)
       setProfileError(null)
-      const response = await fetch('/api/profile')
+      const response = await fetch('/api/profile', { credentials: 'include' })
+      if (response.status === 401) {
+        router.replace('/login?session_expired=1')
+        return
+      }
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
         setProfileError(data.error || 'Failed to load profile')
@@ -90,7 +94,7 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [router])
 
   useEffect(() => {
     fetchProfile()
@@ -129,6 +133,7 @@ export default function ProfilePage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profile),
+        credentials: 'include',
       })
       if (!response.ok) {
         const data = await response.json()

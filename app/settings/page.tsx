@@ -15,7 +15,7 @@ export default function SettingsRoute() {
 
   useEffect(() => {
     const loadRole = async () => {
-      const response = await fetch('/api/profile')
+      const response = await fetch('/api/profile', { credentials: 'include' })
       if (!response.ok) return
       const data = await response.json()
       setRole(data.user?.role || null)

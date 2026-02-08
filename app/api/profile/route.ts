@@ -17,7 +17,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await validateSession(sessionToken)
+    let user: Awaited<ReturnType<typeof validateSession>>
+    try {
+      user = await validateSession(sessionToken)
+    } catch (validateErr) {
+      console.error('[auth][profile] GET validateSession threw', validateErr)
+      return NextResponse.json(
+        { error: 'Temporarily unable to verify session' },
+        { status: 503 }
+      )
+    }
     if (!user) {
       LOG(`${logId} validateSession returned null`)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

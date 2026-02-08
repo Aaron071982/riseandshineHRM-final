@@ -57,6 +57,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ themePreference: next }),
+      credentials: 'include',
     }).catch(() => {})
   }
 
@@ -72,7 +73,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }, [pathname])
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     router.push('/')
   }
 

@@ -40,33 +40,43 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (isTestAccount) {
-      const code = '000000'
+    try {
+      if (isTestAccount) {
+        const code = '000000'
+        await storeOTPEmail(email, code)
+        LOG(`${logId} test account OTP stored`)
+        return NextResponse.json({
+          success: true,
+          isTestAccount: true,
+          devOTP: code,
+        })
+      }
+
+      const code = generateOTP()
       await storeOTPEmail(email, code)
-      LOG(`${logId} test account OTP stored`)
+      LOG(`${logId} OTP stored`)
+
+      const sent = await sendOTPEmail(email, code)
+      LOG(`${logId} email send result`, { sent })
+      if (!sent) {
+        console.warn('[auth][send-otp] Email sending failed, but continuing (may be dev mode)')
+      }
+
+      const isDevMode = !process.env.RESEND_API_KEY
+      LOG(`${logId} success`, { isDevMode })
       return NextResponse.json({
         success: true,
-        isTestAccount: true,
-        devOTP: code,
+        ...(isDevMode && { devOTP: code }),
       })
+    } catch (productionErr: unknown) {
+      const err = productionErr as Error
+      console.error('[auth][send-otp] Production send/store failed', {
+        message: err?.message,
+        stack: err?.stack?.split('\n').slice(0, 4),
+      })
+      const message = 'Unable to send verification code. Please try again or contact support.'
+      return NextResponse.json({ success: false, error: message }, { status: 503 })
     }
-
-    const code = generateOTP()
-    await storeOTPEmail(email, code)
-    LOG(`${logId} OTP stored`)
-
-    const sent = await sendOTPEmail(email, code)
-    LOG(`${logId} email send result`, { sent })
-    if (!sent) {
-      console.warn('[auth][send-otp] Email sending failed, but continuing (may be dev mode)')
-    }
-
-    const isDevMode = !process.env.RESEND_API_KEY
-    LOG(`${logId} success`, { isDevMode })
-    return NextResponse.json({
-      success: true,
-      ...(isDevMode && { devOTP: code }),
-    })
   } catch (error: unknown) {
     const err = error as Error
     console.error('[auth][send-otp] Error sending OTP', {
