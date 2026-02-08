@@ -54,7 +54,12 @@ export default function AdminOnboardingOverride({
       setLoadingSchedule(true)
       const response = await fetch(`/api/admin/rbts/${rbtProfileId}/availability`)
       if (response.ok) {
-        const slots: Array<{ dayOfWeek: number; hour: number }> = await response.json()
+        const data = await response.json()
+        const slots: Array<{ dayOfWeek: number; hour: number }> = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.slots)
+            ? data.slots
+            : []
         const slotKeys = new Set<string>(
           slots.map((slot) => `${slot.dayOfWeek}-${slot.hour}`)
         )
@@ -171,12 +176,12 @@ export default function AdminOnboardingOverride({
   const incompleteTasks = onboardingTasks.filter((t) => !t.isCompleted)
 
   return (
-    <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50/50 to-white">
+    <Card className="border-2 border-orange-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-orange-50/50 to-white dark:from-[var(--bg-elevated)] dark:to-[var(--bg-elevated)]">
       <CardHeader>
-        <CardTitle className="text-xl font-bold text-gray-900">
+        <CardTitle className="text-xl font-bold text-gray-900 dark:text-white">
           Admin Onboarding Override
         </CardTitle>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 dark:text-white">
           Complete onboarding tasks on behalf of {rbtName}
         </p>
       </CardHeader>
@@ -184,24 +189,24 @@ export default function AdminOnboardingOverride({
         {/* Incomplete Tasks List */}
         {incompleteTasks.length > 0 && (
           <div className="space-y-3">
-            <h3 className="font-semibold text-gray-900">Incomplete Tasks</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white">Incomplete Tasks</h3>
             {incompleteTasks.map((task) => (
-              <div key={task.id} className="border rounded-lg p-4 bg-white">
+              <div key={task.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 bg-white dark:bg-[var(--bg-input)]">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <XCircle className="w-5 h-5 text-gray-400" />
-                      <h4 className="font-medium">{task.title}</h4>
+                      <XCircle className="w-5 h-5 text-gray-400 dark:text-[var(--text-tertiary)]" />
+                      <h4 className="font-medium text-gray-900 dark:text-white">{task.title}</h4>
                     </div>
                     {task.description && (
-                      <p className="text-sm text-gray-600 mt-1 ml-7">{task.description}</p>
+                      <p className="text-sm text-gray-600 dark:text-white mt-1 ml-7">{task.description}</p>
                     )}
                   </div>
                   {task.taskType === 'PACKAGE_UPLOAD' ? (
                     <div className="flex flex-col gap-2">
                       <label
                         htmlFor="package-upload-override"
-                        className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors text-sm"
+                        className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-[var(--border-subtle)] rounded-md cursor-pointer hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)] transition-colors text-sm text-gray-700 dark:text-white"
                       >
                         <Upload className="w-4 h-4" />
                         {uploadingPackage ? 'Uploading...' : 'Upload Package'}
@@ -231,6 +236,7 @@ export default function AdminOnboardingOverride({
                       variant="outline"
                       onClick={() => handleCompleteTask(task.id)}
                       disabled={loading}
+                      className="dark:border-[var(--border-subtle)] dark:text-white dark:hover:bg-[var(--bg-elevated-hover)]"
                     >
                       <Check className="w-4 h-4 mr-1" />
                       Mark Complete
@@ -244,14 +250,14 @@ export default function AdminOnboardingOverride({
 
         {/* Schedule Setup */}
         {!scheduleCompleted && (
-          <div className="space-y-3 border-t pt-4">
+          <div className="space-y-3 border-t dark:border-[var(--border-subtle)] pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-orange-500" />
                   Set Weekly Availability
                 </h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-600 dark:text-white mt-1">
                   Set the weekly schedule for {rbtName}
                 </p>
               </div>
@@ -275,20 +281,17 @@ export default function AdminOnboardingOverride({
             </div>
 
             {/* Schedule Grid */}
-            <div className="border rounded-lg p-4 bg-white">
+            <div className="border dark:border-[var(--border-subtle)] rounded-lg p-4 bg-white dark:bg-[var(--bg-input)]">
               <div className="grid grid-cols-8 gap-2">
-                {/* Header row */}
-                <div className="font-semibold text-sm text-gray-700"></div>
-                {DAYS.map((day, idx) => (
-                  <div key={day} className="font-semibold text-xs text-center text-gray-700">
+                <div className="font-semibold text-sm text-gray-700 dark:text-white"></div>
+                {DAYS.map((day) => (
+                  <div key={day} className="font-semibold text-xs text-center text-gray-700 dark:text-white">
                     {day.substring(0, 3)}
                   </div>
                 ))}
-
-                {/* Time slots */}
                 {HOURS.map((hour) => (
                   <div key={hour} className="contents">
-                    <div className="text-xs text-gray-600 py-2">
+                    <div className="text-xs text-gray-600 dark:text-white py-2">
                       {hour <= 12 ? `${hour}:00 ${hour < 12 ? 'AM' : 'PM'}` : `${hour - 12}:00 PM`}
                     </div>
                     {DAYS.map((_, dayIdx) => {
@@ -303,7 +306,7 @@ export default function AdminOnboardingOverride({
                             h-8 rounded border transition-all
                             ${isSelected
                               ? 'bg-orange-500 border-orange-600 hover:bg-orange-600'
-                              : 'bg-white border-gray-300 hover:bg-gray-50'
+                              : 'bg-white dark:bg-[var(--bg-elevated)] border-gray-300 dark:border-[var(--border-subtle)] hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)]'
                             }
                           `}
                         />
@@ -312,7 +315,7 @@ export default function AdminOnboardingOverride({
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-gray-500 mt-3">
+              <p className="text-sm text-gray-500 dark:text-white mt-3">
                 Selected {selectedSlots.size} time slot(s). Click cells to toggle availability.
               </p>
             </div>
@@ -320,14 +323,14 @@ export default function AdminOnboardingOverride({
         )}
 
         {/* Summary */}
-        <div className="border-t pt-4">
+        <div className="border-t dark:border-[var(--border-subtle)] pt-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">
+            <span className="text-gray-600 dark:text-white">
               Completed: {onboardingTasks.filter((t) => t.isCompleted).length} / {onboardingTasks.length} tasks
             </span>
             <Badge
               variant={scheduleCompleted ? 'default' : 'outline'}
-              className={scheduleCompleted ? 'bg-green-100 text-green-700' : ''}
+              className={scheduleCompleted ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'dark:border-[var(--border-subtle)] dark:text-white'}
             >
               Schedule: {scheduleCompleted ? 'Completed' : 'Pending'}
             </Badge>

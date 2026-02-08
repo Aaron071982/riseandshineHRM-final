@@ -173,10 +173,10 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
 
   return (
     <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
-      <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
+      <div className="absolute top-0 right-0 w-40 h-40 bg-blue-200/20 dark:bg-blue-500/10 rounded-full -mr-20 -mt-20 bubble-animation-delayed" />
       <CardHeader className="relative">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Phone className="w-6 h-6 text-primary" />
             Audit Log
           </CardTitle>
@@ -299,7 +299,7 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
             {auditLogs.map((log) => (
               <div
                 key={log.id}
-                className="border rounded-lg p-4 bg-white hover:shadow-md transition-shadow"
+                className="border dark:border-[var(--border-subtle)] rounded-lg p-4 bg-white dark:bg-[var(--bg-input)] hover:shadow-md dark:hover:bg-[var(--bg-elevated-hover)] transition-shadow"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -307,17 +307,17 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
                       <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-semibold rounded">
                         {log.auditType.replace(/_/g, ' ')}
                       </span>
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-gray-600 dark:text-white">
                         {formatDateTime(log.dateTime)}
                       </span>
                     </div>
                     {log.notes && (
-                      <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">
+                      <p className="text-sm text-gray-700 dark:text-white mt-2 whitespace-pre-wrap">
                         {log.notes}
                       </p>
                     )}
                     {log.createdBy && (
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-sm text-gray-500 dark:text-white mt-2">
                         Created by: {log.createdBy}
                       </p>
                     )}
@@ -327,7 +327,7 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEdit(log)}
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -335,7 +335,7 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(log.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

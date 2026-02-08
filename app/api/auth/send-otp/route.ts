@@ -23,6 +23,23 @@ export async function POST(request: NextRequest) {
 
     const isTestAccount = email === 'hrmtesting@gmail.com'
 
+    // Localhost / development bypass: no email, no OTP table required. Use fixed code 123456.
+    const isDevBypass = process.env.NODE_ENV === 'development'
+    const devBypassCode = '123456'
+    if (isDevBypass) {
+      try {
+        await storeOTPEmail(email, devBypassCode)
+      } catch (storeErr) {
+        console.warn('[auth][send-otp] Dev bypass: OTP store failed (OK on localhost)', (storeErr as Error)?.message)
+      }
+      LOG(`${logId} dev bypass success`, { devOTP: devBypassCode })
+      return NextResponse.json({
+        success: true,
+        isDevBypass: true,
+        devOTP: devBypassCode,
+      })
+    }
+
     if (isTestAccount) {
       const code = '000000'
       await storeOTPEmail(email, code)

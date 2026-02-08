@@ -82,46 +82,56 @@ export default async function InterviewsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header (simple, like RBTs & Candidates) */}
-      <div className="pb-6 border-b dark:border-[var(--border-subtle)]">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mb-2">Interviews</h1>
-        <p className="text-gray-600 dark:text-[var(--text-tertiary)]">Manage all interviews and scheduling</p>
+      {/* Header with gradient banner */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-500 via-purple-400 to-violet-400 p-8 shadow-lg">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16 bubble-animation" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12 bubble-animation-delayed" />
+        <div className="relative">
+          <h1 className="text-4xl font-bold text-white mb-2">Interviews</h1>
+          <p className="text-purple-50 text-lg">Manage all interviews and scheduling</p>
+        </div>
       </div>
 
-      {/* Stats Cards - calm, flat like RBTs & Candidates */}
+      {/* Stats Cards with colored borders and gradient icons */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <Card className="card-hover border-2 border-blue-200 dark:border-blue-800/40 bg-gradient-to-br from-white to-blue-50 dark:from-[var(--bg-elevated)] dark:to-blue-950/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Total Interviews</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mt-2">{interviews.length}</p>
+                <p className="text-3xl font-bold text-blue-600 dark:text-[var(--status-interview-text)] mt-2">{interviews.length}</p>
               </div>
-              <Calendar className="h-8 w-8 text-blue-500 dark:text-[var(--status-interview-text)]" />
+              <div className="h-12 w-12 rounded-full gradient-blue flex items-center justify-center">
+                <Calendar className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <Card className="card-hover border-2 border-green-200 dark:border-green-800/40 bg-gradient-to-br from-white to-green-50 dark:from-[var(--bg-elevated)] dark:to-green-950/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Scheduled</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-hired-text)] mt-2">{scheduledInterviews.length}</p>
+                <p className="text-3xl font-bold text-green-600 dark:text-[var(--status-hired-text)] mt-2">{scheduledInterviews.length}</p>
               </div>
-              <Clock className="h-8 w-8 text-green-500 dark:text-[var(--status-hired-text)]" />
+              <div className="h-12 w-12 rounded-full gradient-green flex items-center justify-center">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <Card className="card-hover border-2 border-purple-200 dark:border-purple-800/40 bg-gradient-to-br from-white to-purple-50 dark:from-[var(--bg-elevated)] dark:to-purple-950/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Completed</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-onboarding-text)] mt-2">{completedInterviews.length}</p>
+                <p className="text-3xl font-bold text-purple-600 dark:text-[var(--status-onboarding-text)] mt-2">{completedInterviews.length}</p>
               </div>
-              <Video className="h-8 w-8 text-purple-500 dark:text-[var(--status-onboarding-text)]" />
+              <div className="h-12 w-12 rounded-full gradient-purple flex items-center justify-center">
+                <Video className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>

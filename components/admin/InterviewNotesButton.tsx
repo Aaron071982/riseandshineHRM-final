@@ -28,7 +28,7 @@ export default function InterviewNotesButton({
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
-        className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200"
+        className="border border-orange-500 text-orange-600 bg-white hover:bg-orange-50 hover:text-orange-700 dark:bg-black dark:border-[var(--orange-primary)] dark:text-[var(--orange-primary)] dark:hover:bg-[var(--orange-primary)] dark:hover:text-white shadow-none"
       >
         <FileText className="w-4 h-4 mr-1" />
         Take Notes

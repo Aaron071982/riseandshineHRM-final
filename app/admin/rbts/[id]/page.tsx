@@ -92,40 +92,25 @@ export default async function RBTProfilePage({
       if (!profileRow) {
         notFound()
       }
-      const [interviewsRows, onboardingTasksRows] = await Promise.all([
-        prisma.$queryRaw<
-          Array<{
-            id: string
-            scheduledAt: Date
-            durationMinutes: number
-            interviewerName: string
-            status: string
-            decision: string
-            notes: string | null
-            meetingUrl: string | null
-            reminder_15m_sent_at: Date | null
-          }>
-        >`
-          SELECT id, "scheduledAt", "durationMinutes", "interviewerName", status, decision, notes, "meetingUrl", "reminder_15m_sent_at"
+      // Load interviews and tasks in separate try/catch so one failing (e.g. missing column) doesn't 404 the profile
+      let interviewsRows: Array<{ id: string; scheduledAt: Date; durationMinutes: number; interviewerName: string; status: string; decision: string; notes: string | null; meetingUrl: string | null }> = []
+      let onboardingTasksRows: Array<{ id: string; taskType: string; title: string; description: string | null; isCompleted: boolean; completedAt: Date | null; uploadUrl: string | null; documentDownloadUrl: string | null; sortOrder: number }> = []
+      try {
+        interviewsRows = await prisma.$queryRaw`
+          SELECT id, "scheduledAt", "durationMinutes", "interviewerName", status, decision, notes, "meetingUrl"
           FROM interviews WHERE "rbtProfileId" = ${id} ORDER BY "scheduledAt" DESC
-        `,
-        prisma.$queryRaw<
-          Array<{
-            id: string
-            taskType: string
-            title: string
-            description: string | null
-            isCompleted: boolean
-            completedAt: Date | null
-            uploadUrl: string | null
-            documentDownloadUrl: string | null
-            sortOrder: number
-          }>
-        >`
+        `
+      } catch (e) {
+        console.error('Admin rbts [id]: raw interviews fallback failed', e)
+      }
+      try {
+        onboardingTasksRows = await prisma.$queryRaw`
           SELECT id, "taskType", title, description, "isCompleted", "completedAt", "uploadUrl", "documentDownloadUrl", "sortOrder"
           FROM onboarding_tasks WHERE "rbtProfileId" = ${id} ORDER BY "sortOrder" ASC
-        `,
-      ])
+        `
+      } catch (e) {
+        console.error('Admin rbts [id]: raw onboarding_tasks fallback failed', e)
+      }
       const interviews = (interviewsRows || []).map((i) => ({
         id: i.id,
         rbtProfileId: id,
@@ -137,7 +122,7 @@ export default async function RBTProfilePage({
         notes: i.notes,
         meetingUrl: i.meetingUrl,
         reminderSentAt: null,
-        reminder_15m_sent_at: i.reminder_15m_sent_at,
+        reminder_15m_sent_at: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         interviewNotes: null,

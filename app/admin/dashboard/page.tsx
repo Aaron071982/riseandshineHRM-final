@@ -88,50 +88,49 @@ export default async function AdminDashboard() {
       console.error('🔴 Prisma P1001: Cannot reach database server')
       console.error('   DATABASE_URL host:', process.env.DATABASE_URL?.split('@')[1]?.split('/')[0] || 'NOT SET')
     }
-    // Fallback: load dashboard stats via raw SQL when Prisma fails (e.g. missing columns)
+    // Fallback: load dashboard stats via raw SQL when Prisma fails (e.g. missing columns).
+    // Run each query in its own try/catch so one failure doesn't kill the whole fallback.
+    const now = new Date()
+
     try {
-      const now = new Date()
-      const [totalRows, statusRows, interviewRows, hireRows, onboardingRows] = await Promise.all([
-        prisma.$queryRaw<[{ count: bigint }]>`SELECT COUNT(*) as count FROM rbt_profiles`,
-        prisma.$queryRaw<Array<{ status: string; _count: bigint }>>`
-          SELECT status, COUNT(*)::bigint as _count FROM rbt_profiles GROUP BY status
-        `,
-        prisma.$queryRaw<
-          Array<{
-            id: string
-            scheduledAt: Date
-            durationMinutes: number
-            interviewerName: string
-            status: string
-            meetingUrl: string | null
-            rbtProfileId: string
-            firstName: string
-            lastName: string
-          }>
-        >`
-          SELECT i.id, i."scheduledAt", i."durationMinutes", i."interviewerName", i.status, i."meetingUrl", i."rbtProfileId",
-                 r."firstName", r."lastName"
-          FROM interviews i
-          JOIN rbt_profiles r ON r.id = i."rbtProfileId"
-          WHERE i.status = 'SCHEDULED' AND i."scheduledAt" >= ${now}
-          ORDER BY i."scheduledAt" ASC
-          LIMIT 50
-        `,
-        prisma.$queryRaw<
-          Array<{ id: string; firstName: string; lastName: string; email: string | null; updatedAt: Date }>
-        >`
-          SELECT id, "firstName", "lastName", email, "updatedAt"
-          FROM rbt_profiles
-          WHERE status = 'HIRED'
-          ORDER BY "updatedAt" DESC
-          LIMIT 5
-        `,
-        prisma.$queryRaw<Array<{ rbtProfileId: string }>>`
-          SELECT "rbtProfileId" FROM onboarding_tasks WHERE "isCompleted" = false GROUP BY "rbtProfileId"
-        `,
-      ])
+      const totalRows = await prisma.$queryRaw<[{ count: bigint }]>`SELECT COUNT(*) as count FROM rbt_profiles`
       totalCandidates = Number(totalRows[0]?.count ?? 0)
+    } catch (e) {
+      console.error('Dashboard raw count failed', e)
+      dashboardLoadError = true
+    }
+
+    try {
+      const statusRows = await prisma.$queryRaw<Array<{ status: string; _count: bigint }>>`
+        SELECT status, COUNT(*)::bigint as _count FROM rbt_profiles GROUP BY status
+      `
       candidatesByStatus = statusRows.map((r) => ({ status: r.status, _count: Number(r._count) }))
+    } catch (e) {
+      console.error('Dashboard raw status groupBy failed', e)
+    }
+
+    try {
+      const interviewRows = await prisma.$queryRaw<
+        Array<{
+          id: string
+          scheduledAt: Date
+          durationMinutes: number
+          interviewerName: string
+          status: string
+          meetingUrl: string | null
+          rbtProfileId: string
+          firstName: string
+          lastName: string
+        }>
+      >`
+        SELECT i.id, i."scheduledAt", i."durationMinutes", i."interviewerName", i.status, i."meetingUrl", i."rbtProfileId",
+               r."firstName", r."lastName"
+        FROM interviews i
+        JOIN rbt_profiles r ON r.id = i."rbtProfileId"
+        WHERE i.status = 'SCHEDULED' AND i."scheduledAt" >= ${now}
+        ORDER BY i."scheduledAt" ASC
+        LIMIT 50
+      `
       upcomingInterviews = interviewRows.map((row) => ({
         id: row.id,
         scheduledAt: row.scheduledAt,
@@ -142,6 +141,20 @@ export default async function AdminDashboard() {
         rbtProfileId: row.rbtProfileId,
         rbtProfile: { id: row.rbtProfileId, firstName: row.firstName, lastName: row.lastName },
       }))
+    } catch (e) {
+      console.error('Dashboard raw upcoming interviews failed', e)
+    }
+
+    try {
+      const hireRows = await prisma.$queryRaw<
+        Array<{ id: string; firstName: string; lastName: string; email: string | null; updatedAt: Date }>
+      >`
+        SELECT id, "firstName", "lastName", email, "updatedAt"
+        FROM rbt_profiles
+        WHERE status = 'HIRED'
+        ORDER BY "updatedAt" DESC
+        LIMIT 5
+      `
       recentHires = hireRows.map((row) => ({
         id: row.id,
         firstName: row.firstName,
@@ -149,10 +162,17 @@ export default async function AdminDashboard() {
         email: row.email,
         updatedAt: row.updatedAt,
       }))
+    } catch (e) {
+      console.error('Dashboard raw recent hires failed', e)
+    }
+
+    try {
+      const onboardingRows = await prisma.$queryRaw<Array<{ rbtProfileId: string }>>`
+        SELECT "rbtProfileId" FROM onboarding_tasks WHERE "isCompleted" = false GROUP BY "rbtProfileId"
+      `
       pendingOnboarding = onboardingRows.map((r) => ({ rbtProfileId: r.rbtProfileId, _count: { id: 1 } }))
-    } catch (rawError) {
-      console.error('Dashboard raw fallback failed', rawError)
-      dashboardLoadError = true
+    } catch (e) {
+      console.error('Dashboard raw pending onboarding failed', e)
     }
   }
 
@@ -171,23 +191,27 @@ export default async function AdminDashboard() {
           <p className="text-sm mt-1">Your data is still in the database. Run the migration in Supabase SQL Editor: open prisma/supabase-migrations.sql and run the whole file (or at least sections 4 and 5). Use the same Supabase project as your production DATABASE_URL. Then refresh.</p>
         </div>
       )}
-      {/* Header (simple, like RBTs & Candidates) */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b dark:border-[var(--border-subtle)]">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mb-2">Admin Dashboard</h1>
-          <p className="text-gray-600 dark:text-[var(--text-tertiary)]">Welcome back! Here&apos;s an overview of your system.</p>
+      {/* Header with gradient banner */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-500 via-amber-400 to-orange-400 p-8 shadow-lg">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16 bubble-animation" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12 bubble-animation-delayed" />
+        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1>
+            <p className="text-orange-50 text-lg">Welcome back! Here&apos;s an overview of your system.</p>
+          </div>
+          <TrackedLink href="/admin/rbts/new">
+            <Button className="rounded-xl px-6 py-6 text-base font-semibold bg-white/90 text-orange-700 hover:bg-white border-0 shadow-md">
+              <Plus className="w-5 h-5 mr-2" />
+              Add New RBT / Candidate
+            </Button>
+          </TrackedLink>
         </div>
-        <TrackedLink href="/admin/rbts/new">
-          <Button className="rounded-xl px-6 py-6 text-base font-semibold dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] dark:border-0">
-            <Plus className="w-5 h-5 mr-2" />
-            Add New RBT / Candidate
-          </Button>
-        </TrackedLink>
       </div>
 
-      {/* Statistics Cards - calm, flat like RBTs & Candidates */}
+      {/* Statistics Cards with colored borders and gradient icons */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <Card className="card-hover border-2 border-gray-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-white to-gray-50 dark:from-[var(--bg-elevated)] dark:to-[var(--bg-elevated)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -195,46 +219,54 @@ export default async function AdminDashboard() {
                 <p className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mt-2">{totalCandidates}</p>
                 <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1">All time</p>
               </div>
-              <Users className="h-8 w-8 text-gray-400 dark:text-[var(--text-tertiary)]" />
+              <div className="h-12 w-12 rounded-full bg-gradient-to-r from-gray-400 to-gray-600 flex items-center justify-center">
+                <Users className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <Card className="card-hover border-2 border-green-200 dark:border-green-800/40 bg-gradient-to-br from-white to-green-50 dark:from-[var(--bg-elevated)] dark:to-green-950/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Hired RBTs</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-hired-text)] mt-2">{statusCounts['HIRED'] || 0}</p>
+                <p className="text-3xl font-bold text-green-600 dark:text-[var(--status-hired-text)] mt-2">{statusCounts['HIRED'] || 0}</p>
                 <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1">Active RBTs</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-500 dark:text-[var(--status-hired-text)]" />
+              <div className="h-12 w-12 rounded-full gradient-green flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <Card className="card-hover border-2 border-blue-200 dark:border-blue-800/40 bg-gradient-to-br from-white to-blue-50 dark:from-[var(--bg-elevated)] dark:to-blue-950/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Upcoming Interviews</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-interview-text)] mt-2">{upcomingInterviews.length}</p>
+                <p className="text-3xl font-bold text-blue-600 dark:text-[var(--status-interview-text)] mt-2">{upcomingInterviews.length}</p>
                 <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1">Next 5 interviews</p>
               </div>
-              <Calendar className="h-8 w-8 text-blue-500 dark:text-[var(--status-interview-text)]" />
+              <div className="h-12 w-12 rounded-full gradient-blue flex items-center justify-center">
+                <Calendar className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <Card className="card-hover border-2 border-purple-200 dark:border-purple-800/40 bg-gradient-to-br from-white to-purple-50 dark:from-[var(--bg-elevated)] dark:to-purple-950/20">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Pending Onboarding</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-[var(--status-onboarding-text)] mt-2">{pendingOnboardingCount}</p>
+                <p className="text-3xl font-bold text-purple-600 dark:text-[var(--status-onboarding-text)] mt-2">{pendingOnboardingCount}</p>
                 <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1">Incomplete tasks</p>
               </div>
-              <FileCheck className="h-8 w-8 text-purple-500 dark:text-[var(--status-onboarding-text)]" />
+              <div className="h-12 w-12 rounded-full gradient-purple flex items-center justify-center">
+                <FileCheck className="h-6 w-6 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>

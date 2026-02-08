@@ -103,7 +103,7 @@ export default function InterviewNotesForm({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Interview Script & Notes</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Interview Script & Notes</h3>
         <Button onClick={handleSave} disabled={saving} className="bg-orange-500 hover:bg-orange-600">
           {saving ? (
             <>
@@ -122,10 +122,10 @@ export default function InterviewNotesForm({
       {/* 1. Greeting & Introduction */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">1. Greeting & Introduction</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">1. Greeting & Introduction</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;Hi, how are you? Thanks for meeting with us today. Before we begin, are you familiar with the RBT position and what it involves?&quot;
           </p>
           <div>
@@ -144,10 +144,10 @@ export default function InterviewNotesForm({
       {/* 2. Basic Information */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">2. Basic Information</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">2. Basic Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;To start, can I get some basic information?&quot;
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -208,10 +208,10 @@ export default function InterviewNotesForm({
       {/* 3. Experience & Background */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">3. Experience & Background</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">3. Experience & Background</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;Can you tell me about any experience you have working with children, individuals with autism, or in ABA therapy?&quot;
           </p>
           <div>
@@ -230,10 +230,10 @@ export default function InterviewNotesForm({
       {/* 4. How They Heard About Rise & Shine ABA */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">4. How They Heard About Rise & Shine ABA</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">4. How They Heard About Rise & Shine ABA</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;How did you hear about Rise & Shine ABA?&quot;
           </p>
           <div>
@@ -252,10 +252,10 @@ export default function InterviewNotesForm({
       {/* 5. Familiarity With ABA Platforms */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">5. Familiarity With ABA Platforms</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">5. Familiarity With ABA Platforms</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;Are you familiar with ABA tools like Motivity or Rethink?&quot;
           </p>
           <div>
@@ -274,8 +274,8 @@ export default function InterviewNotesForm({
       {/* Scorecard (1–5) */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Scorecard (1–5)</CardTitle>
-          <p className="text-sm text-gray-600 font-normal">
+          <CardTitle className="text-base text-gray-900 dark:text-white">Scorecard (1–5)</CardTitle>
+          <p className="text-sm text-gray-600 dark:text-white font-normal">
             Rate core RBT skills for consistent hiring decisions.
           </p>
         </CardHeader>
@@ -287,10 +287,10 @@ export default function InterviewNotesForm({
       {/* 6. Communication Importance */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">6. Communication Importance</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">6. Communication Importance</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;How important do you think communication is between you, the child&apos;s parents, and the BCBA?&quot;
           </p>
           <div>
@@ -309,10 +309,10 @@ export default function InterviewNotesForm({
       {/* 7. Availability */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">7. Availability</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">7. Availability</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;What does your weekly availability look like? Which days and times can you consistently work?&quot;
           </p>
           <div>
@@ -331,10 +331,10 @@ export default function InterviewNotesForm({
       {/* 8. Pay Expectations */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">8. Pay Expectations</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">8. Pay Expectations</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;What are your pay expectations for this position?&quot;
           </p>
           <div>
@@ -353,10 +353,10 @@ export default function InterviewNotesForm({
       {/* 9. Previous Company / Why They're Switching */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">9. Previous Company / Why They&apos;re Switching</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">9. Previous Company / Why They&apos;re Switching</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;Why are you leaving your current company, and what made you want to come work with us instead?&quot;
           </p>
           <div>
@@ -375,10 +375,10 @@ export default function InterviewNotesForm({
       {/* 10. Company Expectations */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">10. Company Expectations</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">10. Company Expectations</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;Before we finish up, I want to share our main expectations at Rise & Shine ABA: Punctuality, Consistent data collection (at least 3 targets per hour), Weekly session notes, Maintaining a healthy relationship with parents, the child, and the BCBA. Do you understand and agree to these expectations?&quot;
           </p>
           <div>
@@ -397,10 +397,10 @@ export default function InterviewNotesForm({
       {/* 11. Closing */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">11. Closing</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">11. Closing</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-white">
             &quot;Great. Thank you so much for your time. We&apos;ll review everything and get back to you shortly.&quot;
           </p>
           <div>

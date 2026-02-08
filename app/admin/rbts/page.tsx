@@ -126,17 +126,21 @@ export default async function RBTPage({
           <p className="text-sm mt-1">Your data is still in the database. The app could not read it—often due to a missing schema update. In Supabase: open SQL Editor and run the migration (see prisma/supabase-migrations.sql). Run at least sections 4 and 5. Then refresh this page. To confirm the app is using this database, open <code className="bg-black/10 dark:bg-white/10 px-1 rounded">/api/debug/db-counts</code> in your browser.</p>
         </div>
       )}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)]">RBTs & Candidates</h1>
-          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">Manage your RBT hiring pipeline and active RBTs</p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-blue-500 via-blue-400 to-indigo-400 p-8 shadow-lg">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16 bubble-animation" />
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12 bubble-animation-delayed" />
+        <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">RBTs & Candidates</h1>
+            <p className="text-blue-50 text-lg">Manage your RBT hiring pipeline and active RBTs</p>
+          </div>
+          <Link href="/admin/rbts/new">
+            <Button className="rounded-xl px-6 py-6 text-base font-semibold bg-white/90 text-blue-700 hover:bg-white border-0 shadow-md">
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Candidate
+            </Button>
+          </Link>
         </div>
-        <Link href="/admin/rbts/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Add New Candidate
-          </Button>
-        </Link>
       </div>
 
       <RBTList initialRbts={rbts} loadError={loadError} />

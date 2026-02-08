@@ -13,15 +13,15 @@ export async function POST(request: NextRequest) {
     const sessionToken = cookieStore.get('session')?.value
 
     if (!sessionToken) {
-      return NextResponse.json({ success: false })
+      return NextResponse.json({ success: false }, { status: 200 })
     }
 
-    const user = await validateSession(sessionToken)
+    const user = await validateSession(sessionToken).catch(() => null)
     if (!user) {
-      return NextResponse.json({ success: false })
+      return NextResponse.json({ success: false }, { status: 200 })
     }
 
-    const body = await request.json()
+    const body = await request.json().catch(() => ({}))
     const {
       activityType,
       action,
@@ -29,22 +29,20 @@ export async function POST(request: NextRequest) {
       resourceId,
       url,
       metadata,
-    } = body
+    } = body || {}
 
-    // Get IP address and user agent
     const ipAddress =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
       request.headers.get('x-real-ip') ||
       null
     const userAgent = request.headers.get('user-agent') || null
 
-    // Create activity log entry
     try {
       await prisma.activityLog.create({
         data: {
           userId: user.id,
-          activityType,
-          action,
+          activityType: (['PAGE_VIEW', 'LINK_CLICK', 'BUTTON_CLICK', 'FORM_SUBMISSION', 'LOGIN', 'LOGOUT'].includes(activityType) ? activityType : 'PAGE_VIEW') as 'PAGE_VIEW' | 'LINK_CLICK' | 'BUTTON_CLICK' | 'FORM_SUBMISSION' | 'LOGIN' | 'LOGOUT',
+          action: action ?? 'Unknown',
           resourceType: resourceType || null,
           resourceId: resourceId || null,
           url: url || null,
@@ -56,9 +54,9 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error('Error tracking activity:', err)
     }
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
     console.error('Activity track error:', error)
-    return NextResponse.json({ success: false })
+    return NextResponse.json({ success: false }, { status: 200 })
   }
 }

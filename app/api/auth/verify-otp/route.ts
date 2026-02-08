@@ -67,19 +67,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Test account: allow any OTP for hrmtesting@gmail.com (or accept '000000')
+    // Localhost / development bypass: accept fixed code 123456 so you can log in without email/OTP table
+    const isDevBypass = process.env.NODE_ENV === 'development' && otp === '123456'
     const isTestAccount = email === 'hrmtesting@gmail.com'
     let isValid = false
 
-    try {
-      if (isTestAccount) {
-        isValid = otp === '000000' || (await verifyOTPEmail(email, otp))
-      } else {
-        isValid = await verifyOTPEmail(email, otp)
+    if (isDevBypass) {
+      isValid = true
+      LOG(`${logId} dev bypass OTP accepted`)
+    } else {
+      try {
+        if (isTestAccount) {
+          isValid = otp === '000000' || (await verifyOTPEmail(email, otp))
+        } else {
+          isValid = await verifyOTPEmail(email, otp)
+        }
+      } catch (verifyErr) {
+        LOG(`${logId} OTP verify threw`, { message: (verifyErr as Error)?.message })
+        throw verifyErr
       }
-    } catch (verifyErr) {
-      LOG(`${logId} OTP verify threw`, { message: (verifyErr as Error)?.message })
-      throw verifyErr
     }
 
     if (!isValid) {

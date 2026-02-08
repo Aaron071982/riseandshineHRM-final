@@ -17,11 +17,13 @@ export default function VerifyOTPPage() {
 
   useEffect(() => {
     const pendingEmail = sessionStorage.getItem('pendingEmail')
+    const storedDevOTP = sessionStorage.getItem('devOTP')
     if (!pendingEmail) {
       router.push('/')
       return
     }
     setEmail(pendingEmail)
+    if (storedDevOTP) setOtp(storedDevOTP)
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {

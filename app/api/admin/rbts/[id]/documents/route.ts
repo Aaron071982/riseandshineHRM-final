@@ -23,10 +23,30 @@ export async function GET(
 
     const { id } = await params
 
-    const documents = await prisma.rBTDocument.findMany({
-      where: { rbtProfileId: id },
-      orderBy: { uploadedAt: 'desc' },
-    })
+    let documents: Array<{ id: string; rbtProfileId: string; fileName: string; fileType: string; documentType: string | null; uploadedAt: Date; fileData?: string; filePath?: string | null }>
+    try {
+      documents = await prisma.rBTDocument.findMany({
+        where: { rbtProfileId: id },
+        orderBy: { uploadedAt: 'desc' },
+      })
+    } catch (err) {
+      console.error('Error fetching documents (Prisma), trying raw SQL', err)
+      try {
+        const rows = await prisma.$queryRaw<
+          Array<{ id: string; rbtProfileId: string; fileName: string; fileType: string; documentType: string | null; uploadedAt: Date }>
+        >`
+          SELECT id, "rbtProfileId", "fileName", "fileType", "documentType", "uploadedAt"
+          FROM rbt_documents WHERE "rbtProfileId" = ${id} ORDER BY "uploadedAt" DESC
+        `
+        documents = rows || []
+      } catch (rawErr) {
+        console.error('Error fetching documents (raw)', rawErr)
+        return NextResponse.json(
+          { error: 'Failed to fetch documents' },
+          { status: 500 }
+        )
+      }
+    }
 
     return NextResponse.json(documents)
   } catch (error: any) {
