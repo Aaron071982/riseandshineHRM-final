@@ -51,6 +51,20 @@ END $$;
 ALTER TABLE "user_profiles"
 ADD COLUMN IF NOT EXISTS "themePreference" TEXT;
 
+-- 3b) Create otp_codes table (required for login / Send Verification Code; prevents 503 on send-otp)
+CREATE TABLE IF NOT EXISTS "otp_codes" (
+  "id" TEXT NOT NULL,
+  "phoneNumber" TEXT,
+  "email" TEXT,
+  "code" TEXT NOT NULL,
+  "expiresAt" TIMESTAMPTZ NOT NULL,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "used" BOOLEAN NOT NULL DEFAULT false,
+  CONSTRAINT "otp_codes_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "otp_codes_phoneNumber_code_idx" ON "otp_codes" ("phoneNumber", "code");
+CREATE INDEX IF NOT EXISTS "otp_codes_email_code_idx" ON "otp_codes" ("email", "code");
+
 -- 4) Align rbt_profiles with Prisma schema (fixes "data could not be loaded" / 500s)
 --    Run this block in the SAME Supabase project as your app's DATABASE_URL.
 ALTER TABLE "rbt_profiles"
