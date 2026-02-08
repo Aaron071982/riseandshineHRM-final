@@ -98,6 +98,7 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
           dateTime: formData.dateTime,
           notes: formData.notes || null,
         }),
+        credentials: 'include',
       })
 
       if (response.ok) {
@@ -113,7 +114,6 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
           notes: '',
         })
         await fetchAuditLogs()
-        router.refresh()
       } else {
         const data = await response.json()
         showToast(data.error || 'Failed to save audit log', 'error')

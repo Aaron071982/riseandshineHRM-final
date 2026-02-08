@@ -35,6 +35,7 @@ export default function InterviewDeleteButton({
     try {
       const response = await fetch(`/api/admin/interviews/${interviewId}`, {
         method: 'DELETE',
+        credentials: 'include',
       })
 
       if (response.ok) {

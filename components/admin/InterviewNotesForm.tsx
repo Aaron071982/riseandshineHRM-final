@@ -50,7 +50,7 @@ export default function InterviewNotesForm({
   const fetchNotes = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/admin/interviews/${interviewId}/notes`)
+      const response = await fetch(`/api/admin/interviews/${interviewId}/notes`, { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
         if (data) {
@@ -71,6 +71,7 @@ export default function InterviewNotesForm({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(notes),
+        credentials: 'include',
       })
 
       if (response.ok) {

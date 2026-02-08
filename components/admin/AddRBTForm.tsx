@@ -100,6 +100,7 @@ export default function AddRBTForm() {
       const response = await fetch('/api/admin/rbts', {
         method: 'POST',
         body: pendingFormData,
+        credentials: 'include',
       })
 
       const result = await response.json()

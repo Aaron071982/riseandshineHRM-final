@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import InterviewNotesButton from '@/components/admin/InterviewNotesButton'
 import InterviewDeleteButton from '@/components/admin/InterviewDeleteButton'
+import InterviewCompleteButton from '@/components/admin/InterviewCompleteButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -245,6 +246,9 @@ export default async function InterviewsPage() {
                               <div className="mt-2"><Badge variant="outline" className="text-xs dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">{interview.decision}</Badge></div>
                             </div>
                             <div className="flex justify-end gap-2">
+                              {interview.status === 'SCHEDULED' && (
+                                <InterviewCompleteButton interviewId={interview.id} />
+                              )}
                               <InterviewNotesButton interviewId={interview.id} rbtProfileId={interview.rbtProfile.id} />
                               <InterviewDeleteButton interviewId={interview.id} rbtName={`${interview.rbtProfile.firstName} ${interview.rbtProfile.lastName}`} scheduledAt={interview.scheduledAt} />
                               <Link href={`/admin/rbts/${interview.rbtProfile.id}`}>

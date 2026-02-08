@@ -52,7 +52,7 @@ export default function AdminOnboardingOverride({
   const fetchExistingAvailability = async () => {
     try {
       setLoadingSchedule(true)
-      const response = await fetch(`/api/admin/rbts/${rbtProfileId}/availability`)
+      const response = await fetch(`/api/admin/rbts/${rbtProfileId}/availability`, { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
         const slots: Array<{ dayOfWeek: number; hour: number }> = Array.isArray(data)
@@ -90,6 +90,7 @@ export default function AdminOnboardingOverride({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId }),
+        credentials: 'include',
       })
 
       if (response.ok) {
@@ -121,6 +122,7 @@ export default function AdminOnboardingOverride({
       const response = await fetch(`/api/admin/rbts/${rbtProfileId}/onboarding/upload-package`, {
         method: 'POST',
         body: formData,
+        credentials: 'include',
       })
 
       if (response.ok) {
@@ -155,6 +157,7 @@ export default function AdminOnboardingOverride({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slots }),
+        credentials: 'include',
       })
 
       if (response.ok) {

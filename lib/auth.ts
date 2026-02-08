@@ -38,6 +38,12 @@ export async function createSession(
   return token
 }
 
+const VALID_ROLES = ['ADMIN', 'RBT', 'CANDIDATE'] as const
+function normalizeRole(role: string | null | undefined): 'ADMIN' | 'RBT' | 'CANDIDATE' | null {
+  const r = (role ?? '').toUpperCase()
+  return VALID_ROLES.includes(r as any) ? (r as 'ADMIN' | 'RBT' | 'CANDIDATE') : null
+}
+
 /** Raw SQL fallback when Prisma fails (e.g. schema/connection issues). */
 async function validateSessionRawSql(token: string): Promise<SessionUser | null> {
   try {
@@ -52,10 +58,12 @@ async function validateSessionRawSql(token: string): Promise<SessionUser | null>
     `
     const row = rows?.[0]
     if (!row || row.expiresAt < new Date()) return null
+    const role = normalizeRole(row.role)
+    if (!role) return null
     return {
       id: row.id,
       phoneNumber: row.phoneNumber,
-      role: row.role as 'ADMIN' | 'RBT' | 'CANDIDATE',
+      role,
       name: row.name,
       email: row.email,
       rbtProfileId: null,
@@ -69,65 +77,73 @@ async function validateSessionRawSql(token: string): Promise<SessionUser | null>
 export async function validateSession(token: string): Promise<SessionUser | null> {
   const log = (msg: string, data?: object) =>
     console.log('[auth][validateSession]', msg, data ?? '')
-  let session: Awaited<ReturnType<typeof prisma.session.findUnique>> = null
+
   try {
-    session = await prisma.session.findUnique({
-      where: { token },
-      include: {
-        user: {
-          include: {
-            rbtProfile: true,
+    let session: Awaited<ReturnType<typeof prisma.session.findUnique>> = null
+    try {
+      session = await prisma.session.findUnique({
+        where: { token },
+        include: {
+          user: {
+            include: {
+              rbtProfile: true,
+            },
           },
         },
-      },
-    })
-  } catch (err: unknown) {
-    const msg = (err as Error)?.message ?? ''
-    const code = (err as { code?: string })?.code
-    log('session lookup error, will retry without rbtProfile', {
-      prismaCode: code,
-      message: msg.slice(0, 180),
-    })
-    if (msg.includes('rbt_profiles') || code === 'P2010') {
-      try {
-        session = await prisma.session.findUnique({
-          where: { token },
-          include: { user: true },
-        })
-      } catch (fallbackErr) {
-        log('fallback session lookup failed, trying raw SQL', { message: (fallbackErr as Error)?.message?.slice(0, 120) })
-        const rawUser = await validateSessionRawSql(token)
-        return rawUser
+      })
+    } catch (err: unknown) {
+      const msg = (err as Error)?.message ?? ''
+      const code = (err as { code?: string })?.code
+      log('session lookup error, will retry without rbtProfile', {
+        prismaCode: code,
+        message: msg.slice(0, 180),
+      })
+      if (msg.includes('rbt_profiles') || code === 'P2010') {
+        try {
+          session = await prisma.session.findUnique({
+            where: { token },
+            include: { user: true },
+          })
+        } catch {
+          log('fallback session lookup failed, trying raw SQL')
+          return validateSessionRawSql(token)
+        }
+      } else {
+        log('session lookup failed, trying raw SQL', { message: msg.slice(0, 120) })
+        return validateSessionRawSql(token)
       }
-    } else {
-      log('session lookup failed, trying raw SQL', { message: msg.slice(0, 120) })
-      const rawUser = await validateSessionRawSql(token)
-      return rawUser
     }
-  }
 
-  if (!session) {
-    log('no session found for token')
-    return null
-  }
-  if (session.expiresAt < new Date()) {
-    log('session expired', { expiresAt: session.expiresAt.toISOString() })
-    return null
-  }
-  type SessionWithUser = typeof session & {
-    user: { id: string; role: string; phoneNumber: string | null; name: string | null; email: string | null; rbtProfile?: { id: string } | null }
-  }
-  const sessionWithUser = session as SessionWithUser
-  log('valid', { userId: sessionWithUser.user.id, role: sessionWithUser.user.role })
-
-  const { user } = sessionWithUser
-  return {
-    id: user.id,
-    phoneNumber: user.phoneNumber,
-    role: user.role as 'ADMIN' | 'RBT' | 'CANDIDATE',
-    name: user.name,
-    email: user.email,
-    rbtProfileId: user.rbtProfile?.id ?? null,
+    if (!session) {
+      log('no session found for token')
+      return null
+    }
+    if (session.expiresAt < new Date()) {
+      log('session expired', { expiresAt: session.expiresAt.toISOString() })
+      return null
+    }
+    type SessionWithUser = typeof session & {
+      user: { id: string; role: string; phoneNumber: string | null; name: string | null; email: string | null; rbtProfile?: { id: string } | null }
+    }
+    const sessionWithUser = session as SessionWithUser
+    const { user } = sessionWithUser
+    const role = normalizeRole(user.role)
+    if (!role) {
+      log('invalid role', { role: user.role })
+      return null
+    }
+    log('valid', { userId: user.id, role })
+    return {
+      id: user.id,
+      phoneNumber: user.phoneNumber,
+      role,
+      name: user.name,
+      email: user.email,
+      rbtProfileId: user.rbtProfile?.id ?? null,
+    }
+  } catch (err: unknown) {
+    log('validateSession threw, using raw SQL', { message: (err as Error)?.message?.slice(0, 120) })
+    return validateSessionRawSql(token)
   }
 }
 

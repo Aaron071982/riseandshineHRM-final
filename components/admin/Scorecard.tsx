@@ -32,7 +32,7 @@ export default function Scorecard({ interviewId, onSave }: ScorecardProps) {
 
   const fetchScorecard = useCallback(async () => {
     try {
-      const res = await fetch(`/api/admin/interviews/${interviewId}/scorecard`)
+      const res = await fetch(`/api/admin/interviews/${interviewId}/scorecard`, { credentials: 'include' })
       if (!res.ok) {
         setData(null)
         return
@@ -72,6 +72,7 @@ export default function Scorecard({ interviewId, onSave }: ScorecardProps) {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scores, comments }),
+          credentials: 'include',
         })
         if (res.ok) {
           const json = await res.json()

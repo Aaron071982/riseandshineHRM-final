@@ -71,7 +71,7 @@ export default function SuperAdminActivityLogs() {
       if (endDate) params.append('endDate', endDate)
       if (search) params.append('search', search)
 
-      const response = await fetch(`/api/admin/activity-logs?${params}`)
+      const response = await fetch(`/api/admin/activity-logs?${params}`, { credentials: 'include' })
       if (!response.ok) {
         setError(response.status === 403 ? 'Not authorized to view activity logs.' : 'Failed to load activity logs.')
         setActivities([])

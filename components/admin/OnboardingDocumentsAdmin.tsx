@@ -53,6 +53,7 @@ export default function OnboardingDocumentsAdmin({
       const response = await fetch('/api/admin/onboarding-documents', {
         method: 'POST',
         body: formData,
+        credentials: 'include',
       })
 
       if (response.ok) {

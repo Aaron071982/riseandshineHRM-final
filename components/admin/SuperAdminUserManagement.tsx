@@ -38,7 +38,7 @@ export default function SuperAdminUserManagement() {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch('/api/admin/users')
+      const response = await fetch('/api/admin/users', { credentials: 'include' })
       if (!response.ok) {
         setError(response.status === 403 ? 'Not authorized to view users.' : 'Failed to load users.')
         setUsers([])

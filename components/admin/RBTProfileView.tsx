@@ -187,6 +187,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ templateType: 'REACH_OUT' }),
+          credentials: 'include',
         })
 
         const data = await response.json()
@@ -220,6 +221,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       try {
         const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/hire`, {
           method: 'POST',
+          credentials: 'include',
         })
 
         if (response.ok) {
@@ -254,6 +256,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       try {
         const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/reject`, {
           method: 'POST',
+          credentials: 'include',
         })
 
         if (response.ok) {
@@ -289,6 +292,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ templateType: 'MISSING_ONBOARDING' }),
+          credentials: 'include',
         })
 
         const data = await response.json()
@@ -326,7 +330,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   const handleDeletePermanently = async () => {
     if (!deleteConfirmMatch) return
     try {
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/delete`, { method: 'DELETE' })
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/delete`, { method: 'DELETE', credentials: 'include' })
       if (response.ok) {
         showToast('RBT deleted successfully', 'success')
         setConfirmDialogOpen(false)
@@ -353,6 +357,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'STALLED' }),
+          credentials: 'include',
         })
         if (response.ok) {
           setRbtProfile({ ...rbtProfile, status: 'STALLED' })
@@ -378,6 +383,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       try {
         const response = await fetch(`/api/admin/interviews/${interviewId}/complete`, {
           method: 'PATCH',
+          credentials: 'include',
         })
 
         if (response.ok) {
@@ -421,6 +427,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             rbtProfileId: rbtProfile.id,
             ...data,
           }),
+          credentials: 'include',
         })
 
         if (response.ok) {
@@ -445,7 +452,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
   const fetchDocuments = async () => {
     try {
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents`)
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents`, { credentials: 'include' })
       if (response.ok) {
         const docs = await response.json()
         setDocuments(docs)
@@ -483,6 +490,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents`, {
           method: 'POST',
           body: formData,
+          credentials: 'include',
         })
 
         if (response.ok) {
@@ -516,7 +524,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       try {
         const response = await fetch(
           `/api/admin/rbts/${rbtProfile.id}/documents?documentId=${documentId}`,
-          { method: 'DELETE' }
+          { method: 'DELETE', credentials: 'include' }
         )
 
         if (response.ok) {
@@ -541,7 +549,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
 
   const handleDownloadDocument = async (documentId: string, fileName: string) => {
     try {
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents/${documentId}/download`)
+      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents/${documentId}/download`, { credentials: 'include' })
       if (response.ok) {
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
@@ -734,7 +742,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                   className="flex items-center gap-2 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]"
                   onClick={async () => {
                     try {
-                      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/resume`)
+                      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/resume`, { credentials: 'include' })
                       if (response.ok) {
                         const blob = await response.blob()
                         const url = window.URL.createObjectURL(blob)
@@ -938,6 +946,12 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             }}
           />
 
+          {rbtProfile.status === 'INTERVIEW_SCHEDULED' && (
+            <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+              To hire: mark the interview as completed (after the interview date) in Interview History below or from the Interviews page; then Mark as Hired will appear here.
+            </p>
+          )}
+
           <div className="flex flex-wrap gap-2">
             {canSendReachOut && (
               <Button 
@@ -972,6 +986,16 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                   />
                 </DialogContent>
               </Dialog>
+            )}
+            {rbtProfile.status === 'INTERVIEW_SCHEDULED' && (
+              <Button
+                disabled
+                title="Mark the interview as completed first"
+                variant="outline"
+                className="dark:border-[var(--border-subtle)] dark:text-[var(--text-disabled)]"
+              >
+                Hire Candidate
+              </Button>
             )}
             {canHire && (
               <Button 
@@ -1745,6 +1769,7 @@ function EditProfileForm({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
+        credentials: 'include',
       })
 
       if (!response.ok) {

@@ -31,7 +31,7 @@ export default function RBTScheduleView({ rbtProfileId, rbtName }: RBTScheduleVi
   const fetchSchedule = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/admin/rbts/${rbtProfileId}/availability`)
+      const response = await fetch(`/api/admin/rbts/${rbtProfileId}/availability`, { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
         setSlots(data.slots || [])

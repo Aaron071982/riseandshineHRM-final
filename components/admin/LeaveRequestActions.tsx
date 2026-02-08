@@ -33,6 +33,7 @@ export default function LeaveRequestActions({ requestId }: LeaveRequestActionsPr
       const response = await fetch(`/api/admin/leave-requests/${requestId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           status: action === 'approve' ? 'APPROVED' : 'DENIED',
           adminNotes: notes,
