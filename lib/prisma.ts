@@ -89,24 +89,18 @@ if (databaseUrl.includes('pooler.supabase.com')) {
   // Check if using Transaction Pooler (port 6543) or Session Pooler (port 5432)
   const isTransactionPooler = url.port === '6543' || databaseUrl.includes(':6543')
   
-  // In production, use 1 connection per instance to avoid MaxClientsInSessionMode; in dev, allow more for faster local runs
-  const connectionLimit = process.env.NODE_ENV === 'production' ? '1' : '15'
+  // In production, always force 1 connection per instance to avoid MaxClientsInSessionMode (overwrite URL if needed)
+  const connectionLimit = process.env.NODE_ENV === 'production' ? '1' : (url.searchParams.get('connection_limit') || '15')
   if (isTransactionPooler) {
-    // Transaction Pooler: add pgbouncer=true for prepared statement compatibility
     if (!url.searchParams.has('pgbouncer')) {
       url.searchParams.set('pgbouncer', 'true')
     }
-    if (!url.searchParams.has('connection_limit')) {
-      url.searchParams.set('connection_limit', connectionLimit)
-    }
+    url.searchParams.set('connection_limit', connectionLimit)
   } else {
-    // Session Pooler (port 5432): limit connections per instance in production
     if (!url.searchParams.has('pgbouncer')) {
       url.searchParams.set('pgbouncer', 'true')
     }
-    if (!url.searchParams.has('connection_limit')) {
-      url.searchParams.set('connection_limit', connectionLimit)
-    }
+    url.searchParams.set('connection_limit', connectionLimit)
   }
   
   // Increase timeout parameters for serverless to handle connection pool better
