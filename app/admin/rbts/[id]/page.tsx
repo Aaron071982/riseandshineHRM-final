@@ -341,9 +341,15 @@ export default async function RBTProfilePage({
       include: rbtProfileInclude,
     })
   } catch (error) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin/rbts/[id]','message':'prisma throw',data:{rbtId:id,msg:(error as Error)?.message?.slice(0,80)},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
     console.error('Admin rbts [id]: failed to load profile', error)
     rbtProfile = await loadRbtProfileRaw(id)
-    if (!rbtProfile) return <ProfileUnavailable />
+    if (!rbtProfile) {
+      fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin/rbts/[id]','message':'ProfileUnavailable after throw',data:{rbtId:id},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+      return <ProfileUnavailable />
+    }
   }
 
   if (!rbtProfile) {
@@ -352,7 +358,10 @@ export default async function RBTProfilePage({
     `.catch(() => [])
     if (exists?.length) {
       rbtProfile = await loadRbtProfileRaw(id)
-      if (!rbtProfile) return <ProfileUnavailable />
+      if (!rbtProfile) {
+        fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin/rbts/[id]','message':'ProfileUnavailable exists but raw failed',data:{rbtId:id},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+        return <ProfileUnavailable />
+      }
     } else {
       notFound()
     }

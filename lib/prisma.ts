@@ -89,23 +89,23 @@ if (databaseUrl.includes('pooler.supabase.com')) {
   // Check if using Transaction Pooler (port 6543) or Session Pooler (port 5432)
   const isTransactionPooler = url.port === '6543' || databaseUrl.includes(':6543')
   
+  // In production, use 1 connection per instance to avoid MaxClientsInSessionMode; in dev, allow more for faster local runs
+  const connectionLimit = process.env.NODE_ENV === 'production' ? '1' : '15'
   if (isTransactionPooler) {
-    // Transaction Pooler: has issues with Prisma's prepared statements in serverless
-    // Add pgbouncer=true to work around prepared statement conflicts
-    // This is a workaround - Session Pooler (port 5432) is recommended for Prisma
+    // Transaction Pooler: add pgbouncer=true for prepared statement compatibility
     if (!url.searchParams.has('pgbouncer')) {
       url.searchParams.set('pgbouncer', 'true')
     }
     if (!url.searchParams.has('connection_limit')) {
-      url.searchParams.set('connection_limit', '15')
+      url.searchParams.set('connection_limit', connectionLimit)
     }
   } else {
-    // Session Pooler: needs pgbouncer=true for Prisma
+    // Session Pooler (port 5432): limit connections per instance in production
     if (!url.searchParams.has('pgbouncer')) {
       url.searchParams.set('pgbouncer', 'true')
     }
     if (!url.searchParams.has('connection_limit')) {
-      url.searchParams.set('connection_limit', '15')
+      url.searchParams.set('connection_limit', connectionLimit)
     }
   }
   
@@ -129,7 +129,7 @@ if (process.env.NODE_ENV === 'production') {
 
 // Create Prisma client with optimized settings for Vercel serverless
 // Connection pool settings are configured via DATABASE_URL parameters:
-// - connection_limit: 5 (allows more concurrent connections)
+// - connection_limit: 1 (per instance; prevents MaxClientsInSessionMode on Supabase pooler)
 // - connect_timeout: 20 (increases timeout for connection acquisition)
 // - pool_timeout: 20 (increases timeout for pool operations)
 export const prisma =

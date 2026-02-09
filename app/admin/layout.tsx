@@ -18,7 +18,9 @@ export default async function AdminLayoutWrapper({
     console.error('Admin layout: failed to read cookies', e)
     redirect('/login?session_error=1')
   }
-
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin/layout','message':'cookies',data:{hasCookie:!!sessionToken,len:sessionToken?.length??0},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+  // #endregion
   if (!sessionToken) {
     redirect('/login')
   }
@@ -30,7 +32,9 @@ export default async function AdminLayoutWrapper({
     console.error('Admin layout: session validation failed', e)
     redirect('/login?session_error=1')
   }
-
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin/layout','message':'after validateSession',data:{userId:user?.id??null,role:user?.role??null,strictAdmin:user?.role==='ADMIN'},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
   if (!user || user.role !== 'ADMIN') {
     redirect('/login?session_expired=1')
   }

@@ -7,6 +7,7 @@
 --   Section 3b: creates otp_codes (required for Send Verification Code / login; prevents 503).
 --   Section 4:  adds missing rbt_profiles columns (prevents "Profile unavailable" / load errors).
 --   Section 5:  ensures admin email is ADMIN and active (so you can log in).
+--   Section 7:  adds rbt_documents.filePath (prevents P2022 on documents API / download).
 
 -- 1) Add 15m reminder column to interviews
 ALTER TABLE "interviews"
@@ -93,3 +94,7 @@ WHERE email = 'aaronsiam21@gmail.com';
 -- UNION ALL SELECT 'onboarding_tasks', COUNT(*) FROM onboarding_tasks
 -- UNION ALL SELECT 'interviews', COUNT(*) FROM interviews
 -- UNION ALL SELECT 'onboarding_completions', COUNT(*) FROM onboarding_completions;
+
+-- 7) Add filePath to rbt_documents (fixes P2022 "column filePath does not exist" on documents API / download)
+ALTER TABLE "rbt_documents"
+ADD COLUMN IF NOT EXISTS "filePath" TEXT;

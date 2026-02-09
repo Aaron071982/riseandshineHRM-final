@@ -75,6 +75,9 @@ async function validateSessionRawSql(token: string): Promise<SessionUser | null>
 }
 
 export async function validateSession(token: string): Promise<SessionUser | null> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth:validateSession','message':'entry',data:{hasToken:!!token,len:token?.length??0},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+  // #endregion
   const log = (msg: string, data?: object) =>
     console.log('[auth][validateSession]', msg, data ?? '')
 
@@ -115,10 +118,16 @@ export async function validateSession(token: string): Promise<SessionUser | null
     }
 
     if (!session) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth:validateSession','message':'no session row',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
       log('no session found for token')
       return null
     }
     if (session.expiresAt < new Date()) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth:validateSession','message':'session expired',data:{expiresAt:(session.expiresAt as Date).toISOString()},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
       log('session expired', { expiresAt: session.expiresAt.toISOString() })
       return null
     }
@@ -133,6 +142,9 @@ export async function validateSession(token: string): Promise<SessionUser | null
       return null
     }
     log('valid', { userId: user.id, role })
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth:validateSession','message':'valid',data:{userId:user.id,role},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     return {
       id: user.id,
       phoneNumber: user.phoneNumber,
@@ -142,6 +154,9 @@ export async function validateSession(token: string): Promise<SessionUser | null
       rbtProfileId: user.rbtProfile?.id ?? null,
     }
   } catch (err: unknown) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth:validateSession','message':'threw→raw',data:{msg:(err as Error)?.message?.slice(0,80)},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     log('validateSession threw, using raw SQL', { message: (err as Error)?.message?.slice(0, 120) })
     return validateSessionRawSql(token)
   }

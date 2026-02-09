@@ -62,3 +62,9 @@ This adds any missing columns on `rbt_profiles` (and other tables) so the app ca
 | 3 | Redeploy, then hard refresh the app and check Dashboard, RBTs, Interviews, Onboarding. |
 
 No data is deleted by these steps; they only fix schema and connection so the app can read what’s already there.
+
+---
+
+## After adding new columns in Prisma
+
+If you change `prisma/schema.prisma` (e.g. add a column like `filePath`), production can throw P2022 ("column does not exist") until the DB is updated. Run the matching `ALTER TABLE` (or add a new section to `prisma/supabase-migrations.sql` and run that file) in the **same** Supabase project as your production `DATABASE_URL`, then redeploy if needed.
