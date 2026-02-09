@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { validateSession, isAdmin } from '@/lib/auth'
 import { parseLocalTimeAsNY } from '@/lib/utils'
 
 // GET - Fetch all audit logs for an RBT
@@ -19,7 +19,7 @@ export async function GET(
     }
 
     const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
+    if (!isAdmin(user)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

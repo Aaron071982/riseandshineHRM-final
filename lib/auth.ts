@@ -167,3 +167,8 @@ export function isSuperAdmin(email: string | null | undefined): boolean {
   const superAdmins = ['aaronsiam21@gmail.com', 'alvi@riseandshiny.nyc']
   return !!email && superAdmins.includes(email)
 }
+
+/** Use for route guards so role casing or edge cases never cause false 403. */
+export function isAdmin(user: SessionUser | null): user is SessionUser {
+  return !!user && (user.role ?? '').toUpperCase() === 'ADMIN'
+}

@@ -2,12 +2,11 @@
 -- Run this in Supabase SQL Editor (Dashboard → SQL Editor).
 -- Use the SAME Supabase project as your production DATABASE_URL.
 --
--- IMPORTANT: The app uses Prisma with a direct Postgres connection (DATABASE_URL).
--- In Supabase, the role used by DATABASE_URL (e.g. pooler or postgres) typically has
--- BYPASSRLS. If so, enabling RLS here does NOT change Prisma's behavior; it only
--- restricts Supabase PostgREST/API access. If your connection role does NOT have
--- BYPASSRLS, you must add policies that allow that role to perform needed operations,
--- or use a role with BYPASSRLS for the app.
+-- IMPORTANT: Only run this if the role in your DATABASE_URL has "Bypass RLS" enabled
+-- (Supabase Dashboard → Database → Roles → your role). If you run this without
+-- BYPASSRLS, the app will not be able to read data ("Data could not be loaded",
+-- 403 on audit logs, zeros). If that happens, run prisma/supabase-rls-rollback.sql
+-- in SQL Editor to disable RLS and restore data loading.
 --
 -- Tables from Supabase Performance/Security linter (RLS disabled in public).
 
@@ -31,3 +30,19 @@ ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rbt_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interview_scorecards ENABLE ROW LEVEL SECURITY;
+
+-- If you get 403 on admin routes (e.g. audit logs) after enabling RLS, the role in DATABASE_URL
+-- may not have BYPASSRLS. Either enable "Bypass RLS" for that role in Dashboard → Database → Roles,
+-- or run the block below so the app can still read sessions and users.
+-- Replace 'postgres' with the actual role from: SELECT current_user; (in SQL Editor using your app's connection).
+/*
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'sessions' AND policyname = 'allow_app_sessions') THEN
+    EXECUTE 'CREATE POLICY allow_app_sessions ON public.sessions FOR ALL TO postgres USING (true) WITH CHECK (true)';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'allow_app_users') THEN
+    EXECUTE 'CREATE POLICY allow_app_users ON public.users FOR ALL TO postgres USING (true) WITH CHECK (true)';
+  END IF;
+END $$;
+*/
