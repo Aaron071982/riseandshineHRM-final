@@ -25,7 +25,6 @@ export default function InterviewCompleteButton({ interviewId }: InterviewComple
 
       if (response.ok) {
         showToast('Interview marked as completed', 'success')
-        router.refresh()
       } else {
         const errorData = await response.json()
         showToast(errorData.error || 'Failed to complete interview', 'error')

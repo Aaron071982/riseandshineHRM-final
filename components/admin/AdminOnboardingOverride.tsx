@@ -95,7 +95,6 @@ export default function AdminOnboardingOverride({
 
       if (response.ok) {
         showToast('Task marked as complete', 'success')
-        router.refresh()
       } else {
         const data = await response.json()
         showToast(data.error || 'Failed to complete task', 'error')
@@ -127,7 +126,6 @@ export default function AdminOnboardingOverride({
 
       if (response.ok) {
         showToast(`Successfully uploaded ${files.length} file(s) as onboarding package`, 'success')
-        router.refresh()
       } else {
         const data = await response.json()
         showToast(data.error || 'Failed to upload package', 'error')
@@ -162,7 +160,6 @@ export default function AdminOnboardingOverride({
 
       if (response.ok) {
         showToast('Schedule set successfully', 'success')
-        router.refresh()
       } else {
         const data = await response.json()
         showToast(data.error || 'Failed to set schedule', 'error')

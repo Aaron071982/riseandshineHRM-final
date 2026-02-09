@@ -41,7 +41,6 @@ export default function LeaveRequestActions({ requestId }: LeaveRequestActionsPr
       })
 
       if (response.ok) {
-        router.refresh()
         setAction(null)
         setNotes('')
       }

@@ -192,11 +192,20 @@ export async function POST(request: NextRequest) {
     const { device, browser } = parseUserAgent(userAgent)
 
     LOG(`${logId} creating session`)
-    const sessionToken = await createSession(user.id, {
-      device,
-      browser,
-      ipAddress,
-    })
+    let sessionToken: string
+    try {
+      sessionToken = await createSession(user.id, {
+        device,
+        browser,
+        ipAddress,
+      })
+    } catch (createErr) {
+      console.error('[auth][verify-otp] createSession failed', createErr)
+      return NextResponse.json(
+        { error: 'We couldn’t sign you in right now. Please try again in a moment.' },
+        { status: 503 }
+      )
+    }
 
     try {
       await prisma.activityLog.create({
@@ -218,10 +227,12 @@ export async function POST(request: NextRequest) {
       console.error('[auth][verify-otp] Failed to track login activity', error)
     }
 
-    LOG(`${logId} success`, { userId: user.id, role: user.role })
+    const roleNormalized = (user.role ?? '').toUpperCase()
+    const role = roleNormalized === 'ADMIN' || roleNormalized === 'RBT' || roleNormalized === 'CANDIDATE' ? roleNormalized : null
+    LOG(`${logId} success`, { userId: user.id, role: role ?? user.role })
     const response = NextResponse.json({
       success: true,
-      role: user.role,
+      role: role ?? user.role,
       userId: user.id,
     })
     // Set cookie on the response we return so it is always sent (avoids redirect-to-home bug)

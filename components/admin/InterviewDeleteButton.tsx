@@ -41,7 +41,6 @@ export default function InterviewDeleteButton({
       if (response.ok) {
         showToast('Interview deleted successfully', 'success')
         setOpen(false)
-        router.refresh()
       } else {
         const errorData = await response.json()
         showToast(errorData.error || 'Failed to delete interview', 'error')

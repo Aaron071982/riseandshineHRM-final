@@ -196,7 +196,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           showToast('Reach-out email sent successfully!', 'success')
           setConfirmDialogOpen(false)
           setConfirmAction(null)
-          router.refresh()
         } else {
           showToast(`Failed to send email: ${data.error || 'Unknown error'}`, 'error')
           // Keep dialog open on error so user can see the error message
@@ -225,12 +224,10 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         })
 
         if (response.ok) {
-          // Immediately update status to HIRED in UI
           setRbtProfile({ ...rbtProfile, status: 'HIRED' })
           showToast('Candidate hired successfully!', 'success')
           setConfirmDialogOpen(false)
           setConfirmAction(null)
-          router.refresh()
         } else {
           const data = await response.json()
           showToast(data.error || 'Failed to hire candidate', 'error')
@@ -264,7 +261,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           showToast('Candidate rejected successfully. A rejection email has been sent.', 'success')
           setConfirmDialogOpen(false)
           setConfirmAction(null)
-          router.refresh()
         } else {
           const data = await response.json()
           showToast(data.error || 'Failed to reject candidate', 'error')
@@ -301,7 +297,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           showToast('Missing onboarding reminder email sent successfully!', 'success')
           setConfirmDialogOpen(false)
           setConfirmAction(null)
-          router.refresh()
         } else {
           showToast(`Failed to send email: ${data.error || 'Unknown error'}`, 'error')
         }
@@ -337,7 +332,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         setConfirmAction(null)
         setDeleteStep(0)
         setDeleteConfirmInput('')
-        router.refresh()
         setTimeout(() => router.push('/admin/rbts'), 100)
       } else {
         const errorData = await response.json()
@@ -364,7 +358,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           showToast('Candidate marked as Stalled.', 'success')
           setConfirmDialogOpen(false)
           setConfirmAction(null)
-          router.refresh()
         } else {
           const data = await response.json()
           showToast(data.error || 'Failed to update status', 'error')
@@ -390,7 +383,13 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           showToast('Interview marked as completed!', 'success')
           setConfirmDialogOpen(false)
           setConfirmAction(null)
-          router.refresh()
+          setRbtProfile((prev) => ({
+            ...prev,
+            status: 'INTERVIEW_COMPLETED',
+            interviews: prev.interviews.map((i) =>
+              i.id === interviewId ? { ...i, status: 'COMPLETED' } : i
+            ),
+          }))
         } else {
           const errorData = await response.json()
           showToast(errorData.error || 'Failed to complete interview', 'error')
@@ -431,11 +430,30 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         })
 
         if (response.ok) {
+          const result = await response.json()
+          const newId = result?.id ?? ''
           showToast('Interview scheduled successfully!', 'success')
           setConfirmDialogOpen(false)
           setConfirmAction(null)
           setPendingInterviewData(null)
-          router.refresh()
+          setRbtProfile((prev) => ({
+            ...prev,
+            status: 'INTERVIEW_SCHEDULED',
+            interviews: [
+              ...prev.interviews,
+              {
+                id: newId,
+                scheduledAt: new Date(data.scheduledAt),
+                durationMinutes: 30,
+                interviewerName: data.interviewerName ?? '',
+                status: 'SCHEDULED',
+                decision: 'PENDING',
+                notes: null,
+                meetingUrl: 'https://meet.google.com/gtz-kmij-tvd',
+                reminder_15m_sent_at: null,
+              },
+            ],
+          }))
         } else {
           const errorData = await response.json()
           showToast(errorData.error || 'Failed to schedule interview', 'error')
@@ -499,7 +517,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           setConfirmAction(null)
           setPendingDocumentUpload([])
           await fetchDocuments()
-          router.refresh()
         } else {
           const data = await response.json()
           showToast(data.error || 'Failed to upload documents', 'error')
@@ -532,7 +549,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           setConfirmDialogOpen(false)
           setConfirmAction(null)
           await fetchDocuments()
-          router.refresh()
         } else {
           const data = await response.json()
           showToast(data.error || 'Failed to delete document', 'error')
@@ -645,7 +661,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               onCancel={() => setEditingProfile(false)}
               onSuccess={() => {
                 setEditingProfile(false)
-                router.refresh()
               }}
             />
           ) : (
@@ -942,7 +957,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             initialStatus={rbtProfile.status as 'NEW' | 'REACH_OUT' | 'REACH_OUT_EMAIL_SENT' | 'TO_INTERVIEW' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_COMPLETED' | 'HIRED' | 'REJECTED'}
             onStatusChange={(newStatus) => {
               setRbtProfile({ ...rbtProfile, status: newStatus })
-              router.refresh()
             }}
           />
 

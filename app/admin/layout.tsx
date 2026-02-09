@@ -32,7 +32,7 @@ export default async function AdminLayoutWrapper({
   }
 
   if (!user || user.role !== 'ADMIN') {
-    redirect('/login')
+    redirect('/login?session_expired=1')
   }
 
   return <AdminLayout>{children}</AdminLayout>

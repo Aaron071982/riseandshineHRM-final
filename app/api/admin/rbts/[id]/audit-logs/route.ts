@@ -30,21 +30,28 @@ export async function GET(
         orderBy: { dateTime: 'desc' },
       })
     } catch (err) {
-      console.error('Error fetching audit logs (Prisma), trying raw SQL', err)
+      console.error('Error fetching audit logs (Prisma), retrying once then raw SQL', err)
       try {
-        const rows = await prisma.$queryRaw<
-          Array<{ id: string; rbtProfileId: string; auditType: string; dateTime: Date; notes: string | null; createdBy: string | null; createdAt: Date; updatedAt: Date }>
-        >`
-          SELECT id, "rbtProfileId", "auditType", "dateTime", notes, "createdBy", "createdAt", "updatedAt"
-          FROM rbt_audit_logs WHERE "rbtProfileId" = ${id} ORDER BY "dateTime" DESC
-        `
-        auditLogs = rows || []
-      } catch (rawErr) {
-        console.error('Error fetching audit logs (raw)', rawErr)
-        return NextResponse.json(
-          { error: 'Failed to fetch audit logs' },
-          { status: 500 }
-        )
+        auditLogs = await prisma.rBTAuditLog.findMany({
+          where: { rbtProfileId: id },
+          orderBy: { dateTime: 'desc' },
+        })
+      } catch (retryErr) {
+        try {
+          const rows = await prisma.$queryRaw<
+            Array<{ id: string; rbtProfileId: string; auditType: string; dateTime: Date; notes: string | null; createdBy: string | null; createdAt: Date; updatedAt: Date }>
+          >`
+            SELECT id, "rbtProfileId", "auditType", "dateTime", notes, "createdBy", "createdAt", "updatedAt"
+            FROM rbt_audit_logs WHERE "rbtProfileId" = ${id} ORDER BY "dateTime" DESC
+          `
+          auditLogs = rows || []
+        } catch (rawErr) {
+          console.error('Error fetching audit logs (raw)', rawErr)
+          return NextResponse.json(
+            { error: 'Failed to fetch audit logs' },
+            { status: 500 }
+          )
+        }
       }
     }
 

@@ -36,6 +36,7 @@ export default function VerifyOTPPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp }),
+        credentials: 'include',
       })
 
       const data = await response.json()
@@ -51,18 +52,17 @@ export default function VerifyOTPPage() {
       sessionStorage.removeItem('devOTP')
 
       // Full-page redirect so the browser sends the new session cookie (router.push can miss it)
-      if (data.role === 'ADMIN') {
+      const role = (data.role ?? '').toUpperCase()
+      if (role === 'ADMIN') {
         window.location.href = '/admin/dashboard'
         return
       }
-      if (data.role === 'RBT') {
+      if (role === 'RBT') {
         window.location.href = '/rbt/dashboard'
         return
       }
-      {
-        setError('Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.')
-        setLoading(false)
-      }
+      setError('Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.')
+      setLoading(false)
     } catch (err) {
       setError('An error occurred. Please try again.')
       setLoading(false)

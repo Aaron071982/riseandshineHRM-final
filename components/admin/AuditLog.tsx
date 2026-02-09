@@ -140,7 +140,6 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
       if (response.ok) {
         showToast('Audit log deleted successfully', 'success')
         await fetchAuditLogs()
-        router.refresh()
       } else {
         const data = await response.json()
         showToast(data.error || 'Failed to delete audit log', 'error')
