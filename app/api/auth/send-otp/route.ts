@@ -74,9 +74,13 @@ export async function POST(request: NextRequest) {
         message: err?.message,
         stack: err?.stack?.split('\n').slice(0, 4),
       })
-      const adminFallbackEmail = process.env.ADMIN_FALLBACK_EMAIL?.trim().toLowerCase()
-      if (adminFallbackEmail && email === adminFallbackEmail) {
-        LOG(`${logId} admin fallback: returning fixed code so admin can log in`)
+      // Allow any declared admin/fallback email to get code 123456 when DB or email fails (e.g. missing otp_codes table)
+      const fallbackList = (process.env.ADMIN_FALLBACK_EMAIL ?? '')
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean)
+      if (fallbackList.length > 0 && fallbackList.includes(email)) {
+        LOG(`${logId} admin fallback: returning fixed code so admin can log in`, { email: `${email.slice(0, 3)}***` })
         return NextResponse.json({
           success: true,
           devOTP: '123456',

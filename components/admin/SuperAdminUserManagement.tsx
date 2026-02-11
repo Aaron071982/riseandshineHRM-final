@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/toast'
 import { formatDate, formatDateTime } from '@/lib/utils'
-import { Eye, Edit, User } from 'lucide-react'
+import { Eye, Edit, User, Trash2 } from 'lucide-react'
 
 interface UserWithStats {
   id: string
@@ -60,6 +60,44 @@ export default function SuperAdminUserManagement() {
     fetchUsers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const handleAdminCreated = () => {
+      fetchUsers()
+    }
+    window.addEventListener('adminCreated', handleAdminCreated)
+    return () => {
+      window.removeEventListener('adminCreated', handleAdminCreated)
+    }
+  }, [])
+
+  const handleDeleteAdmin = async (userId: string, userEmail: string | null) => {
+    if (!confirm(`Are you sure you want to remove admin access for ${userEmail || userId}? This will set their role to CANDIDATE.`)) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        showToast(data.error || 'Failed to remove admin', 'error')
+        return
+      }
+
+      showToast('Admin access removed successfully', 'success')
+      await fetchUsers()
+    } catch (error) {
+      console.error('Error removing admin:', error)
+      showToast('Failed to remove admin', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -141,6 +179,17 @@ export default function SuperAdminUserManagement() {
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
+                        {user.role === 'ADMIN' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteAdmin(user.id, user.email)}
+                            title="Remove Admin Access"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

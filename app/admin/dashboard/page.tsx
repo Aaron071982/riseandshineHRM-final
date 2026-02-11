@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import TrackedLink from '@/components/tracking/TrackedLink'
 import { formatDate } from '@/lib/utils'
-import { Plus, Users, Calendar, FileCheck, Clock, TrendingUp, UserPlus, CheckCircle } from 'lucide-react'
+import { Plus, Users, Calendar, FileCheck, Clock, TrendingUp, UserPlus, CheckCircle, Shield } from 'lucide-react'
 import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { validateSession, isSuperAdmin } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -306,6 +306,27 @@ export default async function AdminDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Admin Management - Only visible to super admins */}
+      {adminEmail && isSuperAdmin(adminEmail) && (
+        <Card className="border-2 border-purple-200 dark:border-purple-800/40 bg-gradient-to-br from-white to-purple-50 dark:from-[var(--bg-elevated)] dark:to-purple-950/20">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
+              <Shield className="h-5 w-5 text-purple-600 dark:text-[var(--status-onboarding-text)]" />
+              Admin Management
+            </CardTitle>
+            <CardDescription className="dark:text-[var(--text-tertiary)]">Manage admin users and access</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/profile">
+              <Button className="gradient-primary text-white border-0 w-full md:w-auto">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Manage Admins
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upcoming Interviews */}

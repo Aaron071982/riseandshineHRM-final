@@ -179,8 +179,8 @@ export async function cleanupExpiredSessions(): Promise<void> {
 }
 
 export function isSuperAdmin(email: string | null | undefined): boolean {
-  const superAdmins = ['aaronsiam21@gmail.com', 'alvi@riseandshiny.nyc']
-  return !!email && superAdmins.includes(email)
+  const superAdmins = ['aaronsiam21@gmail.com', 'kazi@siyam.nyc']
+  return !!email && superAdmins.includes(email.toLowerCase())
 }
 
 /** Use for route guards so role casing or edge cases never cause false 403. */

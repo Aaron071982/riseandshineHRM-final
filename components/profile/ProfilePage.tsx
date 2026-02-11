@@ -353,8 +353,8 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Super Admin Controls - Only visible to aaronsiam21@gmail.com */}
-      {user?.email === 'aaronsiam21@gmail.com' && (
+      {/* Super Admin Controls - Only visible to super admins */}
+      {user?.email && (user.email.toLowerCase() === 'aaronsiam21@gmail.com' || user.email.toLowerCase() === 'kazi@siyam.nyc') && (
         <div className="space-y-6">
           <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
             <CardHeader>

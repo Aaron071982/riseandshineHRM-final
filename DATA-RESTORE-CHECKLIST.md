@@ -13,7 +13,7 @@ Your data is in Supabase. Follow these steps so the app can read it everywhere (
 5. Paste it into the Supabase SQL Editor and click **Run**.
 6. You should see **Success** (and possibly “No rows returned” for some statements—that’s normal).
 
-This adds any missing columns on `rbt_profiles` (and other tables) so the app can read your data.
+This adds any missing columns on `rbt_profiles` (and other tables) and creates the **`otp_codes`** table (Section 3b) required for **login / “Send Verification Code”**. If login returns “Unable to send verification code,” the DB is likely missing this table—run the full migration above.
 
 ---
 
@@ -62,6 +62,13 @@ This adds any missing columns on `rbt_profiles` (and other tables) so the app ca
 | 3 | Redeploy, then hard refresh the app and check Dashboard, RBTs, Interviews, Onboarding. |
 
 No data is deleted by these steps; they only fix schema and connection so the app can read what’s already there.
+
+---
+
+## If "Send Verification Code" returns an error (503)
+
+1. **Fix the DB:** Run the full **`prisma/supabase-migrations.sql`** in the **production** Supabase project (Step 1 above). Section 3b creates the `otp_codes` table; without it, login will fail with "Unable to send verification code."
+2. **Temporary workaround:** In Vercel → Environment Variables, add **`ADMIN_FALLBACK_EMAIL`** = comma-separated admin emails (e.g. `aaronsiam21@gmail.com,kazi@siyam.nyc,tisha@riseandshine.nyc`). When the server can't store/send OTP (e.g. missing table), those emails can still log in with code **123456** so admins can access while you fix the migration. Access is still gated by the User table (role ADMIN or hired RBT).
 
 ---
 

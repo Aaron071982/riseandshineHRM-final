@@ -14,13 +14,6 @@ export default function SuperAdminCreateAdmin() {
   const [formData, setFormData] = useState({
     email: '',
     fullName: '',
-    phoneNumber: '',
-    address: '',
-    timezone: 'America/New_York',
-    employeeId: '',
-    startDate: '',
-    department: '',
-    title: '',
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,7 +26,10 @@ export default function SuperAdminCreateAdmin() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          email: formData.email,
+          fullName: formData.fullName,
+        }),
         credentials: 'include',
       })
 
@@ -46,17 +42,13 @@ export default function SuperAdminCreateAdmin() {
       const data = await response.json()
       showToast(`Admin ${data.user.email} created successfully`, 'success')
 
+      // Dispatch event to refresh user list
+      window.dispatchEvent(new CustomEvent('adminCreated'))
+
       // Reset form
       setFormData({
         email: '',
         fullName: '',
-        phoneNumber: '',
-        address: '',
-        timezone: 'America/New_York',
-        employeeId: '',
-        startDate: '',
-        department: '',
-        title: '',
       })
     } catch (error) {
       console.error('Error creating admin:', error)
@@ -99,77 +91,6 @@ export default function SuperAdminCreateAdmin() {
                 placeholder="John Doe"
               />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Phone Number</Label>
-              <Input
-                id="phoneNumber"
-                type="tel"
-                value={formData.phoneNumber}
-                onChange={(e) => setFormData((prev) => ({ ...prev, phoneNumber: e.target.value }))}
-                placeholder="+1 (555) 123-4567"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="timezone">Timezone</Label>
-              <Input
-                id="timezone"
-                value={formData.timezone}
-                onChange={(e) => setFormData((prev) => ({ ...prev, timezone: e.target.value }))}
-                placeholder="America/New_York"
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                value={formData.address}
-                onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
-                placeholder="123 Main St, City, State ZIP"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="employeeId">Employee ID</Label>
-              <Input
-                id="employeeId"
-                value={formData.employeeId}
-                onChange={(e) => setFormData((prev) => ({ ...prev, employeeId: e.target.value }))}
-                placeholder="EMP-001"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="startDate">Start Date</Label>
-              <Input
-                id="startDate"
-                type="date"
-                value={formData.startDate}
-                onChange={(e) => setFormData((prev) => ({ ...prev, startDate: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
-              <Input
-                id="department"
-                value={formData.department}
-                onChange={(e) => setFormData((prev) => ({ ...prev, department: e.target.value }))}
-                placeholder="HR, Operations, etc."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="HR Manager, Operations Lead, etc."
-              />
-            </div>
           </div>
 
           <div className="flex gap-3">
@@ -184,13 +105,6 @@ export default function SuperAdminCreateAdmin() {
                 setFormData({
                   email: '',
                   fullName: '',
-                  phoneNumber: '',
-                  address: '',
-                  timezone: 'America/New_York',
-                  employeeId: '',
-                  startDate: '',
-                  department: '',
-                  title: '',
                 })
               }}
             >

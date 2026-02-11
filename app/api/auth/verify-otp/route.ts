@@ -69,8 +69,8 @@ export async function POST(request: NextRequest) {
 
     // Localhost / development bypass: accept fixed code 123456 so you can log in without email/OTP table
     const isDevBypass = process.env.NODE_ENV === 'development' && otp === '123456'
-    const adminFallbackEmail = process.env.ADMIN_FALLBACK_EMAIL?.trim().toLowerCase()
-    const isAdminFallback = !!adminFallbackEmail && email === adminFallbackEmail && otp === '123456'
+    const adminFallbackList = (process.env.ADMIN_FALLBACK_EMAIL ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+    const isAdminFallback = adminFallbackList.length > 0 && adminFallbackList.includes(email) && otp === '123456'
     const isTestAccount = email === 'hrmtesting@gmail.com'
     let isValid = false
 

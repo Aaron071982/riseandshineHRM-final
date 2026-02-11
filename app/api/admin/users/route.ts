@@ -125,17 +125,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const {
-      email,
-      fullName,
-      phoneNumber,
-      address,
-      timezone,
-      employeeId,
-      startDate,
-      department,
-      title,
-    } = body
+    const { email, fullName } = body
 
     if (!email || !fullName) {
       return NextResponse.json({ error: 'Email and full name are required' }, { status: 400 })
@@ -160,13 +150,7 @@ export async function POST(request: NextRequest) {
         profile: {
           create: {
             fullName,
-            phone: phoneNumber || null,
-            address: address || null,
-            timezone: timezone || 'America/New_York',
-            employeeId: employeeId || null,
-            startDate: startDate ? new Date(startDate) : null,
-            department: department || null,
-            title: title || null,
+            timezone: 'America/New_York',
             skills: [],
             languages: [],
           },
