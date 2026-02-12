@@ -59,16 +59,18 @@ export async function POST(
         }
       }
 
+      // Normalize email to lowercase so login (verify-otp) matches regardless of casing
+      const normalizedEmail = rbtProfile.email ? rbtProfile.email.trim().toLowerCase() : undefined
       // Update user with all required fields
       const updatedUser = await prisma.user.update({
         where: { id: rbtProfile.userId },
         data: { 
           role: 'RBT',
-          email: rbtProfile.email || undefined, // Sync email - this is required for login
+          email: normalizedEmail || rbtProfile.email || undefined, // Sync email - required for login
           isActive: true, // Ensure user is active
         },
       })
-      console.log(`✅ Updated user ${updatedUser.id} to RBT role with email ${rbtProfile.email || 'N/A'}`)
+      console.log(`✅ Updated user ${updatedUser.id} to RBT role with email ${normalizedEmail || rbtProfile.email || 'N/A'}`)
     } catch (error: any) {
       console.error('❌ Error updating user during hire:', error)
       

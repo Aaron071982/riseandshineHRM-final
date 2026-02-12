@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 const LOG = (msg: string, data?: object) =>
   console.log('[auth][verify-otp]', msg, data ?? '')
 
-/** Find user by email or id; include rbtProfile when possible (fallback without if rbt_profiles has schema issues so admins can still log in). */
+/** Find user by email (case-insensitive) or id; include rbtProfile when possible (fallback without if rbt_profiles has schema issues so admins can still log in). */
 async function findUserByEmailWithProfile(
   email: string | null,
   userId?: string
@@ -20,8 +20,9 @@ async function findUserByEmailWithProfile(
       })
     }
     if (!email) return null
-    return await prisma.user.findUnique({
-      where: { email },
+    // Case-insensitive lookup so "Iborasool123@gmail.com" and "lborasool123@gmail.com" (or any casing) match
+    return await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
       include,
     })
   } catch (err: unknown) {
@@ -41,8 +42,8 @@ async function findUserByEmailWithProfile(
         })
       }
       if (!email) return null
-      return await prisma.user.findUnique({
-        where: { email },
+      return await prisma.user.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
         include: {},
       })
     }
@@ -115,8 +116,9 @@ export async function POST(request: NextRequest) {
     LOG(`${logId} OTP valid, looking up user`)
     let user = await findUserByEmailWithProfile(email)
     if (!user) {
+      // Case-insensitive lookup so hired RBTs can log in regardless of email casing in profile
       const rbtProfile = await prisma.rBTProfile.findFirst({
-        where: { email },
+        where: { email: { equals: email, mode: 'insensitive' } },
         select: { userId: true },
       }).catch((e) => {
         LOG(`${logId} rbtProfile lookup by email failed`, { message: (e as Error)?.message?.slice(0, 150) })
