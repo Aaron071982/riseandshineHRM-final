@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import TrackedLink from '@/components/tracking/TrackedLink'
 import { formatDate } from '@/lib/utils'
-import { Plus, Users, Calendar, FileCheck, Clock, TrendingUp, UserPlus, CheckCircle, Shield } from 'lucide-react'
+import { Plus, Users, Calendar, FileCheck, Clock, TrendingUp, CheckCircle, Shield } from 'lucide-react'
 import { cookies } from 'next/headers'
 import { validateSession, isSuperAdmin } from '@/lib/auth'
+import SuperAdminCreateAdmin from '@/components/admin/SuperAdminCreateAdmin'
+import SuperAdminUserManagement from '@/components/admin/SuperAdminUserManagement'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -307,23 +309,25 @@ export default async function AdminDashboard() {
         </CardContent>
       </Card>
 
-      {/* Admin Management - Only visible to super admins */}
+      {/* Admin Management - Only visible to super admins (add/remove admins on dashboard) */}
       {adminEmail && isSuperAdmin(adminEmail) && (
-        <Card className="border-2 border-purple-200 dark:border-purple-800/40 bg-gradient-to-br from-white to-purple-50 dark:from-[var(--bg-elevated)] dark:to-purple-950/20">
+        <Card className="border-2 border-purple-200 dark:border-purple-800/40 bg-white dark:bg-[var(--bg-elevated)]">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
               <Shield className="h-5 w-5 text-purple-600 dark:text-[var(--status-onboarding-text)]" />
               Admin Management
             </CardTitle>
-            <CardDescription className="dark:text-[var(--text-tertiary)]">Manage admin users and access</CardDescription>
+            <CardDescription className="dark:text-[var(--text-tertiary)]">Add and remove admin users. Only you and kazi@siyam.nyc can manage admins.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Link href="/profile">
-              <Button className="gradient-primary text-white border-0 w-full md:w-auto">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Manage Admins
-              </Button>
-            </Link>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <SuperAdminUserManagement />
+              </div>
+              <div>
+                <SuperAdminCreateAdmin />
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
