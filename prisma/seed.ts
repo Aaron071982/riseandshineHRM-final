@@ -178,6 +178,23 @@ async function main() {
     },
   })
 
+  // Admin 11: Kazi (jamal.nyc)
+  const admin11 = await prisma.user.upsert({
+    where: { email: 'kazi@jamal.nyc' },
+    update: {
+      role: 'ADMIN',
+      isActive: true,
+      name: 'Kazi',
+    },
+    create: {
+      phoneNumber: null,
+      name: 'Kazi',
+      email: 'kazi@jamal.nyc',
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+
   console.log('✅ Created/updated admin users:', {
     admin1: admin1.email,
     admin2: admin2.email,
@@ -189,6 +206,7 @@ async function main() {
     admin8: admin8.email,
     admin9: admin9.email,
     admin10: admin10.email,
+    admin11: admin11.email,
   })
 
   console.log('🎉 Seed completed successfully!')
@@ -203,6 +221,7 @@ async function main() {
   console.log('   - q.hossains055@gmail.com')
   console.log('   - azkarim05@gmail.com')
   console.log('   - cary@riseandshine.nyc')
+  console.log('   - kazi@jamal.nyc')
 }
 
 main()
