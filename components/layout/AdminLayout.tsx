@@ -18,6 +18,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  CalendarClock,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
@@ -28,7 +29,7 @@ interface AdminLayoutProps {
   children: React.ReactNode
 }
 
-const navItems = [
+const navItemsBase = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/rbts', label: 'RBTs & Candidates', icon: Users },
   { href: '/admin/interviews', label: 'Interviews', icon: Calendar },
@@ -36,6 +37,10 @@ const navItems = [
   { href: '/admin/attendance', label: 'Attendance & Hours', icon: Clock },
   { href: '/admin/leave', label: 'Leave Requests', icon: CalendarDays },
 ]
+const showSchedulingBeta = process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_SCHEDULING_BETA === 'true'
+const navItems = showSchedulingBeta
+  ? [...navItemsBase, { href: '/admin/scheduling-beta', label: 'Scheduling System (beta)', icon: CalendarClock }]
+  : navItemsBase
 
 const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
 

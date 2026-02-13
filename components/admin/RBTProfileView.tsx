@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDateTime } from '@/lib/utils'
-import { CheckCircle2, XCircle, Download, FileText, Trash2, Edit, Loader2, Upload } from 'lucide-react'
+import { CheckCircle2, XCircle, Download, FileText, Trash2, Edit, Loader2, Upload, CalendarClock } from 'lucide-react'
 import Link from 'next/link'
 import RBTScheduleView from './RBTScheduleView'
 import InterviewNotesButton from './InterviewNotesButton'
@@ -173,6 +173,34 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     uploadedAt: Date
   }>>(initialRbtProfile.documents || [])
   const [uploadingDocuments, setUploadingDocuments] = useState(false)
+  const [clientAssignments, setClientAssignments] = useState<Array<{
+    id: string
+    clientName: string
+    daysOfWeek: number[]
+    timeStart: string | null
+    timeEnd: string | null
+    notes: string | null
+  }>>([])
+  const [clientAssignmentsLoading, setClientAssignmentsLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch(`/api/admin/scheduling-beta/assignments?rbtId=${encodeURIComponent(rbtProfile.id)}`, { credentials: 'include' })
+        if (!res.ok || cancelled) return
+        const data = await res.json()
+        if (cancelled) return
+        setClientAssignments(data.assignments ?? [])
+      } catch (e) {
+        if (!cancelled) setClientAssignments([])
+      } finally {
+        if (!cancelled) setClientAssignmentsLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [rbtProfile.id])
 
   const handleSendReachOutEmail = () => {
     setConfirmMessage(`Are you sure you want to send a reach-out email to ${rbtProfile.firstName} ${rbtProfile.lastName}?`)
@@ -718,6 +746,47 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 </div>
               )}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Client assignments (from Scheduling System) */}
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
+            <CalendarClock className="w-6 h-6" />
+            Client assignments
+          </CardTitle>
+          <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+            Assigned clients and schedule from the Scheduling System (beta). Assign in Admin → Scheduling System (beta).
+          </p>
+        </CardHeader>
+        <CardContent>
+          {clientAssignmentsLoading ? (
+            <p className="text-sm text-gray-500">Loading…</p>
+          ) : clientAssignments.length === 0 ? (
+            <p className="text-sm text-gray-500">No client assignments yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {clientAssignments.map((a) => {
+                const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                const days = (a.daysOfWeek ?? []).map((d) => dayLabels[d] ?? String(d)).join(', ')
+                const time = [a.timeStart, a.timeEnd].filter(Boolean).join('–')
+                return (
+                  <li
+                    key={a.id}
+                    className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-[var(--border-subtle)] text-sm"
+                  >
+                    <span className="font-medium dark:text-[var(--text-primary)]">{a.clientName}</span>
+                    <span className="text-gray-600 dark:text-[var(--text-tertiary)]">
+                      {days}
+                      {time ? ` ${time}` : ''}
+                      {a.notes ? ` · ${a.notes}` : ''}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
           )}
         </CardContent>
       </Card>

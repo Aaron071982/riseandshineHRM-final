@@ -252,8 +252,47 @@ model RBTProfile {
   interviewNotes        InterviewNotes[]
   onboardingCompletions OnboardingCompletion[]
   auditLogs             RBTAuditLog[]
+  clientAssignments     ClientAssignment[]
 
   @@map("rbt_profiles")
+}
+
+// Scheduling: clients (e.g. for RBT–client matching and assignments)
+model SchedulingClient {
+  id                     String   @id @default(cuid())
+  name                   String
+  addressLine1           String?
+  addressLine2           String?
+  city                   String?
+  state                  String?
+  zip                    String?
+  preferredRbtEthnicity   String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  assignments ClientAssignment[]
+
+  @@map("scheduling_clients")
+}
+
+// RBT–client assignment: which days and time range (e.g. Mon/Tue/Wed 4–7 PM)
+model ClientAssignment {
+  id                String   @id @default(cuid())
+  rbtProfileId      String
+  schedulingClientId String
+  daysOfWeek        Int[]    // 0=Sunday, 1=Monday, ..., 6=Saturday
+  timeStart         String?  // e.g. "16:00" or "4:00 PM"
+  timeEnd           String?  // e.g. "19:00" or "7:00 PM"
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  rbtProfile  RBTProfile      @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  client      SchedulingClient @relation(fields: [schedulingClientId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId])
+  @@index([schedulingClientId])
+  @@map("client_assignments")
 }
 
 model Interview {
