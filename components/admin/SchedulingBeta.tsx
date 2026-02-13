@@ -57,6 +57,7 @@ type Client = {
   id: string
   name: string
   addressLine1: string
+  addressLine2?: string
   city: string
   state: string
   zip: string
@@ -162,27 +163,88 @@ export default function SchedulingBeta() {
     fetchAssignments()
   }, [])
 
-  function handleAddClient(e: React.FormEvent) {
+  async function fetchClients() {
+    try {
+      const res = await fetch('/api/admin/scheduling-beta/clients', { credentials: 'include' })
+      if (!res.ok) return
+      const data = await res.json()
+      const list = (data.clients ?? []).map((c: { id: string; name: string; addressLine1: string; addressLine2?: string; city: string; state: string; zip: string; preferredRbtEthnicity: string }) => ({
+        id: c.id,
+        name: c.name,
+        addressLine1: c.addressLine1 ?? '',
+        addressLine2: c.addressLine2 ?? '',
+        city: c.city ?? '',
+        state: c.state ?? '',
+        zip: c.zip ?? '',
+        preferredRbtEthnicity: c.preferredRbtEthnicity ?? '',
+      }))
+      setClients(list)
+    } catch (e) {
+      console.error('Failed to load clients', e)
+    }
+  }
+
+  useEffect(() => {
+    fetchClients()
+  }, [])
+
+  const [clientsLoading, setClientsLoading] = useState(false)
+
+  async function handleAddClient(e: React.FormEvent) {
     e.preventDefault()
     if (!formName.trim()) return
-    setClients((prev) => [
-      ...prev,
-      {
-        id: generateId(),
-        name: formName.trim(),
-        addressLine1: formAddress.trim(),
-        city: formCity.trim(),
-        state: formState.trim() || 'NY',
-        zip: formZip.trim(),
-        preferredRbtEthnicity: formEthnicity === '__none__' ? '' : formEthnicity,
-      },
-    ])
-    setFormName('')
-    setFormAddress('')
-    setFormCity('')
-    setFormState('NY')
-    setFormZip('')
-    setFormEthnicity('__none__')
+    setClientsLoading(true)
+    try {
+      const res = await fetch('/api/admin/scheduling-beta/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: formName.trim(),
+          addressLine1: formAddress.trim() || undefined,
+          city: formCity.trim() || undefined,
+          state: formState.trim() || 'NY',
+          zip: formZip.trim() || undefined,
+          preferredRbtEthnicity: formEthnicity === '__none__' ? undefined : formEthnicity,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to create client')
+      }
+      await fetchClients()
+      setFormName('')
+      setFormAddress('')
+      setFormCity('')
+      setFormState('NY')
+      setFormZip('')
+      setFormEthnicity('__none__')
+    } catch (err) {
+      console.error(err)
+      alert((err as Error).message || 'Failed to add client')
+    } finally {
+      setClientsLoading(false)
+    }
+  }
+
+  async function deleteClient(clientId: string) {
+    if (!confirm('Remove this client? Any assignments to them will also be removed.')) return
+    try {
+      const res = await fetch(`/api/admin/scheduling-beta/clients/${clientId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error('Failed to delete')
+      await fetchClients()
+      setMatchResults((prev) => {
+        const next = { ...prev }
+        delete next[clientId]
+        return next
+      })
+    } catch (e) {
+      console.error(e)
+      alert('Failed to remove client')
+    }
   }
 
   function findClosestThree(client: Client): MatchResult[] {
@@ -221,14 +283,7 @@ export default function SchedulingBeta() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          client: {
-            name: client.name,
-            addressLine1: client.addressLine1 || undefined,
-            city: client.city || undefined,
-            state: client.state || undefined,
-            zip: client.zip || undefined,
-            preferredRbtEthnicity: client.preferredRbtEthnicity || undefined,
-          },
+          clientId: assignClientId,
           rbtProfileId: assignRbtId,
           daysOfWeek: assignDays,
           timeStart: assignTimeStart.trim() || undefined,
@@ -413,7 +468,7 @@ export default function SchedulingBeta() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <UserPlus className="w-5 h-5" />
-              Add client (in-memory, not saved)
+              Add client (saved to database)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -481,7 +536,9 @@ export default function SchedulingBeta() {
                 </Select>
               </div>
               <div className="sm:col-span-2 flex items-end">
-                <Button type="submit">Add client</Button>
+                <Button type="submit" disabled={clientsLoading}>
+                  {clientsLoading ? 'Saving…' : 'Add client'}
+                </Button>
               </div>
             </form>
           </CardContent>
@@ -491,10 +548,11 @@ export default function SchedulingBeta() {
         <Card className="border border-gray-200 dark:border-[var(--border-subtle)]">
           <CardHeader>
             <CardTitle className="text-lg">Clients</CardTitle>
+            <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)]">Saved in database. Assign an RBT later with “Find 3 closest” then “Assign” below.</p>
           </CardHeader>
           <CardContent>
             {clients.length === 0 ? (
-              <p className="text-sm text-gray-500">Add a client above.</p>
+              <p className="text-sm text-gray-500">Add a client above (they are saved and persist after refresh).</p>
             ) : (
               <ul className="space-y-4">
                 {clients.map((client) => (
@@ -516,15 +574,26 @@ export default function SchedulingBeta() {
                           </Badge>
                         )}
                       </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleFindClosest(client.id)}
-                      >
-                        <MapPin className="w-4 h-4 mr-1" />
-                        Find 3 closest RBTs
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleFindClosest(client.id)}
+                        >
+                          <MapPin className="w-4 h-4 mr-1" />
+                          Find 3 closest RBTs
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => deleteClient(client.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                     {matchResults[client.id] && matchResults[client.id].length > 0 && (
                       <div className="mt-3 pl-2 border-l-2 border-primary">
