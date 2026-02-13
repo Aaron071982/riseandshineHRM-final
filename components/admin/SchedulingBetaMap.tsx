@@ -5,7 +5,8 @@ import { zipToCoord } from '@/lib/scheduling-beta/zipToCoord'
 
 declare global {
   interface Window {
-    google?: typeof google
+    // Google Maps JS API is loaded at runtime; no @types/google.maps in build
+    google?: any
     initSchedulingBetaMap?: () => void
   }
 }
@@ -151,14 +152,14 @@ export default function SchedulingBetaMap({
         // Use departure_time so we get duration_in_traffic (realistic drive time with traffic)
         const departure = new Date()
         departure.setMinutes(departure.getMinutes() + 15)
-        const request: google.maps.DirectionsRequest = {
+        const request: Record<string, unknown> = {
           origin: originAddress,
           destination: destAddress,
           travelMode: g.TravelMode.DRIVING,
           ...(departure.getTime() > Date.now() && { drivingOptions: { departureTime: departure } }),
         }
 
-        directionsService.route(request, (result, routeStatus) => {
+        directionsService.route(request, (result: any, routeStatus: any) => {
           if (routeStatus !== g.DirectionsStatus.OK || !result) {
             setStatus('error')
             setErrorMessage(routeStatus || 'Could not get route.')
@@ -169,7 +170,7 @@ export default function SchedulingBetaMap({
           if (leg) {
             const distText = leg.distance?.text ?? ''
             const durVal = leg.duration?.value ?? 0
-            const durInTraffic = (leg as google.maps.DirectionsLeg & { duration_in_traffic?: { text: string; value: number } }).duration_in_traffic
+            const durInTraffic = (leg as { duration_in_traffic?: { text: string; value: number } }).duration_in_traffic
             const durText = durInTraffic?.text ?? leg.duration?.text ?? ''
             const distVal = leg.distance?.value ?? 0
             setDistanceText(distText)
