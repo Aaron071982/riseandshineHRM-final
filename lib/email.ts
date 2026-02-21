@@ -743,13 +743,13 @@ export function generateTeamWelcomeEmail(fullName: string, roleLabel: string): {
   return { subject, html }
 }
 
-/** Welcome + onboarding email for RBTs hired manually (no interview). Mentions 40-hour course access when needed. */
+/** Welcome + "You're hired!" + onboarding email for RBTs hired manually (no interview). Mentions 40-hour course access when needed. */
 export function generateManualHireOnboardingEmail(
   rbtProfile: { firstName: string; lastName: string; email: string | null },
   fortyHourCourseCompleted: boolean
 ): { subject: string; html: string } {
   const loginUrl = makePublicUrl('/login')
-  const subject = 'Welcome to Rise and Shine - Complete Your Onboarding'
+  const subject = "Welcome to Rise and Shine – You're Hired!"
   const fortyHourParagraph = !fortyHourCourseCompleted
     ? `<p><strong>40-Hour RBT Course:</strong> If you have not yet completed the 40-hour RBT course, you will have access to it in your onboarding dashboard. Log in, complete the course, and upload your certificate there.</p>`
     : ''
@@ -774,12 +774,12 @@ export function generateManualHireOnboardingEmail(
     <body>
       <div class="container">
         <div class="header">
-          <h1>Welcome to Rise and Shine</h1>
-          <p style="margin: 10px 0 0 0; font-size: 18px; opacity: 0.95;">You're part of the team</p>
+          <h1>You're Hired!</h1>
+          <p style="margin: 10px 0 0 0; font-size: 18px; opacity: 0.95;">Welcome to Rise and Shine</p>
         </div>
         <div class="content">
           <p>Hello <strong>${rbtProfile.firstName}</strong>,</p>
-          <p>You have been added as an RBT at <strong>Rise and Shine</strong>. Please log into the HRM portal and complete your onboarding so you're ready to go.</p>
+          <p><strong>Welcome to Rise and Shine – you're hired!</strong> We're excited to have you on the team as an RBT. Please log into the HRM portal and complete your onboarding so you're ready to go.</p>
           <div class="steps-box">
             <p style="margin-top: 0;"><strong>Next steps:</strong></p>
             <ul style="margin-bottom: 0;">
