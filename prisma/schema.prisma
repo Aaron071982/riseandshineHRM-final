@@ -68,6 +68,12 @@ enum TimeEntrySource {
   WEB_MANUAL
 }
 
+enum SignatureStatus {
+  SIGNED
+  MISSING
+  NA
+}
+
 enum LeaveType {
   SICK
   VACATION
@@ -121,6 +127,24 @@ enum ActivityType {
   FORM_SUBMISSION
   LOGIN
   LOGOUT
+}
+
+// Employee types for filtering (Dev team is represented by DevTeam/DevTeamMember)
+enum EmployeeType {
+  RBT
+  BCBA
+  BILLING
+  MARKETING
+  CALL_CENTER
+}
+
+// For StaffHoursLog: which type of profile/member the log refers to
+enum StaffHoursLogType {
+  BCBA
+  BILLING
+  MARKETING
+  CALL_CENTER
+  DEV_TEAM_MEMBER
 }
 
 model User {
@@ -253,6 +277,7 @@ model RBTProfile {
   onboardingCompletions OnboardingCompletion[]
   auditLogs             RBTAuditLog[]
   clientAssignments     ClientAssignment[]
+  sessionNotes          SessionNote[]
 
   @@map("rbt_profiles")
 }
@@ -372,20 +397,55 @@ model Shift {
 }
 
 model TimeEntry {
-  id           String          @id @default(cuid())
-  rbtProfileId String
-  shiftId      String?
-  clockInTime  DateTime
-  clockOutTime DateTime?
-  totalHours   Float?
-  source       TimeEntrySource @default(WEB_MANUAL)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id                          String            @id @default(cuid())
+  rbtProfileId                String
+  shiftId                     String?
+  clockInTime                 DateTime
+  clockOutTime                DateTime?
+  totalHours                  Float?
+  source                      TimeEntrySource   @default(WEB_MANUAL)
+  signatureStatus             SignatureStatus?
+  signatureImageUrl           String?           @db.Text
+  guardianName                String?
+  signedAt                    DateTime?
+  guardianUnavailableReason   String?
+  guardianUnavailableNote     String?           @db.Text
+  notes                       String?           @db.Text
+  mobileClockEventIdClockIn   String?
+  mobileClockEventIdClockOut  String?
+  latitude                    Float?
+  longitude                   Float?
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @updatedAt
 
-  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
-  shift      Shift?     @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  rbtProfile  RBTProfile   @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  shift       Shift?        @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  sessionNote SessionNote?
 
+  @@unique([mobileClockEventIdClockIn, mobileClockEventIdClockOut])
   @@map("time_entries")
+}
+
+model SessionNote {
+  id                 String   @id @default(cuid())
+  timeEntryId        String   @unique
+  rbtProfileId       String
+  summary            String?  @db.Text
+  whereServicesWere  String?  @db.Text
+  whosInvolved       String?  @db.Text
+  goalsWorkedOn      String?  @db.Text
+  behaviorsObserved  String?  @db.Text
+  reinforcersUsed    String?  @db.Text
+  generalComments    String?  @db.Text
+  payloadJson        Json?
+  submittedAt        DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  timeEntry  TimeEntry  @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@map("session_notes")
 }
 
 model LeaveRequest {
@@ -575,4 +635,112 @@ model ActivityLog {
   @@index([createdAt])
   @@index([resourceType, resourceId])
   @@map("activity_logs")
+}
+
+// --- Employees and Candidates (non-RBT) ---
+
+model BCBAProfile {
+  id                      String    @id @default(cuid())
+  fullName                String
+  email                   String?
+  phone                   String?
+  certificationNumber     String?
+  certificationExpiresAt   DateTime?
+  isSupervisor            Boolean   @default(false)
+  preferredRegions        String?   @db.Text
+  notes                   String?   @db.Text
+  status                  String?   // e.g. Active, Inactive
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@map("bcba_profiles")
+}
+
+model BillingProfile {
+  id          String    @id @default(cuid())
+  fullName    String
+  email       String?
+  phone       String?
+  title       String?
+  department  String?
+  startDate   DateTime?
+  notes       String?   @db.Text
+  status      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("billing_profiles")
+}
+
+model MarketingProfile {
+  id        String    @id @default(cuid())
+  fullName  String
+  email     String?
+  phone     String?
+  title     String?
+  campaigns String?   @db.Text
+  notes     String?   @db.Text
+  status    String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("marketing_profiles")
+}
+
+model CallCenterProfile {
+  id         String    @id @default(cuid())
+  fullName   String
+  email      String?
+  phone      String?
+  title      String?
+  extension  String?
+  notes      String?   @db.Text
+  status     String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("call_center_profiles")
+}
+
+model DevTeam {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members DevTeamMember[]
+
+  @@map("dev_teams")
+}
+
+model DevTeamMember {
+  id         String   @id @default(cuid())
+  devTeamId  String
+  fullName   String
+  email      String?
+  phone      String?
+  role       String?  // title/role
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  devTeam DevTeam @relation(fields: [devTeamId], references: [id], onDelete: Cascade)
+
+  @@map("dev_team_members")
+}
+
+model StaffHoursLog {
+  id           String           @id @default(cuid())
+  employeeType StaffHoursLogType
+  referenceId  String           // ID of BCBAProfile, BillingProfile, etc., or DevTeamMember
+  periodStart  DateTime         @db.Date
+  periodEnd    DateTime         @db.Date
+  hours        Float
+  note         String?          @db.Text
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([employeeType, referenceId])
+  @@map("staff_hours_logs")
 }

@@ -46,13 +46,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const validStatuses = ['NEW', 'REACH_OUT', 'REACH_OUT_EMAIL_SENT', 'TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'HIRED', 'STALLED', 'REJECTED'] as const
+    const status = validStatuses.includes(data.status as any) ? (data.status as (typeof validStatuses)[number]) : 'NEW'
+
     // Create user first
     const userRecord = await prisma.user.create({
       data: {
         phoneNumber: data.phoneNumber,
         email: data.email || null,
         name: `${data.firstName} ${data.lastName}`,
-        role: data.status === 'HIRED' ? 'RBT' : 'CANDIDATE',
+        role: status === 'HIRED' ? 'RBT' : 'CANDIDATE',
         isActive: true,
       },
     })
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
         gender: data.gender || null,
         ethnicity: data.ethnicity ? (data.ethnicity as any) : null,
         fortyHourCourseCompleted: data.fortyHourCourseCompleted,
-        status: data.status as any,
+        status,
       },
     })
 

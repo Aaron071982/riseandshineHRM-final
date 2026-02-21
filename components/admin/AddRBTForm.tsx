@@ -36,6 +36,7 @@ export default function AddRBTForm() {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [pendingFormData, setPendingFormData] = useState<FormData | null>(null)
+  const [pendingIsHireDirect, setPendingIsHireDirect] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -85,8 +86,11 @@ export default function AddRBTForm() {
       submitData.append(`documentTypes`, doc.documentType)
     })
 
-    // Store form data and show confirmation
+    const selectedStatus = (formData.get('status') as string) || 'NEW'
+    const isHireDirect = selectedStatus === 'HIRED'
+
     setPendingFormData(submitData)
+    setPendingIsHireDirect(isHireDirect)
     setConfirmDialogOpen(true)
   }
 
@@ -114,6 +118,7 @@ export default function AddRBTForm() {
 
       setConfirmDialogOpen(false)
       setPendingFormData(null)
+      setPendingIsHireDirect(false)
       router.push(`/admin/rbts/${result.id}`)
     } catch (err) {
       setError('An error occurred. Please try again.')
@@ -196,14 +201,18 @@ export default function AddRBTForm() {
               <Label htmlFor="status">Initial Status *</Label>
               <Select name="status" required defaultValue="NEW">
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="NEW">New</SelectItem>
                   <SelectItem value="REACH_OUT">Reach Out</SelectItem>
                   <SelectItem value="TO_INTERVIEW">To Interview</SelectItem>
+                  <SelectItem value="HIRED">Hired (no interview)</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Choose &quot;Hired (no interview)&quot; to add them as an active RBT with no interview step.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="fortyHourCourseCompleted">40-Hour RBT Course Already Completed *</Label>
@@ -344,18 +353,21 @@ export default function AddRBTForm() {
       <Dialog 
         open={confirmDialogOpen} 
         onOpenChange={(open) => {
-          // Prevent closing during loading
           if (!open && !confirmLoading) {
             setConfirmDialogOpen(false)
             setPendingFormData(null)
+            setPendingIsHireDirect(false)
+            setError('')
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => confirmLoading && e.preventDefault()} onEscapeKeyDown={(e) => confirmLoading && e.preventDefault()}>
           <DialogHeader>
-            <DialogTitle>Confirm Create RBT</DialogTitle>
+            <DialogTitle>{pendingIsHireDirect ? 'Hire RBT directly (no interview)' : 'Confirm Create RBT'}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to create this RBT candidate? This will add them to the system and they will be available for the hiring process.
+              {pendingIsHireDirect
+                ? 'This will add this person as HIRED with no interview process. They will have full RBT access (e.g. clock in/out, app access). Only continue if you intend to hire them directly.'
+                : 'Are you sure you want to create this RBT candidate? This will add them to the system and they will be available for the hiring process.'}
             </DialogDescription>
           </DialogHeader>
           {error && (
@@ -369,6 +381,7 @@ export default function AddRBTForm() {
               onClick={() => {
                 setConfirmDialogOpen(false)
                 setPendingFormData(null)
+                setPendingIsHireDirect(false)
                 setConfirmLoading(false)
                 setError('')
               }}
@@ -384,8 +397,10 @@ export default function AddRBTForm() {
               {confirmLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating...
+                  {pendingIsHireDirect ? 'Hiring...' : 'Creating...'}
                 </>
+              ) : pendingIsHireDirect ? (
+                'Confirm and hire'
               ) : (
                 'Confirm'
               )}

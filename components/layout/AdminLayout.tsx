@@ -31,7 +31,7 @@ interface AdminLayoutProps {
 
 const navItemsBase = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/rbts', label: 'RBTs & Candidates', icon: Users },
+  { href: '/admin/employees', label: 'Employees and Candidates', icon: Users },
   { href: '/admin/interviews', label: 'Interviews', icon: Calendar },
   { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
   { href: '/admin/attendance', label: 'Attendance & Hours', icon: Clock },
