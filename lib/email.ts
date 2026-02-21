@@ -38,6 +38,42 @@ interface EmailOptions {
   fromEmail?: string
 }
 
+/**
+ * Send an email without logging to interviewEmailLog (e.g. for non-RBT team members).
+ */
+export async function sendGenericEmail(to: string, subject: string, html: string): Promise<boolean> {
+  if (!resend) {
+    console.log(`⚠️ [DEV MODE] Resend not configured. Email would be sent to ${to}:`, subject)
+    return true
+  }
+  const plainText = html
+    .replace(/<style[^>]*>.*?<\/style>/gis, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .trim()
+  const fromAddress = emailFrom.includes('@') ? `"Rise and Shine" <${emailFrom}>` : emailFrom
+  try {
+    const result = await resend.emails.send({
+      from: fromAddress,
+      to,
+      subject,
+      html,
+      text: plainText,
+      reply_to: 'info@riseandshine.nyc',
+    })
+    if (result.error) {
+      console.error('sendGenericEmail failed:', result.error)
+      return false
+    }
+    console.log(`✅ Generic email sent to ${to}`)
+    return true
+  } catch (e) {
+    console.error('sendGenericEmail error:', e)
+    return false
+  }
+}
+
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   // Log email in database
   try {
@@ -655,6 +691,114 @@ export function generateOfferEmail(rbtProfile: {
         <div class="footer">
           <p><strong>Rise and Shine</strong> - HRM Portal</p>
           <p style="margin: 4px 0 0 0; font-size: 11px;">This is an automated email. Please do not reply directly.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}
+
+/** Thank-you email for new non-RBT team members (BCBA, Billing, Marketing, Call Center, Dev). */
+export function generateTeamWelcomeEmail(fullName: string, roleLabel: string): { subject: string; html: string } {
+  const subject = 'Thank you for joining Rise and Shine!'
+  const firstName = fullName.trim().split(/\s+/)[0] || fullName
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: bold; }
+        .content { padding: 30px 20px; background-color: #ffffff; }
+        .content p { margin: 16px 0; }
+        .footer { padding: 24px 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Welcome to the team</h1>
+          <p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.95;">Rise and Shine</p>
+        </div>
+        <div class="content">
+          <p>Hello <strong>${firstName}</strong>,</p>
+          <p>Thank you for joining us at <strong>Rise and Shine</strong>. We are excited to have you on our ${roleLabel} team.</p>
+          <p>If you have any questions or need anything to get started, please don't hesitate to reach out.</p>
+          <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
+          <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            Contact us at <a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a>
+          </p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise and Shine</strong> - HRM</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}
+
+/** Welcome + onboarding email for RBTs hired manually (no interview). Mentions 40-hour course access when needed. */
+export function generateManualHireOnboardingEmail(
+  rbtProfile: { firstName: string; lastName: string; email: string | null },
+  fortyHourCourseCompleted: boolean
+): { subject: string; html: string } {
+  const loginUrl = makePublicUrl('/login')
+  const subject = 'Welcome to Rise and Shine - Complete Your Onboarding'
+  const fortyHourParagraph = !fortyHourCourseCompleted
+    ? `<p><strong>40-Hour RBT Course:</strong> If you have not yet completed the 40-hour RBT course, you will have access to it in your onboarding dashboard. Log in, complete the course, and upload your certificate there.</p>`
+    : ''
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 32px; font-weight: bold; }
+        .content { padding: 30px 20px; background-color: #ffffff; }
+        .content p { margin: 16px 0; }
+        .content ul, .content ol { margin: 16px 0; padding-left: 24px; }
+        .login-button { display: inline-block; background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 24px 0; }
+        .steps-box { background-color: #fff5f0; border-left: 4px solid #E4893D; padding: 20px; margin: 20px 0; border-radius: 4px; }
+        .footer { padding: 24px 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Welcome to Rise and Shine</h1>
+          <p style="margin: 10px 0 0 0; font-size: 18px; opacity: 0.95;">You're part of the team</p>
+        </div>
+        <div class="content">
+          <p>Hello <strong>${rbtProfile.firstName}</strong>,</p>
+          <p>You have been added as an RBT at <strong>Rise and Shine</strong>. Please log into the HRM portal and complete your onboarding so you're ready to go.</p>
+          <div class="steps-box">
+            <p style="margin-top: 0;"><strong>Next steps:</strong></p>
+            <ul style="margin-bottom: 0;">
+              <li>Log in to the Rise and Shine HRM portal (link below)</li>
+              <li>Complete all onboarding tasks (HIPAA docs, training, signature)</li>
+              <li>If you have not completed the 40-hour RBT course, you will see it in your onboarding—complete it and upload your certificate</li>
+            </ul>
+          </div>
+          <p><strong>Log in to start onboarding:</strong></p>
+          <p><a href="${loginUrl}" class="login-button">Log in to HRM</a></p>
+          <p>Use your email <strong>${rbtProfile.email || 'your registered email'}</strong>. You will receive a verification code by email to sign in.</p>
+          ${fortyHourParagraph}
+          <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
+          <p style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+            Questions? <a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a>
+          </p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise and Shine</strong> - HRM Portal</p>
         </div>
       </div>
     </body>

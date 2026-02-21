@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
+import { sendEmail, generateManualHireOnboardingEmail, EmailTemplateType } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -104,6 +105,52 @@ export async function POST(request: NextRequest) {
             fileData: fileBase64,
             documentType: documentType,
           },
+        })
+      }
+    }
+
+    // When manually hired: create onboarding tasks (including 40-hour course if not completed) and send onboarding email
+    if (status === 'HIRED') {
+      const needsFortyHourCourse = !data.fortyHourCourseCompleted
+      const onboardingTasks = [
+        { taskType: 'DOWNLOAD_DOC', title: 'HIPAA Security Overview', description: 'Review the HIPAA Security Rule overview from HHS', documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/security/index.html', sortOrder: 1 },
+        { taskType: 'DOWNLOAD_DOC', title: 'HIPAA Privacy Overview', description: 'Review the HIPAA Privacy Rule overview from HHS', documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/privacy/index.html', sortOrder: 2 },
+        { taskType: 'DOWNLOAD_DOC', title: 'HIPAA Patient Security', description: 'Review HIPAA patient safety guidelines from HHS', documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/patient-safety/index.html', sortOrder: 3 },
+        { taskType: 'DOWNLOAD_DOC', title: 'HIPAA Basics PDF', description: 'Download and review the HIPAA Basics for Providers document from CMS', documentDownloadUrl: 'https://www.cms.gov/files/document/mln909001-hipaa-basics-providers-privacy-security-breach-notification-rules.pdf', sortOrder: 4 },
+        { taskType: 'DOWNLOAD_DOC', title: 'HIPAA IT Security Guide', description: 'Review the Guide to Privacy and Security of Electronic Health Information', documentDownloadUrl: 'https://www.healthit.gov/topic/health-it-resources/guide-privacy-security-electronic-health-information', sortOrder: 5 },
+        ...(needsFortyHourCourse ? [{ taskType: 'FORTY_HOUR_COURSE_CERTIFICATE', title: 'Complete 40-Hour RBT Course & Upload Certificate', description: 'Complete the 40-hour RBT training course and upload your certificate of completion', documentDownloadUrl: 'https://courses.autismpartnershipfoundation.org/offers/it285gs6/checkout', sortOrder: 6 }] : []),
+        { taskType: 'SIGNATURE', title: 'Digital Signature Confirmation', description: 'Sign to confirm you have read and understood all HIPAA documents and training materials', documentDownloadUrl: null as string | null, sortOrder: needsFortyHourCourse ? 7 : 6 },
+      ]
+      try {
+        await Promise.all(
+          onboardingTasks.map((task) =>
+            prisma.onboardingTask.create({
+              data: {
+                rbtProfileId: rbtProfile.id,
+                taskType: task.taskType as any,
+                title: task.title,
+                description: task.description,
+                documentDownloadUrl: task.documentDownloadUrl,
+                sortOrder: task.sortOrder,
+              },
+            })
+          )
+        )
+      } catch (taskError) {
+        console.error('Failed to create onboarding tasks for manual hire:', taskError)
+      }
+
+      if (rbtProfile.email) {
+        const emailContent = generateManualHireOnboardingEmail(
+          { firstName: rbtProfile.firstName, lastName: rbtProfile.lastName, email: rbtProfile.email },
+          data.fortyHourCourseCompleted
+        )
+        await sendEmail({
+          to: rbtProfile.email,
+          subject: emailContent.subject,
+          html: emailContent.html,
+          templateType: EmailTemplateType.OFFER,
+          rbtProfileId: rbtProfile.id,
         })
       }
     }

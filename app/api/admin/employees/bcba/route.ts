@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
+import { sendGenericEmail, generateTeamWelcomeEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +53,11 @@ export async function POST(request: NextRequest) {
         status: status?.trim() || null,
       },
     })
+
+    if (profile.email) {
+      const { subject, html } = generateTeamWelcomeEmail(profile.fullName, 'BCBA')
+      await sendGenericEmail(profile.email, subject, html)
+    }
 
     return NextResponse.json({ id: profile.id, success: true })
   } catch (error) {
