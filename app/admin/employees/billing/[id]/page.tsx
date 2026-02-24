@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
 import StaffHoursLogSection from '@/components/admin/StaffHoursLogSection'
+import EmployeeDeleteSection from '@/components/admin/EmployeeDeleteSection'
 
 export default async function BillingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -37,6 +38,21 @@ export default async function BillingDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       <StaffHoursLogSection employeeType="BILLING" referenceId={profile.id} />
+
+      <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
+        <CardHeader>
+          <CardTitle className="text-red-600 dark:text-[var(--status-rejected-text)]">Danger zone</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmployeeDeleteSection
+            kind="Billing"
+            displayName={profile.fullName}
+            email={profile.email}
+            deleteApiUrl={`/api/admin/employees/billing/${profile.id}/delete`}
+            redirectHref="/admin/employees?type=BILLING"
+          />
+        </CardContent>
+      </Card>
     </div>
   )
 }

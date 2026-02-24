@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate } from '@/lib/utils'
 import AddDevTeamMemberForm from '@/components/admin/AddDevTeamMemberForm'
 import StaffHoursLogSection from '@/components/admin/StaffHoursLogSection'
+import EmployeeDeleteSection from '@/components/admin/EmployeeDeleteSection'
 
 export default async function DevTeamDetailPage({ params }: { params: Promise<{ teamId: string }> }) {
   const { teamId } = await params
@@ -57,9 +58,33 @@ export default async function DevTeamDetailPage({ params }: { params: Promise<{ 
                 <div className="mt-4">
                   <StaffHoursLogSection employeeType="DEV_TEAM_MEMBER" referenceId={member.id} />
                 </div>
+                <div className="mt-4">
+                  <EmployeeDeleteSection
+                    kind="Dev Team Member"
+                    displayName={member.fullName}
+                    email={member.email}
+                    deleteApiUrl={`/api/admin/employees/dev-teams/${team.id}/members/${member.id}/delete`}
+                    redirectHref={`/admin/employees/teams/${teamId}`}
+                    buttonLabel="Delete member"
+                  />
+                </div>
               </div>
             ))
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
+        <CardHeader>
+          <CardTitle className="text-red-600 dark:text-[var(--status-rejected-text)]">Danger zone</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmployeeDeleteSection
+            kind="Dev Team"
+            displayName={team.name}
+            deleteApiUrl={`/api/admin/employees/dev-teams/${team.id}/delete`}
+            redirectHref="/admin/employees?type=DEV_TEAM"
+          />
         </CardContent>
       </Card>
     </div>
