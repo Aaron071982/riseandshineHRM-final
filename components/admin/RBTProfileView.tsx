@@ -99,6 +99,7 @@ interface RBTProfile {
       expectationsAnswer: string | null
       closingNotes: string | null
       fullName: string | null
+      email: string | null
       birthdate: string | null
       currentAddress: string | null
       phoneNumber: string | null
@@ -1513,39 +1514,78 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                   </div>
                   {interview.interviewNotes && (
                     <div className="space-y-3 text-sm">
-                      {interview.interviewNotes.fullName && (
-                        <div>
-                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Full Name: </span>
-                          <span className="text-gray-600 dark:text-[var(--text-tertiary)]">{interview.interviewNotes.fullName}</span>
+                      {(interview.interviewNotes.fullName || interview.interviewNotes.phoneNumber || interview.interviewNotes.email || interview.interviewNotes.currentAddress) && (
+                        <div className="space-y-1">
+                          <p className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Basic Information</p>
+                          {interview.interviewNotes.fullName && <p className="text-gray-600 dark:text-[var(--text-tertiary)]"><span className="font-medium">Name: </span>{interview.interviewNotes.fullName}</p>}
+                          {interview.interviewNotes.phoneNumber && <p className="text-gray-600 dark:text-[var(--text-tertiary)]"><span className="font-medium">Phone: </span>{interview.interviewNotes.phoneNumber}</p>}
+                          {interview.interviewNotes.email && <p className="text-gray-600 dark:text-[var(--text-tertiary)]"><span className="font-medium">Email: </span>{interview.interviewNotes.email}</p>}
+                          {interview.interviewNotes.currentAddress && <p className="text-gray-600 dark:text-[var(--text-tertiary)]"><span className="font-medium">City / location: </span>{interview.interviewNotes.currentAddress}</p>}
                         </div>
                       )}
-                      {interview.interviewNotes.phoneNumber && (
+                      {interview.interviewNotes.greetingAnswer && (
                         <div>
-                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Phone: </span>
-                          <span className="text-gray-600 dark:text-[var(--text-tertiary)]">{interview.interviewNotes.phoneNumber}</span>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">1. Greeting &amp; Introduction: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.greetingAnswer}</p>
+                        </div>
+                      )}
+                      {interview.interviewNotes.basicInfoAnswer && (
+                        <div>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">2. Basic info notes: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.basicInfoAnswer}</p>
                         </div>
                       )}
                       {interview.interviewNotes.experienceAnswer && (
                         <div>
-                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Experience: </span>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">3. Experience &amp; Background: </span>
                           <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.experienceAnswer}</p>
+                        </div>
+                      )}
+                      {interview.interviewNotes.heardAboutAnswer && (
+                        <div>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">4. How they heard about us: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.heardAboutAnswer}</p>
+                        </div>
+                      )}
+                      {interview.interviewNotes.abaPlatformsAnswer && (
+                        <div>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">5. ABA platforms: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.abaPlatformsAnswer}</p>
+                        </div>
+                      )}
+                      {interview.interviewNotes.communicationAnswer && (
+                        <div>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">6. Communication: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.communicationAnswer}</p>
                         </div>
                       )}
                       {interview.interviewNotes.availabilityAnswer && (
                         <div>
-                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Availability: </span>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">7. Availability: </span>
                           <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.availabilityAnswer}</p>
                         </div>
                       )}
                       {interview.interviewNotes.payExpectationsAnswer && (
                         <div>
-                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Pay Expectations: </span>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">8. Pay expectations: </span>
                           <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.payExpectationsAnswer}</p>
+                        </div>
+                      )}
+                      {interview.interviewNotes.previousCompanyAnswer && (
+                        <div>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">9. Previous company / why switching: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.previousCompanyAnswer}</p>
+                        </div>
+                      )}
+                      {interview.interviewNotes.expectationsAnswer && (
+                        <div>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">10. Company expectations: </span>
+                          <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.expectationsAnswer}</p>
                         </div>
                       )}
                       {interview.interviewNotes.closingNotes && (
                         <div>
-                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">Closing Notes: </span>
+                          <span className="font-medium text-gray-700 dark:text-[var(--text-secondary)]">11. Closing notes: </span>
                           <p className="text-gray-600 dark:text-[var(--text-tertiary)] mt-1">{interview.interviewNotes.closingNotes}</p>
                         </div>
                       )}

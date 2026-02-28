@@ -71,7 +71,7 @@ export async function POST(
     }
 
     // Upsert interview notes
-    const updateData: any = {
+    const updateData = {
       greetingAnswer: data.greetingAnswer || null,
       basicInfoAnswer: data.basicInfoAnswer || null,
       experienceAnswer: data.experienceAnswer || null,
@@ -84,6 +84,7 @@ export async function POST(
       expectationsAnswer: data.expectationsAnswer || null,
       closingNotes: data.closingNotes || null,
       fullName: data.fullName || null,
+      email: data.email || null,
       birthdate: data.birthdate || null,
       currentAddress: data.currentAddress || null,
       phoneNumber: data.phoneNumber || null,

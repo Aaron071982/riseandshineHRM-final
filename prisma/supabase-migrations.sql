@@ -98,3 +98,7 @@ WHERE email = 'aaronsiam21@gmail.com';
 -- 7) Add filePath to rbt_documents (fixes P2022 "column filePath does not exist" on documents API / download)
 ALTER TABLE "rbt_documents"
 ADD COLUMN IF NOT EXISTS "filePath" TEXT;
+
+-- 8) Add email to interview_notes (for "best email for Google Meet links" in interview script)
+ALTER TABLE "interview_notes"
+ADD COLUMN IF NOT EXISTS "email" TEXT;
