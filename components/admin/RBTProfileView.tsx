@@ -980,6 +980,26 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
               </div>
             )}
 
+            {/* Government-issued ID from documents */}
+            {documents.filter((d) => d.documentType === 'GOVERNMENT_ID').length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Government-issued ID</p>
+                <div className="space-y-2">
+                  {documents.filter((d) => d.documentType === 'GOVERNMENT_ID').map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-4 bg-white dark:bg-[var(--bg-elevated)] rounded-lg border-2 border-gray-200 dark:border-[var(--border-subtle)]">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-8 w-8 text-primary dark:text-[var(--orange-primary)]" />
+                        <span className="text-sm text-gray-700 dark:text-[var(--text-primary)]">{doc.fileName}</span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadDocument(doc.id, doc.fileName)} className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]">
+                        <Download className="h-4 w-4 mr-1" /> Download
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* RBT Certificate & CPR Card from documents */}
             {documents.filter((d) => d.documentType === 'RBT_CERTIFICATE').length > 0 && (
               <div className="space-y-2">

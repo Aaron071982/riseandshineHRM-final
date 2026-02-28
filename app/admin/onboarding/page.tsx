@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { FileCheck, TrendingUp, Clock, CheckCircle } from 'lucide-react'
+import OnboardingAdminActions from '@/components/admin/OnboardingAdminActions'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -151,6 +152,8 @@ export default async function OnboardingPage() {
           </CardContent>
         </Card>
       </div>
+
+      <OnboardingAdminActions />
 
       {/* Onboarding Progress Table */}
       <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">

@@ -807,6 +807,51 @@ export function generateManualHireOnboardingEmail(
   return { subject, html }
 }
 
+/** Email asking hired RBT to send their ID to info@riseandshine.nyc */
+export function generateIdReminderEmail(fullName: string): { subject: string; html: string } {
+  const subject = 'Rise and Shine – Please send your ID'
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: bold; }
+        .content { padding: 30px 20px; background-color: #ffffff; }
+        .content p { margin: 16px 0; }
+        .highlight { background-color: #fff5f0; border-left: 4px solid #E4893D; padding: 16px 20px; margin: 20px 0; border-radius: 4px; }
+        .footer { padding: 24px 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Rise and Shine</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.95;">Please send your ID</p>
+        </div>
+        <div class="content">
+          <p>Hello ${fullName},</p>
+          <p>Thank you for joining Rise and Shine. To complete our records, please email a copy of your <strong>government-issued ID</strong> to:</p>
+          <div class="highlight">
+            <p style="margin: 0; font-size: 18px;"><strong><a href="mailto:info@riseandshine.nyc" style="color: #E4893D; text-decoration: none;">info@riseandshine.nyc</a></strong></p>
+          </div>
+          <p>You can reply to this email and attach your ID, or send a new email to the address above. We accept a clear photo or scan of your driver’s license, state ID, or passport.</p>
+          <p>If you have already sent your ID, please disregard this message.</p>
+          <p style="margin-top: 32px;">Best regards,<br><strong>The Rise and Shine Team</strong></p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise and Shine</strong></p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}
+
 export function generateRejectionEmail(rbtProfile: {
   firstName: string
   lastName: string

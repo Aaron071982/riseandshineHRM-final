@@ -54,6 +54,8 @@ interface ApplicationData {
   // Step 5: Files
   resume: File | null
   resumeUrl: string | null
+  idDocument: File | null
+  idDocumentUrl: string | null
   rbtCertificate: File | null
   cprCard: File | null
 
@@ -100,6 +102,8 @@ export default function PublicRBTApplicationWizard() {
     notes: '',
     resume: null,
     resumeUrl: null,
+    idDocument: null,
+    idDocumentUrl: null,
     rbtCertificate: null,
     cprCard: null,
   })
@@ -179,6 +183,10 @@ export default function PublicRBTApplicationWizard() {
           setError('Please upload your resume')
           return false
         }
+        if (!data.idDocument) {
+          setError('Please upload your government-issued ID')
+          return false
+        }
         return true
       case 6:
         if (!consent) {
@@ -207,10 +215,9 @@ export default function PublicRBTApplicationWizard() {
     }
   }
 
-  const handleFileChange = (field: 'resume' | 'rbtCertificate' | 'cprCard', file: File | null) => {
+  const handleFileChange = (field: 'resume' | 'idDocument' | 'rbtCertificate' | 'cprCard', file: File | null) => {
+    const maxSize = 10 * 1024 * 1024 // 10MB
     if (field === 'resume' && file) {
-      // Validate resume file
-      const maxSize = 10 * 1024 * 1024 // 10MB
       if (file.size > maxSize) {
         setError(`Resume file size exceeds 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)} MB.`)
         return
@@ -218,6 +225,17 @@ export default function PublicRBTApplicationWizard() {
       const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
       if (!allowedTypes.includes(file.type)) {
         setError('Resume must be a PDF, DOC, or DOCX file')
+        return
+      }
+    }
+    if (field === 'idDocument' && file) {
+      if (file.size > maxSize) {
+        setError(`ID file size exceeds 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)} MB.`)
+        return
+      }
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
+      if (!allowedTypes.includes(file.type)) {
+        setError('ID must be a PDF, JPG, or PNG file')
         return
       }
     }
@@ -233,9 +251,13 @@ export default function PublicRBTApplicationWizard() {
     setError('')
 
     try {
-      // Upload resume first
       if (!data.resume) {
         setError('Please upload your resume')
+        setSubmitting(false)
+        return
+      }
+      if (!data.idDocument) {
+        setError('Please upload your government-issued ID')
         setSubmitting(false)
         return
       }
@@ -297,6 +319,25 @@ export default function PublicRBTApplicationWizard() {
         }
       }
 
+      let idDocumentUrl = data.idDocumentUrl
+      let idDocumentFileName: string | null = null
+      let idDocumentMimeType: string | null = null
+      if (data.idDocument) {
+        const idForm = new FormData()
+        idForm.append('file', data.idDocument)
+        idForm.append('documentType', 'GOVERNMENT_ID')
+        if (draftToken) idForm.append('token', draftToken)
+        const idRes = await fetch('/api/public/apply/upload', { method: 'POST', body: idForm })
+        if (!idRes.ok) {
+          const errData = await idRes.json()
+          throw new Error(errData.error || 'Failed to upload ID')
+        }
+        const idResult = await idRes.json()
+        idDocumentUrl = idResult.url
+        idDocumentFileName = idResult.fileName || data.idDocument.name
+        idDocumentMimeType = idResult.mimeType || data.idDocument.type
+      }
+
       // Submit application
       const submitResponse = await fetch('/api/public/apply/submit', {
         method: 'POST',
@@ -318,6 +359,9 @@ export default function PublicRBTApplicationWizard() {
           cprCardUrl: cprCardUrl || undefined,
           cprCardFileName: cprCardFileName || undefined,
           cprCardMimeType: cprCardMimeType || undefined,
+          idDocumentUrl: idDocumentUrl || undefined,
+          idDocumentFileName: idDocumentFileName || undefined,
+          idDocumentMimeType: idDocumentMimeType || undefined,
           draftToken: draftToken,
           website: data.website || '', // Honeypot
         }),
@@ -798,6 +842,54 @@ export default function PublicRBTApplicationWizard() {
                 </div>
               </div>
               <div>
+                <Label htmlFor="idDocument">Government-issued ID * (PDF, JPG, or PNG, max 10MB)</Label>
+                <div className="mt-2">
+                  <label
+                    htmlFor="idDocument"
+                    className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-card bg-gray-50 hover:bg-gray-100 hover:border-primary/50 transition-colors cursor-pointer group"
+                  >
+                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <Upload className="w-8 h-8 mb-2 text-gray-400 group-hover:text-primary transition-colors" />
+                      <p className="mb-2 text-sm text-gray-500">
+                        <span className="font-semibold">Click to upload</span> or drag and drop
+                      </p>
+                      <p className="text-xs text-gray-500">PDF, JPG, or PNG (MAX. 10MB)</p>
+                    </div>
+                    <input
+                      id="idDocument"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => handleFileChange('idDocument', e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
+                  {data.idDocument && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-3 p-3 bg-white border border-gray-200 rounded-input flex items-center justify-between gap-3 shadow-sm"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Paperclip className="h-4 w-4 text-primary flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{data.idDocument.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {(data.idDocument.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleFileChange('idDocument', null)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                      >
+                        <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                      </button>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+              <div>
                 <Label htmlFor="rbtCertificate">RBT Certificate (Optional)</Label>
                 <div className="mt-2">
                   <Input
@@ -895,6 +987,7 @@ export default function PublicRBTApplicationWizard() {
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <p><strong>Resume:</strong> {data.resume ? data.resume.name : 'Not uploaded'}</p>
+                  <p><strong>Government ID:</strong> {data.idDocument ? data.idDocument.name : 'Not uploaded'}</p>
                   {data.rbtCertificate && <p><strong>RBT Certificate:</strong> {data.rbtCertificate.name}</p>}
                   {data.cprCard && <p><strong>CPR Card:</strong> {data.cprCard.name}</p>}
                 </CardContent>

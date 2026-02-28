@@ -204,7 +204,7 @@ export async function POST(
     } else {
       // Tasks already exist - check if they match expected structure
       const needsFortyHourCourse = !(rbtProfile.fortyHourCourseCompleted === true)
-      const expectedTaskCount = needsFortyHourCourse ? 8 : 7
+      const expectedTaskCount = needsFortyHourCourse ? 7 : 6
       const hasFortyHourCourseTask = existingTasks.some(t => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
       console.log(`RBT ${rbtProfile.id} - Existing tasks: ${existingTasks.length}, Expected: ${expectedTaskCount}, Has 40-hour task: ${hasFortyHourCourseTask}, Needs course: ${needsFortyHourCourse}, fortyHourCourseCompleted value: ${rbtProfile.fortyHourCourseCompleted}`)
       

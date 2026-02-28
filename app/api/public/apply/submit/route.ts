@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
       'authorizedToWork',
       'canPassBackgroundCheck',
       'resumeUrl',
+      'idDocumentUrl',
     ]
 
     for (const field of requiredFields) {
@@ -245,6 +246,18 @@ export async function POST(request: NextRequest) {
             fileData: '',
             filePath: body.cprCardUrl,
             documentType: 'CPR_CARD',
+          },
+        })
+      }
+      if (body.idDocumentUrl) {
+        await tx.rBTDocument.create({
+          data: {
+            rbtProfileId: profile.id,
+            fileName: body.idDocumentFileName || 'government-id',
+            fileType: body.idDocumentMimeType || 'application/pdf',
+            fileData: '',
+            filePath: body.idDocumentUrl,
+            documentType: 'GOVERNMENT_ID',
           },
         })
       }

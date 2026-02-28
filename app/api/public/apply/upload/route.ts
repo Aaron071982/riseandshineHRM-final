@@ -81,16 +81,18 @@ export async function POST(request: NextRequest) {
       'image/png',
     ]
     const allowedTypes =
-      documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD'
+      documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD' || documentType === 'GOVERNMENT_ID'
         ? optionalDocTypes
         : resumeTypes
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
         {
           error:
-            documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD'
-              ? 'Invalid file type. Please upload a PDF, JPG, or PNG file.'
-              : 'Invalid file type. Please upload a PDF, DOC, or DOCX file.',
+            documentType === 'GOVERNMENT_ID'
+              ? 'Invalid file type. Please upload a PDF, JPG, or PNG file for your ID.'
+              : documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD'
+                ? 'Invalid file type. Please upload a PDF, JPG, or PNG file.'
+                : 'Invalid file type. Please upload a PDF, DOC, or DOCX file.',
         },
         { status: 400 }
       )
