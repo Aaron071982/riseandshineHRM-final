@@ -112,9 +112,7 @@ async function handleDocumentAndCredentialExpirations(
       severity = 'WARN'
     }
 
-    if (expiresAt <= today && cred.verificationStatus !== 'EXPIRED') {
-      // Do not change verification_status enum here; expiry is captured via alerts.
-    }
+    // Expiry is captured via alerts; Credential.verificationStatus stays UNVERIFIED/VERIFIED/REJECTED.
 
     await upsertComplianceAlert(tx, {
       employeeId: cred.employeeId,
@@ -134,22 +132,7 @@ async function handlePayerAuthorizationExpirations(
 ) {
   const auths = await tx.payerAuthorization.findMany({
     where: {
-      OR: [
-        {
-          endDate: {
-            not: null,
-            lte: warnThreshold,
-          },
-        },
-        {
-          unitsAuthorized: {
-            not: null,
-          },
-          unitsUsed: {
-            not: null,
-          },
-        },
-      ],
+      endDate: { lte: warnThreshold },
     },
     include: {
       client: true,
@@ -157,7 +140,7 @@ async function handlePayerAuthorizationExpirations(
   })
 
   for (const auth of auths) {
-    const clientName = auth.client?.name ?? 'Client'
+    const clientName = auth.client?.fullName ?? 'Client'
 
     if (auth.endDate) {
       const endDate = auth.endDate

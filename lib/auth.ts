@@ -1,12 +1,24 @@
+import { cookies } from 'next/headers'
 import { prisma } from './prisma'
 import crypto from 'crypto'
 
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
 
+/** Matches Prisma UserRole so session and compliance routes type-check. */
+export type SessionUserRole =
+  | 'ADMIN'
+  | 'RBT'
+  | 'CANDIDATE'
+  | 'BCBA'
+  | 'BILLING'
+  | 'MARKETING'
+  | 'CALL_CENTER'
+  | 'DEV'
+
 export interface SessionUser {
   id: string
   phoneNumber: string | null
-  role: 'ADMIN' | 'RBT' | 'CANDIDATE'
+  role: SessionUserRole
   name?: string | null
   email?: string | null
   rbtProfileId?: string | null
@@ -38,10 +50,19 @@ export async function createSession(
   return token
 }
 
-const VALID_ROLES = ['ADMIN', 'RBT', 'CANDIDATE'] as const
-function normalizeRole(role: string | null | undefined): 'ADMIN' | 'RBT' | 'CANDIDATE' | null {
+const VALID_ROLES: SessionUserRole[] = [
+  'ADMIN',
+  'RBT',
+  'CANDIDATE',
+  'BCBA',
+  'BILLING',
+  'MARKETING',
+  'CALL_CENTER',
+  'DEV',
+]
+function normalizeRole(role: string | null | undefined): SessionUserRole | null {
   const r = (role ?? '').toUpperCase()
-  return VALID_ROLES.includes(r as any) ? (r as 'ADMIN' | 'RBT' | 'CANDIDATE') : null
+  return VALID_ROLES.includes(r as SessionUserRole) ? (r as SessionUserRole) : null
 }
 
 /** Raw SQL fallback when Prisma fails (e.g. schema/connection issues). */
@@ -186,4 +207,12 @@ export function isSuperAdmin(email: string | null | undefined): boolean {
 /** Use for route guards so role casing or edge cases never cause false 403. */
 export function isAdmin(user: SessionUser | null): user is SessionUser {
   return !!user && (user.role ?? '').toUpperCase() === 'ADMIN'
+}
+
+/** Get current session user from cookies (for use in server/API context). */
+export async function getCurrentUser(): Promise<SessionUser | null> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get('session')?.value
+  if (!token) return null
+  return validateSession(token)
 }
