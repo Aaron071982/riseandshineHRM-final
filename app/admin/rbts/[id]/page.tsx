@@ -251,6 +251,15 @@ async function loadRbtProfileRaw(
     if (!profileRow) return null
     let interviewsRows: Array<{ id: string; scheduledAt: Date; durationMinutes: number; interviewerName: string; status: string; decision: string; notes: string | null; meetingUrl: string | null }> = []
     let onboardingTasksRows: Array<{ id: string; taskType: string; title: string; description: string | null; isCompleted: boolean; completedAt: Date | null; uploadUrl: string | null; documentDownloadUrl: string | null; sortOrder: number }> = []
+    let onboardingCompletionsRows: Array<{
+      id: string
+      documentId: string
+      status: string
+      completedAt: Date | null
+      acknowledgmentJson: unknown
+      document_title: string
+      document_type: string
+    }> = []
     try {
       interviewsRows = await prisma.$queryRaw`
         SELECT id, "scheduledAt", "durationMinutes", "interviewerName", status, decision, notes, "meetingUrl"
