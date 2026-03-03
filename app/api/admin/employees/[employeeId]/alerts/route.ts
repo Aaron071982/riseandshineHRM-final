@@ -16,6 +16,7 @@ export async function GET(
     const user = await validateSession(sessionToken)
     if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+    const userId = user.id
     const { employeeId } = await params
     const { searchParams } = new URL(request.url)
     const includeResolved = searchParams.get('includeResolved') === 'true'
@@ -27,7 +28,7 @@ export async function GET(
 
     if (!isAdmin(user)) {
       const employee = await prisma.employee.findFirst({
-        where: { id: employeeId, userId: user.id },
+        where: { id: employeeId, userId },
         select: { id: true },
       })
       if (!employee) {
