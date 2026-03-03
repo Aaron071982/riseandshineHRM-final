@@ -6,8 +6,20 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
 import { formatDate } from '@/lib/utils'
+
+const DOCUMENT_TYPES = [
+  'OFFER_LETTER', 'EMPLOYMENT_AGREEMENT', 'CONTRACTOR_AGREEMENT', 'NDA', 'HIPAA_ACK',
+  'CONFIDENTIALITY', 'NON_COMPETE', 'W4', 'I9', 'DIRECT_DEPOSIT', 'BACKGROUND_CHECK',
+  'CPR_CERT', 'TB_CLEARANCE', 'RBT_40_HR_CERT', 'RBT_COMPETENCY_ASSESSMENT',
+  'BCBA_CERTIFICATE', 'MALPRACTICE_POLICY', 'CAQH_CONFIRMATION', 'CREDENTIALING_APPROVAL_LETTER',
+] as const
+const CREDENTIAL_TYPES = [
+  'BACB_ID', 'RBT_CERT', 'BCBA_CERT', 'STATE_LICENSE', 'NPI',
+  'MEDICAID_PROVIDER_ID', 'CAQH_ID', 'MALPRACTICE_INSURANCE',
+] as const
 
 type TabKey = 'documents' | 'credentials' | 'clinical' | 'supervision' | 'alerts'
 
@@ -57,7 +69,7 @@ export default function EmployeeComplianceTabs({
           <ClinicalLogsTab employeeId={employeeId} onError={(m) => showToast(m, 'error')} />
         )}
         {activeTab === 'supervision' && (
-          <SupervisionTab employeeId={employeeId} onError={(m) => showToast(m, 'error')} />
+          <SupervisionTab employeeId={employeeId} employeeType={employeeType} onError={(m) => showToast(m, 'error')} />
         )}
         {activeTab === 'alerts' && (
           <AlertsTab employeeId={employeeId} onError={(m) => showToast(m, 'error')} />
@@ -110,7 +122,7 @@ function DocumentsTab({
   const { showToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [docs, setDocs] = useState<EmploymentDocument[]>([])
-  const [docType, setDocType] = useState('')
+  const [docType, setDocType] = useState<string>('')
   const [expiresAt, setExpiresAt] = useState('')
 
   useEffect(() => {
@@ -167,11 +179,18 @@ function DocumentsTab({
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row gap-2 md:items-end">
         <div className="flex-1">
-          <Input
-            placeholder="Document type (e.g. EMPLOYMENT_AGREEMENT)"
-            value={docType}
-            onChange={(e) => setDocType(e.target.value.toUpperCase())}
-          />
+          <Select value={docType || undefined} onValueChange={setDocType}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select document type" />
+            </SelectTrigger>
+            <SelectContent>
+              {DOCUMENT_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t.replace(/_/g, ' ')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div>
           <Input
@@ -181,7 +200,7 @@ function DocumentsTab({
             className="w-full md:w-44"
           />
         </div>
-        <Button onClick={handleAdd} size="sm">
+        <Button onClick={handleAdd} size="sm" disabled={!docType}>
           Add
         </Button>
       </div>
@@ -293,17 +312,25 @@ function CredentialsTab({
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row gap-2 md:items-end">
-        <Input
-          placeholder="Credential type (e.g. RBT_CERT)"
-          value={credentialType}
-          onChange={(e) => setCredentialType(e.target.value.toUpperCase())}
-        />
+        <Select value={credentialType || undefined} onValueChange={setCredentialType}>
+          <SelectTrigger className="w-full md:w-48">
+            <SelectValue placeholder="Credential type" />
+          </SelectTrigger>
+          <SelectContent>
+            {CREDENTIAL_TYPES.map((t) => (
+              <SelectItem key={t} value={t}>
+                {t.replace(/_/g, ' ')}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Input
           placeholder="Credential number"
           value={credentialNumber}
           onChange={(e) => setCredentialNumber(e.target.value)}
+          className="flex-1"
         />
-        <Button onClick={handleAdd} size="sm">
+        <Button onClick={handleAdd} size="sm" disabled={!credentialType || !credentialNumber.trim()}>
           Add
         </Button>
       </div>
@@ -424,20 +451,25 @@ interface SupervisionEvent {
 
 function SupervisionTab({
   employeeId,
+  employeeType,
   onError,
 }: {
   employeeId: string
+  employeeType: string
   onError: (msg: string) => void
 }) {
   const [loading, setLoading] = useState(true)
   const [events, setEvents] = useState<SupervisionEvent[]>([])
+
+  const isRbt = (employeeType || '').toUpperCase() === 'RBT'
+  const param = isRbt ? `rbtEmployeeId=${encodeURIComponent(employeeId)}` : `bcbaEmployeeId=${encodeURIComponent(employeeId)}`
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       try {
         const res = await fetch(
-          `/api/supervision/events?bcbaEmployeeId=${encodeURIComponent(employeeId)}`,
+          `/api/supervision/events?${param}`,
           { credentials: 'include' },
         )
         if (!res.ok) throw new Error('Failed to load supervision events')
@@ -455,7 +487,7 @@ function SupervisionTab({
     return () => {
       cancelled = true
     }
-  }, [employeeId, onError])
+  }, [employeeId, employeeType, param, onError])
 
   if (loading) {
     return <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)]">Loading supervision…</p>

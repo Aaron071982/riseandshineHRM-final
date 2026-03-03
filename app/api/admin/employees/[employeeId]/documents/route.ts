@@ -4,6 +4,14 @@ import { prisma } from '@/lib/prisma'
 import { validateSession, isAdmin } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
 
+const VALID_DOC_TYPES = [
+  'OFFER_LETTER', 'EMPLOYMENT_AGREEMENT', 'CONTRACTOR_AGREEMENT', 'NDA', 'HIPAA_ACK',
+  'CONFIDENTIALITY', 'NON_COMPETE', 'W4', 'I9', 'DIRECT_DEPOSIT', 'BACKGROUND_CHECK',
+  'CPR_CERT', 'TB_CLEARANCE', 'RBT_40_HR_CERT', 'RBT_COMPETENCY_ASSESSMENT',
+  'BCBA_CERTIFICATE', 'MALPRACTICE_POLICY', 'CAQH_CONFIRMATION', 'CREDENTIALING_APPROVAL_LETTER',
+] as const
+const VALID_STATUSES = ['ACTIVE', 'EXPIRED', 'REPLACED'] as const
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ employeeId: string }> },
@@ -68,11 +76,18 @@ export async function POST(
     if (!docType) {
       return NextResponse.json({ error: 'docType is required' }, { status: 400 })
     }
+    const docTypeNorm = (docType as string).toUpperCase().trim()
+    if (!VALID_DOC_TYPES.includes(docTypeNorm as any)) {
+      return NextResponse.json(
+        { error: `docType must be one of: ${VALID_DOC_TYPES.join(', ')}` },
+        { status: 400 },
+      )
+    }
 
     const created = await prisma.employmentDocument.create({
       data: {
         employeeId,
-        docType: docType as any,
+        docType: docTypeNorm as any,
         fileUrl: fileUrl?.trim() || null,
         fileHash: fileHash?.trim() || null,
         issuedAt: issuedAt ? new Date(issuedAt) : null,
@@ -124,7 +139,16 @@ export async function PATCH(
 
     const body = await request.json()
     const updateData: any = {}
-    if (body.status) updateData.status = body.status
+    if (body.status) {
+      const statusNorm = (body.status as string).toUpperCase().trim()
+      if (!VALID_STATUSES.includes(statusNorm as any)) {
+        return NextResponse.json(
+          { error: `status must be one of: ${VALID_STATUSES.join(', ')}` },
+          { status: 400 },
+        )
+      }
+      updateData.status = statusNorm
+    }
     if (body.expiresAt !== undefined)
       updateData.expiresAt = body.expiresAt ? new Date(body.expiresAt) : null
     if (body.notes !== undefined) updateData.notes = body.notes?.trim() || null

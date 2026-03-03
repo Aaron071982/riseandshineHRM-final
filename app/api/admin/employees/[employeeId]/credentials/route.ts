@@ -4,6 +4,12 @@ import { prisma } from '@/lib/prisma'
 import { validateSession, isAdmin } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
 
+const VALID_CREDENTIAL_TYPES = [
+  'BACB_ID', 'RBT_CERT', 'BCBA_CERT', 'STATE_LICENSE', 'NPI',
+  'MEDICAID_PROVIDER_ID', 'CAQH_ID', 'MALPRACTICE_INSURANCE',
+] as const
+const VALID_VERIFICATION_STATUSES = ['UNVERIFIED', 'VERIFIED', 'REJECTED'] as const
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ employeeId: string }> },
@@ -69,11 +75,18 @@ export async function POST(
     if (!credentialNumber?.trim()) {
       return NextResponse.json({ error: 'credentialNumber is required' }, { status: 400 })
     }
+    const credTypeNorm = (credentialType as string).toUpperCase().trim()
+    if (!VALID_CREDENTIAL_TYPES.includes(credTypeNorm as any)) {
+      return NextResponse.json(
+        { error: `credentialType must be one of: ${VALID_CREDENTIAL_TYPES.join(', ')}` },
+        { status: 400 },
+      )
+    }
 
     const created = await prisma.credential.create({
       data: {
         employeeId,
-        credentialType: credentialType as any,
+        credentialType: credTypeNorm as any,
         credentialNumber: credentialNumber.trim(),
         state: state?.trim() || null,
         issuedAt: issuedAt ? new Date(issuedAt) : null,
@@ -123,8 +136,20 @@ export async function PATCH(
 
     const body = await request.json()
     const updateData: any = {}
-    if (body.verificationStatus)
-      updateData.verificationStatus = body.verificationStatus as any
+    if (body.verificationStatus !== undefined) {
+      const statusNorm = (body.verificationStatus as string).toUpperCase().trim()
+      if (!VALID_VERIFICATION_STATUSES.includes(statusNorm as any)) {
+        return NextResponse.json(
+          { error: `verificationStatus must be one of: ${VALID_VERIFICATION_STATUSES.join(', ')}` },
+          { status: 400 },
+        )
+      }
+      updateData.verificationStatus = statusNorm
+      updateData.verifiedByUserId = user.id
+      if (statusNorm === 'VERIFIED' && body.verifiedAt === undefined) {
+        updateData.verifiedAt = new Date()
+      }
+    }
     if (body.verifiedAt !== undefined)
       updateData.verifiedAt = body.verifiedAt ? new Date(body.verifiedAt) : null
     if (body.expiresAt !== undefined)
@@ -132,10 +157,6 @@ export async function PATCH(
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
-    }
-
-    if (updateData.verificationStatus) {
-      updateData.verifiedByUserId = user.id
     }
 
     const updated = await prisma.credential.update({
