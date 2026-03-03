@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { sendGenericEmail, generateTeamWelcomeEmail } from '@/lib/email'
+import { ensureEmployeeForBcbaProfile } from '@/lib/employees'
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,6 +54,9 @@ export async function POST(request: NextRequest) {
         status: status?.trim() || null,
       },
     })
+
+    // Ensure an Employee + primary EmployeeRole exists for this BCBA (additive, no impact on existing flows)
+    await ensureEmployeeForBcbaProfile(profile.id)
 
     if (profile.email) {
       const { subject, html } = generateTeamWelcomeEmail(profile.fullName, 'BCBA')

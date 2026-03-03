@@ -430,12 +430,27 @@ export default function EmployeesList({
                       {p.email && <div className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] truncate">{p.email}</div>}
                     </div>
                     <div className="flex items-center justify-between pt-4 border-t dark:border-[var(--border-subtle)]">
-                      <span className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">Updated {formatDate(p.updatedAt)}</span>
-                      <Link href={`${viewBase}/${p.id}`}>
-                        <Button size="sm" variant="outline" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]">
-                          View →
-                        </Button>
-                      </Link>
+                      <span className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
+                        Updated {formatDate(p.updatedAt)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Link href={`${viewBase}/${p.id}`}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]"
+                          >
+                            View →
+                          </Button>
+                        </Link>
+                        {currentType === 'BCBA' && (
+                          <Link href={`/admin/employees/BCBA/${p.id}/compliance`}>
+                            <Button size="sm" variant="outline" className="border-blue-200 text-blue-700">
+                              Compliance
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

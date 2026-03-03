@@ -751,46 +751,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         </CardContent>
       </Card>
 
-      {/* Client assignments (from Scheduling System) */}
-      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)] flex items-center gap-2">
-            <CalendarClock className="w-6 h-6" />
-            Client assignments
-          </CardTitle>
-          <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
-            Assigned clients and schedule from the Scheduling System (beta). Assign in Admin → Scheduling System (beta).
-          </p>
-        </CardHeader>
-        <CardContent>
-          {clientAssignmentsLoading ? (
-            <p className="text-sm text-gray-500">Loading…</p>
-          ) : clientAssignments.length === 0 ? (
-            <p className="text-sm text-gray-500">No client assignments yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {clientAssignments.map((a) => {
-                const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-                const days = (a.daysOfWeek ?? []).map((d) => dayLabels[d] ?? String(d)).join(', ')
-                const time = [a.timeStart, a.timeEnd].filter(Boolean).join('–')
-                return (
-                  <li
-                    key={a.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-[var(--border-subtle)] text-sm"
-                  >
-                    <span className="font-medium dark:text-[var(--text-primary)]">{a.clientName}</span>
-                    <span className="text-gray-600 dark:text-[var(--text-tertiary)]">
-                      {days}
-                      {time ? ` ${time}` : ''}
-                      {a.notes ? ` · ${a.notes}` : ''}
-                    </span>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {/* Client assignments section removed – scheduling beta no longer used */}
 
       {/* Public Application Info */}
       {rbtProfile.source === 'PUBLIC_APPLICATION' && (

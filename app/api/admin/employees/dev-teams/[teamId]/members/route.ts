@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { sendGenericEmail, generateTeamWelcomeEmail } from '@/lib/email'
+import { ensureEmployeeForDevTeamMember } from '@/lib/employees'
 
 export async function POST(
   request: NextRequest,
@@ -40,6 +41,9 @@ export async function POST(
         notes: notes?.trim() || null,
       },
     })
+
+    // Create Employee wrapper row for this dev team member
+    await ensureEmployeeForDevTeamMember(member.id)
 
     if (member.email) {
       const { subject, html } = generateTeamWelcomeEmail(member.fullName, 'Dev')

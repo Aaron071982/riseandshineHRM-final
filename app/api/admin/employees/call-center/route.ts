@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { sendGenericEmail, generateTeamWelcomeEmail } from '@/lib/email'
+import { ensureEmployeeForCallCenterProfile } from '@/lib/employees'
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,6 +40,9 @@ export async function POST(request: NextRequest) {
         status: status?.trim() || null,
       },
     })
+
+    // Create Employee wrapper row for this call center profile
+    await ensureEmployeeForCallCenterProfile(profile.id)
 
     if (profile.email) {
       const { subject, html } = generateTeamWelcomeEmail(profile.fullName, 'Call Center')

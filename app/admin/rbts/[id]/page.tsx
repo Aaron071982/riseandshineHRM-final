@@ -63,6 +63,24 @@ async function loadRbtProfileMinimalRaw(
     if (!profileRow) return null
     let interviewsRows: Array<{ id: string; scheduledAt: Date; durationMinutes: number; interviewerName: string; status: string; decision: string; notes: string | null; meetingUrl: string | null }> = []
     let onboardingTasksRows: Array<{ id: string; taskType: string; title: string; description: string | null; isCompleted: boolean; completedAt: Date | null; uploadUrl: string | null; documentDownloadUrl: string | null; sortOrder: number }> = []
+    let onboardingCompletionsRows: Array<{
+      id: string
+      documentId: string
+      status: string
+      completedAt: Date | null
+      acknowledgmentJson: unknown
+      document_title: string
+      document_type: string
+    }> = []
+    let onboardingCompletionsRows: Array<{
+      id: string
+      documentId: string
+      status: string
+      completedAt: Date | null
+      acknowledgmentJson: unknown
+      document_title: string
+      document_type: string
+    }> = []
     try {
       interviewsRows = await prisma.$queryRaw`
         SELECT id, "scheduledAt", "durationMinutes", "interviewerName", status, decision, notes, "meetingUrl"
@@ -78,6 +96,23 @@ async function loadRbtProfileMinimalRaw(
       `
     } catch (e) {
       console.error('Admin rbts [id]: minimal raw onboarding_tasks failed', e)
+    }
+    try {
+      onboardingCompletionsRows = await prisma.$queryRaw`
+        SELECT oc.id,
+               oc."documentId",
+               oc.status,
+               oc."completedAt",
+               oc."acknowledgmentJson",
+               od.title AS document_title,
+               od.type  AS document_type
+        FROM onboarding_completions oc
+        JOIN onboarding_documents od ON od.id = oc."documentId"
+        WHERE oc."rbtProfileId" = ${id}
+        ORDER BY oc."createdAt" DESC
+      `
+    } catch (e) {
+      console.error('Admin rbts [id]: minimal raw onboarding_completions failed', e)
     }
     const interviews = (interviewsRows || []).map((i) => ({
       id: i.id,
@@ -101,6 +136,18 @@ async function loadRbtProfileMinimalRaw(
       taskType: t.taskType as any,
       createdAt: new Date(),
       updatedAt: new Date(),
+    }))
+    const onboardingCompletions = (onboardingCompletionsRows || []).map((c) => ({
+      id: c.id,
+      documentId: c.documentId,
+      status: c.status,
+      completedAt: c.completedAt,
+      acknowledgmentJson: c.acknowledgmentJson,
+      document: {
+        id: c.documentId,
+        title: c.document_title,
+        type: c.document_type,
+      },
     }))
     return {
       id: profileRow.id,
@@ -152,8 +199,8 @@ async function loadRbtProfileMinimalRaw(
       },
       interviews,
       onboardingTasks,
+      onboardingCompletions,
       documents: [],
-      onboardingCompletions: [],
     } as unknown as RBTProfileWithRelations
   } catch (err) {
     console.error('Admin rbts [id]: loadRbtProfileMinimalRaw failed', err)
@@ -229,6 +276,23 @@ async function loadRbtProfileRaw(
     } catch (e) {
       console.error('Admin rbts [id]: raw onboarding_tasks fallback failed', e)
     }
+    try {
+      onboardingCompletionsRows = await prisma.$queryRaw`
+        SELECT oc.id,
+               oc."documentId",
+               oc.status,
+               oc."completedAt",
+               oc."acknowledgmentJson",
+               od.title AS document_title,
+               od.type  AS document_type
+        FROM onboarding_completions oc
+        JOIN onboarding_documents od ON od.id = oc."documentId"
+        WHERE oc."rbtProfileId" = ${id}
+        ORDER BY oc."createdAt" DESC
+      `
+    } catch (e) {
+      console.error('Admin rbts [id]: raw onboarding_completions fallback failed', e)
+    }
     const interviews = (interviewsRows || []).map((i) => ({
       id: i.id,
       rbtProfileId: id,
@@ -251,6 +315,18 @@ async function loadRbtProfileRaw(
       taskType: t.taskType as any,
       createdAt: new Date(),
       updatedAt: new Date(),
+    }))
+    const onboardingCompletions = (onboardingCompletionsRows || []).map((c) => ({
+      id: c.id,
+      documentId: c.documentId,
+      status: c.status,
+      completedAt: c.completedAt,
+      acknowledgmentJson: c.acknowledgmentJson,
+      document: {
+        id: c.documentId,
+        title: c.document_title,
+        type: c.document_type,
+      },
     }))
     return {
       id: profileRow.id,
@@ -302,8 +378,8 @@ async function loadRbtProfileRaw(
       },
       interviews,
       onboardingTasks,
+      onboardingCompletions,
       documents: [],
-      onboardingCompletions: [],
     } as unknown as RBTProfileWithRelations
   } catch (err) {
     console.error('Admin rbts [id]: loadRbtProfileRaw failed', err)

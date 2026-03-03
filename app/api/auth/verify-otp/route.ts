@@ -67,17 +67,35 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    // Localhost / development bypass: accept fixed code 123456 so you can log in without email/OTP table
-    const isDevBypass = process.env.NODE_ENV === 'development' && otp === '123456'
+    // Localhost / development bypass: accept fixed code 123456 so you can log in without email/OTP table.
+    // Treat any non-production build OR explicit localhost hostname as eligible for the bypass so
+    // `next start` on localhost still works even if NODE_ENV is "production".
+    const hostname = request.nextUrl.hostname
+    const isLocalhostHost = hostname === 'localhost' || hostname === '127.0.0.1'
+    const isNonProdEnv = process.env.NODE_ENV !== 'production'
+    const isDevBypass = (isNonProdEnv || isLocalhostHost) && otp === '123456'
     const adminFallbackList = (process.env.ADMIN_FALLBACK_EMAIL ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
     const isAdminFallback = adminFallbackList.length > 0 && adminFallbackList.includes(email) && otp === '123456'
     const isTestAccount = email === 'hrmtesting@gmail.com'
     let isValid = false
 
+    // For quick localhost / non-production testing, accept a fixed OTP (123456) and
+    // short‑circuit before any database calls. This does NOT apply on production hosts.
     if (isDevBypass) {
-      isValid = true
-      LOG(`${logId} dev bypass OTP accepted`)
+      LOG(`${logId} dev bypass OTP accepted; skipping DB lookups entirely`)
+      const response = NextResponse.json({
+        success: true,
+        role: 'ADMIN',
+        userId: 'local-dev-admin',
+      })
+      response.cookies.set('session', 'local-dev-session', {
+        httpOnly: false,
+        secure: false,
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60,
+        path: '/',
+      })
+      return response
     } else if (isAdminFallback) {
       isValid = true
       LOG(`${logId} admin fallback OTP accepted`)
@@ -258,13 +276,14 @@ export async function POST(request: NextRequest) {
     const isDbError =
       err?.code === 'P1001' ||
       err?.code === 'P1002' ||
+      err?.code === 'P1011' || // TLS / connection closed
       err?.code === 'P1017' ||
-      (err?.message && (
-        err.message.includes("Can't reach database") ||
-        err.message.includes('Connection') ||
-        err.message.includes('ECONNREFUSED') ||
-        err.message.includes('ETIMEDOUT')
-      ))
+      (err?.message &&
+        (err.message.includes("Can't reach database") ||
+          err.message.includes('Error opening a TLS connection') ||
+          err.message.includes('Connection') ||
+          err.message.includes('ECONNREFUSED') ||
+          err.message.includes('ETIMEDOUT')))
     if (isDbError) {
       return NextResponse.json(
         { error: 'Server is temporarily unavailable. Please try again in a moment.' },
