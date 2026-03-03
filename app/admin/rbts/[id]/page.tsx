@@ -72,15 +72,6 @@ async function loadRbtProfileMinimalRaw(
       document_title: string
       document_type: string
     }> = []
-    let onboardingCompletionsRows: Array<{
-      id: string
-      documentId: string
-      status: string
-      completedAt: Date | null
-      acknowledgmentJson: unknown
-      document_title: string
-      document_type: string
-    }> = []
     try {
       interviewsRows = await prisma.$queryRaw`
         SELECT id, "scheduledAt", "durationMinutes", "interviewerName", status, decision, notes, "meetingUrl"

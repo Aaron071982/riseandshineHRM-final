@@ -277,8 +277,20 @@ export default function PublicRBTApplicationWizard() {
         })
 
         if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json()
-          throw new Error(errorData.error || 'Failed to upload resume')
+          let message = 'Failed to upload resume'
+          try {
+            const errorData = await uploadResponse.json()
+            if (errorData?.error) message = errorData.error
+          } catch {
+            if (uploadResponse.status === 429) {
+              message = 'Too many resume uploads. Please wait a minute and try again.'
+            } else if (uploadResponse.status === 413) {
+              message = 'File is too large for upload. Please use a smaller file.'
+            } else {
+              message = `Failed to upload resume (status ${uploadResponse.status})`
+            }
+          }
+          throw new Error(message)
         }
 
         const uploadResult = await uploadResponse.json()
@@ -329,8 +341,20 @@ export default function PublicRBTApplicationWizard() {
         if (draftToken) idForm.append('token', draftToken)
         const idRes = await fetch('/api/public/apply/upload', { method: 'POST', body: idForm })
         if (!idRes.ok) {
-          const errData = await idRes.json()
-          throw new Error(errData.error || 'Failed to upload ID')
+          let message = 'Failed to upload ID'
+          try {
+            const errData = await idRes.json()
+            if (errData?.error) message = errData.error
+          } catch {
+            if (idRes.status === 429) {
+              message = 'Too many ID uploads. Please wait a minute and try again.'
+            } else if (idRes.status === 413) {
+              message = 'ID file is too large. Please upload a smaller file.'
+            } else {
+              message = `Failed to upload ID (status ${idRes.status})`
+            }
+          }
+          throw new Error(message)
         }
         const idResult = await idRes.json()
         idDocumentUrl = idResult.url
@@ -368,8 +392,20 @@ export default function PublicRBTApplicationWizard() {
       })
 
       if (!submitResponse.ok) {
-        const errorData = await submitResponse.json()
-        throw new Error(errorData.error || 'Failed to submit application')
+        let message = 'Failed to submit application'
+        try {
+          const errorData = await submitResponse.json()
+          if (errorData?.error) message = errorData.error
+        } catch {
+          if (submitResponse.status === 429) {
+            message = 'Too many submissions from this browser. Please wait a bit and try again.'
+          } else if (submitResponse.status === 413) {
+            message = 'Submitted data was too large. Please try again or contact support.'
+          } else {
+            message = `Failed to submit application (status ${submitResponse.status})`
+          }
+        }
+        throw new Error(message)
       }
 
       const result = await submitResponse.json()
