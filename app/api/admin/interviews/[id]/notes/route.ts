@@ -28,13 +28,20 @@ export async function GET(
     })
 
     return NextResponse.json(notes || null)
-  } catch (error: any) {
-    console.error('Error fetching interview notes:', error)
+  } catch (error: unknown) {
+    const err = error as Error & { code?: string; meta?: unknown }
+    console.error('Error fetching interview notes:', err?.message, err?.stack, err?.code, err?.meta)
     return NextResponse.json(
       { error: 'Failed to fetch interview notes' },
       { status: 500 }
     )
   }
+}
+
+// Coerce to string or null for Prisma String? fields (avoids type errors from client)
+function strOrNull(v: unknown): string | null {
+  if (v == null || v === '') return null
+  return String(v)
 }
 
 // POST: Create or update interview notes
@@ -56,7 +63,19 @@ export async function POST(
     }
 
     const { id } = await params
-    const data = await request.json()
+
+    let data: Record<string, unknown>
+    try {
+      data = await request.json()
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON body' },
+        { status: 400 }
+      )
+    }
+    if (data == null || typeof data !== 'object') {
+      data = {}
+    }
 
     // Get interview to get rbtProfileId
     const interview = await prisma.interview.findUnique({
@@ -70,24 +89,24 @@ export async function POST(
       )
     }
 
-    // Upsert interview notes
+    // Build payload with coerced string | null (Prisma String? compatible)
     const updateData = {
-      greetingAnswer: data.greetingAnswer || null,
-      basicInfoAnswer: data.basicInfoAnswer || null,
-      experienceAnswer: data.experienceAnswer || null,
-      heardAboutAnswer: data.heardAboutAnswer || null,
-      abaPlatformsAnswer: data.abaPlatformsAnswer || null,
-      communicationAnswer: data.communicationAnswer || null,
-      availabilityAnswer: data.availabilityAnswer || null,
-      payExpectationsAnswer: data.payExpectationsAnswer || null,
-      previousCompanyAnswer: data.previousCompanyAnswer || null,
-      expectationsAnswer: data.expectationsAnswer || null,
-      closingNotes: data.closingNotes || null,
-      fullName: data.fullName || null,
-      email: data.email || null,
-      birthdate: data.birthdate || null,
-      currentAddress: data.currentAddress || null,
-      phoneNumber: data.phoneNumber || null,
+      greetingAnswer: strOrNull(data.greetingAnswer),
+      basicInfoAnswer: strOrNull(data.basicInfoAnswer),
+      experienceAnswer: strOrNull(data.experienceAnswer),
+      heardAboutAnswer: strOrNull(data.heardAboutAnswer),
+      abaPlatformsAnswer: strOrNull(data.abaPlatformsAnswer),
+      communicationAnswer: strOrNull(data.communicationAnswer),
+      availabilityAnswer: strOrNull(data.availabilityAnswer),
+      payExpectationsAnswer: strOrNull(data.payExpectationsAnswer),
+      previousCompanyAnswer: strOrNull(data.previousCompanyAnswer),
+      expectationsAnswer: strOrNull(data.expectationsAnswer),
+      closingNotes: strOrNull(data.closingNotes),
+      fullName: strOrNull(data.fullName),
+      email: strOrNull(data.email),
+      birthdate: strOrNull(data.birthdate),
+      currentAddress: strOrNull(data.currentAddress),
+      phoneNumber: strOrNull(data.phoneNumber),
     }
 
     const notes = await prisma.interviewNotes.upsert({
@@ -101,12 +120,14 @@ export async function POST(
     })
 
     return NextResponse.json({ success: true, notes })
-  } catch (error: any) {
-    console.error('Error saving interview notes:', error)
-    return NextResponse.json(
-      { error: 'Failed to save interview notes' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const err = error as Error & { code?: string; meta?: unknown }
+    console.error('Error saving interview notes:', err?.message, err?.stack, err?.code, err?.meta)
+    const message =
+      process.env.NODE_ENV === 'development' && err?.message
+        ? err.message
+        : 'Failed to save interview notes'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
