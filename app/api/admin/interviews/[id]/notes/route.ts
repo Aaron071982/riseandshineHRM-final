@@ -123,6 +123,7 @@ export async function POST(
   } catch (error: unknown) {
     const err = error as Error & { code?: string; meta?: unknown }
     console.error('Error saving interview notes:', err?.message, err?.stack, err?.code, err?.meta)
+    // If error mentions permission/RLS, run prisma/supabase-rls-policies-app.sql in Supabase SQL Editor.
     const message =
       process.env.NODE_ENV === 'development' && err?.message
         ? err.message

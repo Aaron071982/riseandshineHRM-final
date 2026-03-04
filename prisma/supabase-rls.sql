@@ -2,11 +2,11 @@
 -- Run this in Supabase SQL Editor (Dashboard → SQL Editor).
 -- Use the SAME Supabase project as your production DATABASE_URL.
 --
--- IMPORTANT: Only run this if the role in your DATABASE_URL has "Bypass RLS" enabled
--- (Supabase Dashboard → Database → Roles → your role). If you run this without
--- BYPASSRLS, the app will not be able to read data ("Data could not be loaded",
--- 403 on audit logs, zeros). If that happens, run prisma/supabase-rls-rollback.sql
--- in SQL Editor to disable RLS and restore data loading.
+-- IMPORTANT: Either (1) ensure the role in your DATABASE_URL has "Bypass RLS" enabled
+-- (Supabase Dashboard → Database → Roles → your role), or (2) after enabling RLS, run
+-- prisma/supabase-rls-policies-app.sql in SQL Editor so the app can read/write (e.g. interview notes).
+-- If you already enabled RLS and see 403/500 (e.g. interview notes not saving), run
+-- supabase-rls-policies-app.sql once, or run supabase-rls-rollback.sql to disable RLS.
 --
 -- Tables from Supabase Performance/Security linter (RLS disabled in public).
 
@@ -31,18 +31,5 @@ ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rbt_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interview_scorecards ENABLE ROW LEVEL SECURITY;
 
--- If you get 403 on admin routes (e.g. audit logs) after enabling RLS, the role in DATABASE_URL
--- may not have BYPASSRLS. Either enable "Bypass RLS" for that role in Dashboard → Database → Roles,
--- or run the block below so the app can still read sessions and users.
--- Replace 'postgres' with the actual role from: SELECT current_user; (in SQL Editor using your app's connection).
-/*
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'sessions' AND policyname = 'allow_app_sessions') THEN
-    EXECUTE 'CREATE POLICY allow_app_sessions ON public.sessions FOR ALL TO postgres USING (true) WITH CHECK (true)';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'users' AND policyname = 'allow_app_users') THEN
-    EXECUTE 'CREATE POLICY allow_app_users ON public.users FOR ALL TO postgres USING (true) WITH CHECK (true)';
-  END IF;
-END $$;
-*/
+-- If you get 403/500 after enabling RLS (e.g. audit logs, interview notes not saving), run
+-- prisma/supabase-rls-policies-app.sql in SQL Editor to add allow_app_* policies for all tables.
