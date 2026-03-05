@@ -16,6 +16,7 @@ import PublicFooter from './PublicFooter'
 import { ArrowLeft, ArrowRight, Upload, FileText, CheckCircle, X, Paperclip, Lightbulb } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
+import AddressAutocomplete, { type AddressComponents } from '@/components/ui/AddressAutocomplete'
 
 interface ApplicationData {
   // Step 1: Personal Info
@@ -147,6 +148,10 @@ export default function PublicRBTApplicationWizard() {
       case 1:
         if (!data.firstName || !data.lastName || !data.email || !data.phoneNumber || !data.zipCode || !data.addressLine1) {
           setError('Please fill in all required fields (marked with *)')
+          return false
+        }
+        if (!data.ethnicity) {
+          setError('Please select your ethnicity')
           return false
         }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
@@ -465,6 +470,44 @@ export default function PublicRBTApplicationWizard() {
                   required
                 />
               </div>
+              {typeof process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY === 'string' &&
+                process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
+                  <div className="md:col-span-2">
+                    <AddressAutocomplete
+                      apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                      onPlaceSelect={(address: AddressComponents) =>
+                        setData({
+                          ...data,
+                          addressLine1: address.addressLine1,
+                          addressLine2: address.addressLine2 || '',
+                          city: address.city,
+                          state: address.state,
+                          zipCode: address.zipCode,
+                        })
+                      }
+                      placeholder="Search your address to auto-fill..."
+                      id="application-address-search"
+                      label="Search address (optional)"
+                    />
+                  </div>
+                )}
+              <div className="md:col-span-2">
+                <Label htmlFor="addressLine1">Address Line 1 *</Label>
+                <Input
+                  id="addressLine1"
+                  value={data.addressLine1}
+                  onChange={(e) => setData({ ...data, addressLine1: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="addressLine2">Address Line 2</Label>
+                <Input
+                  id="addressLine2"
+                  value={data.addressLine2}
+                  onChange={(e) => setData({ ...data, addressLine2: e.target.value })}
+                />
+              </div>
               <div>
                 <Label htmlFor="city">City</Label>
                 <Input
@@ -492,31 +535,15 @@ export default function PublicRBTApplicationWizard() {
                   required
                 />
               </div>
-              <div className="md:col-span-2">
-                <Label htmlFor="addressLine1">Address Line 1 *</Label>
-                <Input
-                  id="addressLine1"
-                  value={data.addressLine1}
-                  onChange={(e) => setData({ ...data, addressLine1: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label htmlFor="addressLine2">Address Line 2</Label>
-                <Input
-                  id="addressLine2"
-                  value={data.addressLine2}
-                  onChange={(e) => setData({ ...data, addressLine2: e.target.value })}
-                />
-              </div>
               <div>
-                <Label htmlFor="ethnicity">Ethnicity</Label>
+                <Label htmlFor="ethnicity">Ethnicity *</Label>
                 <Select
                   value={data.ethnicity}
                   onValueChange={(value) => setData({ ...data, ethnicity: value })}
+                  required
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select ethnicity (optional)" />
+                    <SelectValue placeholder="Select ethnicity" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="WHITE">White</SelectItem>

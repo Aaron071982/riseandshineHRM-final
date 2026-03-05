@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
       email: (formData.get('email') as string) || null,
       locationCity: (formData.get('locationCity') as string) || null,
       locationState: (formData.get('locationState') as string) || null,
-      zipCode: formData.get('zipCode') as string,
-      addressLine1: formData.get('addressLine1') as string,
+      zipCode: (formData.get('zipCode') as string) || null,
+      addressLine1: (formData.get('addressLine1') as string) || null,
       addressLine2: (formData.get('addressLine2') as string) || null,
       preferredServiceArea: (formData.get('preferredServiceArea') as string) || null,
       notes: (formData.get('notes') as string) || null,
@@ -37,12 +37,34 @@ export async function POST(request: NextRequest) {
       ethnicity: (formData.get('ethnicity') as string) || null,
       fortyHourCourseCompleted: formData.get('fortyHourCourseCompleted') === 'true',
       status: (formData.get('status') as string) || 'NEW',
+      authorizedToWork: formData.get('authorizedToWork') === 'true',
+      canPassBackgroundCheck: formData.get('canPassBackgroundCheck') === 'true',
+      cprFirstAidCertified: (formData.get('cprFirstAidCertified') as string) || null,
     }
 
     // Validate required fields
     if (!data.addressLine1 || !data.zipCode) {
       return NextResponse.json(
         { error: 'Address Line 1 and Zip Code are required' },
+        { status: 400 }
+      )
+    }
+    if (!data.locationCity || !data.locationState) {
+      return NextResponse.json(
+        { error: 'City and State are required' },
+        { status: 400 }
+      )
+    }
+    if (!data.ethnicity) {
+      return NextResponse.json(
+        { error: 'Ethnicity is required' },
+        { status: 400 }
+      )
+    }
+    const validEthnicities = ['WHITE', 'ASIAN', 'BLACK', 'HISPANIC', 'SOUTH_ASIAN', 'MIDDLE_EASTERN'] as const
+    if (!validEthnicities.includes(data.ethnicity as (typeof validEthnicities)[number])) {
+      return NextResponse.json(
+        { error: 'Invalid ethnicity value' },
         { status: 400 }
       )
     }
@@ -77,9 +99,12 @@ export async function POST(request: NextRequest) {
         preferredServiceArea: data.preferredServiceArea || null,
         notes: data.notes || null,
         gender: data.gender || null,
-        ethnicity: data.ethnicity ? (data.ethnicity as any) : null,
+        ethnicity: data.ethnicity as any,
         fortyHourCourseCompleted: data.fortyHourCourseCompleted,
         status,
+        authorizedToWork: data.authorizedToWork,
+        canPassBackgroundCheck: data.canPassBackgroundCheck,
+        cprFirstAidCertified: data.cprFirstAidCertified,
       },
     })
 

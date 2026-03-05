@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,11 +22,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { X, FileText, Upload, Loader2 } from 'lucide-react'
+import AddressAutocomplete, { type AddressComponents } from '@/components/ui/AddressAutocomplete'
 
 interface DocumentFile {
   file: File
   documentType: string
 }
+
+const GOOGLE_MAPS_KEY = typeof process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY === 'string'
+  ? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+  : ''
 
 export default function AddRBTForm() {
   const router = useRouter()
@@ -37,6 +42,20 @@ export default function AddRBTForm() {
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [pendingFormData, setPendingFormData] = useState<FormData | null>(null)
   const [pendingIsHireDirect, setPendingIsHireDirect] = useState(false)
+  // Address from autocomplete or manual entry (standardized when using autocomplete)
+  const [addressLine1, setAddressLine1] = useState('')
+  const [addressLine2, setAddressLine2] = useState('')
+  const [locationCity, setLocationCity] = useState('')
+  const [locationState, setLocationState] = useState('')
+  const [zipCode, setZipCode] = useState('')
+
+  const handleAddressSelect = useCallback((address: AddressComponents) => {
+    setAddressLine1(address.addressLine1)
+    setAddressLine2(address.addressLine2 || '')
+    setLocationCity(address.city)
+    setLocationState(address.state)
+    setZipCode(address.zipCode)
+  }, [])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -62,23 +81,35 @@ export default function AddRBTForm() {
     setError('')
 
     const formData = new FormData(e.currentTarget)
+    if (!formData.get('authorizedToWork') || !formData.get('canPassBackgroundCheck') || !formData.get('cprFirstAidCertified')) {
+      setError('Please answer all Compliance & Eligibility questions.')
+      return
+    }
+    if (!formData.get('ethnicity')) {
+      setError('Please select Ethnicity.')
+      return
+    }
     
-    // Create FormData for file upload
+    // Create FormData for file upload (use state for address so autocomplete-filled values are used)
     const submitData = new FormData()
     submitData.append('firstName', formData.get('firstName') as string)
     submitData.append('lastName', formData.get('lastName') as string)
     submitData.append('phoneNumber', formData.get('phoneNumber') as string)
     submitData.append('email', (formData.get('email') as string) || '')
-    submitData.append('locationCity', (formData.get('locationCity') as string) || '')
-    submitData.append('locationState', (formData.get('locationState') as string) || '')
-    submitData.append('zipCode', formData.get('zipCode') as string)
-    submitData.append('addressLine1', formData.get('addressLine1') as string)
-    submitData.append('addressLine2', (formData.get('addressLine2') as string) || '')
+    submitData.append('locationCity', locationCity)
+    submitData.append('locationState', locationState)
+    submitData.append('zipCode', zipCode)
+    submitData.append('addressLine1', addressLine1)
+    submitData.append('addressLine2', addressLine2 || '')
     submitData.append('preferredServiceArea', (formData.get('preferredServiceArea') as string) || '')
     submitData.append('notes', (formData.get('notes') as string) || '')
     submitData.append('gender', formData.get('gender') as string)
+    submitData.append('ethnicity', formData.get('ethnicity') as string)
     submitData.append('status', formData.get('status') as string)
     submitData.append('fortyHourCourseCompleted', formData.get('fortyHourCourseCompleted') === 'true' ? 'true' : 'false')
+    submitData.append('authorizedToWork', formData.get('authorizedToWork') as string)
+    submitData.append('canPassBackgroundCheck', formData.get('canPassBackgroundCheck') as string)
+    submitData.append('cprFirstAidCertified', formData.get('cprFirstAidCertified') as string)
 
     // Add documents
     documents.forEach((doc, index) => {
@@ -154,20 +185,8 @@ export default function AddRBTForm() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="locationCity">City</Label>
-              <Input id="locationCity" name="locationCity" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="locationState">State</Label>
-              <Input id="locationState" name="locationState" maxLength={2} placeholder="NY" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="zipCode">Zip Code *</Label>
-              <Input id="zipCode" name="zipCode" required />
+              <Label htmlFor="email">Email *</Label>
+              <Input id="email" name="email" type="email" required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="gender">Gender *</Label>
@@ -182,10 +201,10 @@ export default function AddRBTForm() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ethnicity">Ethnicity</Label>
-              <Select name="ethnicity">
+              <Label htmlFor="ethnicity">Ethnicity *</Label>
+              <Select name="ethnicity" required>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select ethnicity (optional)" />
+                  <SelectValue placeholder="Select ethnicity" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="WHITE">White</SelectItem>
@@ -229,17 +248,121 @@ export default function AddRBTForm() {
                 If &quot;No&quot;, the RBT will need to complete the 40-hour course and upload certificate during onboarding.
               </p>
             </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="addressLine1">Address Line 1 *</Label>
-              <Input id="addressLine1" name="addressLine1" required />
+            {/* Location & Address — use search to standardize, or fill manually */}
+            <div className="md:col-span-2 space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Location &amp; Address</p>
+              {GOOGLE_MAPS_KEY ? (
+                <AddressAutocomplete
+                  apiKey={GOOGLE_MAPS_KEY}
+                  onPlaceSelect={handleAddressSelect}
+                  placeholder="Search address to auto-fill below..."
+                  id="address-search"
+                  label="Search address (optional)"
+                  className="mb-4"
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground mb-2">
+                  Set <code className="bg-muted px-1 rounded">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> in .env to enable address search and standardization.
+                </p>
+              )}
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
+              <Label htmlFor="addressLine1">Address Line 1 *</Label>
+              <Input
+                id="addressLine1"
+                name="addressLine1"
+                value={addressLine1}
+                onChange={(e) => setAddressLine1(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="addressLine2">Address Line 2</Label>
-              <Input id="addressLine2" name="addressLine2" />
+              <Input
+                id="addressLine2"
+                name="addressLine2"
+                value={addressLine2}
+                onChange={(e) => setAddressLine2(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="locationCity">City *</Label>
+              <Input
+                id="locationCity"
+                name="locationCity"
+                value={locationCity}
+                onChange={(e) => setLocationCity(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="locationState">State *</Label>
+              <Input
+                id="locationState"
+                name="locationState"
+                value={locationState}
+                onChange={(e) => setLocationState(e.target.value)}
+                maxLength={2}
+                placeholder="NY"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="zipCode">Zip Code *</Label>
+              <Input
+                id="zipCode"
+                name="zipCode"
+                value={zipCode}
+                onChange={(e) => setZipCode(e.target.value)}
+                required
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="preferredServiceArea">Preferred Service Area</Label>
               <Input id="preferredServiceArea" name="preferredServiceArea" />
+            </div>
+            {/* Compliance & Eligibility (same as application) */}
+            <div className="md:col-span-2 pt-2 border-t space-y-4">
+              <p className="text-sm font-semibold">Compliance &amp; Eligibility *</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="authorizedToWork">Authorized to work in the US? *</Label>
+                  <Select name="authorizedToWork" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="canPassBackgroundCheck">Can pass background check? *</Label>
+                  <Select name="canPassBackgroundCheck" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cprFirstAidCertified">CPR/First Aid certified? *</Label>
+                  <Select name="cprFirstAidCertified" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                      <SelectItem value="not-yet">Not yet</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="notes">Notes</Label>

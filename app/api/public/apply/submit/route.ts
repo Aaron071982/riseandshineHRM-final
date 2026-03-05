@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
       'phoneNumber',
       'zipCode',
       'addressLine1',
+      'ethnicity',
       'fortyHourCourseCompleted',
       'authorizedToWork',
       'canPassBackgroundCheck',
@@ -81,6 +82,14 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
+    }
+
+    const validEthnicities = ['WHITE', 'ASIAN', 'BLACK', 'HISPANIC', 'SOUTH_ASIAN', 'MIDDLE_EASTERN']
+    if (!validEthnicities.includes(body.ethnicity)) {
+      return NextResponse.json(
+        { error: 'Invalid ethnicity value' },
+        { status: 400 }
+      )
     }
 
     // Validate email format
