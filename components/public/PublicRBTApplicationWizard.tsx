@@ -470,27 +470,23 @@ export default function PublicRBTApplicationWizard() {
                   required
                 />
               </div>
-              {typeof process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY === 'string' &&
-                process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
-                  <div className="md:col-span-2">
-                    <AddressAutocomplete
-                      apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-                      onPlaceSelect={(address: AddressComponents) =>
-                        setData({
-                          ...data,
-                          addressLine1: address.addressLine1,
-                          addressLine2: address.addressLine2 || '',
-                          city: address.city,
-                          state: address.state,
-                          zipCode: address.zipCode,
-                        })
-                      }
-                      placeholder="Search your address to auto-fill..."
-                      id="application-address-search"
-                      label="Search address (optional)"
-                    />
-                  </div>
-                )}
+              <div className="md:col-span-2">
+                <AddressAutocomplete
+                  onPlaceSelect={(address: AddressComponents) =>
+                    setData({
+                      ...data,
+                      addressLine1: address.addressLine1,
+                      addressLine2: address.addressLine2 || '',
+                      city: address.city,
+                      state: address.state,
+                      zipCode: address.zipCode,
+                    })
+                  }
+                  placeholder="Search your address to auto-fill..."
+                  id="application-address-search"
+                  label="Search address (optional)"
+                />
+              </div>
               <div className="md:col-span-2">
                 <Label htmlFor="addressLine1">Address Line 1 *</Label>
                 <Input

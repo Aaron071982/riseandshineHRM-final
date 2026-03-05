@@ -29,10 +29,6 @@ interface DocumentFile {
   documentType: string
 }
 
-const GOOGLE_MAPS_KEY = typeof process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY === 'string'
-  ? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-  : ''
-
 export default function AddRBTForm() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -248,23 +244,16 @@ export default function AddRBTForm() {
                 If &quot;No&quot;, the RBT will need to complete the 40-hour course and upload certificate during onboarding.
               </p>
             </div>
-            {/* Location & Address — use search to standardize, or fill manually */}
+            {/* Location & Address — search autofills line address (no map loaded) */}
             <div className="md:col-span-2 space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Location &amp; Address</p>
-              {GOOGLE_MAPS_KEY ? (
-                <AddressAutocomplete
-                  apiKey={GOOGLE_MAPS_KEY}
-                  onPlaceSelect={handleAddressSelect}
-                  placeholder="Search address to auto-fill below..."
-                  id="address-search"
-                  label="Search address (optional)"
-                  className="mb-4"
-                />
-              ) : (
-                <p className="text-xs text-muted-foreground mb-2">
-                  Set <code className="bg-muted px-1 rounded">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> in .env to enable address search and standardization.
-                </p>
-              )}
+              <AddressAutocomplete
+                onPlaceSelect={handleAddressSelect}
+                placeholder="Search address to auto-fill below..."
+                id="address-search"
+                label="Search address (optional)"
+                className="mb-4"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="addressLine1">Address Line 1 *</Label>

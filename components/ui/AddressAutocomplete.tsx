@@ -1,15 +1,8 @@
 'use client'
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import type { GeocoderAddressComponent, PlaceResult } from '@/types/google-maps-places'
-
-declare global {
-  interface Window {
-    __addressAutocompleteInit?: (() => void) | null
-  }
-}
 
 export interface AddressComponents {
   addressLine1: string
@@ -20,7 +13,6 @@ export interface AddressComponents {
 }
 
 interface AddressAutocompleteProps {
-  apiKey: string
   onPlaceSelect: (address: AddressComponents) => void
   placeholder?: string
   id?: string
@@ -30,44 +22,9 @@ interface AddressAutocompleteProps {
   className?: string
 }
 
-function getComponent(
-  components: GeocoderAddressComponent[],
-  type: string,
-  useShort = false
-): string {
-  const c = components.find((c) => c.types.includes(type))
-  return c ? (useShort ? c.short_name : c.long_name) : ''
-}
-
-/**
- * Parses Google address_components into a standardized format (US-style).
- * Uses locality or sublocality_level_1 for city (e.g. NYC boroughs).
- */
-export function parseAddressComponents(
-  components: GeocoderAddressComponent[]
-): AddressComponents {
-  const streetNumber = getComponent(components, 'street_number')
-  const route = getComponent(components, 'route')
-  const addressLine1 = [streetNumber, route].filter(Boolean).join(' ').trim() || ''
-  const city =
-    getComponent(components, 'locality') ||
-    getComponent(components, 'sublocality_level_1') ||
-    getComponent(components, 'sublocality')
-  const state = getComponent(components, 'administrative_area_level_1', true)
-  const zipCode =
-    getComponent(components, 'postal_code') +
-    (getComponent(components, 'postal_code_suffix') ? `-${getComponent(components, 'postal_code_suffix')}` : '')
-  return {
-    addressLine1,
-    addressLine2: null,
-    city,
-    state,
-    zipCode,
-  }
-}
+const DEBOUNCE_MS = 300
 
 export default function AddressAutocomplete({
-  apiKey,
   onPlaceSelect,
   placeholder = 'Start typing an address...',
   id = 'address-autocomplete',
@@ -76,76 +33,99 @@ export default function AddressAutocomplete({
   disabled = false,
   className,
 }: AddressAutocompleteProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [scriptLoaded, setScriptLoaded] = useState(false)
+  const [query, setQuery] = useState('')
+  const [predictions, setPredictions] = useState<Array<{ placeId: string; description: string }>>([])
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+
+  const fetchPredictions = useCallback(async (input: string) => {
+    if (input.length < 3) {
+      setPredictions([])
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/places/autocomplete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input }),
+      })
+      const data = await res.json()
+      setPredictions(data.predictions ?? [])
+      setSelectedIndex(-1)
+    } catch {
+      setPredictions([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    if (!apiKey || !inputRef.current) return
-
-    const loadScript = () => {
-      if (window.google?.maps?.places) {
-        setScriptLoaded(true)
-        return
-      }
-      if (window.__addressAutocompleteInit) return
-      const script = document.createElement('script')
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`
-      script.async = true
-      script.defer = true
-      window.__addressAutocompleteInit = () => {
-        setScriptLoaded(true)
-        window.__addressAutocompleteInit = null
-      }
-      script.onload = () => {
-        if (window.google?.maps?.places) {
-          setScriptLoaded(true)
-          window.__addressAutocompleteInit = null
-        }
-      }
-      document.head.appendChild(script)
-    }
-
-    loadScript()
-  }, [apiKey])
-
-  useEffect(() => {
-    if (!scriptLoaded || !window.google?.maps?.places || !inputRef.current) return
-
-    const input = inputRef.current
-    const autocomplete = new window.google.maps.places.Autocomplete(input, {
-      types: ['address'],
-      fields: ['place_id', 'address_components'],
-      componentRestrictions: { country: 'us' },
-    })
-
-    const handlePlaceChange = () => {
-      const place = autocomplete.getPlace()
-      if (!place?.place_id) return
-      if (place.address_components?.length) {
-        const parsed = parseAddressComponents(place.address_components)
-        onPlaceSelect(parsed)
-        if (input) input.value = place.formatted_address || ''
-        return
-      }
-      const mapDiv = document.createElement('div')
-      const service = new window.google.maps.places.PlacesService(mapDiv)
-      service.getDetails(
-        { placeId: place.place_id, fields: ['address_components'] },
-        (details: PlaceResult | null, status: string) => {
-          if (status === 'OK' && details?.address_components?.length) {
-            const parsed = parseAddressComponents(details.address_components as GeocoderAddressComponent[])
-            onPlaceSelect(parsed)
-            if (input) input.value = details.formatted_address ?? place.formatted_address ?? ''
-          }
-        }
-      )
-    }
-
-    autocomplete.addListener('place_changed', handlePlaceChange)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      fetchPredictions(query)
+      debounceRef.current = null
+    }, DEBOUNCE_MS)
     return () => {
-      window.google?.maps?.event?.clearInstanceListeners?.(autocomplete)
+      if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [scriptLoaded, onPlaceSelect])
+  }, [query, fetchPredictions])
+
+  const selectPlace = useCallback(
+    async (placeId: string, description: string) => {
+      setOpen(false)
+      setPredictions([])
+      setQuery(description)
+      setLoading(true)
+      try {
+        const res = await fetch(
+          `/api/places/details?placeId=${encodeURIComponent(placeId)}`
+        )
+        if (!res.ok) throw new Error('Details failed')
+        const address = await res.json()
+        onPlaceSelect({
+          addressLine1: address.addressLine1 ?? '',
+          addressLine2: address.addressLine2 ?? null,
+          city: address.city ?? '',
+          state: address.state ?? '',
+          zipCode: address.zipCode ?? '',
+        })
+      } catch {
+        // leave form fields unchanged
+      } finally {
+        setLoading(false)
+      }
+    },
+    [onPlaceSelect]
+  )
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!open || predictions.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSelectedIndex((i) => (i < predictions.length - 1 ? i + 1 : i))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSelectedIndex((i) => (i > 0 ? i - 1 : -1))
+    } else if (e.key === 'Enter' && selectedIndex >= 0 && predictions[selectedIndex]) {
+      e.preventDefault()
+      const p = predictions[selectedIndex]
+      selectPlace(p.placeId, p.description)
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+      setSelectedIndex(-1)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedIndex >= 0 && listRef.current) {
+      const el = listRef.current.children[selectedIndex] as HTMLElement
+      el?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [selectedIndex])
 
   return (
     <div className={className}>
@@ -154,18 +134,61 @@ export default function AddressAutocomplete({
           {label} {required && '*'}
         </Label>
       )}
-      <Input
-        ref={inputRef}
-        id={id}
-        type="text"
-        autoComplete="off"
-        placeholder={placeholder}
-        required={required}
-        disabled={disabled}
-        className="mt-1.5"
-      />
+      <div className="relative mt-1.5">
+        <Input
+          id={id}
+          type="text"
+          autoComplete="off"
+          placeholder={placeholder}
+          required={required}
+          disabled={disabled}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => predictions.length > 0 && setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
+          onKeyDown={handleKeyDown}
+          aria-expanded={open && predictions.length > 0}
+          aria-controls={`${id}-list`}
+          aria-activedescendant={
+            selectedIndex >= 0 && predictions[selectedIndex]
+              ? `${id}-opt-${selectedIndex}`
+              : undefined
+          }
+        />
+        {open && (predictions.length > 0 || loading) && (
+          <ul
+            ref={listRef}
+            id={`${id}-list`}
+            role="listbox"
+            className="absolute z-50 mt-1 w-full rounded-md border border-input bg-background py-1 shadow-lg max-h-60 overflow-auto"
+          >
+            {loading && predictions.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-muted-foreground">Searching...</li>
+            ) : (
+              predictions.map((p, i) => (
+                <li
+                  key={p.placeId}
+                  id={`${id}-opt-${i}`}
+                  role="option"
+                  aria-selected={selectedIndex === i}
+                  className={`cursor-pointer px-3 py-2 text-sm ${selectedIndex === i ? 'bg-muted' : 'hover:bg-muted/80'}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    selectPlace(p.placeId, p.description)
+                  }}
+                >
+                  {p.description}
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+      </div>
       <p className="text-xs text-muted-foreground mt-1">
-        Select an address from the dropdown to auto-fill city, state, and zip.
+        Select an address from the list to auto-fill the fields below.
       </p>
     </div>
   )
