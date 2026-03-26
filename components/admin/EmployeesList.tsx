@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select'
 import type { EmployeeListType } from '@/app/admin/employees/page'
 import RBTKanbanBoard, { type RBTKanbanProfile } from '@/components/admin/RBTKanbanBoard'
+import EmployeeDeleteSection from '@/components/admin/EmployeeDeleteSection'
 
 interface RBTProfile {
   id: string
@@ -295,6 +296,7 @@ export default function EmployeesList({
               if (currentType === 'RBT' && status) q.set('status', status)
               if (currentType === 'RBT' && search) q.set('search', search)
               const viewHref = `/admin/rbts/${rbt.id}${q.toString() ? `?${q.toString()}` : ''}`
+              const redirectHref = `/admin/employees?type=RBT${status ? `&status=${encodeURIComponent(status)}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`
               return (
                 <Card
                   key={rbt.id}
@@ -332,11 +334,27 @@ export default function EmployeesList({
                     </div>
                     <div className="flex items-center justify-between pt-4 border-t dark:border-[var(--border-subtle)]">
                       <span className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">Updated {formatDate(rbt.updatedAt)}</span>
-                      <Link href={viewHref}>
-                        <Button size="sm" variant="outline" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]">
-                          View →
-                        </Button>
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link href={viewHref}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]"
+                          >
+                            View →
+                          </Button>
+                        </Link>
+                        <EmployeeDeleteSection
+                          compact
+                          kind="RBT"
+                          displayName={`${rbt.firstName} ${rbt.lastName}`}
+                          email={rbt.email}
+                          deleteApiUrl={`/api/admin/rbts/${rbt.id}/delete`}
+                          redirectHref={redirectHref}
+                          buttonLabel="Delete"
+                          compactButtonClassName="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 dark:border-[var(--status-rejected-border)] dark:text-[var(--status-rejected-text)] px-2 py-1 text-xs rounded-md"
+                        />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

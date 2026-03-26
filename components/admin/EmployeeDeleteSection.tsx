@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Trash2, Loader2 } from 'lucide-react'
@@ -16,7 +16,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/toast'
 
-export type EmployeeDeleteKind = 'BCBA' | 'Billing' | 'Marketing' | 'Call Center' | 'Dev Team' | 'Dev Team Member'
+export type EmployeeDeleteKind =
+  | 'BCBA'
+  | 'Billing'
+  | 'Marketing'
+  | 'Call Center'
+  | 'Dev Team'
+  | 'Dev Team Member'
+  | 'RBT'
 
 interface EmployeeDeleteSectionProps {
   /** Label for the type of employee (e.g. "BCBA", "Dev Team") */
@@ -31,6 +38,12 @@ interface EmployeeDeleteSectionProps {
   redirectHref: string
   /** Optional: smaller button label (e.g. "Delete member") */
   buttonLabel?: string
+  /** Render a compact button (no border/p description). */
+  compact?: boolean
+  /** Override compact button styling (useful in cards/kanban). */
+  compactButtonClassName?: string
+  /** Stop click propagation when opening (useful for draggable cards). */
+  stopPropagationOnOpen?: boolean
 }
 
 export default function EmployeeDeleteSection({
@@ -40,6 +53,9 @@ export default function EmployeeDeleteSection({
   deleteApiUrl,
   redirectHref,
   buttonLabel,
+  compact = false,
+  compactButtonClassName,
+  stopPropagationOnOpen = false,
 }: EmployeeDeleteSectionProps) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -53,7 +69,8 @@ export default function EmployeeDeleteSection({
     confirmInput.trim() === displayName ||
     (!!email && confirmInput.trim().toLowerCase() === email.toLowerCase())
 
-  const handleOpen = () => {
+  const handleOpen = (e?: MouseEvent<HTMLButtonElement>) => {
+    if (stopPropagationOnOpen) e?.stopPropagation()
     setStep(1)
     setConfirmInput('')
     setOpen(true)
@@ -98,19 +115,33 @@ export default function EmployeeDeleteSection({
 
   return (
     <>
-      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[var(--border-subtle)]">
+      {compact ? (
         <Button
-          onClick={handleOpen}
+          onClick={(e) => handleOpen(e)}
           variant="outline"
-          className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 dark:border-[var(--status-rejected-border)] dark:text-[var(--status-rejected-text)] dark:hover:bg-[var(--status-rejected-bg)] rounded-xl px-6 w-full sm:w-auto"
+          className={
+            compactButtonClassName ??
+            'border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 dark:border-[var(--status-rejected-border)] dark:text-[var(--status-rejected-text)] px-2.5 py-1 text-xs rounded-md'
+          }
         >
-          <Trash2 className="w-4 h-4 mr-2" />
-          {buttonLabel ?? `Delete ${kind}`}
+          <Trash2 className="w-4 h-4" />
+          <span className="ml-1">{buttonLabel ?? `Delete ${kind}`}</span>
         </Button>
-        <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-2">
-          This action cannot be undone. All data will be permanently deleted.
-        </p>
-      </div>
+      ) : (
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[var(--border-subtle)]">
+          <Button
+            onClick={(e) => handleOpen(e)}
+            variant="outline"
+            className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 dark:border-[var(--status-rejected-border)] dark:text-[var(--status-rejected-text)] dark:hover:bg-[var(--status-rejected-bg)] rounded-xl px-6 w-full sm:w-auto"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            {buttonLabel ?? `Delete ${kind}`}
+          </Button>
+          <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-2">
+            This action cannot be undone. All data will be permanently deleted.
+          </p>
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={(o) => (!o ? handleClose() : null)}>
         <DialogContent className="sm:max-w-md">

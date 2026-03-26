@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/toast'
 import { ChevronDown, ChevronRight, Calendar, UserX, UserCheck } from 'lucide-react'
+import EmployeeDeleteSection from '@/components/admin/EmployeeDeleteSection'
 
 const COLUMN_COLLAPSE_KEY = 'rbt-kanban-column-collapsed'
 
@@ -87,6 +88,7 @@ export default function RBTKanbanBoard({
 }: RBTKanbanBoardProps) {
   const { showToast } = useToast()
   const [rbts, setRbts] = useState<RBTKanbanProfile[]>(initialRbts)
+  const redirectHref = `/admin/employees?type=RBT${statusFilter ? `&status=${encodeURIComponent(statusFilter)}` : ''}${searchFilter ? `&search=${encodeURIComponent(searchFilter)}` : ''}`
   const [hiredModal, setHiredModal] = useState<{
     open: boolean
     rbt: RBTKanbanProfile | null
@@ -314,6 +316,17 @@ export default function RBTKanbanBoard({
                                           View Profile
                                         </Button>
                                       </Link>
+                                      <EmployeeDeleteSection
+                                        compact
+                                        kind="RBT"
+                                        displayName={`${rbt.firstName} ${rbt.lastName}`}
+                                        email={rbt.email}
+                                        deleteApiUrl={`/api/admin/rbts/${rbt.id}/delete`}
+                                        redirectHref={redirectHref}
+                                        buttonLabel="Delete"
+                                        compactButtonClassName="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 dark:border-[var(--status-rejected-border)] dark:text-[var(--status-rejected-text)] px-2 py-1 text-xs rounded-md"
+                                        stopPropagationOnOpen
+                                      />
                                       {rbt.status === 'NEW' && (
                                         <Button
                                           size="sm"
