@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 
 export async function PATCH(
   request: NextRequest,
@@ -9,17 +8,9 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     const interview = await prisma.interview.findUnique({
       where: { id },
@@ -39,23 +30,26 @@ export async function PATCH(
       )
     }
 
-    // Update interview status
+    const body = await request.json().catch(() => ({}))
+    const decision = body?.decision === 'REJECTED' ? 'REJECTED' : body?.decision === 'OFFERED' ? 'OFFERED' : 'PENDING'
+
     await prisma.interview.update({
       where: { id },
-      data: { status: 'COMPLETED' },
+      data: { status: 'COMPLETED', decision },
     })
 
     const previousStatus = interview.rbtProfile.status
+    const newProfileStatus = decision === 'REJECTED' ? 'REJECTED' : 'INTERVIEW_COMPLETED'
     await prisma.rBTProfile.update({
       where: { id: interview.rbtProfileId },
-      data: { status: 'INTERVIEW_COMPLETED' },
+      data: { status: newProfileStatus },
     })
     await prisma.rBTAuditLog.create({
       data: {
         rbtProfileId: interview.rbtProfileId,
         auditType: 'STATUS_CHANGE',
         dateTime: new Date(),
-        notes: `Interview marked completed. Status changed from ${previousStatus} to INTERVIEW_COMPLETED`,
+        notes: `Interview marked completed (${decision}). Status changed from ${previousStatus} to ${newProfileStatus}`,
         createdBy: user?.email || user?.name || 'Admin',
       },
     })

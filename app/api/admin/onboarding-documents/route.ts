@@ -1,21 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     const documents = await prisma.onboardingDocument.findMany({
       orderBy: { sortOrder: 'asc' },
@@ -33,18 +24,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
     const formData = await request.formData()
     const documentId = formData.get('documentId') as string
     const file = formData.get('file') as File

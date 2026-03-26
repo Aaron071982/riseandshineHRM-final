@@ -1,3 +1,5 @@
+import SchedulingBeta from '@/components/admin/SchedulingBeta'
+
 export default function SchedulingBetaPage() {
-  return null
+  return <SchedulingBeta />
 }

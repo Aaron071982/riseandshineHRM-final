@@ -13,7 +13,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { formatDateTime } from '@/lib/utils'
 import { Phone, Plus, Trash2, Edit, Loader2 } from 'lucide-react'
@@ -32,9 +31,11 @@ interface AuditLog {
 interface AuditLogProps {
   rbtProfileId: string
   rbtName: string
+  /** Called after create / update / delete so parent (e.g. CRM Activity) can refresh */
+  onLogsChange?: () => void
 }
 
-export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
+export default function AuditLog({ rbtProfileId, rbtName, onLogsChange }: AuditLogProps) {
   const router = useRouter()
   const { showToast } = useToast()
   const showToastRef = useRef(showToast)
@@ -54,6 +55,11 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
   })
 
   const fetchAuditLogs = useCallback(async () => {
+    if (!rbtProfileId || rbtProfileId === 'null') {
+      setLoading(false)
+      setFetchError('No profile selected.')
+      return
+    }
     try {
       setLoading(true)
       setFetchError(null)
@@ -76,11 +82,18 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
   }, [rbtProfileId])
 
   useEffect(() => {
-    fetchAuditLogs()
-  }, [fetchAuditLogs])
+    if (rbtProfileId && rbtProfileId !== 'null') {
+      fetchAuditLogs()
+    } else {
+      setLoading(false)
+      setAuditLogs([])
+      setFetchError('No profile selected.')
+    }
+  }, [fetchAuditLogs, rbtProfileId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!rbtProfileId || rbtProfileId === 'null') return
     setSubmitting(true)
 
     try {
@@ -114,6 +127,7 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
           notes: '',
         })
         await fetchAuditLogs()
+        onLogsChange?.()
       } else {
         const data = await response.json()
         showToast(data.error || 'Failed to save audit log', 'error')
@@ -127,6 +141,7 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
   }
 
   const handleDelete = async (auditId: string) => {
+    if (!rbtProfileId || rbtProfileId === 'null') return
     if (!confirm('Are you sure you want to delete this audit log?')) {
       return
     }
@@ -134,12 +149,13 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
     try {
       const response = await fetch(
         `/api/admin/rbts/${rbtProfileId}/audit-logs/${auditId}`,
-        { method: 'DELETE' }
+        { method: 'DELETE', credentials: 'include' }
       )
 
       if (response.ok) {
         showToast('Audit log deleted successfully', 'success')
         await fetchAuditLogs()
+        onLogsChange?.()
       } else {
         const data = await response.json()
         showToast(data.error || 'Failed to delete audit log', 'error')
@@ -179,17 +195,17 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
             <Phone className="w-6 h-6 text-primary" />
             Audit Log
           </CardTitle>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={handleNew}
-                className="dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Audit Entry
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              onClick={handleNew}
+              className="dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)] dark:hover:bg-[var(--orange-hover)] border-0"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Audit Entry
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>
                   {editingLog ? 'Edit Audit Entry' : 'Add Audit Entry'}
@@ -269,8 +285,9 @@ export default function AuditLog({ rbtProfileId, rbtName }: AuditLogProps) {
                   </Button>
                 </DialogFooter>
               </form>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="relative">

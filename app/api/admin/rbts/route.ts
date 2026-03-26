@@ -1,22 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import type { Prisma } from '@prisma/client'
+import { requireAdminSession } from '@/lib/auth'
 import { sendEmail, generateManualHireOnboardingEmail, EmailTemplateType } from '@/lib/email'
+import { geocodeAddress } from '@/lib/mapbox-geocode'
+
+const RBT_STATUSES = ['NEW', 'REACH_OUT', 'REACH_OUT_EMAIL_SENT', 'TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'HIRED', 'ONBOARDING_COMPLETED', 'STALLED', 'REJECTED'] as const
+
+export async function GET(request: NextRequest) {
+  try {
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+
+    const idsOnly = request.nextUrl.searchParams.get('idsOnly') === '1'
+    const status = request.nextUrl.searchParams.get('status') || ''
+    const search = request.nextUrl.searchParams.get('search') || ''
+
+    const where: Prisma.RBTProfileWhereInput = {}
+    if (status && RBT_STATUSES.includes(status as typeof RBT_STATUSES[number])) {
+      where.status = status as Prisma.RBTProfileWhereInput['status']
+    }
+    if (search.trim()) {
+      where.OR = [
+        { firstName: { contains: search.trim(), mode: 'insensitive' } },
+        { lastName: { contains: search.trim(), mode: 'insensitive' } },
+        { email: { contains: search.trim(), mode: 'insensitive' } },
+        { phoneNumber: { contains: search.trim(), mode: 'insensitive' } },
+      ]
+    }
+
+    if (idsOnly) {
+      const profiles = await prisma.rBTProfile.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        select: { id: true },
+      })
+      return NextResponse.json({ ids: profiles.map((p) => p.id) })
+    }
+
+    return NextResponse.json({ error: 'Use idsOnly=1 for list' }, { status: 400 })
+  } catch (error) {
+    console.error('Error in GET /api/admin/rbts:', error)
+    return NextResponse.json({ error: 'Failed to fetch RBT list' }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     const formData = await request.formData()
 
@@ -107,6 +140,23 @@ export async function POST(request: NextRequest) {
         cprFirstAidCertified: data.cprFirstAidCertified,
       },
     })
+
+    // Auto-geocode address (fire-and-forget)
+    if (data.addressLine1 || data.locationCity || data.locationState) {
+      geocodeAddress(
+        data.addressLine1 || null,
+        data.locationCity || null,
+        data.locationState || null,
+        data.zipCode || null
+      ).then((result) => {
+        if (result) {
+          prisma.rBTProfile.update({
+            where: { id: rbtProfile.id },
+            data: { latitude: result.lat, longitude: result.lng },
+          }).catch((e) => console.error('[POST rbts] geocode update', e))
+        }
+      }).catch((e) => console.error('[POST rbts] geocode', e))
+    }
 
     // Handle documents if provided
     const files = formData.getAll('documents') as File[]

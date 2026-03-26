@@ -25,6 +25,18 @@ interface AdminOnboardingOverrideProps {
     sortOrder: number
   }>
   scheduleCompleted: boolean
+  onTasksChange?: (nextTasks: Array<{
+    id: string
+    taskType: string
+    title: string
+    description: string | null
+    isCompleted: boolean
+    completedAt: Date | null
+    uploadUrl: string | null
+    documentDownloadUrl: string | null
+    sortOrder: number
+  }>) => void
+  onScheduleCompletedChange?: (next: boolean) => void
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -35,6 +47,8 @@ export default function AdminOnboardingOverride({
   rbtName,
   onboardingTasks,
   scheduleCompleted,
+  onTasksChange,
+  onScheduleCompletedChange,
 }: AdminOnboardingOverrideProps) {
   const router = useRouter()
   const { showToast } = useToast()
@@ -42,12 +56,22 @@ export default function AdminOnboardingOverride({
   const [loadingSchedule, setLoadingSchedule] = useState(true)
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set())
   const [uploadingPackage, setUploadingPackage] = useState(false)
+  const [localTasks, setLocalTasks] = useState(onboardingTasks)
+  const [localScheduleCompleted, setLocalScheduleCompleted] = useState(scheduleCompleted)
 
   // Load existing availability on mount
   useEffect(() => {
     fetchExistingAvailability()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rbtProfileId])
+
+  useEffect(() => {
+    setLocalTasks(onboardingTasks)
+  }, [onboardingTasks])
+
+  useEffect(() => {
+    setLocalScheduleCompleted(scheduleCompleted)
+  }, [scheduleCompleted])
 
   const fetchExistingAvailability = async () => {
     try {
@@ -95,6 +119,11 @@ export default function AdminOnboardingOverride({
 
       if (response.ok) {
         showToast('Task marked as complete', 'success')
+        setLocalTasks((prev) => {
+          const next = prev.map((t) => (t.id === taskId ? { ...t, isCompleted: true, completedAt: new Date() } : t))
+          onTasksChange?.(next)
+          return next
+        })
       } else {
         const data = await response.json()
         showToast(data.error || 'Failed to complete task', 'error')
@@ -102,6 +131,35 @@ export default function AdminOnboardingOverride({
     } catch (error) {
       console.error('Error completing task:', error)
       showToast('An error occurred while completing task', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUncompleteTask = async (taskId: string) => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/admin/rbts/${rbtProfileId}/onboarding/uncomplete-task`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId }),
+        credentials: 'include',
+      })
+
+      if (response.ok) {
+        showToast('Task reverted to pending', 'success')
+        setLocalTasks((prev) => {
+          const next = prev.map((t) => (t.id === taskId ? { ...t, isCompleted: false, completedAt: null } : t))
+          onTasksChange?.(next)
+          return next
+        })
+      } else {
+        const data = await response.json()
+        showToast(data.error || 'Failed to revert task', 'error')
+      }
+    } catch (error) {
+      console.error('Error reverting onboarding task:', error)
+      showToast('An error occurred while reverting task', 'error')
     } finally {
       setLoading(false)
     }
@@ -160,6 +218,8 @@ export default function AdminOnboardingOverride({
 
       if (response.ok) {
         showToast('Schedule set successfully', 'success')
+        setLocalScheduleCompleted(true)
+        onScheduleCompletedChange?.(true)
       } else {
         const data = await response.json()
         showToast(data.error || 'Failed to set schedule', 'error')
@@ -172,8 +232,7 @@ export default function AdminOnboardingOverride({
     }
   }
 
-  const packageTask = onboardingTasks.find((t) => t.taskType === 'PACKAGE_UPLOAD')
-  const incompleteTasks = onboardingTasks.filter((t) => !t.isCompleted)
+  const tasks = localTasks
 
   return (
     <Card className="border-2 border-orange-200 dark:border-[var(--border-subtle)] bg-gradient-to-br from-orange-50/50 to-white dark:from-[var(--bg-elevated)] dark:to-[var(--bg-elevated)]">
@@ -186,49 +245,94 @@ export default function AdminOnboardingOverride({
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Incomplete Tasks List */}
-        {incompleteTasks.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Incomplete Tasks</h3>
-            {incompleteTasks.map((task) => (
+        {/* Tasks List (editable) */}
+        <div className="space-y-3">
+          <h3 className="font-semibold text-gray-900 dark:text-white">Onboarding Tasks</h3>
+          {tasks.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)]">No onboarding tasks found.</p>
+          ) : (
+            tasks.map((task) => (
               <div key={task.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 bg-white dark:bg-[var(--bg-input)]">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <XCircle className="w-5 h-5 text-gray-400 dark:text-[var(--text-tertiary)]" />
+                      {task.isCompleted ? (
+                        <CheckCircle2 className="w-5 h-5 text-green-500 dark:text-[var(--status-hired-text)]" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-gray-400 dark:text-[var(--text-tertiary)]" />
+                      )}
                       <h4 className="font-medium text-gray-900 dark:text-white">{task.title}</h4>
                     </div>
                     {task.description && (
                       <p className="text-sm text-gray-600 dark:text-white mt-1 ml-7">{task.description}</p>
                     )}
+                    {task.isCompleted && task.completedAt && (
+                      <p className="text-xs text-gray-500 dark:text-[var(--text-tertiary)] mt-1 ml-7">
+                        Completed: {formatDateTime(task.completedAt)}
+                      </p>
+                    )}
                   </div>
+
                   {task.taskType === 'PACKAGE_UPLOAD' ? (
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 items-end">
                       <label
-                        htmlFor="package-upload-override"
+                        htmlFor={`package-upload-override-${task.id}`}
                         className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-[var(--border-subtle)] rounded-md cursor-pointer hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)] transition-colors text-sm text-gray-700 dark:text-white"
                       >
                         <Upload className="w-4 h-4" />
                         {uploadingPackage ? 'Uploading...' : 'Upload Package'}
                       </label>
                       <input
-                        id="package-upload-override"
+                        id={`package-upload-override-${task.id}`}
                         type="file"
                         multiple
                         onChange={handleUploadPackage}
                         className="hidden"
                         disabled={uploadingPackage}
                       />
+                      {task.isCompleted ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-300 text-red-600 hover:bg-red-50 dark:border-[var(--border-subtle)] dark:text-red-400"
+                          onClick={() => handleUncompleteTask(task.id)}
+                          disabled={loading}
+                        >
+                          Mark Incomplete
+                        </Button>
+                      ) : null}
                     </div>
                   ) : task.taskType === 'SIGNATURE' ? (
+                    task.isCompleted ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-300 text-red-600 hover:bg-red-50 dark:border-[var(--border-subtle)] dark:text-red-400"
+                        onClick={() => handleUncompleteTask(task.id)}
+                        disabled={loading}
+                      >
+                        Mark Incomplete
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => handleCompleteTask(task.id)}
+                        disabled={loading}
+                        className="bg-orange-500 hover:bg-orange-600"
+                      >
+                        <Check className="w-4 h-4 mr-1" />
+                        Mark Signed
+                      </Button>
+                    )
+                  ) : task.isCompleted ? (
                     <Button
                       size="sm"
-                      onClick={() => handleCompleteTask(task.id)}
+                      variant="outline"
+                      onClick={() => handleUncompleteTask(task.id)}
                       disabled={loading}
-                      className="bg-orange-500 hover:bg-orange-600"
+                      className="border-red-300 text-red-600 hover:bg-red-50 dark:border-[var(--border-subtle)] dark:text-red-400"
                     >
-                      <Check className="w-4 h-4 mr-1" />
-                      Mark Signed
+                      Mark Incomplete
                     </Button>
                   ) : (
                     <Button
@@ -244,18 +348,17 @@ export default function AdminOnboardingOverride({
                   )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
 
         {/* Schedule Setup */}
-        {!scheduleCompleted && (
-          <div className="space-y-3 border-t dark:border-[var(--border-subtle)] pt-4">
+        <div className="space-y-3 border-t dark:border-[var(--border-subtle)] pt-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-orange-500" />
-                  Set Weekly Availability
+                  {localScheduleCompleted ? 'Update Weekly Availability' : 'Set Weekly Availability'}
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-white mt-1">
                   Set the weekly schedule for {rbtName}
@@ -320,19 +423,18 @@ export default function AdminOnboardingOverride({
               </p>
             </div>
           </div>
-        )}
 
         {/* Summary */}
         <div className="border-t dark:border-[var(--border-subtle)] pt-4">
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600 dark:text-white">
-              Completed: {onboardingTasks.filter((t) => t.isCompleted).length} / {onboardingTasks.length} tasks
+              Completed: {localTasks.filter((t) => t.isCompleted).length} / {localTasks.length} tasks
             </span>
             <Badge
-              variant={scheduleCompleted ? 'default' : 'outline'}
-              className={scheduleCompleted ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'dark:border-[var(--border-subtle)] dark:text-white'}
+              variant={localScheduleCompleted ? 'default' : 'outline'}
+              className={localScheduleCompleted ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'dark:border-[var(--border-subtle)] dark:text-white'}
             >
-              Schedule: {scheduleCompleted ? 'Completed' : 'Pending'}
+              Schedule: {localScheduleCompleted ? 'Completed' : 'Pending'}
             </Badge>
           </div>
         </div>

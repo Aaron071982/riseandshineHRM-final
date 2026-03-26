@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -11,12 +10,9 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET() {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    if (!sessionToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     const list = await prisma.schedulingClient.findMany({
       orderBy: { name: 'asc' },
@@ -46,13 +42,8 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    if (!sessionToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
     const body = await req.json().catch(() => ({}))
     const name = typeof body.name === 'string' ? body.name.trim() : ''
     if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })

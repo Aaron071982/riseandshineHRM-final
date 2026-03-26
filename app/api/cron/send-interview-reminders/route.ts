@@ -1,3 +1,8 @@
+/**
+ * 30-minute interview reminder cron.
+ * Sends reminders for interviews in the next 30 minutes. Uses Interview.reminderSentAt to avoid duplicate sends.
+ * Auth: CRON_SECRET (Bearer header). This endpoint is separate from the 15m reminder (interview-reminders/route.ts).
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -5,13 +10,11 @@ import {
   generateInterviewReminderEmail,
   EmailTemplateType,
 } from '@/lib/email'
+import { assertCronOrResponse } from '@/lib/cron-auth'
 
 export async function GET(request: NextRequest) {
-  // Verify this is a cron request (optional: add authentication)
-  const authHeader = request.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = assertCronOrResponse(request)
+  if (auth) return auth
 
   try {
     const now = new Date()

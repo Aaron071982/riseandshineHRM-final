@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
-import { sendEmail, generateOfferEmail, EmailTemplateType } from '@/lib/email'
+import { requireAdminSession } from '@/lib/auth'
+import { getWorkflowSettings } from '@/lib/workflow-settings'
+import { sendEmail, sendGenericEmail, generateOfferEmail, EmailTemplateType } from '@/lib/email'
+import { makePublicUrl } from '@/lib/baseUrl'
 
 export async function POST(
   request: NextRequest,
@@ -10,17 +11,9 @@ export async function POST(
 ) {
   const { id } = await params
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     const rbtProfile = await prisma.rBTProfile.findUnique({
       where: { id },
@@ -293,8 +286,10 @@ export async function POST(
       }
     }
 
-    // Send welcome email
-    if (rbtProfile.email) {
+    const workflow = await getWorkflowSettings()
+
+    // Send welcome email (gated by workflow)
+    if (workflow.emailHired && rbtProfile.email) {
       const emailContent = generateOfferEmail(rbtProfile)
       await sendEmail({
         to: rbtProfile.email,
@@ -303,6 +298,36 @@ export async function POST(
         templateType: EmailTemplateType.OFFER,
         rbtProfileId: rbtProfile.id,
       })
+    }
+
+    // Notify all admins (email + in-app notification)
+    if (workflow.notifyAdminsHired) {
+      const admins = await prisma.user.findMany({
+        where: { role: 'ADMIN', isActive: true },
+        select: { id: true, email: true },
+      })
+      const profileUrl = makePublicUrl(`/admin/rbts/${rbtProfile.id}`)
+      const rbtName = `${rbtProfile.firstName} ${rbtProfile.lastName}`
+      const adminSubject = `New RBT hired: ${rbtName}`
+      const adminHtml = `
+        <p>${rbtName} has been hired and added to the Rise and Shine team.</p>
+        <p><a href="${profileUrl}" style="color: #E4893D;">View profile</a></p>
+      `
+      for (const admin of admins) {
+        if (admin.email) {
+          sendGenericEmail(admin.email, adminSubject, `<div style="font-family: sans-serif;">${adminHtml}</div>`).catch((e) =>
+            console.error('Admin hire notification email failed:', e)
+          )
+        }
+        await prisma.adminNotification.create({
+          data: {
+            userId: admin.id,
+            type: 'CANDIDATE_HIRED',
+            message: `Candidate hired: ${rbtName}`,
+            linkUrl: profileUrl,
+          },
+        }).catch((e) => console.error('Admin notification create failed:', e))
+      }
     }
 
     // Track form submission

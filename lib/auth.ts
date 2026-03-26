@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
 import { prisma } from './prisma'
 import crypto from 'crypto'
 
@@ -65,15 +66,45 @@ function normalizeRole(role: string | null | undefined): SessionUserRole | null 
   return VALID_ROLES.includes(r as SessionUserRole) ? (r as SessionUserRole) : null
 }
 
+/**
+ * Session lookups sometimes omit `rbtProfile` (Prisma fallback / raw SQL). Messaging and other
+ * RBT routes require `rbtProfileId` — resolve it from `users.id` when missing.
+ */
+export async function attachRbtProfileIdIfNeeded(user: SessionUser): Promise<SessionUser> {
+  if (user.rbtProfileId) return user
+  if (user.role !== 'RBT' && user.role !== 'CANDIDATE') return user
+  try {
+    const rp = await prisma.rBTProfile.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    })
+    if (rp?.id) {
+      return { ...user, rbtProfileId: rp.id }
+    }
+  } catch {
+    // ignore
+  }
+  return user
+}
+
 /** Raw SQL fallback when Prisma fails (e.g. schema/connection issues). */
 async function validateSessionRawSql(token: string): Promise<SessionUser | null> {
   try {
     const rows = await prisma.$queryRaw<
-      Array<{ id: string; role: string; email: string | null; phoneNumber: string | null; name: string | null; expiresAt: Date }>
+      Array<{
+        id: string
+        role: string
+        email: string | null
+        phoneNumber: string | null
+        name: string | null
+        expiresAt: Date
+        rbtProfileId: string | null
+      }>
     >`
-      SELECT u.id, u.role, u.email, u."phoneNumber", u.name, s."expiresAt"
+      SELECT u.id, u.role, u.email, u."phoneNumber", u.name, s."expiresAt", rp.id AS "rbtProfileId"
       FROM sessions s
       JOIN users u ON u.id = s."userId"
+      LEFT JOIN rbt_profiles rp ON rp."userId" = u.id
       WHERE s.token = ${token}
       LIMIT 1
     `
@@ -81,24 +112,43 @@ async function validateSessionRawSql(token: string): Promise<SessionUser | null>
     if (!row || row.expiresAt < new Date()) return null
     const role = normalizeRole(row.role)
     if (!role) return null
-    return {
+    return attachRbtProfileIdIfNeeded({
       id: row.id,
       phoneNumber: row.phoneNumber,
       role,
       name: row.name,
       email: row.email,
-      rbtProfileId: null,
-    }
+      rbtProfileId: row.rbtProfileId ?? null,
+    })
   } catch (err) {
     console.error('[auth][validateSessionRawSql]', (err as Error)?.message?.slice(0, 200))
     return null
   }
 }
 
+/** Magic token set by verify-otp dev bypass (localhost + OTP 123456). Not in DB; validateSession accepts it so redirect to dashboard works. */
+export const LOCAL_DEV_SESSION_TOKEN = 'local-dev-session'
+
 export async function validateSession(token: string): Promise<SessionUser | null> {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth:validateSession','message':'entry',data:{hasToken:!!token,len:token?.length??0},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-  // #endregion
+  // Localhost / non-production dev bypass only — never honor this cookie in production (forged cookie risk).
+  if (
+    token === LOCAL_DEV_SESSION_TOKEN &&
+    process.env.NODE_ENV !== 'production'
+  ) {
+    await prisma.user.upsert({
+      where: { id: 'local-dev-admin' },
+      update: {},
+      create: { id: 'local-dev-admin', name: 'Local Dev Admin', email: 'dev@riseandshine.local', role: 'ADMIN', isActive: true },
+    }).catch(() => {})
+    return {
+      id: 'local-dev-admin',
+      phoneNumber: null,
+      role: 'ADMIN',
+      name: 'Local Dev Admin',
+      email: 'dev@riseandshine.local',
+      rbtProfileId: null,
+    }
+  }
   const log = (msg: string, data?: object) =>
     console.log('[auth][validateSession]', msg, data ?? '')
 
@@ -139,16 +189,10 @@ export async function validateSession(token: string): Promise<SessionUser | null
     }
 
     if (!session) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth:validateSession','message':'no session row',data:{},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
       log('no session found for token')
       return null
     }
     if (session.expiresAt < new Date()) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth:validateSession','message':'session expired',data:{expiresAt:(session.expiresAt as Date).toISOString()},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
       log('session expired', { expiresAt: session.expiresAt.toISOString() })
       return null
     }
@@ -163,21 +207,15 @@ export async function validateSession(token: string): Promise<SessionUser | null
       return null
     }
     log('valid', { userId: user.id, role })
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth:validateSession','message':'valid',data:{userId:user.id,role},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
-    return {
+    return attachRbtProfileIdIfNeeded({
       id: user.id,
       phoneNumber: user.phoneNumber,
       role,
       name: user.name,
       email: user.email,
       rbtProfileId: user.rbtProfile?.id ?? null,
-    }
+    })
   } catch (err: unknown) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth:validateSession','message':'threw→raw',data:{msg:(err as Error)?.message?.slice(0,80)},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
     log('validateSession threw, using raw SQL', { message: (err as Error)?.message?.slice(0, 120) })
     return validateSessionRawSql(token)
   }
@@ -215,4 +253,28 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const token = cookieStore.get('session')?.value
   if (!token) return null
   return validateSession(token)
+}
+
+/**
+ * For admin API Route Handlers: validates session and admin role.
+ * Returns { user, response: null } if authorized, or { user: null, response: NextResponse } to return.
+ * Usage: const auth = await requireAdminSession(); if (auth.response) return auth.response;
+ */
+export async function requireAdminSession(): Promise<
+  | { user: SessionUser; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const cookieStore = await cookies()
+  const sessionToken = cookieStore.get('session')?.value
+  if (!sessionToken) {
+    return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+  const user = await validateSession(sessionToken)
+  if (!user) {
+    return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+  if (!isAdmin(user)) {
+    return { user: null, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+  return { user, response: null }
 }

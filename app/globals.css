@@ -204,6 +204,16 @@
       background-position: 1000px 0;
     }
   }
+
+  @keyframes confetti-fall {
+    to {
+      transform: translateY(100vh) rotate(720deg);
+      opacity: 0;
+    }
+  }
+  .animate-confetti-fall {
+    animation: confetti-fall 2.5s ease-out forwards;
+  }
   
   .gradient-primary {
     background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%);
@@ -423,6 +433,26 @@
     .bubble-animation-delayed,
     .bubble-animation-delayed-2,
     .bubble-animation-delayed-3 {
+      animation: none;
+    }
+  }
+
+  /* Org chart (React Flow) edges */
+  .org-chart-edge-stroke {
+    stroke: #f97316;
+    stroke-width: 2px;
+  }
+  .org-chart-edge-animated {
+    stroke-dasharray: 6 10;
+    animation: orgChartFlow 1.2s linear infinite;
+  }
+  @keyframes orgChartFlow {
+    to {
+      stroke-dashoffset: -32;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .org-chart-edge-animated {
       animation: none;
     }
   }

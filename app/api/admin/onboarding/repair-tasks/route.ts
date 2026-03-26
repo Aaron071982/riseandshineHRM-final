@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 
 /** Canonical onboarding task list: 5 HIPAA + optional 40-hour + signature = 6 or 7 tasks (must match hire route and RBT dashboard). */
 function buildCanonicalTasks(needsFortyHourCourse: boolean) {
@@ -64,12 +63,9 @@ function buildCanonicalTasks(needsFortyHourCourse: boolean) {
 
 export async function POST() {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    if (!sessionToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     const hired = await prisma.rBTProfile.findMany({
       where: { status: 'HIRED' },

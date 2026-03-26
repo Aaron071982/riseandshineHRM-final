@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Circle, Loader2 } from 'lucide-react'
@@ -93,18 +93,14 @@ export default function ScheduleSetup({ rbtProfileId, onComplete }: ScheduleSetu
     return `${hour - 12}:00 PM`
   }
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="p-12 text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-orange-600" />
-          <p className="text-gray-600">Loading your schedule...</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
+  return loading ? (
+    <Card>
+      <CardContent className="p-12 text-center">
+        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-orange-600" />
+        <p className="text-gray-600">Loading your schedule...</p>
+      </CardContent>
+    </Card>
+  ) : (
     <Card>
       <CardHeader>
         <CardTitle>Set Your Weekly Schedule</CardTitle>
@@ -129,8 +125,8 @@ export default function ScheduleSetup({ rbtProfileId, onComplete }: ScheduleSetu
 
                 {/* Time slots */}
                 {HOURS.map((hour) => (
-                  <>
-                    <div key={`time-${hour}`} className="text-sm text-gray-600 p-2 border-r">
+                  <React.Fragment key={hour}>
+                    <div className="text-sm text-gray-600 p-2 border-r">
                       {formatHour(hour)} - {formatHour(hour + 1)}
                     </div>
                     {DAYS.map((_, dayOfWeek) => {
@@ -158,7 +154,7 @@ export default function ScheduleSetup({ rbtProfileId, onComplete }: ScheduleSetu
                         </button>
                       )
                     })}
-                  </>
+                  </React.Fragment>
                 ))}
               </div>
             </div>
@@ -194,6 +190,6 @@ export default function ScheduleSetup({ rbtProfileId, onComplete }: ScheduleSetu
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 

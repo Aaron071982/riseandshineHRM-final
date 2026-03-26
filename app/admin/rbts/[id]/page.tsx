@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import RBTProfileView from '@/components/admin/RBTProfileView'
+import RBTProfileCRMLayout from '@/components/admin/RBTProfileCRMLayout'
 
 const rbtProfileInclude = {
   user: true,
@@ -18,6 +18,7 @@ const rbtProfileInclude = {
       documentId: true,
       status: true,
       completedAt: true,
+      signedPdfUrl: true,
       acknowledgmentJson: true,
       document: { select: { id: true, title: true, type: true } },
     },
@@ -68,6 +69,7 @@ async function loadRbtProfileMinimalRaw(
       documentId: string
       status: string
       completedAt: Date | null
+      signedPdfUrl: string | null
       acknowledgmentJson: unknown
       document_title: string
       document_type: string
@@ -94,6 +96,7 @@ async function loadRbtProfileMinimalRaw(
                oc."documentId",
                oc.status,
                oc."completedAt",
+               oc."signedPdfUrl",
                oc."acknowledgmentJson",
                od.title AS document_title,
                od.type  AS document_type
@@ -133,6 +136,7 @@ async function loadRbtProfileMinimalRaw(
       documentId: c.documentId,
       status: c.status,
       completedAt: c.completedAt,
+      signedPdfUrl: c.signedPdfUrl ?? null,
       acknowledgmentJson: c.acknowledgmentJson,
       document: {
         id: c.documentId,
@@ -256,6 +260,7 @@ async function loadRbtProfileRaw(
       documentId: string
       status: string
       completedAt: Date | null
+      signedPdfUrl: string | null
       acknowledgmentJson: unknown
       document_title: string
       document_type: string
@@ -282,6 +287,7 @@ async function loadRbtProfileRaw(
                oc."documentId",
                oc.status,
                oc."completedAt",
+               oc."signedPdfUrl",
                oc."acknowledgmentJson",
                od.title AS document_title,
                od.type  AS document_type
@@ -321,6 +327,7 @@ async function loadRbtProfileRaw(
       documentId: c.documentId,
       status: c.status,
       completedAt: c.completedAt,
+      signedPdfUrl: c.signedPdfUrl ?? null,
       acknowledgmentJson: c.acknowledgmentJson,
       document: {
         id: c.documentId,
@@ -406,10 +413,16 @@ function ProfileUnavailable() {
 
 export default async function RBTProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ status?: string; search?: string; type?: string }>
 }) {
   const { id } = await params
+  const search = await searchParams
+  if (!id || id === 'null' || id.trim() === '') {
+    notFound()
+  }
   let rbtProfile: RBTProfileWithRelations | null = null
   try {
     rbtProfile = await prisma.rBTProfile.findUnique({
@@ -417,13 +430,9 @@ export default async function RBTProfilePage({
       include: rbtProfileInclude,
     })
   } catch (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin/rbts/[id]','message':'prisma throw',data:{rbtId:id,msg:(error as Error)?.message?.slice(0,80)},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
-    // #endregion
     console.error('Admin rbts [id]: failed to load profile', error)
     rbtProfile = await loadRbtProfileRaw(id)
     if (!rbtProfile) {
-      fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin/rbts/[id]','message':'ProfileUnavailable after throw',data:{rbtId:id},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
       return <ProfileUnavailable />
     }
   }
@@ -435,7 +444,6 @@ export default async function RBTProfilePage({
     if (exists?.length) {
       rbtProfile = await loadRbtProfileRaw(id)
       if (!rbtProfile) {
-        fetch('http://127.0.0.1:7242/ingest/3b5b3be0-730f-42a8-8e8a-282e15fc296a',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'admin/rbts/[id]','message':'ProfileUnavailable exists but raw failed',data:{rbtId:id},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
         return <ProfileUnavailable />
       }
     } else {
@@ -443,6 +451,6 @@ export default async function RBTProfilePage({
     }
   }
 
-  return <RBTProfileView rbtProfile={rbtProfile} />
+  return <RBTProfileCRMLayout rbtProfile={rbtProfile} searchParams={search} />
 }
 

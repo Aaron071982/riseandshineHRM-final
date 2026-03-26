@@ -1,27 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 import {
   sendEmail,
   generateInterviewInviteEmail,
   EmailTemplateType,
 } from '@/lib/email'
+import { sendGenericEmail } from '@/lib/email/core'
+import { generateInterviewScheduledAdminEmail } from '@/lib/email/generators'
+import { makePublicUrl } from '@/lib/baseUrl'
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
     const data = await request.json()
     const scheduledAt = new Date(data.scheduledAt)
     const durationMinutes = data.durationMinutes ?? 30
@@ -114,6 +107,57 @@ export async function POST(request: NextRequest) {
       }
     } else {
       console.warn(`⚠️ No email address found for RBT profile ${data.rbtProfileId} - interview created but no email sent`)
+    }
+
+    // Notify all other admins about the new interview
+    try {
+      if (!rbtProfile) {
+        console.warn(`Skipping admin notifications: RBT profile not found for ${data.rbtProfileId}`)
+      } else {
+        const candidateName = `${rbtProfile.firstName} ${rbtProfile.lastName}`
+        const interviewLink = makePublicUrl(`/admin/interviews`)
+        const claimLink = makePublicUrl(`/admin/interviews`)
+
+        const allAdmins = await prisma.user.findMany({
+          where: { role: 'ADMIN', isActive: true },
+          select: { id: true, email: true, name: true },
+        })
+
+        for (const admin of allAdmins) {
+          if (admin.id === user.id) continue
+          try {
+            if (admin.email) {
+              const { subject, html } = generateInterviewScheduledAdminEmail(
+                candidateName,
+                scheduledAt,
+                interview.meetingUrl,
+                interviewLink,
+                claimLink
+              )
+              await sendGenericEmail(admin.email, subject, html)
+            }
+
+            await prisma.adminNotification.create({
+              data: {
+                userId: admin.id,
+                type: 'INTERVIEW_SCHEDULED',
+                message: `New interview scheduled: ${candidateName} at ${scheduledAt.toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  timeZone: 'America/New_York',
+                })}`,
+                linkUrl: '/admin/interviews',
+              },
+            })
+          } catch (e) {
+            console.error(`Failed to notify admin ${admin.email}:`, e)
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to send admin notifications:', e)
     }
 
     return NextResponse.json({ id: interview.id, success: true })

@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
       'phoneNumber',
       'zipCode',
       'addressLine1',
+      'gender',
       'ethnicity',
       'fortyHourCourseCompleted',
       'authorizedToWork',
@@ -82,6 +83,14 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
+    }
+
+    const validGenders = ['Male', 'Female']
+    if (!validGenders.includes(body.gender)) {
+      return NextResponse.json(
+        { error: 'Gender must be Male or Female' },
+        { status: 400 }
+      )
     }
 
     const validEthnicities = ['WHITE', 'ASIAN', 'BLACK', 'HISPANIC', 'SOUTH_ASIAN', 'MIDDLE_EASTERN']
@@ -205,7 +214,7 @@ export async function POST(request: NextRequest) {
           zipCode: body.zipCode,
           addressLine1: body.addressLine1,
           addressLine2: body.addressLine2 || null,
-          gender: null,
+          gender: body.gender || null,
           ethnicity: body.ethnicity ? (body.ethnicity as any) : null,
           fortyHourCourseCompleted: body.fortyHourCourseCompleted === 'true',
           status: 'NEW',
@@ -337,6 +346,29 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('Error sending notification emails:', error)
       // Don't fail the request if emails fail
+    }
+
+    // In-app notifications for all admins
+    try {
+      const { makePublicUrl } = await import('@/lib/baseUrl')
+      const admins = await prisma.user.findMany({
+        where: { role: 'ADMIN', isActive: true },
+        select: { id: true },
+      })
+      const profileUrl = makePublicUrl(`/admin/rbts/${rbtProfile.id}`)
+      const message = `New candidate applied: ${rbtProfile.firstName} ${rbtProfile.lastName}`
+      for (const admin of admins) {
+        await prisma.adminNotification.create({
+          data: {
+            userId: admin.id,
+            type: 'NEW_APPLICATION',
+            message,
+            linkUrl: profileUrl,
+          },
+        })
+      }
+    } catch (error) {
+      console.error('Error creating admin notifications:', error)
     }
 
     return NextResponse.json({

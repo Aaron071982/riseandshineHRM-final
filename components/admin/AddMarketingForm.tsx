@@ -1,50 +1,35 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
+import { useAdminFormSubmit } from '@/lib/useAdminFormSubmit'
 
 export default function AddMarketingForm() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const { submit, loading, error, goCancel } = useAdminFormSubmit({
+    defaultError: 'Failed to create marketing profile',
+    cancelRedirect: '/admin/employees',
+  })
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setError('')
-    setLoading(true)
     const form = e.currentTarget
     const formData = new FormData(form)
-    try {
-      const res = await fetch('/api/admin/employees/marketing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: (formData.get('fullName') as string)?.trim(),
-          email: (formData.get('email') as string)?.trim() || undefined,
-          phone: (formData.get('phone') as string)?.trim() || undefined,
-          title: (formData.get('title') as string)?.trim() || undefined,
-          campaigns: (formData.get('campaigns') as string)?.trim() || undefined,
-          notes: (formData.get('notes') as string)?.trim() || undefined,
-          status: (formData.get('status') as string)?.trim() || undefined,
-        }),
-        credentials: 'include',
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || 'Failed to create marketing profile')
-        setLoading(false)
-        return
-      }
-      router.push(`/admin/employees/marketing/${data.id}`)
-    } catch {
-      setError('An error occurred. Please try again.')
-      setLoading(false)
-    }
+    await submit({
+      url: '/api/admin/employees/marketing',
+      body: {
+        fullName: (formData.get('fullName') as string)?.trim(),
+        email: (formData.get('email') as string)?.trim() || undefined,
+        phone: (formData.get('phone') as string)?.trim() || undefined,
+        title: (formData.get('title') as string)?.trim() || undefined,
+        campaigns: (formData.get('campaigns') as string)?.trim() || undefined,
+        notes: (formData.get('notes') as string)?.trim() || undefined,
+        status: (formData.get('status') as string)?.trim() || undefined,
+      },
+      successRedirect: (data) => `/admin/employees/marketing/${data.id}`,
+    })
   }
 
   return (
@@ -95,7 +80,7 @@ export default function AddMarketingForm() {
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {loading ? 'Creating...' : 'Add Marketing'}
             </Button>
-            <Button type="button" variant="outline" onClick={() => router.push('/admin/employees')}>
+            <Button type="button" variant="outline" onClick={goCancel}>
               Cancel
             </Button>
           </div>

@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runExpirationEngine } from '@/lib/compliance/expiration'
+import { assertCronOrResponse } from '@/lib/cron-auth'
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = assertCronOrResponse(request)
+  if (auth) return auth
 
   try {
     await runExpirationEngine()

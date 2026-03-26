@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
+import { getWorkflowSettings } from '@/lib/workflow-settings'
 import { sendEmail, generateRejectionEmail, EmailTemplateType } from '@/lib/email'
 
 export async function POST(
@@ -10,17 +10,9 @@ export async function POST(
 ) {
   const { id } = await params
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     const rbtProfile = await prisma.rBTProfile.findUnique({
       where: { id },
@@ -61,8 +53,9 @@ export async function POST(
       })
     }
 
-    // Send rejection email if email is available
-    if (rbtProfile.email) {
+    // Send rejection email if workflow enabled and email is available
+    const workflow = await getWorkflowSettings()
+    if (workflow.emailRejection && rbtProfile.email) {
       const emailContent = generateRejectionEmail(rbtProfile)
       await sendEmail({
         to: rbtProfile.email,

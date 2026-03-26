@@ -41,10 +41,16 @@ export async function GET(request: NextRequest) {
     })
 
     if (existingInterview) {
-      return NextResponse.json({ 
-        valid: false, 
-        error: 'You already have a scheduled interview. Please contact support if you need to reschedule.' 
-      }, { status: 400 })
+      return NextResponse.json({
+        valid: true,
+        rbtName: `${rbtProfile.firstName} ${rbtProfile.lastName}`,
+        existingInterview: {
+          scheduledAt: existingInterview.scheduledAt.toISOString(),
+          durationMinutes: existingInterview.durationMinutes,
+          interviewerName: existingInterview.interviewerName,
+          meetingUrl: existingInterview.meetingUrl,
+        },
+      })
     }
 
     return NextResponse.json({

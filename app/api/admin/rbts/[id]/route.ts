@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
+import { geocodeAddress } from '@/lib/mapbox-geocode'
 
 // PATCH: Update RBT profile
 export async function PATCH(
@@ -9,19 +9,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
     const { id } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     const data = await request.json()
 
     // Validate required fields
@@ -48,6 +38,7 @@ export async function PATCH(
         preferredServiceArea: data.preferredServiceArea || null,
         notes: data.notes || null,
         gender: data.gender || null,
+        ethnicity: data.ethnicity || null,
         fortyHourCourseCompleted: data.fortyHourCourseCompleted ?? false,
       },
       include: {
@@ -63,7 +54,7 @@ export async function PATCH(
     })
 
     // Also update user email and name if they changed
-    if (data.email !== updatedProfile.email || 
+    if (data.email !== updatedProfile.email ||
         `${data.firstName} ${data.lastName}` !== `${updatedProfile.firstName} ${updatedProfile.lastName}`) {
       await prisma.user.update({
         where: { id: updatedProfile.userId },
@@ -72,6 +63,24 @@ export async function PATCH(
           name: `${data.firstName} ${data.lastName}`,
         },
       })
+    }
+
+    // Auto-geocode address (fire-and-forget)
+    const addr = {
+      addressLine1: data.addressLine1,
+      city: data.locationCity,
+      state: data.locationState,
+      zip: data.zipCode,
+    }
+    if (addr.addressLine1 || addr.city || addr.state) {
+      geocodeAddress(addr.addressLine1, addr.city, addr.state, addr.zip).then((result) => {
+        if (result) {
+          prisma.rBTProfile.update({
+            where: { id },
+            data: { latitude: result.lat, longitude: result.lng },
+          }).catch((e) => console.error('[PATCH rbts] geocode update', e))
+        }
+      }).catch((e) => console.error('[PATCH rbts] geocode', e))
     }
 
     return NextResponse.json({ success: true, profile: updatedProfile })

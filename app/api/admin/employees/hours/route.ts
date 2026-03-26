@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 
 const VALID_TYPES = ['BCBA', 'BILLING', 'MARKETING', 'CALL_CENTER', 'DEV_TEAM_MEMBER'] as const
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    if (!sessionToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     const body = await request.json()
     const { employeeType, referenceId, periodStart, periodEnd, hours, note } = body as {
@@ -58,13 +54,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    if (!sessionToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
     const { searchParams } = new URL(request.url)
     const employeeType = searchParams.get('employeeType')
     const referenceId = searchParams.get('referenceId')

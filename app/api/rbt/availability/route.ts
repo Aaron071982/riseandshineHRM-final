@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     }
 
     const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'RBT' || !user.rbtProfileId) {
+    if (!user || (user.role !== 'RBT' && user.role !== 'CANDIDATE') || !user.rbtProfileId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'RBT' || !user.rbtProfileId) {
+    if (!user || (user.role !== 'RBT' && user.role !== 'CANDIDATE') || !user.rbtProfileId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

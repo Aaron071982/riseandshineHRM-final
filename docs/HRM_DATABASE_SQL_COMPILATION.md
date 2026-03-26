@@ -60,6 +60,16 @@ ALTER TABLE "interviews" ALTER COLUMN "durationMinutes" SET DEFAULT 30;
 ALTER TABLE "rbt_documents" ADD COLUMN IF NOT EXISTS "filePath" TEXT;
 ```
 
+### 1.3b – `RBTStatus.ONBOARDING_COMPLETED` (manual / drift fix)
+
+Prisma’s `RBTStatus` enum includes `ONBOARDING_COMPLETED`, but some databases only received `STALLED` (see 1.3) and never this value. If Postgres errors with `invalid input value for enum "RBTStatus": "ONBOARDING_COMPLETED"`, run:
+
+```sql
+ALTER TYPE "RBTStatus" ADD VALUE IF NOT EXISTS 'ONBOARDING_COMPLETED';
+```
+
+Script: `prisma/scripts/add-rbtstatus-onboarding-completed.sql`.
+
 ### 1.4 – 20260218000000_mobile_attendance_sync
 
 ```sql

@@ -35,6 +35,7 @@ enum RBTStatus {
   INTERVIEW_SCHEDULED
   INTERVIEW_COMPLETED
   HIRED
+  ONBOARDING_COMPLETED
   STALLED
   REJECTED
 }
@@ -94,6 +95,7 @@ enum LeaveRequestStatus {
 
 enum EmailTemplateType {
   REACH_OUT
+  APPLICATION_REVIEWED
   INTERVIEW_INVITE
   OFFER
   REJECTION
@@ -109,6 +111,11 @@ enum OnboardingCompletionStatus {
   NOT_STARTED
   IN_PROGRESS
   COMPLETED
+}
+
+enum RBTMessageSenderRole {
+  RBT
+  ADMIN
 }
 
 enum ApplicationSource {
@@ -249,6 +256,7 @@ model User {
   sessions                 Session[]
   activities               ActivityLog[]
   interviewScorecards      InterviewScorecard[]
+  claimedInterviews        Interview[]          @relation("InterviewClaimedBy")
   employees                Employee[]           @relation("UserEmployee")
   employmentDocuments      EmploymentDocument[] @relation("UserEmploymentDocuments")
   verifiedCredentials      Credential[]         @relation("UserVerifiedCredentials")
@@ -256,10 +264,60 @@ model User {
   createdSupervisionEvents SupervisionEvent[]   @relation("UserCreatedSupervisionEvents")
   resolvedComplianceAlerts ComplianceAlert[]    @relation("UserResolvedComplianceAlerts")
   auditLogs                AuditLog[]           @relation("UserAuditLogs")
+  adminNotifications       AdminNotification[]
+  interviewerSettings     InterviewerSettings?
+  interviewerAvailability InterviewerAvailability[]
+  interviewSlots           InterviewSlot[]     @relation("InterviewSlotInterviewer")
+  schedulingExclusions     SchedulingExclusion[] @relation("SchedulingExcludedByUser")
+  linkedOrgNodes         OrgNode[]             @relation("OrgNodeLinkedUser")
 
   @@map("users")
 }
 
+/// Company hierarchy / org chart (admin-managed tree).
+model OrgNode {
+  id           String   @id @default(cuid())
+  parentId     String?
+  parent       OrgNode?  @relation("OrgNodeHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children     OrgNode[] @relation("OrgNodeHierarchy")
+  name            String
+  title           String
+  department      String?
+  /// Subgroup within department (e.g. Recruiting under HR).
+  subDepartment   String?
+  email        String?
+  phone        String?
+  linkedUserId String?
+  linkedUser   User?     @relation("OrgNodeLinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  avatarColor  String    @default("#f97316")
+  sortOrder    Int       @default(0)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([parentId])
+  @@index([linkedUserId])
+  @@index([parentId, sortOrder])
+  @@index([department, subDepartment])
+  @@map("org_nodes")
+}
+
+model AdminNotification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  message   String   @db.Text
+  linkUrl   String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("admin_notifications")
+}
+
+/// Reserved for future profile feature. Currently only referenced as resourceType in activity log; no code path creates/updates.
 model UserProfile {
   id                           String                  @id @default(cuid())
   userId                       String                  @unique
@@ -355,6 +413,8 @@ model RBTProfile {
   transportation           Boolean?
   preferredHoursRange      String?
   schedulingToken          String?            @unique
+  latitude                 Float?
+  longitude                Float?
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
 
@@ -372,8 +432,30 @@ model RBTProfile {
   auditLogs             RBTAuditLog[]
   clientAssignments     ClientAssignment[]
   sessionNotes          SessionNote[]
+  messages              RBTMessage[]
+  interviewSlotsBooked  InterviewSlot[]
+  schedulingExclusions  SchedulingExclusion[]
 
   @@map("rbt_profiles")
+}
+
+model SchedulingExclusion {
+  id               String    @id @default(cuid())
+  rbtProfileId     String
+  excludedByUserId String
+  reason           String?   @db.Text
+  expiresAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  rbtProfile     RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  excludedByUser User       @relation("SchedulingExcludedByUser", fields: [excludedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId])
+  @@index([excludedByUserId])
+  @@index([expiresAt])
+  @@unique([rbtProfileId])
+  @@map("scheduling_exclusions")
 }
 
 // Scheduling: clients (e.g. for RBT–client matching and assignments)
@@ -414,27 +496,93 @@ model ClientAssignment {
   @@map("client_assignments")
 }
 
+/// Interview reminder columns: reminderSentAt = 30-minute reminder sent at (cron: send-interview-reminders).
+/// reminder_15m_sent_at = 15-minute reminder sent at (cron: interview-reminders, env INTERVIEW_REMINDER_MINUTES).
 model Interview {
-  id                   String            @id @default(cuid())
-  rbtProfileId         String
-  scheduledAt          DateTime
-  durationMinutes      Int               @default(30)
-  interviewerName      String
-  status               InterviewStatus   @default(SCHEDULED)
-  decision             InterviewDecision @default(PENDING)
-  meetingUrl           String?
-  notes                String?
-  reminderSentAt       DateTime?
-  reminder_15m_sent_at DateTime?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  id                    String            @id @default(cuid())
+  rbtProfileId          String
+  scheduledAt           DateTime
+  durationMinutes       Int               @default(30)
+  interviewerName       String
+  status                InterviewStatus   @default(SCHEDULED)
+  decision              InterviewDecision @default(PENDING)
+  meetingUrl            String?
+  notes                 String?
+  reminderSentAt        DateTime?         // 30m reminder sent at
+  reminder_15m_sent_at  DateTime?         // 15m reminder sent at
+  reminder_1hr_sent_at  DateTime?         // 1hr reminder sent at
+  claimedByUserId       String?           // admin who claimed this interview
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   rbtProfile     RBTProfile           @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  claimedBy      User?                @relation("InterviewClaimedBy", fields: [claimedByUserId], references: [id], onDelete: SetNull)
   interviewNotes InterviewNotes?
   scorecards     InterviewScorecard[]
 
   @@index([reminder_15m_sent_at])
+  @@index([claimedByUserId])
   @@map("interviews")
+}
+
+/// Per-admin toggle and slot rules for interview scheduling (Calendly-style).
+model InterviewerSettings {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  acceptInterviewBookings Boolean  @default(true)
+  slotDurationMinutes     Int      @default(15)
+  bufferMinutes           Int      @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("interviewer_settings")
+}
+
+/// Weekly availability windows per admin (e.g. Mon 9–11, Mon 15–17).
+model InterviewerAvailability {
+  id           String   @id @default(cuid())
+  userId       String
+  dayOfWeek    Int      // 0=Sunday .. 6=Saturday
+  startHour    Int      // 0-23
+  startMinute  Int      // 0 or 30
+  endHour      Int      // 0-23
+  endMinute    Int      // 0 or 30
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slots  InterviewSlot[]
+
+  @@index([userId])
+  @@index([userId, dayOfWeek])
+  @@map("interviewer_availability")
+}
+
+/// Concrete bookable slot (created when a slot is booked, or for tracking).
+model InterviewSlot {
+  id                        String    @id @default(cuid())
+  interviewerAvailabilityId String
+  userId                    String
+  slotDate                  DateTime  @db.Date
+  startTime                 DateTime
+  endTime                   DateTime
+  isBooked                  Boolean   @default(false)
+  bookedByRbtProfileId      String?
+  bookedAt                  DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  availability InterviewerAvailability @relation(fields: [interviewerAvailabilityId], references: [id], onDelete: Cascade)
+  user         User                     @relation("InterviewSlotInterviewer", fields: [userId], references: [id], onDelete: Cascade)
+  bookedBy     RBTProfile?               @relation(fields: [bookedByRbtProfileId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([slotDate])
+  @@index([slotDate, userId, startTime])
+  @@map("interview_slots")
 }
 
 model InterviewEmailLog {
@@ -592,12 +740,18 @@ model InterviewNotes {
   expectationsAnswer    String? @db.Text
   closingNotes          String? @db.Text
 
+  // Quick freeform notes (new redesign)
+  quickNotes String? @db.Text
+
   // Additional structured fields for basic info
   fullName       String?
   email          String?
   birthdate      String?
   currentAddress String? @db.Text
   phoneNumber    String?
+
+  // Recommendation from scorecard tab
+  recommendation String? // 'HIRE', 'CONSIDER', 'REJECT'
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -663,6 +817,7 @@ model OnboardingCompletion {
   documentId         String
   status             OnboardingCompletionStatus @default(NOT_STARTED)
   completedAt        DateTime?
+  downloadedAt       DateTime? // When RBT downloaded fillable PDF (for reminder emails)
   acknowledgmentJson Json? // Stores acknowledgment data (name, checkboxes, timestamp, etc.)
   signedPdfUrl       String?                    @db.Text // URL or path to the signed/completed PDF (Supabase Storage path)
   signedPdfData      String?                    @db.Text // base64 encoded signed PDF (legacy/backward compatibility)
@@ -677,6 +832,20 @@ model OnboardingCompletion {
 
   @@unique([rbtProfileId, documentId])
   @@map("onboarding_completions")
+}
+
+model RBTMessage {
+  id           String              @id @default(cuid())
+  rbtProfileId String
+  senderRole   RBTMessageSenderRole
+  message      String              @db.Text
+  isRead       Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId, createdAt])
+  @@map("rbt_messages")
 }
 
 model CandidateApplicationDraft {

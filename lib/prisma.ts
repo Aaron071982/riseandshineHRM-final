@@ -3,6 +3,7 @@ import { PrismaClientKnownRequestError, PrismaClientInitializationError } from '
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
+  databaseUrl: string | undefined
 }
 
 // Helper to log Prisma connection info (without exposing secrets)
@@ -89,17 +90,35 @@ if (databaseUrl.includes('pooler.supabase.com')) {
   // Check if using Transaction Pooler (port 6543) or Session Pooler (port 5432)
   const isTransactionPooler = url.port === '6543' || databaseUrl.includes(':6543')
   
-  // In production, always force 1 connection per instance to avoid MaxClientsInSessionMode (overwrite URL if needed)
-  const connectionLimit = process.env.NODE_ENV === 'production' ? '1' : (url.searchParams.get('connection_limit') || '15')
+  // Keep this conservative in both dev and prod to reduce pool/TLS churn.
+  const connectionLimit = process.env.PRISMA_CONNECTION_LIMIT || url.searchParams.get('connection_limit') || '1'
+
+  // Supabase pooler TLS behavior can vary between environments/pooler setups.
+  // If `sslmode` isn't provided, default to `require` for safety.
+  if (!url.searchParams.has('sslmode')) {
+    url.searchParams.set('sslmode', 'require')
+  }
+
+  // In local dev, Prisma currently fails when using `sslmode=require` against the pooler
+  // (TLS connection closed / reset). `sslmode=disable` works reliably.
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    url.hostname.includes('pooler.supabase.com') &&
+    url.port === '5432' &&
+    url.searchParams.get('sslmode') === 'require'
+  ) {
+    url.searchParams.set('sslmode', 'disable')
+  }
+
   if (isTransactionPooler) {
+    // Transaction pooler should explicitly use pgbouncer mode.
     if (!url.searchParams.has('pgbouncer')) {
       url.searchParams.set('pgbouncer', 'true')
     }
     url.searchParams.set('connection_limit', connectionLimit)
   } else {
-    if (!url.searchParams.has('pgbouncer')) {
-      url.searchParams.set('pgbouncer', 'true')
-    }
+    // Session pooler (5432) should NOT force pgbouncer mode.
+    url.searchParams.delete('pgbouncer')
     url.searchParams.set('connection_limit', connectionLimit)
   }
   
@@ -126,25 +145,28 @@ if (process.env.NODE_ENV === 'production') {
 // - connection_limit: 1 (per instance; prevents MaxClientsInSessionMode on Supabase pooler)
 // - connect_timeout: 20 (increases timeout for connection acquisition)
 // - pool_timeout: 20 (increases timeout for pool operations)
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    datasources: {
-      db: {
-        url: databaseUrl,
+const shouldReuseExisting = !!globalForPrisma.prisma && globalForPrisma.databaseUrl === databaseUrl
+
+export const prisma = shouldReuseExisting
+  ? globalForPrisma.prisma!
+  : new PrismaClient({
+      log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+      datasources: {
+        db: {
+          url: databaseUrl,
+        },
       },
-    },
-    errorFormat: 'pretty',
-  })
+      errorFormat: 'pretty',
+    })
 
 // Note: Prisma errors are best handled at the query level
 // Use logPrismaError() in try-catch blocks around Prisma queries
 
 // Always cache in global to prevent multiple instances in serverless environments
 // This is critical for Vercel's serverless functions
-if (!globalForPrisma.prisma) {
+if (!shouldReuseExisting) {
   globalForPrisma.prisma = prisma
+  globalForPrisma.databaseUrl = databaseUrl
 }
 
 // Graceful shutdown handling

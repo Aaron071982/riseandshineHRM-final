@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
-import { validateSession, isAdmin } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
 
 const VALID_DOC_TYPES = [
@@ -17,13 +16,8 @@ export async function GET(
   { params }: { params: Promise<{ employeeId: string }> },
 ) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    if (!sessionToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const user = await validateSession(sessionToken)
-    if (!isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
     const { employeeId } = await params
 
     const docs = await prisma.employmentDocument.findMany({
@@ -43,13 +37,9 @@ export async function POST(
   { params }: { params: Promise<{ employeeId: string }> },
 ) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    if (!sessionToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const user = await validateSession(sessionToken)
-    if (!isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
     const { employeeId } = await params
     const employee = await prisma.employee.findUnique({ where: { id: employeeId } })
     if (!employee) {
@@ -118,13 +108,9 @@ export async function PATCH(
   { params }: { params: Promise<{ employeeId: string }> },
 ) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-    if (!sessionToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const user = await validateSession(sessionToken)
-    if (!isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
     const { employeeId } = await params
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')

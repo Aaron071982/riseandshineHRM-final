@@ -15,7 +15,10 @@ DECLARE
     'candidate_application_drafts', 'time_entries', 'shifts', 'onboarding_tasks',
     'leave_requests', 'onboarding_documents', 'onboarding_completions', 'user_profiles',
     'rbt_audit_logs', 'interviews', 'rbt_documents', 'interview_notes',
-    'sessions', 'activity_logs', 'rbt_profiles', 'interview_scorecards'
+    'sessions', 'activity_logs', 'rbt_profiles', 'interview_scorecards',
+    'rbt_messages', 'admin_notifications', 'session_notes', 'client_assignments',
+    'scheduling_clients',
+    'org_nodes'
   ];
   pol_name text;
 BEGIN

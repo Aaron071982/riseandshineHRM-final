@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 import {
   sendEmail,
   generateReachOutEmail,
@@ -17,17 +16,9 @@ export async function POST(
 ) {
   const { id } = await params
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     const body = await request.json().catch(() => ({}))
     const templateType = body?.templateType as string | undefined
@@ -50,48 +41,38 @@ export async function POST(
       console.error('Send-email: Prisma findUnique failed', err)
     }
 
-    // Fallback: load profile + incomplete tasks via raw SQL when Prisma fails (e.g. schema mismatch)
+    // Fallback: load profile and tasks in separate queries (avoids raw SQL column naming issues)
     if (!rbtProfile && templateType === EmailTemplateType.MISSING_ONBOARDING) {
       try {
-        const [profileRow] = await prisma.$queryRaw<
-          Array<{ id: string; firstName: string; lastName: string; email: string | null }>
-        >`
-          SELECT id, "firstName", "lastName", email FROM rbt_profiles WHERE id = ${id}
-        `
-        if (!profileRow?.email) {
+        const profileOnly = await prisma.rBTProfile.findUnique({
+          where: { id },
+          select: { id: true, firstName: true, lastName: true, email: true },
+        })
+        if (!profileOnly?.email) {
           return NextResponse.json(
             { error: 'RBT profile not found or email missing' },
             { status: 404 }
           )
         }
-        const tasksRows = await prisma.$queryRaw<
-          Array<{ title: string; description: string | null; taskType: string }>
-        >`
-          SELECT title, description, "taskType" FROM onboarding_tasks
-          WHERE "rbtProfileId" = ${id} AND "isCompleted" = false
-        `
-        const incompleteTasks = (tasksRows || []).map(t => ({
-          title: t.title,
-          description: t.description,
-          taskType: t.taskType,
-        }))
-        if (incompleteTasks.length === 0) {
+        const incompleteTasksList = await prisma.onboardingTask.findMany({
+          where: { rbtProfileId: id, isCompleted: false },
+          select: { title: true, description: true, taskType: true },
+        })
+        if (incompleteTasksList.length === 0) {
           return NextResponse.json(
             { error: 'This RBT has no incomplete onboarding tasks' },
             { status: 400 }
           )
         }
         rbtProfile = {
-          id: profileRow.id,
-          firstName: profileRow.firstName,
-          lastName: profileRow.lastName,
-          email: profileRow.email,
-          onboardingTasks: incompleteTasks.map(t => ({ ...t, isCompleted: false })),
+          ...profileOnly,
+          onboardingTasks: incompleteTasksList.map((t) => ({ ...t, isCompleted: false })),
         } as RbtProfileWithTasks
-      } catch (rawErr) {
-        console.error('Send-email: raw fallback failed', rawErr)
+      } catch (fallbackErr) {
+        console.error('Send-email: fallback load failed', fallbackErr)
+        const msg = fallbackErr instanceof Error ? fallbackErr.message : 'Could not load RBT profile'
         return NextResponse.json(
-          { error: 'Could not load RBT profile. Try again or run database migrations.' },
+          { error: process.env.NODE_ENV === 'development' ? msg : 'Could not load RBT profile. Try again later.' },
           { status: 500 }
         )
       }
@@ -152,14 +133,24 @@ export async function POST(
     }
 
     console.log(`📧 Attempting to send ${templateType} email to ${rbtProfile.email}...`)
-    
-    const emailSent = await sendEmail({
-      to: rbtProfile.email,
-      subject: emailContent.subject,
-      html: emailContent.html,
-      templateType: templateType as EmailTemplateType,
-      rbtProfileId: rbtProfile.id,
-    })
+
+    let emailSent = false
+    try {
+      emailSent = await sendEmail({
+        to: rbtProfile.email,
+        subject: emailContent.subject,
+        html: emailContent.html,
+        templateType: templateType as EmailTemplateType,
+        rbtProfileId: rbtProfile.id,
+      })
+    } catch (sendErr) {
+      console.error('Send-email: sendEmail threw', sendErr)
+      const msg = sendErr instanceof Error ? sendErr.message : 'Email service error'
+      return NextResponse.json(
+        { error: process.env.NODE_ENV === 'development' ? msg : 'Email failed to send. Try again later.' },
+        { status: 500 }
+      )
+    }
 
     if (!emailSent) {
       console.error(`❌ Email sending failed for ${rbtProfile.email}`)
@@ -212,4 +203,3 @@ export async function POST(
     )
   }
 }
-

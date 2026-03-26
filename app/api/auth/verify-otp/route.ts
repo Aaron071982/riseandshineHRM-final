@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTPEmail } from '@/lib/email-otp'
-import { createSession } from '@/lib/auth'
+import { createSession, LOCAL_DEV_SESSION_TOKEN } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 const LOG = (msg: string, data?: object) =>
@@ -77,7 +77,53 @@ export async function POST(request: NextRequest) {
     const adminFallbackList = (process.env.ADMIN_FALLBACK_EMAIL ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
     const isAdminFallback = adminFallbackList.length > 0 && adminFallbackList.includes(email) && otp === '123456'
     const isTestAccount = email === 'hrmtesting@gmail.com'
+    const isRbtTestBypass = (isNonProdEnv || isLocalhostHost) && email === 'aaronsiam22@gmail.com' && otp === '123456'
     let isValid = false
+
+    // RBT test account: aaronsiam22@gmail.com + 123456 on localhost/non-prod → real session if user is RBT with rbtProfileId
+    if (isRbtTestBypass) {
+      LOG(`${logId} RBT test bypass: looking up user`)
+      let rbtTestUser = await findUserByEmailWithProfile(email)
+      if (!rbtTestUser) {
+        const rbtProfile = await prisma.rBTProfile.findFirst({
+          where: { email: { equals: email, mode: 'insensitive' } },
+          select: { userId: true },
+        }).catch(() => null)
+        if (rbtProfile) rbtTestUser = await findUserByEmailWithProfile(null, rbtProfile.userId)
+      }
+      if (rbtTestUser?.role === 'RBT' && rbtTestUser.rbtProfile?.id && rbtTestUser.isActive) {
+        const userAgent = request.headers.get('user-agent') || ''
+        const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || null
+        const { device, browser } = parseUserAgent(userAgent)
+        const sessionToken = await createSession(rbtTestUser.id, { device, browser, ipAddress })
+        try {
+          await prisma.activityLog.create({
+            data: {
+              userId: rbtTestUser.id,
+              activityType: 'LOGIN',
+              action: 'User logged in',
+              ipAddress,
+              userAgent: request.headers.get('user-agent') || null,
+              metadata: { device, browser, email: rbtTestUser.email, role: 'RBT', rbtTestBypass: true },
+            },
+          })
+        } catch (_) {}
+        const response = NextResponse.json({ success: true, role: 'RBT', userId: rbtTestUser.id })
+        response.cookies.set('session', sessionToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 30 * 24 * 60 * 60,
+          path: '/',
+        })
+        return response
+      }
+      LOG(`${logId} RBT test bypass: user not found or not RBT`)
+      return NextResponse.json(
+        { error: 'No RBT account found for this email. Create the RBT in Admin (Employees & Candidates), set status to HIRED, and use this email.' },
+        { status: 403 }
+      )
+    }
 
     // For quick localhost / non-production testing, accept a fixed OTP (123456) and
     // short‑circuit before any database calls. This does NOT apply on production hosts.
@@ -88,7 +134,7 @@ export async function POST(request: NextRequest) {
         role: 'ADMIN',
         userId: 'local-dev-admin',
       })
-      response.cookies.set('session', 'local-dev-session', {
+      response.cookies.set('session', LOCAL_DEV_SESSION_TOKEN, {
         httpOnly: false,
         secure: false,
         sameSite: 'lax',

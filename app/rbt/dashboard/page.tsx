@@ -2,9 +2,8 @@ import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
-import OnboardingDashboard from '@/components/rbt/OnboardingDashboard'
-import RBTMainDashboard from '@/components/rbt/RBTMainDashboard'
 import ScheduleSetupWrapper from './ScheduleSetupWrapper'
+import RBTDashboardHome from '@/components/rbt/RBTDashboardHome'
 import { PrismaClientKnownRequestError, PrismaClientInitializationError } from '@prisma/client/runtime/library'
 
 export const dynamic = 'force-dynamic'
@@ -232,14 +231,10 @@ async function RBTDashboardPageInner() {
         console.log(`[RBT Dashboard] RBT ${user.rbtProfileId} is HIRED but has no tasks. Creating canonical tasks (40-hour: ${needsFortyHourCourse})...`)
       }
       await createCanonicalTasksForRbt(user.rbtProfileId!, needsFortyHourCourse)
-      const newTasks = await prisma.onboardingTask.findMany({
+      onboardingTasks = await prisma.onboardingTask.findMany({
         where: { rbtProfileId: user.rbtProfileId },
         orderBy: { sortOrder: 'asc' },
       })
-      const allCompleted = newTasks.every((task) => task.isCompleted)
-      if (!allCompleted) {
-        return <OnboardingDashboard rbtProfileId={user.rbtProfileId} />
-      }
     } catch (error) {
       logError('Error creating/repairing onboarding tasks', error)
       if (onboardingTasks.length === 0) {
@@ -260,44 +255,81 @@ async function RBTDashboardPageInner() {
     }
   }
 
-  const allTasksCompleted = onboardingTasks.length > 0 && onboardingTasks.every((task) => task.isCompleted)
+  // Load profile, documents, completions, shifts, time entries for unified dashboard
+  let rbtProfile: { firstName: string; scheduleCompleted?: boolean } | null = null
+  let onboardingDocuments: Awaited<ReturnType<typeof prisma.onboardingDocument.findMany>> = []
+  let completions: Awaited<ReturnType<typeof prisma.onboardingCompletion.findMany>> = []
+  let todayShifts: Awaited<ReturnType<typeof prisma.shift.findMany>> = []
+  let upcomingShifts: Awaited<ReturnType<typeof prisma.shift.findMany>> = []
+  let timeEntries: Awaited<ReturnType<typeof prisma.timeEntry.findMany>> = []
+  let activeSessionClockIn: Date | null = null
 
-  // Check if schedule is completed
-  // Gracefully handle if scheduleCompleted field doesn't exist yet
-  let rbtProfile: { scheduleCompleted?: boolean } | null = null
   try {
-    rbtProfile = await prisma.rBTProfile.findUnique({
-      where: { id: user.rbtProfileId },
-      select: { scheduleCompleted: true },
-    })
-  } catch (error: any) {
-    // If scheduleCompleted column doesn't exist or query fails, treat as not completed
-    logError('Failed to check schedule completion status', error)
-    rbtProfile = { scheduleCompleted: false }
-  }
-
-  // Show onboarding tasks if not all completed
-  if (!allTasksCompleted) {
-    try {
-      return <OnboardingDashboard rbtProfileId={user.rbtProfileId} />
-    } catch (error) {
-      logError('Failed to render OnboardingDashboard', error)
-      return (
-        <div className="container mx-auto p-6 max-w-4xl">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <h1 className="text-xl font-bold text-red-800 mb-2">Error Loading Onboarding</h1>
-            <p className="text-red-700">
-              Unable to load the onboarding dashboard. Please try refreshing the page.
-            </p>
-          </div>
+    const [profileResult, docsResult, completionsResult, todayResult, upcomingResult, timeResult] = await Promise.all([
+      prisma.rBTProfile.findUnique({
+        where: { id: user.rbtProfileId },
+        select: { firstName: true, scheduleCompleted: true },
+      }),
+      prisma.onboardingDocument.findMany({
+        where: { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+      }),
+      prisma.onboardingCompletion.findMany({
+        where: { rbtProfileId: user.rbtProfileId },
+        include: { document: true },
+      }),
+      prisma.shift.findMany({
+        where: {
+          rbtProfileId: user.rbtProfileId,
+          startTime: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0)),
+            lt: new Date(new Date().setHours(23, 59, 59, 999)),
+          },
+          status: { not: 'CANCELED' },
+        },
+        orderBy: { startTime: 'asc' },
+      }),
+      prisma.shift.findMany({
+        where: {
+          rbtProfileId: user.rbtProfileId,
+          startTime: { gt: new Date(new Date().setHours(23, 59, 59, 999)) },
+          status: { not: 'CANCELED' },
+        },
+        orderBy: { startTime: 'asc' },
+      }),
+      prisma.timeEntry.findMany({
+        where: {
+          rbtProfileId: user.rbtProfileId,
+          clockInTime: { gte: new Date(new Date().setDate(new Date().getDate() - 31)) },
+        },
+        orderBy: { clockInTime: 'desc' },
+      }),
+    ])
+    rbtProfile = profileResult
+    onboardingDocuments = docsResult
+    completions = completionsResult
+    todayShifts = todayResult
+    upcomingShifts = upcomingResult
+    timeEntries = timeResult
+    activeSessionClockIn = timeResult.find((t) => t.clockOutTime == null)?.clockInTime ?? null
+  } catch (err) {
+    logError('Failed to load dashboard data', err)
+    return (
+      <div className="container mx-auto p-6 max-w-4xl">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <h1 className="text-xl font-bold text-red-800 mb-2">Error Loading Dashboard</h1>
+          <p className="text-red-700">Unable to load your dashboard. Please try again.</p>
         </div>
-      )
-    }
+      </div>
+    )
   }
 
-  // Show schedule setup if tasks are done but schedule is not
-  // Use wrapper component to handle the onComplete callback (Client Component)
-  if (!rbtProfile?.scheduleCompleted) {
+  if (!rbtProfile) {
+    redirect('/')
+  }
+
+  // Show schedule setup if not completed
+  if (!rbtProfile.scheduleCompleted) {
     try {
       return <ScheduleSetupWrapper rbtProfileId={user.rbtProfileId} />
     } catch (error) {
@@ -306,30 +338,85 @@ async function RBTDashboardPageInner() {
         <div className="container mx-auto p-6 max-w-4xl">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6">
             <h1 className="text-xl font-bold text-red-800 mb-2">Error Loading Schedule Setup</h1>
-            <p className="text-red-700">
-              Unable to load the schedule setup. Please try refreshing the page.
-            </p>
+            <p className="text-red-700">Unable to load the schedule setup. Please try refreshing the page.</p>
           </div>
         </div>
       )
     }
   }
 
-  // Main dashboard
+  // Compute onboarding progress (tasks + documents)
+  const totalSteps = onboardingTasks.length + onboardingDocuments.length
+  const completedTaskCount = onboardingTasks.filter((t) => t.isCompleted).length
+  const completedDocCount = completions.filter((c) => c.status === 'COMPLETED').length
+  const completedSteps = completedTaskCount + completedDocCount
+  const onboardingPercent = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 100
+
+  const remainingTasks = [
+    ...onboardingTasks.filter((t) => !t.isCompleted).map((t) => ({ id: t.id, title: t.title, isCompleted: false })),
+    ...onboardingDocuments
+      .filter((d) => completions.find((c) => c.documentId === d.id)?.status !== 'COMPLETED')
+      .map((d) => ({ id: d.id, title: d.title, isCompleted: false })),
+  ]
+  const completedTasks = [
+    ...onboardingTasks.filter((t) => t.isCompleted).map((t) => ({ id: t.id, title: t.title, isCompleted: true })),
+    ...completions
+      .filter((c) => c.status === 'COMPLETED')
+      .map((c) => ({
+        id: c.documentId,
+        title: (c as any).document?.title ?? 'Document',
+        isCompleted: true,
+      })),
+  ]
+
+  // Fillable PDFs: downloaded but not yet uploaded (for reminder banner)
+  const pendingUploadTitles = completions
+    .filter(
+      (c) =>
+        c.downloadedAt != null &&
+        !c.signedPdfUrl &&
+        c.status !== 'COMPLETED' &&
+        (c as any).document?.type === 'FILLABLE_PDF'
+    )
+    .map((c) => (c as any).document?.title ?? '')
+
+  const now = new Date()
+  const weekStart = new Date(now)
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+  weekStart.setHours(0, 0, 0, 0)
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const hoursThisWeek = timeEntries
+    .filter((e) => e.clockInTime >= weekStart && e.totalHours)
+    .reduce((sum, e) => sum + (e.totalHours ?? 0), 0)
+  const hoursThisMonth = timeEntries
+    .filter((e) => e.clockInTime >= monthStart && e.totalHours)
+    .reduce((sum, e) => sum + (e.totalHours ?? 0), 0)
+
   try {
-    return <RBTMainDashboard rbtProfileId={user.rbtProfileId} />
+    return (
+      <RBTDashboardHome
+        firstName={rbtProfile.firstName}
+        onboardingPercent={onboardingPercent}
+        totalSteps={totalSteps}
+        completedSteps={completedSteps}
+        remainingTasks={remainingTasks}
+        completedTasks={completedTasks}
+        todayShifts={todayShifts}
+        upcomingShifts={upcomingShifts}
+        hoursThisWeek={hoursThisWeek}
+        hoursThisMonth={hoursThisMonth}
+        upcomingShiftsCount={upcomingShifts.length}
+        pendingUploadTitles={pendingUploadTitles}
+        activeSessionClockIn={activeSessionClockIn}
+      />
+    )
   } catch (error) {
-    logError('Failed to render RBTMainDashboard', error)
+    logError('Failed to render RBTDashboardHome', error)
     return (
       <div className="container mx-auto p-6 max-w-4xl">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <h1 className="text-xl font-bold text-red-800 mb-2">Error Loading Dashboard</h1>
-          <p className="text-red-700">
-            Unable to load your dashboard. Please try refreshing the page.
-          </p>
-          <p className="text-sm text-red-600 mt-2">
-            If this problem persists, please contact support.
-          </p>
+          <p className="text-red-700">Unable to load your dashboard. Please try refreshing the page.</p>
         </div>
       </div>
     )

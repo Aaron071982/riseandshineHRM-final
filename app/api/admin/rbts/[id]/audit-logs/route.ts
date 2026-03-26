@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession, isAdmin } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 import { parseLocalTimeAsNY } from '@/lib/utils'
 
 // GET - Fetch all audit logs for an RBT
@@ -11,18 +10,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!isAdmin(user)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
     let auditLogs: Array<{ id: string; rbtProfileId: string; auditType: string; dateTime: Date; notes: string | null; createdBy: string | null; createdAt: Date; updatedAt: Date }>
     try {
       auditLogs = await prisma.rBTAuditLog.findMany({
@@ -72,17 +61,9 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     const body = await request.json()
     const { auditType, dateTime, notes, createdBy } = body

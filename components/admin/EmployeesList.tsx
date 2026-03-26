@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { EmployeeListType } from '@/app/admin/employees/page'
+import RBTKanbanBoard, { type RBTKanbanProfile } from '@/components/admin/RBTKanbanBoard'
 
 interface RBTProfile {
   id: string
@@ -52,6 +53,7 @@ interface DevTeamWithCount {
 
 interface EmployeesListProps {
   currentType: EmployeeListType
+  viewMode?: 'list' | 'board'
   initialRbts: RBTProfile[]
   bcbaProfiles: GenericProfile[]
   billingProfiles: GenericProfile[]
@@ -69,6 +71,8 @@ const statusColors: Record<string, { bg: string; text: string; darkBg: string; d
   INTERVIEW_SCHEDULED: { bg: 'bg-purple-50', text: 'text-purple-700', darkBg: 'dark:bg-[var(--status-onboarding-bg)]', darkText: 'dark:text-[var(--status-onboarding-text)]' },
   INTERVIEW_COMPLETED: { bg: 'bg-indigo-50', text: 'text-indigo-700', darkBg: 'dark:bg-[var(--status-scheduled-bg)]', darkText: 'dark:text-[var(--status-scheduled-text)]' },
   HIRED: { bg: 'bg-green-50', text: 'text-green-700', darkBg: 'dark:bg-[var(--status-hired-bg)]', darkText: 'dark:text-[var(--status-hired-text)]' },
+  ONBOARDING_COMPLETED: { bg: 'bg-emerald-50', text: 'text-emerald-700', darkBg: 'dark:bg-[var(--status-hired-bg)]', darkText: 'dark:text-[var(--status-hired-text)]' },
+  STALLED: { bg: 'bg-gray-100', text: 'text-gray-600', darkBg: 'dark:bg-[var(--bg-elevated)]', darkText: 'dark:text-[var(--text-tertiary)]' },
   REJECTED: { bg: 'bg-red-50', text: 'text-red-700', darkBg: 'dark:bg-[var(--status-rejected-bg)]', darkText: 'dark:text-[var(--status-rejected-text)]' },
 }
 
@@ -83,6 +87,7 @@ const TYPE_OPTIONS: { value: EmployeeListType; label: string }[] = [
 
 export default function EmployeesList({
   currentType,
+  viewMode = 'list',
   initialRbts,
   bcbaProfiles,
   billingProfiles,
@@ -131,25 +136,22 @@ export default function EmployeesList({
     })
   }
 
-  const statusCounts = initialRbts.reduce((acc, rbt) => {
+  const statusCounts = initialRbts.reduce<Record<string, number>>((acc, rbt) => {
     acc[rbt.status] = (acc[rbt.status] || 0) + 1
     return acc
-  }, {} as Record<string, number>)
+  }, {})
 
   const filteredRbts = status ? initialRbts.filter((r) => r.status === status) : initialRbts
 
-  const totalCount =
-    currentType === 'RBT'
-      ? (currentType === 'RBT' ? filteredRbts.length : initialRbts.length)
-      : currentType === 'BCBA'
-        ? bcbaProfiles.length
-        : currentType === 'BILLING'
-          ? billingProfiles.length
-          : currentType === 'MARKETING'
-            ? marketingProfiles.length
-            : currentType === 'CALL_CENTER'
-              ? callCenterProfiles.length
-              : devTeams.length
+  const totalCount = (() => {
+    if (currentType === 'RBT') return filteredRbts.length
+    if (currentType === 'BCBA') return bcbaProfiles.length
+    if (currentType === 'BILLING') return billingProfiles.length
+    if (currentType === 'MARKETING') return marketingProfiles.length
+    if (currentType === 'CALL_CENTER') return callCenterProfiles.length
+    if (currentType === 'DEV_TEAM') return devTeams.length
+    return 0
+  })()
 
   const showStatusFilter = currentType === 'RBT'
   const listCount = currentType === 'RBT' ? filteredRbts.length : totalCount
@@ -253,6 +255,8 @@ export default function EmployeesList({
                   <SelectItem value="INTERVIEW_SCHEDULED">Interview Scheduled</SelectItem>
                   <SelectItem value="INTERVIEW_COMPLETED">Interview Completed</SelectItem>
                   <SelectItem value="HIRED">Hired</SelectItem>
+                  <SelectItem value="ONBOARDING_COMPLETED">Onboarding Completed</SelectItem>
+                  <SelectItem value="STALLED">Stalled</SelectItem>
                   <SelectItem value="REJECTED">Rejected</SelectItem>
                 </SelectContent>
               </Select>
@@ -270,7 +274,13 @@ export default function EmployeesList({
           </CardContent>
         </Card>
       ) : currentType === 'RBT' ? (
-        filteredRbts.length === 0 ? (
+        viewMode === 'board' ? (
+          <RBTKanbanBoard
+            rbts={filteredRbts as RBTKanbanProfile[]}
+            statusFilter={status}
+            searchFilter={search}
+          />
+        ) : filteredRbts.length === 0 ? (
           <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
             <CardContent className="p-12 text-center">
               <p className="text-lg font-medium text-gray-700 dark:text-[var(--text-secondary)] mb-2">No candidates found</p>
@@ -281,6 +291,10 @@ export default function EmployeesList({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredRbts.map((rbt) => {
               const statusConfig = statusColors[rbt.status] || statusColors.NEW
+              const q = new URLSearchParams()
+              if (currentType === 'RBT' && status) q.set('status', status)
+              if (currentType === 'RBT' && search) q.set('search', search)
+              const viewHref = `/admin/rbts/${rbt.id}${q.toString() ? `?${q.toString()}` : ''}`
               return (
                 <Card
                   key={rbt.id}
@@ -318,7 +332,7 @@ export default function EmployeesList({
                     </div>
                     <div className="flex items-center justify-between pt-4 border-t dark:border-[var(--border-subtle)]">
                       <span className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">Updated {formatDate(rbt.updatedAt)}</span>
-                      <Link href={`/admin/rbts/${rbt.id}`}>
+                      <Link href={viewHref}>
                         <Button size="sm" variant="outline" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:border-[var(--orange-primary)] dark:hover:text-[var(--orange-primary)]">
                           View →
                         </Button>

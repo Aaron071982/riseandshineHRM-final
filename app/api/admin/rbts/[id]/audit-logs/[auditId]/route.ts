@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 import { parseLocalTimeAsNY } from '@/lib/utils'
 
 // DELETE - Delete an audit log
@@ -11,17 +10,9 @@ export async function DELETE(
 ) {
   try {
     const { id, auditId } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
 
     // Verify the audit log belongs to this RBT
     const auditLog = await prisma.rBTAuditLog.findUnique({
@@ -56,18 +47,8 @@ export async function PATCH(
 ) {
   try {
     const { id, auditId } = await params
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
     // Verify the audit log belongs to this RBT
     const auditLog = await prisma.rBTAuditLog.findUnique({
       where: { id: auditId },

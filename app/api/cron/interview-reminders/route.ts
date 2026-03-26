@@ -1,3 +1,8 @@
+/**
+ * 15-minute interview reminder cron.
+ * Sends reminders for interviews starting in ~15 minutes (configurable via INTERVIEW_REMINDER_MINUTES, default 15).
+ * Uses Interview.reminder_15m_sent_at to avoid duplicate sends. Auth: CRON_SECRET (Bearer or ?secret=).
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
@@ -6,20 +11,14 @@ import {
   generateInterviewReminder15mEmail,
 } from '@/lib/email'
 import { makePublicUrl } from '@/lib/baseUrl'
-
-const CRON_SECRET = process.env.CRON_SECRET
+import { assertCronOrResponse } from '@/lib/cron-auth'
 const REMINDER_MINUTES = parseInt(process.env.INTERVIEW_REMINDER_MINUTES ?? '15', 10)
 const RECIPIENTS_RAW = process.env.INTERVIEW_REMINDER_RECIPIENTS ?? 'aaronsiam21@gmail.com,kazi@siyam.nyc'
 const RECIPIENTS = RECIPIENTS_RAW.split(',').map((e) => e.trim()).filter(Boolean)
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const secretParam = request.nextUrl.searchParams.get('secret')
-  const providedSecret = secretParam ?? authHeader?.replace(/^Bearer\s+/i, '')
-
-  if (CRON_SECRET && providedSecret !== CRON_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const auth = assertCronOrResponse(request)
+  if (auth) return auth
 
   try {
     const now = new Date()

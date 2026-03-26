@@ -27,12 +27,15 @@ interface FillablePdfFlowProps {
   document: OnboardingDocument
   completion: Completion | undefined
   onComplete: () => void
+  /** Called when user clicks Download (for tracking downloadedAt in wizard) */
+  onDownload?: () => void
 }
 
 export default function FillablePdfFlow({
   document,
   completion,
   onComplete,
+  onDownload,
 }: FillablePdfFlowProps) {
   const { showToast } = useToast()
   const [isCompleted, setIsCompleted] = useState(completion?.status === 'COMPLETED')
@@ -46,6 +49,7 @@ export default function FillablePdfFlow({
   }, [completion])
 
   const handleDownload = () => {
+    onDownload?.()
     if (!document.pdfData) {
       showToast('PDF data not available', 'error')
       return

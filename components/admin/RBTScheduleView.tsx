@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, CheckCircle2, Circle } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 interface RBTScheduleViewProps {
   rbtProfileId: string
@@ -16,7 +16,6 @@ interface AvailabilitySlot {
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const HOURS = Array.from({ length: 8 }, (_, i) => i + 14) // 2 PM to 9 PM (14-21)
 
 export default function RBTScheduleView({ rbtProfileId, rbtName }: RBTScheduleViewProps) {
   const [slots, setSlots] = useState<AvailabilitySlot[]>([])
@@ -48,10 +47,6 @@ export default function RBTScheduleView({ rbtProfileId, rbtName }: RBTScheduleVi
     if (hour === 12) return '12:00 PM'
     if (hour < 12) return `${hour}:00 AM`
     return `${hour - 12}:00 PM`
-  }
-
-  const isSlotSelected = (dayOfWeek: number, hour: number) => {
-    return slots.some((slot) => slot.dayOfWeek === dayOfWeek && slot.hour === hour)
   }
 
   if (loading) {
@@ -95,54 +90,8 @@ export default function RBTScheduleView({ rbtProfileId, rbtName }: RBTScheduleVi
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <div className="inline-block min-w-full">
-            <div className="grid grid-cols-8 gap-2">
-              {/* Header row */}
-              <div className="font-semibold text-sm text-gray-700 p-2">Time</div>
-              {DAYS.map((day, index) => (
-                <div key={index} className="font-semibold text-sm text-gray-700 p-2 text-center">
-                  {day.substring(0, 3)}
-                </div>
-              ))}
-
-              {/* Time slots */}
-              {HOURS.map((hour) => (
-                <>
-                  <div key={`time-${hour}`} className="text-sm text-gray-600 p-2 border-r">
-                    {formatHour(hour)} - {formatHour(hour + 1)}
-                  </div>
-                  {DAYS.map((_, dayOfWeek) => {
-                    const isSelected = isSlotSelected(dayOfWeek, hour)
-                    return (
-                      <div
-                        key={`${dayOfWeek}-${hour}`}
-                        className={`
-                          h-12 border rounded-lg
-                          ${isSelected
-                            ? 'bg-orange-500 border-orange-600'
-                            : 'bg-gray-50 border-gray-200'
-                          }
-                          flex items-center justify-center
-                        `}
-                      >
-                        {isSelected ? (
-                          <CheckCircle2 className="w-5 h-5 text-white" />
-                        ) : (
-                          <Circle className="w-5 h-5 text-gray-300" />
-                        )}
-                      </div>
-                    )
-                  })}
-                </>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Summary */}
-        <div className="mt-6 pt-6 border-t">
-          <h4 className="font-semibold text-gray-900 mb-3">Schedule Summary</h4>
+        <div className="space-y-3">
+          <h4 className="font-semibold text-gray-900">Schedule Summary</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             {DAYS.map((day, index) => {
               const daySlots = slots.filter((slot) => slot.dayOfWeek === index)

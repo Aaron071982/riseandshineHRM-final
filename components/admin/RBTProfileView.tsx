@@ -6,21 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDateTime } from '@/lib/utils'
-import { CheckCircle2, XCircle, Download, FileText, Trash2, Edit, Loader2, Upload, CalendarClock } from 'lucide-react'
+import { CheckCircle2, XCircle, Download, FileText, Trash2, Edit, Loader2, Upload } from 'lucide-react'
 import Link from 'next/link'
 import RBTScheduleView from './RBTScheduleView'
 import InterviewNotesButton from './InterviewNotesButton'
 import AdminOnboardingOverride from './AdminOnboardingOverride'
 import StatusManager from './StatusManager'
-import AuditLog from './AuditLog'
 import { trackButtonClick } from '@/lib/activity-tracker'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -33,111 +25,16 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/toast'
-
-interface RBTProfile {
-  id: string
-  firstName: string
-  lastName: string
-  phoneNumber: string
-  email: string | null
-  locationCity: string | null
-  locationState: string | null
-  zipCode: string | null
-  addressLine1: string | null
-  addressLine2: string | null
-  preferredServiceArea: string | null
-  notes: string | null
-  gender: string | null
-  ethnicity: string | null
-  fortyHourCourseCompleted: boolean
-  status: string
-  scheduleCompleted?: boolean
-  source: string | null
-  submittedAt: Date | null
-  resumeUrl: string | null
-  resumeFileName: string | null
-  resumeMimeType: string | null
-  resumeSize: number | null
-  availabilityJson: any
-  languagesJson: any
-  experienceYears: number | null
-  experienceYearsDisplay: string | null
-  preferredAgeGroupsJson: any
-  authorizedToWork: boolean | null
-  canPassBackgroundCheck: boolean | null
-  cprFirstAidCertified: string | null
-  transportation: boolean | null
-  preferredHoursRange: string | null
-  createdAt: Date
-  updatedAt: Date
-  user: {
-    id: string
-    role: string
-    isActive: boolean
-  }
-  interviews: Array<{
-    id: string
-    scheduledAt: Date
-    durationMinutes: number
-    interviewerName: string
-    status: string
-    decision: string
-    notes: string | null
-    meetingUrl: string | null
-    reminder_15m_sent_at: Date | null
-    interviewNotes?: {
-      id: string
-      greetingAnswer: string | null
-      basicInfoAnswer: string | null
-      experienceAnswer: string | null
-      heardAboutAnswer: string | null
-      abaPlatformsAnswer: string | null
-      communicationAnswer: string | null
-      availabilityAnswer: string | null
-      payExpectationsAnswer: string | null
-      previousCompanyAnswer: string | null
-      expectationsAnswer: string | null
-      closingNotes: string | null
-      fullName: string | null
-      email: string | null
-      birthdate: string | null
-      currentAddress: string | null
-      phoneNumber: string | null
-      createdAt: Date
-      updatedAt: Date
-    } | null
-  }>
-  onboardingTasks: Array<{
-    id: string
-    taskType: string
-    title: string
-    description: string | null
-    isCompleted: boolean
-    completedAt: Date | null
-    uploadUrl: string | null
-    documentDownloadUrl: string | null
-    sortOrder: number
-  }>
-  documents?: Array<{
-    id: string
-    fileName: string
-    fileType: string
-    documentType: string | null
-    uploadedAt: Date
-  }>
-  onboardingCompletions?: Array<{
-    id: string
-    documentId: string
-    status: string
-    completedAt: Date | null
-    acknowledgmentJson?: any
-    document: {
-      id: string
-      title: string
-      type: string
-    }
-  }>
-}
+import {
+  RBTProfileHeader,
+  RBTProfileDocuments,
+  RBTProfileAuditLog,
+  RBTProfileInterviews,
+  RBTProfileOnboarding,
+  EditProfileForm,
+  InterviewScheduleForm,
+} from './rbt-profile'
+import type { RBTProfile } from './rbt-profile/types'
 
 interface RBTProfileViewProps {
   rbtProfile: RBTProfile
@@ -151,6 +48,8 @@ const statusColors: Record<string, string> = {
   INTERVIEW_SCHEDULED: 'bg-purple-500',
   INTERVIEW_COMPLETED: 'bg-indigo-500',
   HIRED: 'bg-green-500',
+  ONBOARDING_COMPLETED: 'bg-emerald-500',
+  STALLED: 'bg-amber-500',
   REJECTED: 'bg-red-500',
 }
 
@@ -184,7 +83,28 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
   }>>([])
   const [clientAssignmentsLoading, setClientAssignmentsLoading] = useState(true)
 
+  const DAYS: Array<{ value: number; label: string }> = [
+    { value: 0, label: 'Sun' },
+    { value: 1, label: 'Mon' },
+    { value: 2, label: 'Tue' },
+    { value: 3, label: 'Wed' },
+    { value: 4, label: 'Thu' },
+    { value: 5, label: 'Fri' },
+    { value: 6, label: 'Sat' },
+  ]
+
+  const formatDays = (daysOfWeek: number[]): string => {
+    const set = new Set(daysOfWeek.map((d) => Number(d)))
+    return DAYS.filter((d) => set.has(d.value))
+      .map((d) => d.label)
+      .join(', ')
+  }
+
   useEffect(() => {
+    if (!rbtProfile?.id || rbtProfile.id === 'null') {
+      setClientAssignmentsLoading(false)
+      return
+    }
     let cancelled = false
     async function load() {
       try {
@@ -201,7 +121,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     }
     load()
     return () => { cancelled = true }
-  }, [rbtProfile.id])
+  }, [rbtProfile?.id])
 
   const handleSendReachOutEmail = () => {
     setConfirmMessage(`Are you sure you want to send a reach-out email to ${rbtProfile.firstName} ${rbtProfile.lastName}?`)
@@ -640,24 +560,14 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     INTERVIEW_SCHEDULED: { color: 'from-purple-500 to-purple-400' },
     INTERVIEW_COMPLETED: { color: 'from-indigo-500 to-indigo-400' },
     HIRED: { color: 'from-green-500 to-green-400' },
+    ONBOARDING_COMPLETED: { color: 'from-emerald-500 to-emerald-400' },
     STALLED: { color: 'from-amber-500 to-amber-400' },
     REJECTED: { color: 'from-red-500 to-red-400' },
   }[rbtProfile.status] || { color: 'from-gray-500 to-gray-400' }
 
   return (
     <div className="space-y-6">
-      {/* Header (simple, like RBTs & Candidates) */}
-      <div className="pb-6 border-b dark:border-[var(--border-subtle)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)] mb-2">
-            {rbtProfile.firstName} {rbtProfile.lastName}
-          </h1>
-          <p className="text-gray-600 dark:text-[var(--text-tertiary)]">RBT Profile & Hiring Pipeline</p>
-        </div>
-        <Badge className="bg-gray-100 dark:bg-[var(--bg-elevated)] text-gray-800 dark:text-[var(--text-primary)] border dark:border-[var(--border-subtle)] px-4 py-2 text-base font-semibold">
-          {rbtProfile.status.replace(/_/g, ' ')}
-        </Badge>
-      </div>
+      <RBTProfileHeader rbtProfile={rbtProfile} />
 
       {/* Profile Information */}
       <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
@@ -718,12 +628,10 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                 <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Preferred Service Area</p>
                 <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.preferredServiceArea || '—'}</p>
               </div>
-              {rbtProfile.gender && (
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Gender</p>
-                  <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.gender}</p>
-                </div>
-              )}
+              <div>
+                <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Gender</p>
+                <p className="font-medium dark:text-[var(--text-primary)]">{rbtProfile.gender || '—'}</p>
+              </div>
               {rbtProfile.ethnicity && (
                 <div>
                   <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">Ethnicity</p>
@@ -751,7 +659,75 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         </CardContent>
       </Card>
 
-      {/* Client assignments section removed – scheduling beta no longer used */}
+      {/* Client assignments (Scheduling demo) */}
+      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
+              Client assignments
+            </CardTitle>
+            <Badge
+              variant="outline"
+              className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-[var(--orange-subtle)] dark:text-[var(--orange-primary)] dark:border-[var(--orange-border)]"
+            >
+              Scheduling demo
+            </Badge>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+            Clients assigned with specific days and hours will appear here.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {clientAssignmentsLoading ? (
+            <div className="flex items-center gap-2 py-2 text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading assignments…
+            </div>
+          ) : clientAssignments.length === 0 ? (
+            <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+              No client assignments yet.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {clientAssignments.map((a) => (
+                <div
+                  key={a.id}
+                  className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-[var(--border-subtle)] dark:bg-[var(--bg-elevated)]"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 dark:text-[var(--text-primary)] truncate">
+                        {a.clientName}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+                        {formatDays(a.daysOfWeek)}
+                        {(a.timeStart || a.timeEnd) ? (
+                          <span className="ml-2">
+                            {a.timeStart ?? '—'}–{a.timeEnd ?? '—'}
+                          </span>
+                        ) : null}
+                      </p>
+                      {a.notes ? (
+                        <p className="mt-2 text-sm text-gray-700 dark:text-[var(--text-secondary)] whitespace-pre-wrap">
+                          {a.notes}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="shrink-0">
+                      <Link
+                        href="/admin/scheduling-beta"
+                        className="text-sm font-semibold text-orange-600 hover:underline dark:text-[var(--orange-primary)]"
+                      >
+                        View scheduling demo →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Public Application Info */}
       {rbtProfile.source === 'PUBLIC_APPLICATION' && (
@@ -848,27 +824,30 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             )}
 
             {/* Availability: single box, one Preferred Weekly Hours, time range from availabilityJson */}
-            {rbtProfile.availabilityJson && (
+            {rbtProfile.availabilityJson && (() => {
+              const av = rbtProfile.availabilityJson as { weekday?: Record<string, boolean>; weekend?: Record<string, boolean>; earliestStartTime?: string; latestEndTime?: string } | null
+              if (!av) return null
+              return (
               <div className="space-y-2">
                 <p className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">Availability</p>
                 <div className="bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] p-4 space-y-2">
-                  {rbtProfile.availabilityJson?.weekday && Object.keys(rbtProfile.availabilityJson.weekday).length > 0 && (
+                  {av.weekday && Object.keys(av.weekday).length > 0 && (
                     <div>
                       <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Weekdays (after 2PM):</p>
                       <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
-                        {Object.keys(rbtProfile.availabilityJson.weekday)
-                          .filter((day: string) => rbtProfile.availabilityJson?.weekday?.[day])
+                        {Object.keys(av.weekday)
+                          .filter((day: string) => av.weekday?.[day])
                           .sort()
                           .join(', ') || 'None'}
                       </p>
                     </div>
                   )}
-                  {rbtProfile.availabilityJson?.weekend && Object.keys(rbtProfile.availabilityJson.weekend).length > 0 && (
+                  {av.weekend && Object.keys(av.weekend).length > 0 && (
                     <div>
                       <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Weekends:</p>
                       <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
-                        {Object.keys(rbtProfile.availabilityJson.weekend)
-                          .filter((day: string) => rbtProfile.availabilityJson?.weekend?.[day])
+                        {Object.keys(av.weekend)
+                          .filter((day: string) => av.weekend?.[day])
                           .sort()
                           .join(', ') || 'None'}
                       </p>
@@ -880,17 +859,18 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                       <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">{rbtProfile.preferredHoursRange}</p>
                     </div>
                   )}
-                  {((rbtProfile.availabilityJson as any)?.earliestStartTime || (rbtProfile.availabilityJson as any)?.latestEndTime) && (
+                  {(av.earliestStartTime || av.latestEndTime) && (
                     <div>
                       <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Time Range:</p>
                       <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
-                        {(rbtProfile.availabilityJson as any).earliestStartTime || '—'} – {(rbtProfile.availabilityJson as any).latestEndTime || '—'}
+                        {av.earliestStartTime || '—'} – {av.latestEndTime || '—'}
                       </p>
                     </div>
                   )}
                 </div>
               </div>
-            )}
+              )
+            })()}
 
             {/* Languages */}
             {rbtProfile.languagesJson && (rbtProfile.languagesJson as any).languages && (rbtProfile.languagesJson as any).languages.length > 0 && (
@@ -1005,7 +985,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         <CardContent className="space-y-4">
           <StatusManager
             rbtId={rbtProfile.id}
-            initialStatus={rbtProfile.status as 'NEW' | 'REACH_OUT' | 'REACH_OUT_EMAIL_SENT' | 'TO_INTERVIEW' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_COMPLETED' | 'HIRED' | 'REJECTED'}
+            initialStatus={rbtProfile.status as 'NEW' | 'REACH_OUT' | 'REACH_OUT_EMAIL_SENT' | 'TO_INTERVIEW' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_COMPLETED' | 'HIRED' | 'ONBOARDING_COMPLETED' | 'STALLED' | 'REJECTED'}
             onStatusChange={(newStatus) => {
               setRbtProfile({ ...rbtProfile, status: newStatus })
             }}
@@ -1120,79 +1100,13 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         </CardContent>
       </Card>
 
-      {/* Interviews */}
-      {rbtProfile.interviews.length > 0 && (
-        <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Interview History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {rbtProfile.interviews.map((interview) => {
-                const isScheduled = interview.status === 'SCHEDULED'
-                const isCompleted = interview.status === 'COMPLETED'
-                const isPast = new Date(interview.scheduledAt) < new Date()
-                const canMarkCompleted = isScheduled && isPast
-                const canHireOrReject = isCompleted && rbtProfile.status === 'INTERVIEW_COMPLETED'
-
-                return (
-                  <div key={interview.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-elevated)]">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-medium dark:text-[var(--text-primary)]">
-                          {formatDateTime(interview.scheduledAt)} ({interview.durationMinutes} min)
-                        </p>
-                        <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
-                          Interviewer: {interview.interviewerName}
-                        </p>
-                        {interview.notes && (
-                          <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-2">{interview.notes}</p>
-                        )}
-                      </div>
-                      <div className="flex flex-col gap-2 items-end">
-                        <div className="flex gap-2">
-                          <Badge variant="outline" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">{interview.status}</Badge>
-                          <Badge variant="outline" className="dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">{interview.decision}</Badge>
-                        </div>
-                        {canMarkCompleted && (
-                          <Button
-                            size="sm"
-                            onClick={() => handleCompleteInterview(interview.id)}
-                            disabled={loading}
-                            className="dark:bg-[var(--status-interview-bg)] dark:text-[var(--status-interview-text)] border-0"
-                          >
-                            Mark as Completed
-                          </Button>
-                        )}
-                        {canHireOrReject && (
-                          <div className="flex gap-2 mt-2">
-                            <Button
-                              size="sm"
-                              onClick={handleHire}
-                              disabled={loading}
-                              className="dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)] border-0"
-                            >
-                              Hire
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={handleReject}
-                              disabled={loading}
-                              variant="destructive"
-                            >
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <RBTProfileInterviews
+        rbtProfile={rbtProfile}
+        loading={loading}
+        onCompleteInterview={handleCompleteInterview}
+        onHire={handleHire}
+        onReject={handleReject}
+      />
 
       {/* Admin Onboarding Override */}
       {isHired && (incompleteTasks.length > 0 || !rbtProfile.scheduleCompleted) && (
@@ -1204,233 +1118,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         />
       )}
 
-      {/* Onboarding Progress */}
-      {isHired && (
-        <Card className="border-2 border-gray-200 dark:border-[var(--border-subtle)] dark:bg-[var(--bg-elevated)]">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Onboarding Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Progress Bar */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium dark:text-[var(--text-tertiary)]">Overall Progress</span>
-                  <span className="font-bold dark:text-[var(--text-primary)]">
-                    {completedOnboardingTasks} / {totalOnboardingTasks} tasks completed
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-[var(--bg-input)] rounded-full h-4 overflow-hidden">
-                  <div
-                    className={`h-4 rounded-full transition-all ${
-                      (completedOnboardingTasks / totalOnboardingTasks) * 100 === 100
-                        ? 'bg-green-500'
-                        : 'bg-orange-600'
-                    }`}
-                    style={{
-                      width: `${(completedOnboardingTasks / totalOnboardingTasks) * 100}%`,
-                    }}
-                  />
-                </div>
-                <div className="text-sm text-gray-600 dark:text-[var(--text-disabled)]">
-                  {Math.round((completedOnboardingTasks / totalOnboardingTasks) * 100)}% complete
-                </div>
-              </div>
-
-              {/* Tasks List - hide "Download Onboarding Documents Folder" task */}
-              <div className="space-y-3 mt-6">
-                <h3 className="font-semibold text-gray-900 dark:text-[var(--text-primary)]">Tasks</h3>
-                {rbtProfile.onboardingTasks
-                  .filter(
-                    (task) =>
-                      !task.title?.toLowerCase().includes('download onboarding documents folder') &&
-                      !task.documentDownloadUrl?.includes('onboarding-package')
-                  )
-                  .map((task) => (
-                  <div key={task.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-elevated)]">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          {task.isCompleted ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-500 dark:text-[var(--status-hired-text)]" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-gray-400 dark:text-[var(--text-disabled)]" />
-                          )}
-                          <h4 className="font-medium dark:text-[var(--text-primary)]">{task.title}</h4>
-                        </div>
-                        {task.description && (
-                          <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1 ml-7">{task.description}</p>
-                        )}
-                        {task.isCompleted && task.completedAt && (
-                          <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1 ml-7">
-                            Completed: {formatDateTime(task.completedAt)}
-                          </p>
-                        )}
-                      </div>
-                      <Badge
-                        className={
-                          task.isCompleted
-                            ? 'bg-green-100 text-green-700 dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)]'
-                            : 'bg-gray-100 text-gray-600 dark:bg-[var(--bg-elevated)] dark:text-[var(--text-tertiary)]'
-                        }
-                      >
-                        {task.isCompleted ? 'Completed' : 'Pending'}
-                      </Badge>
-                    </div>
-
-                    {/* Show Signature if available */}
-                    {task.taskType === 'SIGNATURE' && task.isCompleted && task.uploadUrl && (
-                      <div className="mt-4 ml-7 p-4 bg-gray-50 dark:bg-[var(--bg-input)] rounded-lg">
-                        <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)] mb-2">Digital Signature:</p>
-                        {/* eslint-disable-next-line @next/next/no-img-element -- signature URL is dynamic/signed */}
-                        <img
-                          src={task.uploadUrl}
-                          alt="Signature"
-                          className="max-w-md border border-gray-300 dark:border-[var(--border-subtle)] rounded bg-white dark:bg-[var(--bg-elevated)] p-2"
-                        />
-                      </div>
-                    )}
-
-                    {/* Show Package Upload confirmation (no download option) */}
-                    {task.taskType === 'PACKAGE_UPLOAD' && task.isCompleted && task.uploadUrl && (
-                      <div className="mt-4 ml-7 p-4 bg-gray-50 dark:bg-[var(--bg-input)] rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="w-5 h-5 text-green-600 dark:text-[var(--status-hired-text)]" />
-                          <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Uploaded Package:</p>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
-                          Package uploaded and sent to administrator email
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Onboarding Documents - always visible for hired RBTs */}
-      {isHired && (
-        <Card className="border-2 border-gray-200 dark:border-[var(--border-subtle)] dark:bg-[var(--bg-elevated)]">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Onboarding Documents</CardTitle>
-            <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1">Acknowledgment and fillable PDF completions</p>
-          </CardHeader>
-          <CardContent>
-            {!rbtProfile.onboardingCompletions || rbtProfile.onboardingCompletions.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-[var(--text-tertiary)]">
-                <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-[var(--text-disabled)]" />
-                <p className="text-sm">No onboarding documents completed yet</p>
-              </div>
-            ) : (
-            <div className="space-y-4">
-              {rbtProfile.onboardingCompletions.map((completion) => (
-                <div key={completion.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-elevated)]">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        {completion.status === 'COMPLETED' ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500 dark:text-[var(--status-hired-text)]" />
-                        ) : completion.status === 'IN_PROGRESS' ? (
-                          <XCircle className="w-5 h-5 text-yellow-500 dark:text-[var(--status-warning-text)]" />
-                        ) : (
-                          <XCircle className="w-5 h-5 text-gray-400 dark:text-[var(--text-disabled)]" />
-                        )}
-                        <h4 className="font-medium dark:text-[var(--text-primary)]">{completion.document.title}</h4>
-                        <Badge variant="outline" className="ml-2 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
-                          {completion.document.type === 'ACKNOWLEDGMENT' ? 'Acknowledgment' : 'Fillable PDF'}
-                        </Badge>
-                      </div>
-                      {completion.completedAt && (
-                        <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1 ml-7">
-                          Completed: {formatDateTime(completion.completedAt)}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        className={
-                          completion.status === 'COMPLETED'
-                            ? 'bg-green-100 text-green-700 dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)]'
-                            : completion.status === 'IN_PROGRESS'
-                            ? 'bg-yellow-100 text-yellow-700 dark:bg-[var(--status-warning-bg)] dark:text-[var(--status-warning-text)]'
-                            : 'bg-gray-100 text-gray-600 dark:bg-[var(--bg-elevated)] dark:text-[var(--text-tertiary)]'
-                        }
-                      >
-                        {completion.status === 'COMPLETED' ? 'Completed' : completion.status === 'IN_PROGRESS' ? 'In Progress' : 'Not Started'}
-                      </Badge>
-                      {completion.status === 'COMPLETED' && (
-                        <>
-                          {completion.document.type === 'FILLABLE_PDF' ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex items-center gap-2 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]"
-                              onClick={async () => {
-                                try {
-                                  const response = await fetch(
-                                    `/api/admin/onboarding/completions/${rbtProfile.id}/${completion.id}/download`
-                                  )
-                                  if (response.ok) {
-                                    const blob = await response.blob()
-                                    const url = window.URL.createObjectURL(blob)
-                                    const a = document.createElement('a')
-                                    a.href = url
-                                    a.download = `${completion.document.title.replace(/[^a-z0-9]/gi, '_')}.pdf`
-                                    document.body.appendChild(a)
-                                    a.click()
-                                    document.body.removeChild(a)
-                                    window.URL.revokeObjectURL(url)
-                                    showToast('PDF downloaded successfully', 'success')
-                                  } else {
-                                    const error = await response.json()
-                                    showToast(error.error || 'Failed to download PDF', 'error')
-                                  }
-                                } catch (error) {
-                                  console.error('Error downloading PDF:', error)
-                                  showToast('An error occurred while downloading the PDF', 'error')
-                                }
-                              }}
-                            >
-                              <Download className="w-4 h-4" />
-                              Download PDF
-                            </Button>
-                          ) : (
-                            // For acknowledgments, show signature inline instead of download
-                            completion.acknowledgmentJson && (
-                              <div className="flex flex-col gap-2">
-                                {(completion.acknowledgmentJson as any)?.signatureData && (
-                                  <div className="border dark:border-[var(--border-subtle)] rounded p-2 bg-gray-50 dark:bg-[var(--bg-input)]">
-                                    <p className="text-xs text-gray-600 dark:text-[var(--text-tertiary)] mb-1">Signature:</p>
-                                    {/* eslint-disable-next-line @next/next/no-img-element -- data URL from signature pad */}
-                                    <img
-                                      src={(completion.acknowledgmentJson as any).signatureData}
-                                      alt="Signature"
-                                      className="max-w-[200px] max-h-[80px] border rounded"
-                                    />
-                                  </div>
-                                )}
-                                {(completion.acknowledgmentJson as any)?.typedName && (
-                                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
-                                    Signed: {(completion.acknowledgmentJson as any).typedName}
-                                  </p>
-                                )}
-                              </div>
-                            )
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <RBTProfileOnboarding rbtProfile={rbtProfile} showToast={showToast} />
 
       {/* RBT Schedule */}
       {isHired && (
@@ -1564,95 +1252,43 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         </Card>
       )}
 
-      {/* Audit Log Section */}
-      <AuditLog
+      <RBTProfileAuditLog rbtProfileId={rbtProfile.id} rbtName={`${rbtProfile.firstName} ${rbtProfile.lastName}`} />
+
+      <RBTProfileDocuments
         rbtProfileId={rbtProfile.id}
         rbtName={`${rbtProfile.firstName} ${rbtProfile.lastName}`}
+        documents={documents}
+        onboardingCompletions={rbtProfile.onboardingCompletions}
+        uploadingDocuments={uploadingDocuments}
+        uploadDisabled={confirmDialogOpen}
+        onUploadClick={handleDocumentUploadClick}
+        onDownload={handleDownloadDocument}
+        onDelete={handleDeleteDocument}
+        onRequestReupload={async (completionId) => {
+          const res = await fetch(
+            `/api/admin/rbts/${rbtProfile.id}/documents/request-reupload`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ completionId }),
+            }
+          )
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}))
+            throw new Error(data.error || 'Failed to request re-upload')
+          }
+          setRbtProfile((prev) => ({
+            ...prev,
+            onboardingCompletions:
+              prev.onboardingCompletions?.map((c) =>
+                c.id === completionId
+                  ? { ...c, status: 'NOT_STARTED' as const, signedPdfUrl: null, completedAt: null }
+                  : c
+              ) ?? [],
+          }))
+          showToast('Re-upload requested. RBT will receive an email.', 'success')
+        }}
       />
-
-      {/* Documents Section */}
-      <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Documents</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Upload Section */}
-          <div className="space-y-3">
-            <label
-              htmlFor="document-upload"
-              className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-[var(--border-subtle)] rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)] transition-colors"
-            >
-              <Upload className="w-5 h-5 text-gray-400 dark:text-[var(--text-disabled)]" />
-              <span className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">
-                {uploadingDocuments ? 'Uploading...' : 'Upload Documents'}
-              </span>
-            </label>
-            <input
-              id="document-upload"
-              type="file"
-              multiple
-              onChange={handleDocumentUploadClick}
-              className="hidden"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-              disabled={uploadingDocuments || confirmDialogOpen}
-            />
-            <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
-              Upload resumes, certifications, or other relevant documents (PDF, DOC, DOCX, JPG, PNG)
-            </p>
-          </div>
-
-          {/* Documents List */}
-          {documents.length > 0 ? (
-            <div className="space-y-2">
-              {documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center gap-3 p-3 bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] hover:shadow-md dark:hover:bg-[var(--bg-elevated-hover)] transition-shadow"
-                >
-                  <FileText className="w-5 h-5 text-orange-500 dark:text-[var(--orange-primary)] flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-[var(--text-primary)] truncate">
-                      {doc.fileName}
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
-                        {doc.documentType || 'OTHER'}
-                      </Badge>
-                      <span className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
-                        {new Date(doc.uploadedAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownloadDocument(doc.id, doc.fileName)}
-                      className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:border-[var(--border-subtle)] dark:text-[var(--orange-primary)] dark:hover:bg-[var(--bg-elevated-hover)]"
-                    >
-                      <Download className="w-4 h-4 mr-1" />
-                      Download
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteDocument(doc.id, doc.fileName)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-[var(--status-rejected-text)] dark:hover:bg-[var(--status-rejected-bg)]"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500 dark:text-[var(--text-tertiary)]">
-              <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-[var(--text-disabled)]" />
-              <p className="text-sm">No documents uploaded yet</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Confirmation Dialog */}
       <Dialog 
@@ -1739,309 +1375,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-// Helper function to convert NY time to UTC ISO string
-function nyTimeToUTC(dateStr: string, timeStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  const [h, min] = timeStr.split(':').map(Number)
-  
-  // Create a test date at noon UTC on the target date to determine timezone offset
-  // (NY uses EST UTC-5 in winter, EDT UTC-4 in summer due to DST)
-  const testDateUTC = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
-  
-  // Format in NY timezone to see what 12:00 UTC becomes in NY
-  const nyFormatted = testDateUTC.toLocaleString('en-US', {
-    timeZone: 'America/New_York',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-  
-  // Parse to get the hour in NY timezone when UTC is 12:00
-  const nyHour = parseInt(nyFormatted.split(', ')[1].split(':')[0], 10)
-  
-  // Calculate offset: if UTC 12:00 = NY 07:00, then offset is -5 (NY is 5 hours behind UTC)
-  // So to convert NY time to UTC, we ADD 5 hours
-  // offsetHours = 12 (UTC) - 7 (NY) = 5
-  const offsetHours = 12 - nyHour
-  
-  // Create UTC date: if input is NY 12:30 and offset is +5, then UTC is 17:30
-  const utcDate = new Date(Date.UTC(y, m - 1, d, h + offsetHours, min, 0))
-  return utcDate.toISOString()
-}
-
-function InterviewScheduleForm({
-  rbtProfileId,
-  onSubmit,
-  onCancel,
-}: {
-  rbtProfileId: string
-  onSubmit: (data: any) => void
-  onCancel: () => void
-}) {
-  const [interviewerEmail, setInterviewerEmail] = useState('')
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-    const dateStr = formData.get('date') as string
-    const timeStr = formData.get('time') as string
-    
-    // Treat input as New York time and convert to UTC for storage
-    onSubmit({
-      scheduledAt: nyTimeToUTC(dateStr, timeStr),
-      durationMinutes: 30,
-      interviewerName: interviewerEmail, // Use the selected email
-    })
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="date">Date</Label>
-        <Input id="date" name="date" type="date" required />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="time">Time</Label>
-        <Input id="time" name="time" type="time" step="1800" required />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="duration">Duration (minutes)</Label>
-        <Input id="duration" name="duration" type="number" defaultValue={30} readOnly className="bg-gray-50" />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="interviewerEmail">Interviewer Email</Label>
-        <Select value={interviewerEmail} onValueChange={setInterviewerEmail} required>
-          <SelectTrigger>
-            <SelectValue placeholder="Select interviewer" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="aaronsiam21@gmail.com">aaronsiam21@gmail.com</SelectItem>
-            <SelectItem value="kazi@siyam.nyc">kazi@siyam.nyc</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit">Schedule Interview</Button>
-      </DialogFooter>
-    </form>
-  )
-}
-
-function EditProfileForm({
-  rbtProfile,
-  onCancel,
-  onSuccess,
-}: {
-  rbtProfile: RBTProfile
-  onCancel: () => void
-  onSuccess: () => void
-}) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-
-    const formData = new FormData(e.currentTarget)
-    const data = {
-      firstName: formData.get('firstName'),
-      lastName: formData.get('lastName'),
-      phoneNumber: formData.get('phoneNumber'),
-      email: formData.get('email') || null,
-      locationCity: formData.get('locationCity') || null,
-      locationState: formData.get('locationState') || null,
-      zipCode: formData.get('zipCode') || null,
-      addressLine1: formData.get('addressLine1') || null,
-      addressLine2: formData.get('addressLine2') || null,
-      preferredServiceArea: formData.get('preferredServiceArea') || null,
-      notes: formData.get('notes') || null,
-    }
-
-    try {
-      const response = await fetch(`/api/admin/rbts/${rbtProfile.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        credentials: 'include',
-      })
-
-      if (!response.ok) {
-        const result = await response.json()
-        throw new Error(result.error || 'Failed to update profile')
-      }
-
-      onSuccess()
-    } catch (err: any) {
-      setError(err.message || 'Failed to update profile')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label htmlFor="edit-firstName">First Name *</Label>
-          <Input
-            id="edit-firstName"
-            name="firstName"
-            defaultValue={rbtProfile.firstName}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-lastName">Last Name *</Label>
-          <Input
-            id="edit-lastName"
-            name="lastName"
-            defaultValue={rbtProfile.lastName}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-phoneNumber">Phone Number *</Label>
-          <Input
-            id="edit-phoneNumber"
-            name="phoneNumber"
-            type="tel"
-            defaultValue={rbtProfile.phoneNumber}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-email">Email</Label>
-          <Input
-            id="edit-email"
-            name="email"
-            type="email"
-            defaultValue={rbtProfile.email || ''}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-locationCity">City</Label>
-          <Input
-            id="edit-locationCity"
-            name="locationCity"
-            defaultValue={rbtProfile.locationCity || ''}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-locationState">State</Label>
-          <Input
-            id="edit-locationState"
-            name="locationState"
-            maxLength={2}
-            placeholder="NY"
-            defaultValue={rbtProfile.locationState || ''}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-zipCode">Zip Code *</Label>
-          <Input
-            id="edit-zipCode"
-            name="zipCode"
-            defaultValue={rbtProfile.zipCode || ''}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-preferredServiceArea">Preferred Service Area</Label>
-          <Input
-            id="edit-preferredServiceArea"
-            name="preferredServiceArea"
-            defaultValue={rbtProfile.preferredServiceArea || ''}
-          />
-        </div>
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="edit-addressLine1">Address Line 1 *</Label>
-          <Input
-            id="edit-addressLine1"
-            name="addressLine1"
-            defaultValue={rbtProfile.addressLine1 || ''}
-            required
-          />
-        </div>
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="edit-addressLine2">Address Line 2</Label>
-          <Input
-            id="edit-addressLine2"
-            name="addressLine2"
-            defaultValue={rbtProfile.addressLine2 || ''}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-gender">Gender</Label>
-          <Select name="gender" defaultValue={rbtProfile.gender || 'Male'}>
-            <SelectTrigger id="edit-gender">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Male">Male</SelectItem>
-              <SelectItem value="Female">Female</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-fortyHourCourseCompleted">40-Hour RBT Course Already Completed</Label>
-          <Select name="fortyHourCourseCompleted" defaultValue={rbtProfile.fortyHourCourseCompleted ? 'true' : 'false'}>
-            <SelectTrigger id="edit-fortyHourCourseCompleted">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="false">No</SelectItem>
-              <SelectItem value="true">Yes</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-sm text-gray-500">
-            If &quot;No&quot;, the RBT will need to complete the 40-hour course and upload certificate during onboarding.
-          </p>
-        </div>
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="edit-notes">Notes</Label>
-          <textarea
-            id="edit-notes"
-            name="notes"
-            rows={4}
-            defaultValue={rbtProfile.notes || ''}
-            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          />
-        </div>
-      </div>
-
-      {error && (
-        <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-          {error}
-        </div>
-      )}
-
-      <div className="flex gap-4">
-        <Button type="submit" disabled={loading}>
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            'Save Changes'
-          )}
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
-          Cancel
-        </Button>
-      </div>
-    </form>
   )
 }
 

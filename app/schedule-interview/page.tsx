@@ -14,6 +14,7 @@ import PublicNavBar from '@/components/public/PublicNavBar'
 import PublicFooter from '@/components/public/PublicFooter'
 import Image from 'next/image'
 import Link from 'next/link'
+import CalendlyInterviewScheduler from '@/components/public/CalendlyInterviewScheduler'
 
 interface TimeSlot {
   value: string
@@ -37,6 +38,7 @@ const TIME_SLOTS: TimeSlot[] = [
 ]
 
 export default function ScheduleInterviewPage() {
+  return <CalendlyInterviewScheduler />
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')

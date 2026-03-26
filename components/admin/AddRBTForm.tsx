@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { X, FileText, Upload, Loader2 } from 'lucide-react'
-import AddressAutocomplete, { type AddressComponents } from '@/components/ui/AddressAutocomplete'
+import AddressAutocomplete, { type StructuredAddress } from '@/components/ui/AddressAutocomplete'
 
 interface DocumentFile {
   file: File
@@ -45,7 +45,7 @@ export default function AddRBTForm() {
   const [locationState, setLocationState] = useState('')
   const [zipCode, setZipCode] = useState('')
 
-  const handleAddressSelect = useCallback((address: AddressComponents) => {
+  const handleAddressSelect = useCallback((address: StructuredAddress) => {
     setAddressLine1(address.addressLine1)
     setAddressLine2(address.addressLine2 || '')
     setLocationCity(address.city)
@@ -248,7 +248,7 @@ export default function AddRBTForm() {
             <div className="md:col-span-2 space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Location &amp; Address</p>
               <AddressAutocomplete
-                onPlaceSelect={handleAddressSelect}
+                onAddressSelect={handleAddressSelect}
                 placeholder="Search address to auto-fill below..."
                 id="address-search"
                 label="Search address (optional)"
