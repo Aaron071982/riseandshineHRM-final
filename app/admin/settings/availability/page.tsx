@@ -98,14 +98,18 @@ export default function AvailabilitySettingsPage() {
   }, [])
 
   const update = (patch: Partial<MyAvailability>) => {
-    setData({ ...data, ...patch })
+    // Use functional updates so multiple rapid field changes don't get dropped
+    // due to stale `data` captured by closures.
+    setData((prev) => ({ ...prev, ...patch }))
   }
 
   const setDay = (dayOfWeek: number, updater: (d: DayState) => DayState) => {
-    setData({
-      ...data,
-      availability: data.availability.map((d) => (d.dayOfWeek === dayOfWeek ? updater(d) : d)),
-    })
+    // Functional update ensures hour/minute changes in the same UI interaction
+    // are applied consistently.
+    setData((prev) => ({
+      ...prev,
+      availability: prev.availability.map((d) => (d.dayOfWeek === dayOfWeek ? updater(d) : d)),
+    }))
   }
 
   const addRange = (dayOfWeek: number) => {
