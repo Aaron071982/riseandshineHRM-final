@@ -34,6 +34,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
 import { trackButtonClick } from '@/lib/activity-tracker'
 import RBTProfileInterviews from './rbt-profile/RBTProfileInterviews'
@@ -44,6 +51,7 @@ import InterviewScheduleForm from './rbt-profile/InterviewScheduleForm'
 import InterviewNotesButton from './InterviewNotesButton'
 import AuditLog from '@/components/admin/AuditLog'
 import AvailabilityGridPreview from '@/components/admin/rbt-profile/AvailabilityGridPreview'
+import AdminRbtAvailabilityDialog from '@/components/admin/rbt-profile/AdminRbtAvailabilityDialog'
 import EditProfileForm from '@/components/admin/rbt-profile/EditProfileForm'
 import type { RBTProfile } from './rbt-profile/types'
 
@@ -126,6 +134,16 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
   const [editTimeEnd, setEditTimeEnd] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
+  const [availabilityEditOpen, setAvailabilityEditOpen] = useState(false)
+  const [addAssignmentOpen, setAddAssignmentOpen] = useState(false)
+  const [schedulingClients, setSchedulingClients] = useState<Array<{ id: string; name: string }>>([])
+  const [addAssignmentClientId, setAddAssignmentClientId] = useState('')
+  const [addAssignmentDays, setAddAssignmentDays] = useState<number[]>([])
+  const [addAssignmentTimeStart, setAddAssignmentTimeStart] = useState('')
+  const [addAssignmentTimeEnd, setAddAssignmentTimeEnd] = useState('')
+  const [addAssignmentNotes, setAddAssignmentNotes] = useState('')
+  const [addAssignmentSubmitting, setAddAssignmentSubmitting] = useState(false)
+  const [clientsLoading, setClientsLoading] = useState(false)
 
   const DAYS: Array<{ value: number; label: string }> = [
     { value: 0, label: 'Sun' },
@@ -736,6 +754,83 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
     }
   }
 
+  useEffect(() => {
+    if (!addAssignmentOpen) return
+    setAddAssignmentClientId('')
+    setAddAssignmentDays([])
+    setAddAssignmentTimeStart('')
+    setAddAssignmentTimeEnd('')
+    setAddAssignmentNotes('')
+    setClientsLoading(true)
+    fetch('/api/admin/scheduling-beta/clients', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : { clients: [] }))
+      .then((data) => {
+        const list = (data.clients ?? []) as Array<{ id: string; name: string }>
+        setSchedulingClients(list.map((c) => ({ id: c.id, name: c.name })))
+      })
+      .catch(() => setSchedulingClients([]))
+      .finally(() => setClientsLoading(false))
+  }, [addAssignmentOpen])
+
+  const submitAddAssignment = async () => {
+    if (!addAssignmentClientId) {
+      showToast('Select a client', 'error')
+      return
+    }
+    if (addAssignmentDays.length === 0) {
+      showToast('Select at least one day', 'error')
+      return
+    }
+    setAddAssignmentSubmitting(true)
+    try {
+      const res = await fetch('/api/admin/scheduling-beta/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          rbtProfileId: rbtProfile.id,
+          clientId: addAssignmentClientId,
+          daysOfWeek: [...addAssignmentDays].sort((a, b) => a - b),
+          timeStart: addAssignmentTimeStart.trim() || null,
+          timeEnd: addAssignmentTimeEnd.trim() || null,
+          notes: addAssignmentNotes.trim() || null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || 'Failed to create assignment', 'error')
+        return
+      }
+      const a = data.assignment as {
+        id: string
+        clientName: string
+        daysOfWeek: number[]
+        timeStart: string | null
+        timeEnd: string | null
+        notes: string | null
+      }
+      if (a?.id) {
+        setClientAssignments((prev) => [
+          {
+            id: a.id,
+            clientName: a.clientName,
+            daysOfWeek: a.daysOfWeek,
+            timeStart: a.timeStart,
+            timeEnd: a.timeEnd,
+            notes: a.notes,
+          },
+          ...prev,
+        ])
+      }
+      setAddAssignmentOpen(false)
+      showToast('Assignment added', 'success')
+    } catch {
+      showToast('Failed to create assignment', 'error')
+    } finally {
+      setAddAssignmentSubmitting(false)
+    }
+  }
+
   // eslint-disable-next-line react/jsx-no-target-blank
   const root = (
     <div className="min-h-screen bg-gray-50 dark:bg-[var(--bg-primary)]">
@@ -1012,13 +1107,25 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
             )}
             {activeTab === 'availability' && (
               <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
-                <CardHeader className="py-3">
-                  <CardTitle className="text-lg font-semibold text-gray-900 dark:text-[var(--text-primary)]">
-                    Weekly availability
-                  </CardTitle>
-                  <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)]">
-                    Days and hourly window from their application. Orange cells = available that hour.
-                  </p>
+                <CardHeader className="py-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-gray-900 dark:text-[var(--text-primary)]">
+                      Weekly availability
+                    </CardTitle>
+                    <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)] mt-1">
+                      Days and hourly window from their application. Orange cells = available that hour.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => setAvailabilityEditOpen(true)}
+                    disabled={loading}
+                  >
+                    Edit availability &amp; schedule
+                  </Button>
                 </CardHeader>
                 <CardContent className="pt-0 space-y-4">
                   <AvailabilityGridPreview availabilityJson={rbtProfile.availabilityJson || derivedAvailabilityJson} />
@@ -1030,16 +1137,27 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                   ) : null}
 
                   <div className="border-t border-gray-200 dark:border-[var(--border-subtle)] pt-4">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-sm font-semibold text-gray-900 dark:text-[var(--text-primary)]">
                         Assigned clients
                       </p>
-                      <Link
-                        href="/admin/scheduling-beta"
-                        className="text-xs font-semibold text-orange-600 hover:underline dark:text-[var(--orange-primary)]"
-                      >
-                        Open scheduling demo →
-                      </Link>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAddAssignmentOpen(true)}
+                          disabled={loading}
+                        >
+                          Add assignment
+                        </Button>
+                        <Link
+                          href="/admin/scheduling-beta"
+                          className="text-xs font-semibold text-orange-600 hover:underline dark:text-[var(--orange-primary)]"
+                        >
+                          Open scheduling demo →
+                        </Link>
+                      </div>
                     </div>
 
                     {clientAssignmentsLoading ? (
@@ -1293,6 +1411,134 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                 {confirmLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing...</> : deleteStep === 1 ? 'Continue' : 'Confirm'}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AdminRbtAvailabilityDialog
+        open={availabilityEditOpen}
+        onOpenChange={setAvailabilityEditOpen}
+        rbtProfileId={rbtProfile.id}
+        availabilityJson={rbtProfile.availabilityJson}
+        preferredHoursRange={rbtProfile.preferredHoursRange}
+        showToast={showToast}
+        onSaved={(data) => {
+          setRbtProfile((prev) => ({
+            ...prev,
+            availabilityJson: data.availabilityJson,
+            preferredHoursRange: data.preferredHoursRange,
+            scheduleCompleted: data.scheduleCompleted,
+          }))
+          fetchAuditLogs()
+        }}
+      />
+
+      <Dialog open={addAssignmentOpen} onOpenChange={setAddAssignmentOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add client assignment</DialogTitle>
+            <DialogDescription>
+              Link a scheduling client to this RBT with days and optional times.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Client *</Label>
+              {clientsLoading ? (
+                <div className="flex items-center gap-2 mt-2 text-sm text-gray-600">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading clients…
+                </div>
+              ) : schedulingClients.length === 0 ? (
+                <p className="text-sm text-amber-700 mt-2">
+                  No clients in the list. Add one from{' '}
+                  <Link href="/admin/scheduling-beta" className="underline font-medium">
+                    scheduling beta
+                  </Link>{' '}
+                  or create via API.
+                </p>
+              ) : (
+                <Select value={addAssignmentClientId} onValueChange={setAddAssignmentClientId}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {schedulingClients.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            <div>
+              <Label>Days of week *</Label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {DAYS.map((d) => (
+                  <button
+                    key={d.value}
+                    type="button"
+                    onClick={() =>
+                      setAddAssignmentDays((prev) =>
+                        prev.includes(d.value)
+                          ? prev.filter((x) => x !== d.value)
+                          : [...prev, d.value].sort((a, b) => a - b)
+                      )
+                    }
+                    className={`inline-flex items-center justify-center w-10 h-8 rounded text-sm border ${
+                      addAssignmentDays.includes(d.value)
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'border-input bg-background'
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Time start</Label>
+                <Input
+                  value={addAssignmentTimeStart}
+                  onChange={(e) => setAddAssignmentTimeStart(e.target.value)}
+                  placeholder="16:00"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Time end</Label>
+                <Input
+                  value={addAssignmentTimeEnd}
+                  onChange={(e) => setAddAssignmentTimeEnd(e.target.value)}
+                  placeholder="19:00"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <textarea
+                value={addAssignmentNotes}
+                onChange={(e) => setAddAssignmentNotes(e.target.value)}
+                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAddAssignmentOpen(false)} disabled={addAssignmentSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={submitAddAssignment}
+              disabled={addAssignmentSubmitting || clientsLoading || schedulingClients.length === 0 || !addAssignmentClientId || addAssignmentDays.length === 0}
+            >
+              {addAssignmentSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Add assignment
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
