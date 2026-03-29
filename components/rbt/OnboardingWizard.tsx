@@ -348,6 +348,8 @@ export default function OnboardingWizard({
           {currentStep?.kind === 'task' && currentStep.task.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE' && (
             <FortyHourUpload
               taskId={currentStep.task.id}
+              courseUrl={currentStep.task.documentDownloadUrl}
+              description={currentStep.task.description}
               onComplete={() => {
                 setLocalCompleted((prev) => new Set(prev).add(`task:${currentStep.task.id}`))
                 if (currentIndex < steps.length - 1) setCurrentIndex((i) => i + 1)
@@ -419,14 +421,22 @@ export default function OnboardingWizard({
   )
 }
 
+/** Same default as hire route / dashboard when task row has no URL yet */
+const DEFAULT_RBT_40_HOUR_COURSE_URL =
+  'https://courses.autismpartnershipfoundation.org/offers/it285gs6/checkout'
+
 function FortyHourUpload({
   taskId,
+  courseUrl,
+  description,
   onComplete,
   loading,
   setLoading,
   showToast,
 }: {
   taskId: string
+  courseUrl: string | null
+  description: string | null
   onComplete: () => void
   loading: boolean
   setLoading: (v: boolean) => void
@@ -470,8 +480,28 @@ function FortyHourUpload({
     }
   }
 
+  const href = (courseUrl && courseUrl.trim()) || DEFAULT_RBT_40_HOUR_COURSE_URL
+
   return (
     <div className="space-y-4">
+      <div className="rounded-lg border border-[#e36f1e]/30 bg-orange-50/80 dark:bg-orange-950/25 dark:border-orange-800/50 p-4 space-y-3">
+        <p className="text-sm font-medium text-gray-900 dark:text-[var(--text-primary)]">
+          Open the 40-hour RBT course (opens in a new tab)
+        </p>
+        <Button asChild className="bg-[#e36f1e] hover:bg-[#c85f18] text-white">
+          <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2">
+            <ExternalLink className="w-4 h-4" />
+            Access 40-Hour Course
+          </a>
+        </Button>
+      </div>
+      {description ? (
+        <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">{description}</p>
+      ) : (
+        <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+          After you finish the course, upload your certificate of completion below.
+        </p>
+      )}
       <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
         Upload your 40-hour RBT course certificate (PDF, JPG, or PNG, max 10MB).
       </p>
