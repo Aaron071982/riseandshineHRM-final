@@ -362,6 +362,23 @@ export default function OnboardingWizard({
             />
           )}
 
+          {currentStep?.kind === 'task' && currentStep.task.taskType === 'SOCIAL_SECURITY_DOCUMENT' && (
+            <SensitiveDocUpload
+              taskId={currentStep.task.id}
+              description={currentStep.task.description}
+              uploadLabel="Upload Social Security card"
+              onComplete={() => {
+                setLocalCompleted((prev) => new Set(prev).add(`task:${currentStep.task.id}`))
+                if (currentIndex < steps.length - 1) setCurrentIndex((i) => i + 1)
+                else setShowAllDone(true)
+                showToast('Social Security card uploaded', 'success')
+              }}
+              loading={loading}
+              setLoading={setLoading}
+              showToast={showToast}
+            />
+          )}
+
           {currentStep?.kind === 'document' && currentStep.document.type === 'ACKNOWLEDGMENT' && (
             <AcknowledgmentFlow
               document={{
@@ -519,6 +536,95 @@ function FortyHourUpload({
       <Button onClick={handleUpload} disabled={!file || uploading}>
         {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
         Upload certificate
+      </Button>
+    </div>
+  )
+}
+
+/** PDF/JPEG/PNG upload for Social Security card (no external link). */
+function SensitiveDocUpload({
+  taskId,
+  description,
+  uploadLabel,
+  onComplete,
+  loading,
+  setLoading,
+  showToast,
+}: {
+  taskId: string
+  description: string | null
+  uploadLabel: string
+  onComplete: () => void
+  loading: boolean
+  setLoading: (v: boolean) => void
+  showToast: (msg: string, type: 'success' | 'error') => void
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+
+  const handleUpload = async () => {
+    if (!file) {
+      showToast('Please select a file first', 'error')
+      return
+    }
+    const maxSize = 10 * 1024 * 1024
+    if (file.size > maxSize) {
+      showToast('File must be under 10MB', 'error')
+      return
+    }
+    const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
+    if (!allowed.includes(file.type)) {
+      showToast('Please upload a PDF, JPG, or PNG', 'error')
+      return
+    }
+    setUploading(true)
+    setLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`/api/rbt/onboarding-tasks/${taskId}/upload`, { method: 'POST', body: formData })
+      if (res.ok) {
+        onComplete()
+      } else {
+        const data = await res.json()
+        showToast(data.error || 'Upload failed', 'error')
+      }
+    } catch {
+      showToast('Upload failed', 'error')
+    } finally {
+      setUploading(false)
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-amber-200/80 bg-amber-50/90 dark:bg-amber-950/20 dark:border-amber-800/40 p-4">
+        <p className="text-sm text-gray-800 dark:text-[var(--text-primary)]">
+          Upload a <strong>clear</strong> image of your Social Security card. Do not obscure any text. This is kept
+          confidential and used only for payroll and employment verification.
+        </p>
+      </div>
+      {description ? (
+        <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">{description}</p>
+      ) : null}
+      <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+        Accepted: PDF, JPG, or PNG — max 10MB.
+      </p>
+      <input
+        type="file"
+        accept=".pdf,image/jpeg,image/jpg,image/png,application/pdf"
+        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-[#e36f1e] file:text-white"
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+      />
+      {file && (
+        <p className="text-sm text-gray-600">
+          Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
+        </p>
+      )}
+      <Button onClick={handleUpload} disabled={!file || uploading}>
+        {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+        {uploadLabel}
       </Button>
     </div>
   )

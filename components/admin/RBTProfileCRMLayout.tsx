@@ -642,6 +642,11 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
   const canReject = rbtProfile.status !== 'HIRED' && rbtProfile.status !== 'REJECTED'
   const isHired = rbtProfile.status === 'HIRED'
   const incompleteTasks = rbtProfile.onboardingTasks.filter((t) => !t.isCompleted)
+  const ssnOnboardingTask = rbtProfile.onboardingTasks.find((t) => t.taskType === 'SOCIAL_SECURITY_DOCUMENT')
+  const canSendSsnReminder =
+    isHired &&
+    !!rbtProfile.email?.trim() &&
+    (!ssnOnboardingTask || !ssnOnboardingTask.isCompleted)
 
   const fullAddress = [rbtProfile.addressLine1, rbtProfile.addressLine2, rbtProfile.locationCity, rbtProfile.locationState, rbtProfile.zipCode].filter(Boolean).join(', ') || '—'
   const daysSinceApplication = rbtProfile.submittedAt
@@ -1415,7 +1420,20 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
           </DialogHeader>
           <div className="space-y-2">
             {canSendReachOut && <Button variant="outline" className="w-full justify-start" onClick={() => handleSendEmailByTemplate('REACH_OUT')}>Reach out</Button>}
-            {isHired && incompleteTasks.length > 0 && <Button variant="outline" className="w-full justify-start" onClick={() => handleSendEmailByTemplate('MISSING_ONBOARDING')}>Missing onboarding reminder</Button>}
+            {isHired && incompleteTasks.length > 0 && (
+              <Button variant="outline" className="w-full justify-start" onClick={() => handleSendEmailByTemplate('MISSING_ONBOARDING')}>
+                Missing onboarding reminder
+              </Button>
+            )}
+            {canSendSsnReminder && (
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => handleSendEmailByTemplate('SOCIAL_SECURITY_UPLOAD_REMINDER')}
+              >
+                Social Security upload reminder
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>

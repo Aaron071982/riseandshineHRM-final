@@ -4,6 +4,7 @@ import { requireAdminSession } from '@/lib/auth'
 import { getWorkflowSettings } from '@/lib/workflow-settings'
 import { sendEmail, sendGenericEmail, generateOfferEmail, EmailTemplateType } from '@/lib/email'
 import { makePublicUrl } from '@/lib/baseUrl'
+import { ensureSocialSecurityOnboardingTask } from '@/lib/onboarding/socialSecurityTask'
 
 export async function POST(
   request: NextRequest,
@@ -166,10 +167,18 @@ export async function POST(
           sortOrder: 6,
         }] : []),
         {
+          taskType: 'SOCIAL_SECURITY_DOCUMENT',
+          title: 'Upload Social Security card',
+          description:
+            'Upload a clear photo or scan of your Social Security card (PDF, JPG, or PNG, max 10MB). This is required for payroll and employment records.',
+          documentDownloadUrl: null,
+          sortOrder: needsFortyHourCourse ? 7 : 6,
+        },
+        {
           taskType: 'SIGNATURE',
           title: 'Digital Signature Confirmation',
           description: 'Sign to confirm you have read and understood all HIPAA documents and training materials',
-          sortOrder: needsFortyHourCourse ? 7 : 6,
+          sortOrder: needsFortyHourCourse ? 8 : 7,
         },
       ]
 
@@ -195,15 +204,24 @@ export async function POST(
         // Tasks can be created manually if needed
       }
     } else {
-      // Tasks already exist - check if they match expected structure
+      // Tasks already exist - ensure Social Security step exists (non-destructive), then validate structure
+      await ensureSocialSecurityOnboardingTask(prisma, rbtProfile.id)
+      let tasksAfterEnsure = await prisma.onboardingTask.findMany({
+        where: { rbtProfileId: rbtProfile.id },
+      })
+
       const needsFortyHourCourse = !(rbtProfile.fortyHourCourseCompleted === true)
-      const expectedTaskCount = needsFortyHourCourse ? 7 : 6
-      const hasFortyHourCourseTask = existingTasks.some(t => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
-      console.log(`RBT ${rbtProfile.id} - Existing tasks: ${existingTasks.length}, Expected: ${expectedTaskCount}, Has 40-hour task: ${hasFortyHourCourseTask}, Needs course: ${needsFortyHourCourse}, fortyHourCourseCompleted value: ${rbtProfile.fortyHourCourseCompleted}`)
-      
+      const expectedTaskCount = needsFortyHourCourse ? 8 : 7
+      const hasFortyHourCourseTask = tasksAfterEnsure.some((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
+      console.log(
+        `RBT ${rbtProfile.id} - Existing tasks: ${tasksAfterEnsure.length}, Expected: ${expectedTaskCount}, Has 40-hour task: ${hasFortyHourCourseTask}, Needs course: ${needsFortyHourCourse}, fortyHourCourseCompleted value: ${rbtProfile.fortyHourCourseCompleted}`
+      )
+
       // If task count is wrong OR 40-hour course task is missing when it should exist, recreate tasks
-      if (existingTasks.length !== expectedTaskCount || (needsFortyHourCourse && !hasFortyHourCourseTask)) {
-        console.log(`⚠️ Found ${existingTasks.length} tasks (expected ${expectedTaskCount}) for RBT ${rbtProfile.id}. Missing 40-hour course task: ${needsFortyHourCourse && !hasFortyHourCourseTask}. Recreating tasks...`)
+      if (tasksAfterEnsure.length !== expectedTaskCount || (needsFortyHourCourse && !hasFortyHourCourseTask)) {
+        console.log(
+          `⚠️ Found ${tasksAfterEnsure.length} tasks (expected ${expectedTaskCount}) for RBT ${rbtProfile.id}. Missing 40-hour course task: ${needsFortyHourCourse && !hasFortyHourCourseTask}. Recreating tasks...`
+        )
         
         // Delete existing tasks
         await prisma.onboardingTask.deleteMany({
@@ -255,10 +273,18 @@ export async function POST(
             sortOrder: 6,
           }] : []),
           {
+            taskType: 'SOCIAL_SECURITY_DOCUMENT',
+            title: 'Upload Social Security card',
+            description:
+              'Upload a clear photo or scan of your Social Security card (PDF, JPG, or PNG, max 10MB). This is required for payroll and employment records.',
+            documentDownloadUrl: null,
+            sortOrder: needsFortyHourCourse ? 7 : 6,
+          },
+          {
             taskType: 'SIGNATURE',
             title: 'Digital Signature Confirmation',
             description: 'Sign to confirm you have read and understood all HIPAA documents and training materials',
-            sortOrder: needsFortyHourCourse ? 7 : 6,
+            sortOrder: needsFortyHourCourse ? 8 : 7,
           },
         ]
 
@@ -282,7 +308,7 @@ export async function POST(
           console.error(`❌ Error recreating onboarding tasks:`, taskError)
         }
       } else {
-        console.log(`✅ Onboarding tasks already exist for RBT ${rbtProfile.id} (${existingTasks.length} tasks)`)
+        console.log(`✅ Onboarding tasks already exist for RBT ${rbtProfile.id} (${tasksAfterEnsure.length} tasks)`)
       }
     }
 

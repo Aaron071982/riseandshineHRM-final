@@ -6,8 +6,11 @@ import {
   generateReachOutEmail,
   generateRejectionEmail,
   generateMissingOnboardingEmail,
+  generateSocialSecurityUploadReminderEmail,
   EmailTemplateType,
 } from '@/lib/email'
+import { makePublicUrl } from '@/lib/baseUrl'
+import { ensureSocialSecurityOnboardingTask } from '@/lib/onboarding/socialSecurityTask'
 import { randomBytes } from 'crypto'
 
 export async function POST(
@@ -123,6 +126,28 @@ export async function POST(
           )
         }
         emailContent = generateMissingOnboardingEmail(rbtProfile, incompleteTasks)
+        break
+      }
+      case EmailTemplateType.SOCIAL_SECURITY_UPLOAD_REMINDER: {
+        await ensureSocialSecurityOnboardingTask(prisma, rbtProfile.id)
+        const refreshed = await prisma.onboardingTask.findMany({
+          where: { rbtProfileId: rbtProfile.id, taskType: 'SOCIAL_SECURITY_DOCUMENT' },
+        })
+        const ssnTask = refreshed[0]
+        if (!ssnTask) {
+          return NextResponse.json(
+            { error: 'Could not add Social Security onboarding task. Ensure the RBT has a signature step in onboarding.' },
+            { status: 400 }
+          )
+        }
+        if (ssnTask.isCompleted) {
+          return NextResponse.json(
+            { error: 'Social Security card has already been uploaded for this RBT.' },
+            { status: 400 }
+          )
+        }
+        const tasksUrl = makePublicUrl('/rbt/tasks')
+        emailContent = generateSocialSecurityUploadReminderEmail(rbtProfile.firstName, tasksUrl)
         break
       }
       default:

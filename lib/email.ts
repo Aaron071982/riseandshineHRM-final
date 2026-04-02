@@ -17,6 +17,7 @@ export {
   generateTeamWelcomeEmail,
   generateManualHireOnboardingEmail,
   generateIdReminderEmail,
+  generateSocialSecurityUploadReminderEmail,
   generateRejectionEmail,
   generateMissingOnboardingEmail,
   generateApplicationSubmissionInternalEmail,

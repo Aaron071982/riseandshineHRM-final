@@ -17,6 +17,7 @@ export enum EmailTemplateType {
   OFFER = 'OFFER',
   REJECTION = 'REJECTION',
   MISSING_ONBOARDING = 'MISSING_ONBOARDING',
+  SOCIAL_SECURITY_UPLOAD_REMINDER = 'SOCIAL_SECURITY_UPLOAD_REMINDER',
 }
 
 function getFromEmail(templateType: EmailTemplateType, customFrom?: string): string {

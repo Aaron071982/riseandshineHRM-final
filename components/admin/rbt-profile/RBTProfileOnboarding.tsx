@@ -26,6 +26,35 @@ export default function RBTProfileOnboarding({ rbtProfile, showToast }: RBTProfi
       !task.documentDownloadUrl?.includes('onboarding-package')
   )
 
+  const handleDownloadSsnTask = async (taskId: string) => {
+    try {
+      const response = await fetch(
+        `/api/admin/rbts/${rbtProfile.id}/onboarding-tasks/${taskId}/download`,
+        { credentials: 'include' }
+      )
+      if (response.ok) {
+        const blob = await response.blob()
+        const cd = response.headers.get('Content-Disposition')
+        const match = cd?.match(/filename="([^"]+)"/)
+        const filename = match?.[1] || 'social-security-card.pdf'
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        showToast('Download started', 'success')
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast((err as { error?: string })?.error || 'Failed to download', 'error')
+      }
+    } catch {
+      showToast('Failed to download file', 'error')
+    }
+  }
+
   const handleDownloadCompletion = async (completionId: string, title: string) => {
     try {
       const response = await fetch(
@@ -137,6 +166,22 @@ export default function RBTProfileOnboarding({ rbtProfile, showToast }: RBTProfi
                       </div>
                       <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
                         Package uploaded and sent to administrator email
+                      </p>
+                    </div>
+                  )}
+                  {task.taskType === 'SOCIAL_SECURITY_DOCUMENT' && task.isCompleted && (
+                    <div className="mt-4 ml-7 flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex items-center gap-2 dark:border-[var(--border-subtle)]"
+                        onClick={() => handleDownloadSsnTask(task.id)}
+                      >
+                        <Download className="w-4 h-4" />
+                        Download Social Security card
+                      </Button>
+                      <p className="text-xs text-gray-500 dark:text-[var(--text-tertiary)] w-full">
+                        Stored securely; handle per your data policy.
                       </p>
                     </div>
                   )}

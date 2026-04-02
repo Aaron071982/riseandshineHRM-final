@@ -633,7 +633,8 @@ export function generateManualHireOnboardingEmail(
             <p style="margin-top: 0;"><strong>Next steps:</strong></p>
             <ul style="margin-bottom: 0;">
               <li>Log in to the Rise and Shine HRM portal (link below)</li>
-              <li>Complete all onboarding tasks (HIPAA docs, training, signature)</li>
+              <li>Complete all onboarding tasks (HIPAA materials, Social Security card upload, digital signature)</li>
+              <li>Upload a clear photo or scan of your Social Security card where prompted (My Tasks / onboarding)</li>
               <li>If you have not completed the 40-hour RBT course, you will see it in your onboarding—complete it and upload your certificate</li>
             </ul>
           </div>
@@ -693,6 +694,59 @@ export function generateIdReminderEmail(fullName: string): { subject: string; ht
         </div>
         <div class="footer">
           <p><strong>Rise and Shine</strong></p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}
+
+/** Reminder to upload Social Security card via HRM onboarding (My Tasks). */
+export function generateSocialSecurityUploadReminderEmail(
+  firstName: string,
+  tasksUrl: string
+): { subject: string; html: string } {
+  const subject = 'Action required: Upload your Social Security card – Rise and Shine'
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: bold; }
+        .content { padding: 30px 20px; background-color: #ffffff; }
+        .content p { margin: 16px 0; }
+        .cta { display: inline-block; margin: 20px 0; padding: 14px 28px; background-color: #E4893D; color: white !important; text-decoration: none; border-radius: 8px; font-weight: 600; }
+        .highlight { background-color: #fff5f0; border-left: 4px solid #E4893D; padding: 16px 20px; margin: 20px 0; border-radius: 4px; }
+        .footer { padding: 24px 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Rise and Shine</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.95;">Complete your onboarding</p>
+        </div>
+        <div class="content">
+          <p>Hello <strong>${firstName}</strong>,</p>
+          <p>We need one more item to finish your onboarding: a clear upload of your <strong>Social Security card</strong> (photo or scan). This is required for payroll and employment records.</p>
+          <div class="highlight">
+            <p style="margin: 0;"><strong>Accepted formats:</strong> PDF, JPG, or PNG (max 10MB).</p>
+          </div>
+          <p>Please log in to the HRM portal and open <strong>My Tasks</strong> to upload your card. If you have other onboarding steps pending, you can complete those in the same place.</p>
+          <p style="text-align: center;">
+            <a href="${tasksUrl}" class="cta">Open My Tasks</a>
+          </p>
+          <p>If you have already uploaded your Social Security card through the portal, you can ignore this email.</p>
+          <p style="margin-top: 32px;">Questions? Contact <a href="mailto:info@riseandshine.nyc" style="color: #E4893D;">info@riseandshine.nyc</a></p>
+          <p>Best regards,<br><strong>The Rise and Shine Team</strong></p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise and Shine</strong> – HRM Portal</p>
         </div>
       </div>
     </body>

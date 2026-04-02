@@ -51,8 +51,8 @@ export async function POST(
       )
     }
 
-    // Validate file type for certificate uploads
-    if (task.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE') {
+    // Validate file type for certificate / Social Security card uploads
+    if (task.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE' || task.taskType === 'SOCIAL_SECURITY_DOCUMENT') {
       const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
       if (!allowedTypes.includes(file.type)) {
         return NextResponse.json(
@@ -156,6 +156,44 @@ export async function POST(
         } catch (emailError: any) {
           console.error('Error sending certificate email:', emailError)
           // Don't fail the upload if email fails
+        }
+      }
+
+      // Social Security card: notify admin only (no attachment — download from admin dashboard)
+      if (task.taskType === 'SOCIAL_SECURITY_DOCUMENT') {
+        try {
+          const rbtName = task.rbtProfile ? `${task.rbtProfile.firstName} ${task.rbtProfile.lastName}` : 'Unknown RBT'
+          const rbtEmail = task.rbtProfile?.email || 'Unknown email'
+          const emailSubject = `Social Security card uploaded — ${rbtName}`
+          const emailHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="UTF-8"></head>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+              <p>Hello,</p>
+              <p><strong>${rbtName}</strong> has uploaded their Social Security card in onboarding.</p>
+              <p><strong>RBT email:</strong> ${rbtEmail}<br/>
+              <strong>File:</strong> ${file.name}<br/>
+              <strong>Submitted:</strong> ${new Date().toLocaleString()}</p>
+              <p>For security, the file is <strong>not</strong> attached. Download it from the RBT’s profile in the admin portal (Onboarding → task download).</p>
+              <p>Rise and Shine HRM</p>
+            </body>
+            </html>
+          `
+          if (resendApiKey) {
+            const resend = new Resend(resendApiKey)
+            await resend.emails.send({
+              from: emailFrom,
+              to: adminEmail,
+              subject: emailSubject,
+              html: emailHtml,
+            })
+            console.log(`✅ SSN upload notification sent to ${adminEmail} for RBT ${rbtName}`)
+          } else {
+            console.log(`⚠️ [DEV MODE] SSN upload notification would be sent to ${adminEmail}`)
+          }
+        } catch (emailError: unknown) {
+          console.error('Error sending SSN notification email:', emailError)
         }
       }
 

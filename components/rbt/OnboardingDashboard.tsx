@@ -206,9 +206,12 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
     }
   }
 
-  const handleFileUpload = async (taskId: string, isCertificate = false) => {
+  const handleFileUpload = async (taskId: string) => {
     const files = selectedFiles[taskId]
-    
+    const task = tasks.find((t) => t.id === taskId)
+    const isSingleFileUpload =
+      task?.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE' || task?.taskType === 'SOCIAL_SECURITY_DOCUMENT'
+
     if (!files || files.length === 0) {
       alert('Please select at least one file first.')
       return
@@ -235,7 +238,7 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
     setUploading((prev) => ({ ...prev, [taskId]: true }))
 
     try {
-      if (isCertificate) {
+      if (isSingleFileUpload) {
         const formData = new FormData()
         formData.append('file', files[0])
 
@@ -253,7 +256,11 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
               return newState
             })
             fetchAllData()
-            alert('Certificate uploaded successfully!')
+            alert(
+              task?.taskType === 'SOCIAL_SECURITY_DOCUMENT'
+                ? 'Social Security card uploaded successfully!'
+                : 'Certificate uploaded successfully!'
+            )
           }
         } else {
           const errorData = await response.json()
@@ -328,6 +335,7 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
   )
   const signatureTasks = regularTasks.filter((t) => t.taskType === 'SIGNATURE')
   const fortyHourCourseTasks = regularTasks.filter((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
+  const socialSecurityTasks = regularTasks.filter((t) => t.taskType === 'SOCIAL_SECURITY_DOCUMENT')
 
   if (allTasksCompleted) {
     return (
@@ -573,7 +581,7 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
                           </ul>
                           <div className="flex gap-2 mt-3">
                             <Button
-                              onClick={() => handleFileUpload(task.id, true)}
+                              onClick={() => handleFileUpload(task.id)}
                               disabled={uploading[task.id]}
                               className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2"
                             >
@@ -609,6 +617,67 @@ export default function OnboardingDashboard({ rbtProfileId }: OnboardingDashboar
                         ✅ Certificate uploaded successfully
                       </p>
                     </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Social Security card */}
+      {socialSecurityTasks.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Social Security card</CardTitle>
+            <CardDescription>Required for payroll. Upload a clear photo or scan of your card.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {socialSecurityTasks.map((task) => (
+                <div key={task.id} className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        {task.isCompleted ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        ) : (
+                          <Circle className="w-5 h-5 text-gray-400" />
+                        )}
+                        <h3 className="font-medium">{task.title}</h3>
+                      </div>
+                      {task.description && <p className="text-sm text-gray-600 mt-1">{task.description}</p>}
+                    </div>
+                    {task.isCompleted && <Badge className="bg-green-500">Completed</Badge>}
+                  </div>
+                  {!task.isCompleted && (
+                    <div className="space-y-3">
+                      <input
+                        id={`file-input-${task.id}`}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => handleFileSelect(task.id, e.target.files)}
+                        className="text-sm"
+                      />
+                      <p className="text-xs text-gray-500">PDF, JPG, or PNG — max 10MB.</p>
+                      {selectedFiles[task.id] && selectedFiles[task.id].length > 0 && (
+                        <div className="flex gap-2 mt-2">
+                          <Button
+                            onClick={() => handleFileUpload(task.id)}
+                            disabled={uploading[task.id]}
+                            className="bg-orange-600 hover:bg-orange-700 text-white"
+                          >
+                            {uploading[task.id] ? 'Uploading…' : 'Upload Social Security card'}
+                          </Button>
+                          <Button variant="outline" onClick={() => handleClearSelection(task.id)} disabled={uploading[task.id]}>
+                            Clear
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {task.isCompleted && (
+                    <p className="text-sm text-gray-600">Your Social Security card has been submitted.</p>
                   )}
                 </div>
               ))}

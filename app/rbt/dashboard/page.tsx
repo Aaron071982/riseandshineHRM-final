@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import ScheduleSetupWrapper from './ScheduleSetupWrapper'
 import RBTDashboardHome from '@/components/rbt/RBTDashboardHome'
 import { PrismaClientKnownRequestError, PrismaClientInitializationError } from '@prisma/client/runtime/library'
+import { ensureSocialSecurityOnboardingTask } from '@/lib/onboarding/socialSecurityTask'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -181,7 +182,7 @@ async function RBTDashboardPageInner() {
     }
   }
 
-  // Canonical onboarding task list (must match hire route and manual-add): 5 HIPAA + optional 40-hour + signature = 6 or 7 tasks
+  // Canonical onboarding task list (must match hire route): 5 HIPAA + optional 40-hour + SSN upload + signature = 7 or 8 tasks
   const buildCanonicalOnboardingTasks = (needsFortyHourCourse: boolean) => [
     { taskType: 'DOWNLOAD_DOC' as const, title: 'HIPAA Security Overview', description: 'Review the HIPAA Security Rule overview from HHS', documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/security/index.html', sortOrder: 1 },
     { taskType: 'DOWNLOAD_DOC' as const, title: 'HIPAA Privacy Overview', description: 'Review the HIPAA Privacy Rule overview from HHS', documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/privacy/index.html', sortOrder: 2 },
@@ -189,7 +190,15 @@ async function RBTDashboardPageInner() {
     { taskType: 'DOWNLOAD_DOC' as const, title: 'HIPAA Basics PDF', description: 'Download and review the HIPAA Basics for Providers document from CMS', documentDownloadUrl: 'https://www.cms.gov/files/document/mln909001-hipaa-basics-providers-privacy-security-breach-notification-rules.pdf', sortOrder: 4 },
     { taskType: 'DOWNLOAD_DOC' as const, title: 'HIPAA IT Security Guide', description: 'Review the Guide to Privacy and Security of Electronic Health Information', documentDownloadUrl: 'https://www.healthit.gov/topic/health-it-resources/guide-privacy-security-electronic-health-information', sortOrder: 5 },
     ...(needsFortyHourCourse ? [{ taskType: 'FORTY_HOUR_COURSE_CERTIFICATE' as const, title: 'Complete 40-Hour RBT Course & Upload Certificate', description: 'Complete the 40-hour RBT training course and upload your certificate of completion', documentDownloadUrl: 'https://courses.autismpartnershipfoundation.org/offers/it285gs6/checkout', sortOrder: 6 }] : []),
-    { taskType: 'SIGNATURE' as const, title: 'Digital Signature Confirmation', description: 'Sign to confirm you have read and understood all HIPAA documents and training materials', documentDownloadUrl: null as string | null, sortOrder: needsFortyHourCourse ? 7 : 6 },
+    {
+      taskType: 'SOCIAL_SECURITY_DOCUMENT' as const,
+      title: 'Upload Social Security card',
+      description:
+        'Upload a clear photo or scan of your Social Security card (PDF, JPG, or PNG, max 10MB). This is required for payroll and employment records.',
+      documentDownloadUrl: null as string | null,
+      sortOrder: needsFortyHourCourse ? 7 : 6,
+    },
+    { taskType: 'SIGNATURE' as const, title: 'Digital Signature Confirmation', description: 'Sign to confirm you have read and understood all HIPAA documents and training materials', documentDownloadUrl: null as string | null, sortOrder: needsFortyHourCourse ? 8 : 7 },
   ]
 
   const createCanonicalTasksForRbt = async (rbtProfileId: string, needsFortyHourCourse: boolean) => {
@@ -216,7 +225,16 @@ async function RBTDashboardPageInner() {
     : null
 
   const needsFortyHourCourse = rbtProfileForTasks ? !(rbtProfileForTasks.fortyHourCourseCompleted === true) : true
-  const expectedTaskCount = needsFortyHourCourse ? 7 : 6
+  const expectedTaskCount = needsFortyHourCourse ? 8 : 7
+
+  if (rbtProfileForTasks?.status === 'HIRED' && user.rbtProfileId && onboardingTasks.length > 0) {
+    await ensureSocialSecurityOnboardingTask(prisma, user.rbtProfileId)
+    onboardingTasks = await prisma.onboardingTask.findMany({
+      where: { rbtProfileId: user.rbtProfileId },
+      orderBy: { sortOrder: 'asc' },
+    })
+  }
+
   const hasFortyHourTask = onboardingTasks.some((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
   const needsRepair =
     rbtProfileForTasks?.status === 'HIRED' &&

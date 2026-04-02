@@ -61,6 +61,7 @@ enum OnboardingTaskType {
   SIGNATURE
   PACKAGE_UPLOAD
   FORTY_HOUR_COURSE_CERTIFICATE
+  SOCIAL_SECURITY_DOCUMENT
 }
 
 enum ShiftStatus {
@@ -100,6 +101,7 @@ enum EmailTemplateType {
   OFFER
   REJECTION
   MISSING_ONBOARDING
+  SOCIAL_SECURITY_UPLOAD_REMINDER
 }
 
 enum OnboardingDocumentType {

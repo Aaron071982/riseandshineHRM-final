@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/auth'
+import { ensureSocialSecurityOnboardingTask } from '@/lib/onboarding/socialSecurityTask'
 
-/** Canonical onboarding task list: 5 HIPAA + optional 40-hour + signature = 6 or 7 tasks (must match hire route and RBT dashboard). */
+/** Canonical onboarding task list: 5 HIPAA + optional 40-hour + SSN + signature = 7 or 8 tasks (must match hire route and RBT dashboard). */
 function buildCanonicalTasks(needsFortyHourCourse: boolean) {
   return [
     {
@@ -52,11 +53,19 @@ function buildCanonicalTasks(needsFortyHourCourse: boolean) {
         ]
       : []),
     {
+      taskType: 'SOCIAL_SECURITY_DOCUMENT' as const,
+      title: 'Upload Social Security card',
+      description:
+        'Upload a clear photo or scan of your Social Security card (PDF, JPG, or PNG, max 10MB). This is required for payroll and employment records.',
+      documentDownloadUrl: null as string | null,
+      sortOrder: needsFortyHourCourse ? 7 : 6,
+    },
+    {
       taskType: 'SIGNATURE' as const,
       title: 'Digital Signature Confirmation',
       description: 'Sign to confirm you have read and understood all HIPAA documents and training materials',
       documentDownloadUrl: null as string | null,
-      sortOrder: needsFortyHourCourse ? 7 : 6,
+      sortOrder: needsFortyHourCourse ? 8 : 7,
     },
   ]
 }
@@ -69,17 +78,20 @@ export async function POST() {
 
     const hired = await prisma.rBTProfile.findMany({
       where: { status: 'HIRED' },
-      include: { onboardingTasks: true },
     })
 
     let repaired = 0
     for (const rbt of hired) {
+      await ensureSocialSecurityOnboardingTask(prisma, rbt.id)
+      const onboardingTasks = await prisma.onboardingTask.findMany({
+        where: { rbtProfileId: rbt.id },
+      })
       const needsFortyHourCourse = !(rbt.fortyHourCourseCompleted === true)
-      const expectedCount = needsFortyHourCourse ? 7 : 6
-      const hasFortyHourTask = rbt.onboardingTasks.some((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
+      const expectedCount = needsFortyHourCourse ? 8 : 7
+      const hasFortyHourTask = onboardingTasks.some((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
       const needsRepair =
-        rbt.onboardingTasks.length === 0 ||
-        rbt.onboardingTasks.length !== expectedCount ||
+        onboardingTasks.length === 0 ||
+        onboardingTasks.length !== expectedCount ||
         (needsFortyHourCourse && !hasFortyHourTask)
 
       if (!needsRepair) continue
