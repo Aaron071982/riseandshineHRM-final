@@ -478,15 +478,16 @@ model SchedulingClient {
 
 // RBT–client assignment: which days and time range (e.g. Mon/Tue/Wed 4–7 PM)
 model ClientAssignment {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   rbtProfileId       String
   schedulingClientId String
   daysOfWeek         Int[] // 0=Sunday, 1=Monday, ..., 6=Saturday
   timeStart          String? // e.g. "16:00" or "4:00 PM"
   timeEnd            String? // e.g. "19:00" or "7:00 PM"
-  notes              String?  @db.Text
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  hourlyRate         Decimal?  @db.Decimal(10, 2) // RBT pay per hour for this client (USD)
+  notes              String?   @db.Text
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   rbtProfile RBTProfile       @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
   client     SchedulingClient @relation(fields: [schedulingClientId], references: [id], onDelete: Cascade)

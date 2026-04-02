@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
+
+function decimalHourlyToNumber(v: Prisma.Decimal | null): number | null {
+  if (v == null) return null
+  return Number(v)
+}
+
+/** undefined = omit; null = clear; Decimal = set */
+function parseHourlyRateBody(input: unknown): { ok: true; value: Prisma.Decimal | null } | { ok: false; error: string } {
+  if (input === undefined) return { ok: true, value: null }
+  if (input === null || input === '') return { ok: true, value: null }
+  const raw = typeof input === 'number' ? input : typeof input === 'string' ? parseFloat(input.replace(/[^0-9.-]/g, '')) : NaN
+  if (!Number.isFinite(raw) || raw < 0) return { ok: false, error: 'hourlyRate must be a non-negative number' }
+  if (raw > 999_999.99) return { ok: false, error: 'hourlyRate is too large' }
+  return { ok: true, value: new Prisma.Decimal(Math.round(raw * 100) / 100) }
+}
 
 /**
  * GET /api/admin/scheduling-beta/assignments?rbtId=xxx
@@ -36,6 +52,7 @@ export async function GET(req: NextRequest) {
       daysOfWeek: a.daysOfWeek,
       timeStart: a.timeStart,
       timeEnd: a.timeEnd,
+      hourlyRate: decimalHourlyToNumber(a.hourlyRate),
       notes: a.notes,
       createdAt: a.createdAt,
     }))
@@ -57,7 +74,7 @@ export async function POST(req: NextRequest) {
     const auth = await requireAdminSession()
     if (auth.response) return auth.response
     const body = await req.json()
-    const { client, clientId, rbtProfileId, daysOfWeek, timeStart, timeEnd, notes } = body
+    const { client, clientId, rbtProfileId, daysOfWeek, timeStart, timeEnd, notes, hourlyRate: hourlyRateRaw } = body
 
     if (!rbtProfileId || !Array.isArray(daysOfWeek) || daysOfWeek.length === 0) {
       return NextResponse.json({ error: 'rbtProfileId and daysOfWeek (non-empty) required' }, { status: 400 })
@@ -86,6 +103,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Provide clientId or client { name, ... }' }, { status: 400 })
     }
 
+    const hr = parseHourlyRateBody(hourlyRateRaw)
+    if (!hr.ok) return NextResponse.json({ error: hr.error }, { status: 400 })
+
     const assignment = await prisma.clientAssignment.create({
       data: {
         rbtProfileId,
@@ -93,6 +113,7 @@ export async function POST(req: NextRequest) {
         daysOfWeek: daysOfWeek.map((d: number) => Number(d)),
         timeStart: timeStart?.trim() || null,
         timeEnd: timeEnd?.trim() || null,
+        hourlyRate: hr.value,
         notes: notes?.trim() || null,
       },
       include: {
@@ -111,6 +132,7 @@ export async function POST(req: NextRequest) {
         daysOfWeek: assignment.daysOfWeek,
         timeStart: assignment.timeStart,
         timeEnd: assignment.timeEnd,
+        hourlyRate: decimalHourlyToNumber(assignment.hourlyRate),
         notes: assignment.notes,
         createdAt: assignment.createdAt,
       },

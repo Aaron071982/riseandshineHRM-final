@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
+function decimalHourlyToNumber(v: Prisma.Decimal | null): number | null {
+  if (v == null) return null
+  return Number(v)
+}
+
+function parseHourlyRatePatch(input: unknown): { ok: true; value: Prisma.Decimal | null } | { ok: false; error: string } {
+  if (input === null || input === '') return { ok: true, value: null }
+  const raw = typeof input === 'number' ? input : typeof input === 'string' ? parseFloat(input.replace(/[^0-9.-]/g, '')) : NaN
+  if (!Number.isFinite(raw) || raw < 0) return { ok: false, error: 'hourlyRate must be a non-negative number' }
+  if (raw > 999_999.99) return { ok: false, error: 'hourlyRate is too large' }
+  return { ok: true, value: new Prisma.Decimal(Math.round(raw * 100) / 100) }
+}
+
 /**
  * PATCH /api/admin/scheduling-beta/assignments/[id]
- * Body: { daysOfWeek?: number[], timeStart?: string|null, timeEnd?: string|null, notes?: string|null }
+ * Body: { daysOfWeek?: number[], timeStart?: string|null, timeEnd?: string|null, hourlyRate?: number|null|string, notes?: string|null }
  */
 export async function PATCH(
   req: NextRequest,
@@ -23,6 +37,7 @@ export async function PATCH(
       daysOfWeek?: number[]
       timeStart?: string | null
       timeEnd?: string | null
+      hourlyRate?: Prisma.Decimal | null
       notes?: string | null
     } = {}
 
@@ -35,6 +50,11 @@ export async function PATCH(
     }
     if (body.timeEnd === null || typeof body.timeEnd === 'string') {
       patch.timeEnd = typeof body.timeEnd === 'string' ? body.timeEnd.trim() || null : null
+    }
+    if ('hourlyRate' in body) {
+      const hr = parseHourlyRatePatch(body.hourlyRate)
+      if (!hr.ok) return NextResponse.json({ error: hr.error }, { status: 400 })
+      patch.hourlyRate = hr.value
     }
     if (body.notes === null || typeof body.notes === 'string') {
       patch.notes = typeof body.notes === 'string' ? body.notes.trim() || null : null
@@ -63,6 +83,7 @@ export async function PATCH(
         daysOfWeek: updated.daysOfWeek,
         timeStart: updated.timeStart,
         timeEnd: updated.timeEnd,
+        hourlyRate: decimalHourlyToNumber(updated.hourlyRate),
         notes: updated.notes,
         createdAt: updated.createdAt,
       },

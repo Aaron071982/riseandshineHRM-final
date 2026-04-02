@@ -125,6 +125,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
     daysOfWeek: number[]
     timeStart: string | null
     timeEnd: string | null
+    hourlyRate: number | null
     notes: string | null
   }>>([])
   const [clientAssignmentsLoading, setClientAssignmentsLoading] = useState(true)
@@ -132,6 +133,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
   const [editDays, setEditDays] = useState<number[]>([])
   const [editTimeStart, setEditTimeStart] = useState('')
   const [editTimeEnd, setEditTimeEnd] = useState('')
+  const [editHourlyRate, setEditHourlyRate] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editSubmitting, setEditSubmitting] = useState(false)
   const [availabilityEditOpen, setAvailabilityEditOpen] = useState(false)
@@ -141,6 +143,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
   const [addAssignmentDays, setAddAssignmentDays] = useState<number[]>([])
   const [addAssignmentTimeStart, setAddAssignmentTimeStart] = useState('')
   const [addAssignmentTimeEnd, setAddAssignmentTimeEnd] = useState('')
+  const [addAssignmentHourlyRate, setAddAssignmentHourlyRate] = useState('')
   const [addAssignmentNotes, setAddAssignmentNotes] = useState('')
   const [addAssignmentSubmitting, setAddAssignmentSubmitting] = useState(false)
   const [clientsLoading, setClientsLoading] = useState(false)
@@ -160,6 +163,11 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
     return DAYS.filter((d) => set.has(d.value))
       .map((d) => d.label)
       .join(', ')
+  }
+
+  const formatHourlyUsd = (n: number | null | undefined): string | null => {
+    if (n == null || !Number.isFinite(n)) return null
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
   }
 
   const derivedAvailabilityJson = useMemo(() => {
@@ -676,7 +684,18 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
         if (!res.ok || cancelled) return
         const data = await res.json()
         if (cancelled) return
-        setClientAssignments(data.assignments ?? [])
+        const list = (data.assignments ?? []) as Array<Record<string, unknown>>
+        setClientAssignments(
+          list.map((row) => ({
+            id: String(row.id),
+            clientName: String(row.clientName ?? ''),
+            daysOfWeek: (row.daysOfWeek as number[]) ?? [],
+            timeStart: (row.timeStart as string | null) ?? null,
+            timeEnd: (row.timeEnd as string | null) ?? null,
+            hourlyRate: typeof row.hourlyRate === 'number' && Number.isFinite(row.hourlyRate) ? row.hourlyRate : null,
+            notes: (row.notes as string | null) ?? null,
+          }))
+        )
       } catch {
         if (!cancelled) setClientAssignments([])
       } finally {
@@ -689,11 +708,19 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
     }
   }, [rbtProfile?.id])
 
-  const openEditAssignment = (a: { id: string; daysOfWeek: number[]; timeStart: string | null; timeEnd: string | null; notes: string | null }) => {
+  const openEditAssignment = (a: {
+    id: string
+    daysOfWeek: number[]
+    timeStart: string | null
+    timeEnd: string | null
+    hourlyRate: number | null
+    notes: string | null
+  }) => {
     setEditAssignmentId(a.id)
     setEditDays((a.daysOfWeek ?? []).slice().sort((x, y) => x - y))
     setEditTimeStart(a.timeStart ?? '')
     setEditTimeEnd(a.timeEnd ?? '')
+    setEditHourlyRate(a.hourlyRate != null && Number.isFinite(a.hourlyRate) ? String(a.hourlyRate) : '')
     setEditNotes(a.notes ?? '')
   }
 
@@ -729,6 +756,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
           daysOfWeek: editDays,
           timeStart: editTimeStart.trim() || null,
           timeEnd: editTimeEnd.trim() || null,
+          hourlyRate: editHourlyRate.trim() === '' ? null : editHourlyRate.trim(),
           notes: editNotes.trim() || null,
         }),
       })
@@ -741,7 +769,14 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
       setClientAssignments((prev) =>
         prev.map((a) =>
           a.id === updated.id
-            ? { ...a, daysOfWeek: updated.daysOfWeek ?? a.daysOfWeek, timeStart: updated.timeStart ?? null, timeEnd: updated.timeEnd ?? null, notes: updated.notes ?? null }
+            ? {
+                ...a,
+                daysOfWeek: updated.daysOfWeek ?? a.daysOfWeek,
+                timeStart: updated.timeStart ?? null,
+                timeEnd: updated.timeEnd ?? null,
+                hourlyRate: updated.hourlyRate ?? null,
+                notes: updated.notes ?? null,
+              }
             : a
         )
       )
@@ -760,6 +795,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
     setAddAssignmentDays([])
     setAddAssignmentTimeStart('')
     setAddAssignmentTimeEnd('')
+    setAddAssignmentHourlyRate('')
     setAddAssignmentNotes('')
     setClientsLoading(true)
     fetch('/api/admin/scheduling-beta/clients', { credentials: 'include' })
@@ -793,6 +829,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
           daysOfWeek: [...addAssignmentDays].sort((a, b) => a - b),
           timeStart: addAssignmentTimeStart.trim() || null,
           timeEnd: addAssignmentTimeEnd.trim() || null,
+          hourlyRate: addAssignmentHourlyRate.trim() === '' ? null : addAssignmentHourlyRate.trim(),
           notes: addAssignmentNotes.trim() || null,
         }),
       })
@@ -807,6 +844,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
         daysOfWeek: number[]
         timeStart: string | null
         timeEnd: string | null
+        hourlyRate: number | null
         notes: string | null
       }
       if (a?.id) {
@@ -817,6 +855,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
             daysOfWeek: a.daysOfWeek,
             timeStart: a.timeStart,
             timeEnd: a.timeEnd,
+            hourlyRate: a.hourlyRate ?? null,
             notes: a.notes,
           },
           ...prev,
@@ -1189,6 +1228,11 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                                     </span>
                                   ) : null}
                                 </p>
+                                {formatHourlyUsd(a.hourlyRate) ? (
+                                  <p className="mt-1 text-sm font-medium text-gray-800 dark:text-[var(--text-primary)]">
+                                    RBT hourly rate: {formatHourlyUsd(a.hourlyRate)}
+                                  </p>
+                                ) : null}
                               </div>
                               <div className="shrink-0 flex items-center gap-2">
                                 <Button
@@ -1518,6 +1562,20 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
               </div>
             </div>
             <div>
+              <Label>RBT salary / hour (USD)</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={addAssignmentHourlyRate}
+                onChange={(e) => setAddAssignmentHourlyRate(e.target.value)}
+                placeholder="e.g. 28.50"
+                className="mt-1"
+              />
+              <p className="text-xs text-gray-500 dark:text-[var(--text-tertiary)] mt-1">
+                Optional. Shown on this Availability tab with the assignment.
+              </p>
+            </div>
+            <div>
               <Label>Notes</Label>
               <textarea
                 value={addAssignmentNotes}
@@ -1548,7 +1606,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
           <DialogHeader>
             <DialogTitle>Edit assigned client</DialogTitle>
             <DialogDescription>
-              Update the days/times for this assignment. Changes save immediately.
+              Update days, times, pay, or notes. Changes save immediately.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1586,6 +1644,17 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                 <Label>Time end</Label>
                 <Input value={editTimeEnd} onChange={(e) => setEditTimeEnd(e.target.value)} placeholder="19:00" />
               </div>
+            </div>
+            <div>
+              <Label>RBT salary / hour (USD)</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={editHourlyRate}
+                onChange={(e) => setEditHourlyRate(e.target.value)}
+                placeholder="e.g. 28.50"
+              />
+              <p className="text-xs text-gray-500 dark:text-[var(--text-tertiary)] mt-1">Leave blank to clear.</p>
             </div>
             <div>
               <Label>Notes</Label>

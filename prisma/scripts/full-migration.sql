@@ -111,6 +111,7 @@ CREATE TABLE IF NOT EXISTS "client_assignments" (
     "daysOfWeek" INTEGER[] DEFAULT '{}',
     "timeStart" TEXT,
     "timeEnd" TEXT,
+    "hourlyRate" DECIMAL(10,2),
     "notes" TEXT,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -163,6 +164,9 @@ ALTER TABLE "rbt_documents" ADD COLUMN IF NOT EXISTS "filePath" TEXT;
 -- 3g. time_entries: guardian unavailable fields
 ALTER TABLE "time_entries" ADD COLUMN IF NOT EXISTS "guardianUnavailableReason" TEXT;
 ALTER TABLE "time_entries" ADD COLUMN IF NOT EXISTS "guardianUnavailableNote" TEXT;
+
+-- 3h. client_assignments: RBT hourly rate for this assignment (USD)
+ALTER TABLE "client_assignments" ADD COLUMN IF NOT EXISTS "hourlyRate" DECIMAL(10,2);
 
 -- ============================================================
 -- SECTION 4: FOREIGN KEYS (drop broken ones first, then recreate)

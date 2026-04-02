@@ -93,6 +93,7 @@ type Assignment = {
   daysOfWeek: number[]   // 0=Sun, 1=Mon, ..., 6=Sat
   timeStart: string
   timeEnd: string
+  hourlyRate: number | null
   notes: string
 }
 
@@ -146,6 +147,7 @@ export default function SchedulingBeta() {
   const [assignDays, setAssignDays] = useState<number[]>([])
   const [assignTimeStart, setAssignTimeStart] = useState('')
   const [assignTimeEnd, setAssignTimeEnd] = useState('')
+  const [assignHourlyRate, setAssignHourlyRate] = useState('')
   const [assignNotes, setAssignNotes] = useState('')
   const [assignmentsLoading, setAssignmentsLoading] = useState(false)
 
@@ -209,6 +211,7 @@ export default function SchedulingBeta() {
   const [assignModalDays, setAssignModalDays] = useState<number[]>([])
   const [assignModalTimeStart, setAssignModalTimeStart] = useState('')
   const [assignModalTimeEnd, setAssignModalTimeEnd] = useState('')
+  const [assignModalHourlyRate, setAssignModalHourlyRate] = useState('')
   const [assignModalNotes, setAssignModalNotes] = useState('')
   const [assignModalSubmitting, setAssignModalSubmitting] = useState(false)
   const [copyFeedbackId, setCopyFeedbackId] = useState<string | null>(null)
@@ -237,7 +240,7 @@ export default function SchedulingBeta() {
       const res = await fetch('/api/admin/scheduling-beta/assignments', { credentials: 'include' })
       if (!res.ok) return
       const data = await res.json()
-      const list = (data.assignments ?? []).map((a: { id: string; clientId: string; clientName: string; rbtId: string; rbtName: string; daysOfWeek: number[]; timeStart: string; timeEnd: string; notes: string }) => ({
+      const list = (data.assignments ?? []).map((a: { id: string; clientId: string; clientName: string; rbtId: string; rbtName: string; daysOfWeek: number[]; timeStart: string; timeEnd: string; hourlyRate?: number | null; notes: string }) => ({
         id: a.id,
         clientId: a.clientId,
         clientName: a.clientName,
@@ -246,6 +249,7 @@ export default function SchedulingBeta() {
         daysOfWeek: a.daysOfWeek ?? [],
         timeStart: a.timeStart ?? '',
         timeEnd: a.timeEnd ?? '',
+        hourlyRate: typeof a.hourlyRate === 'number' && Number.isFinite(a.hourlyRate) ? a.hourlyRate : null,
         notes: a.notes ?? '',
       }))
       setAssignments(list)
@@ -524,6 +528,7 @@ export default function SchedulingBeta() {
     setAssignModalDays([])
     setAssignModalTimeStart('')
     setAssignModalTimeEnd('')
+    setAssignModalHourlyRate('')
     setAssignModalNotes('')
   }
 
@@ -537,6 +542,7 @@ export default function SchedulingBeta() {
         daysOfWeek: number[]
         timeStart?: string
         timeEnd?: string
+        hourlyRate?: string | null
         notes?: string
         clientId?: string
         client?: { name: string; addressLine1?: string; city?: string; state?: string; zip?: string }
@@ -545,6 +551,7 @@ export default function SchedulingBeta() {
         daysOfWeek: assignModalDays,
         timeStart: assignModalTimeStart.trim() || undefined,
         timeEnd: assignModalTimeEnd.trim() || undefined,
+        hourlyRate: assignModalHourlyRate.trim() === '' ? null : assignModalHourlyRate.trim(),
         notes: assignModalNotes.trim() || undefined,
       }
       if (assignModalClientId) {
@@ -580,6 +587,7 @@ export default function SchedulingBeta() {
           daysOfWeek: data.assignment.daysOfWeek ?? [],
           timeStart: data.assignment.timeStart ?? '',
           timeEnd: data.assignment.timeEnd ?? '',
+          hourlyRate: data.assignment.hourlyRate ?? null,
           notes: data.assignment.notes ?? '',
         },
       ])
@@ -693,6 +701,7 @@ export default function SchedulingBeta() {
           daysOfWeek: assignDays,
           timeStart: assignTimeStart.trim() || undefined,
           timeEnd: assignTimeEnd.trim() || undefined,
+          hourlyRate: assignHourlyRate.trim() === '' ? null : assignHourlyRate.trim(),
           notes: assignNotes.trim() || undefined,
         }),
       })
@@ -712,6 +721,7 @@ export default function SchedulingBeta() {
           daysOfWeek: data.assignment.daysOfWeek ?? [],
           timeStart: data.assignment.timeStart ?? '',
           timeEnd: data.assignment.timeEnd ?? '',
+          hourlyRate: data.assignment.hourlyRate ?? null,
           notes: data.assignment.notes ?? '',
         },
       ])
@@ -720,6 +730,7 @@ export default function SchedulingBeta() {
       setAssignDays([])
       setAssignTimeStart('')
       setAssignTimeEnd('')
+      setAssignHourlyRate('')
       setAssignNotes('')
     } catch (err) {
       console.error(err)
@@ -757,6 +768,11 @@ export default function SchedulingBeta() {
     if (a.timeStart) return `from ${a.timeStart}`
     if (a.timeEnd) return `until ${a.timeEnd}`
     return ''
+  }
+
+  function formatHourlyUsd(n: number | null): string {
+    if (n == null || !Number.isFinite(n)) return ''
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
   }
 
   return (
@@ -1406,6 +1422,16 @@ export default function SchedulingBeta() {
                   placeholder="e.g. 7:00 PM or 19:00"
                 />
               </div>
+              <div>
+                <Label>RBT salary / hour USD (optional)</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={assignHourlyRate}
+                  onChange={(e) => setAssignHourlyRate(e.target.value)}
+                  placeholder="e.g. 28.50"
+                />
+              </div>
               <div className="sm:col-span-2">
                 <Label>Notes (optional)</Label>
                 <Input
@@ -1442,6 +1468,7 @@ export default function SchedulingBeta() {
                           const s = [formatDays(a.daysOfWeek), formatTimeRange(a)].filter(Boolean).join(' ')
                           return s ? ` (${s})` : ''
                         })()}
+                        {formatHourlyUsd(a.hourlyRate) ? ` · ${formatHourlyUsd(a.hourlyRate)}/hr` : ''}
                         {a.notes ? ` — ${a.notes}` : ''}
                       </span>
                       <Button
@@ -1509,6 +1536,16 @@ export default function SchedulingBeta() {
               <Label>Time end</Label>
               <Input value={assignModalTimeEnd} onChange={(e) => setAssignModalTimeEnd(e.target.value)} placeholder="19:00" />
             </div>
+          </div>
+          <div>
+            <Label>RBT salary / hour (USD)</Label>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={assignModalHourlyRate}
+              onChange={(e) => setAssignModalHourlyRate(e.target.value)}
+              placeholder="e.g. 28.50"
+            />
           </div>
           <div>
             <Label>Notes</Label>

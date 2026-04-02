@@ -79,6 +79,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     daysOfWeek: number[]
     timeStart: string | null
     timeEnd: string | null
+    hourlyRate: number | null
     notes: string | null
   }>>([])
   const [clientAssignmentsLoading, setClientAssignmentsLoading] = useState(true)
@@ -100,6 +101,11 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
       .join(', ')
   }
 
+  const formatHourlyUsd = (n: number | null | undefined): string | null => {
+    if (n == null || !Number.isFinite(n)) return null
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
+  }
+
   useEffect(() => {
     if (!rbtProfile?.id || rbtProfile.id === 'null') {
       setClientAssignmentsLoading(false)
@@ -112,7 +118,18 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         if (!res.ok || cancelled) return
         const data = await res.json()
         if (cancelled) return
-        setClientAssignments(data.assignments ?? [])
+        const list = (data.assignments ?? []) as Array<Record<string, unknown>>
+        setClientAssignments(
+          list.map((row) => ({
+            id: String(row.id),
+            clientName: String(row.clientName ?? ''),
+            daysOfWeek: (row.daysOfWeek as number[]) ?? [],
+            timeStart: (row.timeStart as string | null) ?? null,
+            timeEnd: (row.timeEnd as string | null) ?? null,
+            hourlyRate: typeof row.hourlyRate === 'number' && Number.isFinite(row.hourlyRate) ? row.hourlyRate : null,
+            notes: (row.notes as string | null) ?? null,
+          }))
+        )
       } catch (e) {
         if (!cancelled) setClientAssignments([])
       } finally {
@@ -707,6 +724,11 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
                           </span>
                         ) : null}
                       </p>
+                      {formatHourlyUsd(a.hourlyRate) ? (
+                        <p className="mt-1 text-sm font-medium text-gray-800 dark:text-[var(--text-primary)]">
+                          RBT hourly rate: {formatHourlyUsd(a.hourlyRate)}
+                        </p>
+                      ) : null}
                       {a.notes ? (
                         <p className="mt-2 text-sm text-gray-700 dark:text-[var(--text-secondary)] whitespace-pre-wrap">
                           {a.notes}
