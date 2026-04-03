@@ -17,11 +17,6 @@ import {
   TrendingDown,
   Minus,
   LogIn,
-  LogOut,
-  MousePointerClick,
-  FileText,
-  Eye,
-  Activity,
 } from 'lucide-react'
 import {
   BarChart,
@@ -66,12 +61,12 @@ interface DashboardData {
   pipeline: { stages: { name: string; count: number; dropOffPercent: number }[] }
   hiringActivity: { weeks: { weekLabel: string; candidatesAdded: number; hires: number }[] }
   sourceBreakdown: { publicApplication: number; adminCreated: number }
-  recentActivity: {
+  recentSignIns: {
     id: string
-    action: string
-    activityType: string
-    createdAt: string
-    user: { id: string; email: string | null; name: string | null } | null
+    signedInAt: string
+    role: string
+    displayName: string
+    email: string | null
   }[]
   upcomingInterviews: {
     id: string
@@ -113,24 +108,6 @@ function TrendIndicator({ trend }: { trend: Trend }) {
       <TrendingDown className="h-3 w-3" /> -{trend.percentChange}%
     </span>
   )
-}
-
-function ActivityIcon({ type }: { type: string }) {
-  switch (type) {
-    case 'LOGIN':
-      return <LogIn className="h-4 w-4 text-blue-500" />
-    case 'LOGOUT':
-      return <LogOut className="h-4 w-4 text-gray-500" />
-    case 'LINK_CLICK':
-    case 'BUTTON_CLICK':
-      return <MousePointerClick className="h-4 w-4 text-orange-500" />
-    case 'FORM_SUBMISSION':
-      return <FileText className="h-4 w-4 text-green-500" />
-    case 'PAGE_VIEW':
-      return <Eye className="h-4 w-4 text-gray-500" />
-    default:
-      return <Activity className="h-4 w-4 text-gray-400" />
-  }
 }
 
 export default function DashboardAnalytics() {
@@ -194,7 +171,7 @@ export default function DashboardAnalytics() {
 
   if (!data) return null
 
-  const { kpis, pipeline, hiringActivity, sourceBreakdown, recentActivity, upcomingInterviews, onboardingAlerts, unclaimedTodayCount } = data
+  const { kpis, pipeline, hiringActivity, sourceBreakdown, recentSignIns, upcomingInterviews, onboardingAlerts, unclaimedTodayCount } = data
 
   const sourcePieData = [
     { name: 'Public application', value: sourceBreakdown.publicApplication, color: '#f97316' },
@@ -405,29 +382,39 @@ export default function DashboardAnalytics() {
         </CardContent>
       </Card>
 
-      {/* Three-column: Recent activity, Upcoming interviews, Onboarding alerts */}
+      {/* Three-column: Recent sign-ins, Upcoming interviews, Onboarding alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Recent Activity
+              <LogIn className="h-5 w-5" />
+              Recent sign-ins
             </CardTitle>
-            <CardDescription>Last 10 actions</CardDescription>
+            <CardDescription>Admins and RBTs (last 20 logins)</CardDescription>
           </CardHeader>
           <CardContent>
-            {recentActivity.length === 0 ? (
-              <p className="text-sm text-gray-500 py-4">No recent activity</p>
+            {recentSignIns.length === 0 ? (
+              <p className="text-sm text-gray-500 py-4">No sign-ins recorded yet.</p>
             ) : (
               <ul className="space-y-3">
-                {recentActivity.map((a) => (
-                  <li key={a.id} className="flex items-start gap-3 text-sm">
-                    <ActivityIcon type={a.activityType} />
+                {recentSignIns.map((row) => (
+                  <li key={row.id} className="flex items-start gap-3 text-sm">
+                    <LogIn className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-gray-900 dark:text-gray-100 truncate">{a.action}</p>
-                      <p className="text-xs text-gray-500">
-                        {a.user?.email || a.user?.name || 'System'} ·{' '}
-                        {new Date(a.createdAt).toLocaleString()}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-gray-900 dark:text-gray-100 font-medium truncate">
+                          {row.displayName}
+                        </p>
+                        <Badge variant="outline" className="text-[10px] uppercase shrink-0">
+                          {row.role === 'ADMIN' ? 'Admin' : 'RBT'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {new Date(row.signedInAt).toLocaleString(undefined, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        })}
+                        {row.email ? ` · ${row.email}` : ''}
                       </p>
                     </div>
                   </li>

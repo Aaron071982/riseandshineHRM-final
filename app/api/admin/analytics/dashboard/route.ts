@@ -265,19 +265,44 @@ export async function GET(request: NextRequest) {
     const adminCreated = sourceCounts.find((s) => s.source === 'ADMIN_CREATED')?._count ?? 0
     const sourceBreakdown = { publicApplication, adminCreated }
 
-    // ---- Recent activity (last 10) ----
-    const recentActivityRows = await prisma.activityLog.findMany({
+    // ---- Recent sign-ins (admin + RBT): one row per successful OTP session ----
+    const recentSessionRows = await prisma.session.findMany({
+      where: {
+        user: { role: { in: ['ADMIN', 'RBT'] } },
+      },
       orderBy: { createdAt: 'desc' },
-      take: 10,
-      include: { user: { select: { id: true, email: true, name: true } } },
+      take: 20,
+      select: {
+        id: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            rbtProfile: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
     })
-    const recentActivity = recentActivityRows.map((a) => ({
-      id: a.id,
-      action: a.action,
-      activityType: a.activityType,
-      createdAt: a.createdAt,
-      user: a.user ? { id: a.user.id, email: a.user.email, name: a.user.name } : null,
-    }))
+    const recentSignIns = recentSessionRows.map((s) => {
+      const u = s.user
+      const rbtName =
+        u.rbtProfile &&
+        [u.rbtProfile.firstName, u.rbtProfile.lastName].filter(Boolean).join(' ').trim()
+      const displayName =
+        u.role === 'RBT' && rbtName
+          ? rbtName
+          : (u.name?.trim() || u.email || 'Unknown user')
+      return {
+        id: s.id,
+        signedInAt: s.createdAt,
+        role: u.role,
+        displayName,
+        email: u.email,
+      }
+    })
 
     // ---- Upcoming interviews (next 5) ----
     const upcomingInterviews = await prisma.interview.findMany({
@@ -327,7 +352,7 @@ export async function GET(request: NextRequest) {
       pipeline,
       hiringActivity: { weeks },
       sourceBreakdown,
-      recentActivity,
+      recentSignIns,
       upcomingInterviews,
       onboardingAlerts: onboardingProgressList,
       unclaimedTodayCount,
