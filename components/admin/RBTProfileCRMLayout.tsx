@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/toast'
 import { trackButtonClick } from '@/lib/activity-tracker'
+import { formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
 import RBTProfileInterviews from './rbt-profile/RBTProfileInterviews'
 import RBTProfileOnboarding from './rbt-profile/RBTProfileOnboarding'
 import RBTProfileDocuments from './rbt-profile/RBTProfileDocuments'
@@ -539,14 +540,18 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
     setConfirmDialogOpen(true)
   }
 
-  const handleDocumentUploadClick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
+  const handleDocumentFilesSelected = (files: File[], documentType: string) => {
     if (files.length === 0) return
-    setConfirmMessage(`Upload ${files.length} document(s)?`)
+    setConfirmMessage(
+      `Upload ${files.length} file(s) as “${formatRbtDocumentTypeLabel(documentType)}” for ${rbtProfile.firstName} ${rbtProfile.lastName}?`
+    )
     setConfirmAction(async () => {
       setUploadingDocuments(true)
       const formData = new FormData()
-      files.forEach((f) => { formData.append('documents', f); formData.append('documentTypes', 'OTHER') })
+      files.forEach((f) => {
+        formData.append('documents', f)
+        formData.append('documentTypes', documentType)
+      })
       const res = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents`, { method: 'POST', body: formData, credentials: 'include' })
       if (res.ok) {
         showToast(`${files.length} document(s) uploaded.`, 'success')
@@ -560,7 +565,6 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
       setUploadingDocuments(false)
     })
     setConfirmDialogOpen(true)
-    e.target.value = ''
   }
 
   const handleDeleteDocument = (documentId: string, fileName: string) => {
@@ -1338,7 +1342,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                 onboardingCompletions={rbtProfile.onboardingCompletions}
                 uploadingDocuments={uploadingDocuments}
                 uploadDisabled={confirmDialogOpen}
-                onUploadClick={handleDocumentUploadClick}
+                onFilesSelected={handleDocumentFilesSelected}
                 onDownload={handleDownloadDocument}
                 onDelete={handleDeleteDocument}
                 onRequestReupload={async (completionId) => {

@@ -12,11 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
 
 type MyDoc = {
   id: string
   fileName: string
   fileType: string
+  documentType: string | null
   uploadedAt: string
   size: number | null
 }
@@ -89,7 +91,12 @@ export default function RBTDocumentsPage() {
     return name.toLowerCase().includes(search.trim().toLowerCase())
   }
 
-  const myFiltered = data?.myDocuments?.filter((d) => filter(d.fileName)) ?? []
+  const myFiltered =
+    data?.myDocuments?.filter(
+      (d) =>
+        filter(d.fileName) ||
+        filter(formatRbtDocumentTypeLabel(d.documentType))
+    ) ?? []
   const companyFiltered = data?.companyDocuments?.filter((d) => filter(d.title)) ?? []
   const formsFiltered = data?.forms?.filter((d) => filter(d.title)) ?? []
 
@@ -154,7 +161,7 @@ export default function RBTDocumentsPage() {
             <CardHeader>
               <CardTitle className="text-lg">My Documents</CardTitle>
               <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
-                Documents you have uploaded.
+                Files you uploaded during onboarding or that your team added for you.
               </p>
             </CardHeader>
             <CardContent>
@@ -174,6 +181,7 @@ export default function RBTDocumentsPage() {
                         <div className="min-w-0">
                           <p className="font-medium truncate">{doc.fileName}</p>
                           <p className="text-xs text-gray-500">
+                            {formatRbtDocumentTypeLabel(doc.documentType)} ·{' '}
                             {formatDate(doc.uploadedAt)} · {formatSize(doc.size)}
                           </p>
                         </div>

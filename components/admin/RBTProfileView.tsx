@@ -13,6 +13,7 @@ import InterviewNotesButton from './InterviewNotesButton'
 import AdminOnboardingOverride from './AdminOnboardingOverride'
 import StatusManager from './StatusManager'
 import { trackButtonClick } from '@/lib/activity-tracker'
+import { formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
 import {
   Dialog,
   DialogContent,
@@ -446,7 +447,6 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     }
   }
 
-  const [pendingDocumentUpload, setPendingDocumentUpload] = useState<File[]>([])
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0)
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
 
@@ -455,20 +455,18 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
     deleteConfirmInput.trim() === `${rbtProfile.firstName} ${rbtProfile.lastName}` ||
     (rbtProfile.email && deleteConfirmInput.trim().toLowerCase() === rbtProfile.email.toLowerCase())
 
-  const handleDocumentUploadClick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
+  const handleDocumentFilesSelected = (files: File[], documentType: string) => {
     if (files.length === 0) return
-    
-    // Store files and show confirmation
-    setPendingDocumentUpload(files)
-    setConfirmMessage(`Upload ${files.length} document(s) for ${rbtProfile.firstName} ${rbtProfile.lastName}?`)
+    setConfirmMessage(
+      `Upload ${files.length} file(s) as “${formatRbtDocumentTypeLabel(documentType)}” for ${rbtProfile.firstName} ${rbtProfile.lastName}?`
+    )
     setConfirmAction(async () => {
       try {
         setUploadingDocuments(true)
         const formData = new FormData()
         files.forEach((file) => {
           formData.append('documents', file)
-          formData.append('documentTypes', 'OTHER') // Default type
+          formData.append('documentTypes', documentType)
         })
 
         const response = await fetch(`/api/admin/rbts/${rbtProfile.id}/documents`, {
@@ -481,24 +479,19 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
           showToast(`✅ ${files.length} document(s) uploaded successfully for ${rbtProfile.firstName} ${rbtProfile.lastName}`, 'success')
           setConfirmDialogOpen(false)
           setConfirmAction(null)
-          setPendingDocumentUpload([])
           await fetchDocuments()
         } else {
           const data = await response.json()
           showToast(data.error || 'Failed to upload documents', 'error')
-          // Keep dialog open on error so user can see the error message
         }
       } catch (error) {
         console.error('Error uploading documents:', error)
         showToast('An error occurred while uploading documents', 'error')
-        // Keep dialog open on error so user can see the error message
       } finally {
         setUploadingDocuments(false)
       }
     })
     setConfirmDialogOpen(true)
-    // Reset the file input
-    e.target.value = ''
   }
 
   const handleDeleteDocument = (documentId: string, fileName: string) => {
@@ -1283,7 +1276,7 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
         onboardingCompletions={rbtProfile.onboardingCompletions}
         uploadingDocuments={uploadingDocuments}
         uploadDisabled={confirmDialogOpen}
-        onUploadClick={handleDocumentUploadClick}
+        onFilesSelected={handleDocumentFilesSelected}
         onDownload={handleDownloadDocument}
         onDelete={handleDeleteDocument}
         onRequestReupload={async (completionId) => {

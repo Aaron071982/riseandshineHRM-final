@@ -18,7 +18,14 @@ export async function GET() {
 
     const rbtProfileId = user.rbtProfileId
 
-    let myDocs: Array<{ id: string; fileName: string; fileType: string; uploadedAt: Date; fileData?: string | null }> = []
+    let myDocs: Array<{
+      id: string
+      fileName: string
+      fileType: string
+      documentType: string | null
+      uploadedAt: Date
+      fileData?: string | null
+    }> = []
     let completionsWithDocs: Array<{ id: string; documentId: string; status: string; completedAt: Date | null; signedPdfUrl: string | null; document: { title: string } }> = []
     let formDocs: Array<{ id: string; title: string; slug: string; type: string; pdfUrl: string | null }> = []
 
@@ -30,6 +37,7 @@ export async function GET() {
           id: true,
           fileName: true,
           fileType: true,
+          documentType: true,
           uploadedAt: true,
           fileData: true,
         },
@@ -62,6 +70,7 @@ export async function GET() {
       id: d.id,
       fileName: d.fileName,
       fileType: d.fileType,
+      documentType: d.documentType,
       uploadedAt: d.uploadedAt,
       size: d.fileData != null && d.fileData.length > 0 ? Math.ceil((d.fileData.length * 3) / 4) : null,
     }))

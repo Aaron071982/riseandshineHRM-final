@@ -4,8 +4,17 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { FileText, Download, Trash2, Upload, Loader2, FileArchive } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import { ADMIN_RBT_DOCUMENT_TYPES, formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
 import type { RBTProfileDocument, RBTProfileOnboardingCompletion } from './types'
 
 interface RBTProfileDocumentsProps {
@@ -15,7 +24,8 @@ interface RBTProfileDocumentsProps {
   onboardingCompletions?: RBTProfileOnboardingCompletion[]
   uploadingDocuments: boolean
   uploadDisabled?: boolean
-  onUploadClick: (e: React.ChangeEvent<HTMLInputElement>) => void
+  /** Called after the admin picks files; `documentType` is the selected category for this batch. */
+  onFilesSelected: (files: File[], documentType: string) => void
   onDownload: (documentId: string, fileName: string) => void
   onDelete: (documentId: string, fileName: string) => void
   onRequestReupload?: (completionId: string) => Promise<void>
@@ -28,14 +38,22 @@ export default function RBTProfileDocuments({
   onboardingCompletions = [],
   uploadingDocuments,
   uploadDisabled,
-  onUploadClick,
+  onFilesSelected,
   onDownload,
   onDelete,
   onRequestReupload,
 }: RBTProfileDocumentsProps) {
+  const [uploadDocType, setUploadDocType] = useState('OTHER')
   const [reuploadingId, setReuploadingId] = useState<string | null>(null)
   const [downloadingZip, setDownloadingZip] = useState(false)
   const { showToast } = useToast()
+
+  const handleAdminFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (files.length === 0) return
+    onFilesSelected(files, uploadDocType)
+  }
   const completedWithPdf = onboardingCompletions.filter(
     (c) => c.status === 'COMPLETED' && c.signedPdfUrl
   )
@@ -103,26 +121,43 @@ export default function RBTProfileDocuments({
           </div>
         )}
         <div className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="admin-doc-type" className="text-sm text-gray-700 dark:text-[var(--text-secondary)]">
+              Document type (applies to this upload)
+            </Label>
+            <Select value={uploadDocType} onValueChange={setUploadDocType} disabled={uploadingDocuments || uploadDisabled}>
+              <SelectTrigger id="admin-doc-type" className="max-w-md">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ADMIN_RBT_DOCUMENT_TYPES.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <label
             htmlFor="document-upload"
             className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 dark:border-[var(--border-subtle)] rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)] transition-colors"
           >
             <Upload className="w-5 h-5 text-gray-400 dark:text-[var(--text-disabled)]" />
             <span className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">
-              {uploadingDocuments ? 'Uploading...' : 'Upload Documents'}
+              {uploadingDocuments ? 'Uploading...' : 'Choose files to upload'}
             </span>
           </label>
           <input
             id="document-upload"
             type="file"
             multiple
-            onChange={onUploadClick}
+            onChange={handleAdminFileInput}
             className="hidden"
             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
             disabled={uploadingDocuments || uploadDisabled}
           />
           <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
-            Upload resumes, certifications, or other relevant documents (PDF, DOC, DOCX, JPG, PNG)
+            Upload on behalf of this RBT (PDF, DOC, DOCX, JPG, PNG). They will also see these under Document Center.
           </p>
         </div>
 
@@ -140,7 +175,7 @@ export default function RBTProfileDocuments({
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="outline" className="text-xs dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
-                      {doc.documentType || 'OTHER'}
+                      {formatRbtDocumentTypeLabel(doc.documentType)}
                     </Badge>
                     <span className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
                       {new Date(doc.uploadedAt).toLocaleDateString()}

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { Resend } from 'resend'
+import { replaceRbtDocumentOfType } from '@/lib/rbtDocumentsSync'
 
 const resendApiKey = process.env.RESEND_API_KEY
 const emailFrom = process.env.EMAIL_FROM || 'noreply@riseandshinehrm.com'
@@ -79,6 +80,34 @@ export async function POST(
           completedAt: new Date(),
         },
       })
+
+      // Mirror into RBT documents so they appear in admin + RBT Document Center
+      if (task.taskType === 'SOCIAL_SECURITY_DOCUMENT') {
+        try {
+          await replaceRbtDocumentOfType(prisma, {
+            rbtProfileId: task.rbtProfileId,
+            documentType: 'SOCIAL_SECURITY_CARD',
+            fileName: file.name || 'social-security-card',
+            fileType: fileMimeType,
+            fileBase64: fileBase64,
+          })
+        } catch (e) {
+          console.error('[onboarding upload] Failed to sync Social Security card to rbt_documents:', e)
+        }
+      }
+      if (task.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE') {
+        try {
+          await replaceRbtDocumentOfType(prisma, {
+            rbtProfileId: task.rbtProfileId,
+            documentType: 'FORTY_HOUR_CERTIFICATE',
+            fileName: file.name || '40-hour-certificate',
+            fileType: fileMimeType,
+            fileBase64: fileBase64,
+          })
+        } catch (e) {
+          console.error('[onboarding upload] Failed to sync 40-hour cert to rbt_documents:', e)
+        }
+      }
 
       // If this is a certificate upload, email it to admin
       if (task.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE') {
