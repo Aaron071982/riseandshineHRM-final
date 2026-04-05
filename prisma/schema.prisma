@@ -102,6 +102,7 @@ enum EmailTemplateType {
   REJECTION
   MISSING_ONBOARDING
   SOCIAL_SECURITY_UPLOAD_REMINDER
+  DOCUMENT_SIGNATURE_RECEIPT
 }
 
 enum OnboardingDocumentType {
@@ -342,6 +343,8 @@ model UserProfile {
   rbtCertificationNumber       String?
   rbtCertificationExpiresAt    DateTime?
   themePreference              String? // "light" | "dark" | "system"
+  eSignConsentGiven            Boolean                 @default(false)
+  eSignConsentTimestamp        DateTime?
   createdAt                    DateTime                @default(now())
   updatedAt                    DateTime                @updatedAt
 
@@ -430,7 +433,8 @@ model RBTProfile {
   availabilitySlots     AvailabilitySlot[]
   documents             RBTDocument[]
   interviewNotes        InterviewNotes[]
-  onboardingCompletions OnboardingCompletion[]
+  onboardingCompletions  OnboardingCompletion[]
+  signatureCertificates  SignatureCertificate[]
   auditLogs             RBTAuditLog[]
   clientAssignments     ClientAssignment[]
   sessionNotes          SessionNote[]
@@ -809,7 +813,8 @@ model OnboardingDocument {
   createdAt DateTime               @default(now())
   updatedAt DateTime               @updatedAt
 
-  completions OnboardingCompletion[]
+  completions            OnboardingCompletion[]
+  signatureCertificates  SignatureCertificate[]
 
   @@map("onboarding_documents")
 }
@@ -827,14 +832,50 @@ model OnboardingCompletion {
   storageBucket      String? // Supabase Storage bucket name (e.g., 'onboarding-documents')
   fieldValues        Json? // Stores extracted field values for debugging/audit
   draftData          Json? // Stores draft form field data for fillable PDFs
+  signatureText              String?                @db.Text
+  signatureTimestamp         DateTime?
+  signatureIpAddress         String?
+  signatureUserAgent         String?                @db.Text
+  signatureConsentGiven      Boolean                @default(false)
+  signatureMethod            String? // TYPED_NAME, DRAWN, UPLOADED, PRE_COMPLIANCE
+  auditTrailJson             Json?
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
 
-  rbtProfile RBTProfile         @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
-  document   OnboardingDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  rbtProfile         RBTProfile            @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  document           OnboardingDocument    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  signatureCertificate SignatureCertificate?
 
   @@unique([rbtProfileId, documentId])
   @@map("onboarding_completions")
+}
+
+model SignatureCertificate {
+  id                     String   @id @default(cuid())
+  onboardingCompletionId String   @unique
+  rbtProfileId           String
+  documentId             String
+  documentTitle          String
+  documentSlug           String
+  signerFullName         String
+  signerEmail            String?
+  signerIpAddress        String?
+  signerUserAgent        String?  @db.Text
+  signatureText          String?  @db.Text
+  signatureTimestamp     DateTime
+  consentStatement       String?  @db.Text
+  documentHash           String
+  certificateGeneratedAt DateTime @default(now())
+  certificateJson        Json
+  createdAt              DateTime @default(now())
+
+  onboardingCompletion OnboardingCompletion @relation(fields: [onboardingCompletionId], references: [id], onDelete: Cascade)
+  rbtProfile           RBTProfile           @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  document             OnboardingDocument   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId])
+  @@index([documentId])
+  @@map("signature_certificates")
 }
 
 model RBTMessage {

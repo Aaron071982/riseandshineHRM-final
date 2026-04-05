@@ -24,4 +24,5 @@ export {
   generateApplicationSubmissionConfirmationEmail,
   generateInterviewReminderEmail,
   generateInterviewReminder15mEmail,
+  generateDocumentSignedReceiptEmail,
 } from './email/generators'

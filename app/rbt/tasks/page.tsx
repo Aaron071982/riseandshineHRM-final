@@ -20,7 +20,7 @@ export default async function RBTTasksPage() {
     redirect('/')
   }
 
-  const [onboardingTasks, onboardingDocuments, completions] = await Promise.all([
+  const [onboardingTasks, onboardingDocuments, completions, userProfile] = await Promise.all([
     prisma.onboardingTask.findMany({
       where: { rbtProfileId: user.rbtProfileId },
       orderBy: { sortOrder: 'asc' },
@@ -33,7 +33,13 @@ export default async function RBTTasksPage() {
       where: { rbtProfileId: user.rbtProfileId },
       include: { document: true },
     }),
+    prisma.userProfile.findUnique({
+      where: { userId: user.id },
+      select: { eSignConsentGiven: true },
+    }),
   ])
+
+  const eSignConsentGiven = userProfile?.eSignConsentGiven === true
 
   return (
     <OnboardingWizard
@@ -41,6 +47,7 @@ export default async function RBTTasksPage() {
       onboardingTasks={onboardingTasks}
       onboardingDocuments={onboardingDocuments}
       completions={completions}
+      eSignConsentGiven={eSignConsentGiven}
     />
   )
 }

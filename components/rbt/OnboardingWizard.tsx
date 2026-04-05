@@ -60,6 +60,8 @@ interface OnboardingWizardProps {
   onboardingTasks: OnboardingTask[]
   onboardingDocuments: OnboardingDocument[]
   completions: OnboardingCompletion[]
+  /** From UserProfile: required before any onboarding signing/tasks that imply e-sign. */
+  eSignConsentGiven?: boolean
 }
 
 export default function OnboardingWizard({
@@ -67,13 +69,21 @@ export default function OnboardingWizard({
   onboardingTasks,
   onboardingDocuments,
   completions,
+  eSignConsentGiven: eSignConsentGivenProp = false,
 }: OnboardingWizardProps) {
   const { showToast } = useToast()
+  const [eSignConsentGiven, setESignConsentGiven] = useState(eSignConsentGivenProp)
+  const [eSignCheckbox, setESignCheckbox] = useState(false)
+  const [eSignSubmitting, setESignSubmitting] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
   const [localCompleted, setLocalCompleted] = useState<Set<string>>(new Set())
   const [showAllDone, setShowAllDone] = useState(false)
   const [readConfirmed, setReadConfirmed] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    setESignConsentGiven(eSignConsentGivenProp)
+  }, [eSignConsentGivenProp])
 
   const steps = useMemo((): Step[] => {
     const taskSteps: Step[] = onboardingTasks
@@ -209,6 +219,85 @@ export default function OnboardingWizard({
             <Button asChild className="mt-4">
               <Link href="/rbt/dashboard">Back to Dashboard</Link>
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const handleEsignConsent = async () => {
+    if (!eSignCheckbox) return
+    setESignSubmitting(true)
+    try {
+      const res = await fetch('/api/rbt/esign-consent', { method: 'POST', credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || 'Could not save consent', 'error')
+        return
+      }
+      setESignConsentGiven(true)
+      showToast('Electronic signature consent saved', 'success')
+    } catch {
+      showToast('Something went wrong', 'error')
+    } finally {
+      setESignSubmitting(false)
+    }
+  }
+
+  if (!eSignConsentGiven) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 px-4 sm:px-0">
+        <div className="flex items-center gap-3">
+          <ClipboardList className="w-8 h-8 text-[#e36f1e]" />
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">My Tasks</h1>
+        </div>
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-md dark:bg-[var(--bg-elevated)] overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-50 to-orange-50/80 dark:from-slate-900 dark:to-orange-950/30 border-b border-slate-200 dark:border-slate-700 px-5 py-4">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-[var(--text-primary)]">
+              Electronic signature consent
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-[var(--text-tertiary)] mt-1">
+              Required once before you can sign or complete documents in this portal.
+            </p>
+          </div>
+          <CardContent className="pt-6 space-y-5 text-sm text-slate-700 dark:text-[var(--text-secondary)] leading-relaxed">
+            <p>
+              By using this portal, you agree to use electronic signatures in place of handwritten signatures. Your typed
+              name constitutes a legal electronic signature under the federal E-SIGN Act (15 U.S.C. § 7001) and applicable
+              state law (including the Uniform Electronic Transactions Act where adopted).
+            </p>
+            <div className="flex items-start gap-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-4 border border-slate-100 dark:border-slate-800">
+              <Checkbox
+                id="esign-portal-consent"
+                checked={eSignCheckbox}
+                onCheckedChange={(c) => setESignCheckbox(c === true)}
+                className="mt-0.5"
+              />
+              <Label htmlFor="esign-portal-consent" className="text-sm font-normal cursor-pointer leading-snug">
+                I agree to conduct this transaction electronically and use electronic signatures
+              </Label>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-1">
+              <Button
+                type="button"
+                className="bg-[#e36f1e] hover:bg-[#c85e18] text-white"
+                disabled={!eSignCheckbox || eSignSubmitting}
+                onClick={handleEsignConsent}
+              >
+                {eSignSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                I agree & continue
+              </Button>
+              <Button type="button" variant="outline" asChild>
+                <Link href="/rbt/documents">Download instead</Link>
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-[var(--text-disabled)]">
+              Prefer paper? Use <span className="font-medium">Download instead</span> to open the Document Center, or email{' '}
+              <a href="mailto:info@riseandshine.nyc" className="text-[#e36f1e] underline underline-offset-2">
+                info@riseandshine.nyc
+              </a>{' '}
+              for a paper packet.
+            </p>
           </CardContent>
         </Card>
       </div>

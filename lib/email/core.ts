@@ -18,6 +18,7 @@ export enum EmailTemplateType {
   REJECTION = 'REJECTION',
   MISSING_ONBOARDING = 'MISSING_ONBOARDING',
   SOCIAL_SECURITY_UPLOAD_REMINDER = 'SOCIAL_SECURITY_UPLOAD_REMINDER',
+  DOCUMENT_SIGNATURE_RECEIPT = 'DOCUMENT_SIGNATURE_RECEIPT',
 }
 
 function getFromEmail(templateType: EmailTemplateType, customFrom?: string): string {

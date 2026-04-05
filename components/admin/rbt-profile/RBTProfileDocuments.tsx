@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import { Dancing_Script } from 'next/font/google'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,10 +13,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { FileText, Download, Trash2, Upload, Loader2, FileArchive } from 'lucide-react'
+import { FileText, Download, Trash2, Upload, Loader2, FileArchive, ScrollText } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { ADMIN_RBT_DOCUMENT_TYPES, formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
+import { formatUserAgentShort } from '@/lib/user-agent-short'
+import { LEGAL_BASIS } from '@/lib/signature-certificate'
 import type { RBTProfileDocument, RBTProfileOnboardingCompletion } from './types'
+
+const dancingScript = Dancing_Script({ weight: '400', subsets: ['latin'] })
 
 interface RBTProfileDocumentsProps {
   rbtProfileId: string
@@ -57,6 +68,64 @@ export default function RBTProfileDocuments({
   const completedWithPdf = onboardingCompletions.filter(
     (c) => c.status === 'COMPLETED' && c.signedPdfUrl
   )
+  const completedAcknowledgments = onboardingCompletions.filter(
+    (c) => c.status === 'COMPLETED' && c.document.type === 'ACKNOWLEDGMENT'
+  )
+
+  const [certModalOpen, setCertModalOpen] = useState(false)
+  const [certLoading, setCertLoading] = useState(false)
+  const [certCompletionId, setCertCompletionId] = useState<string | null>(null)
+  const [certData, setCertData] = useState<{
+    documentTitle: string
+    signerFullName: string
+    signerEmail: string | null
+    signatureText: string | null
+    signatureTimestamp: string
+    signerIpAddress: string | null
+    signerUserAgent: string | null
+    documentHash: string
+    certificateJson: Record<string, unknown>
+  } | null>(null)
+
+  const openCertificate = useCallback(
+    async (completionId: string) => {
+      setCertCompletionId(completionId)
+      setCertLoading(true)
+      setCertModalOpen(true)
+      setCertData(null)
+      try {
+        const res = await fetch(
+          `/api/admin/rbts/${rbtProfileId}/completions/${completionId}/certificate`,
+          { credentials: 'include' }
+        )
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          showToast(body.error || 'No certificate found', 'error')
+          setCertModalOpen(false)
+          setCertCompletionId(null)
+          return
+        }
+        const c = body.certificate
+        setCertData({
+          documentTitle: c.documentTitle,
+          signerFullName: c.signerFullName,
+          signerEmail: c.signerEmail,
+          signatureText: c.signatureText,
+          signatureTimestamp: c.signatureTimestamp,
+          signerIpAddress: c.signerIpAddress,
+          signerUserAgent: c.signerUserAgent,
+          documentHash: c.documentHash,
+          certificateJson: (c.certificateJson || {}) as Record<string, unknown>,
+        })
+      } catch {
+        showToast('Failed to load certificate', 'error')
+        setCertModalOpen(false)
+      } finally {
+        setCertLoading(false)
+      }
+    },
+    [rbtProfileId, showToast]
+  )
 
   const handleDownloadAll = async () => {
     setDownloadingZip(true)
@@ -96,13 +165,102 @@ export default function RBTProfileDocuments({
     }
   }
 
+  const auditEvents = Array.isArray(certData?.certificateJson?.auditTrail)
+    ? (certData!.certificateJson.auditTrail as Array<{ action?: string; timestamp?: string }>)
+    : []
+
   return (
     <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
       <CardHeader>
         <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Documents</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {(documents.length > 0 || completedWithPdf.length > 0) && (
+        <Dialog open={certModalOpen} onOpenChange={setCertModalOpen}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <ScrollText className="w-5 h-5 text-orange-600" />
+                Signature certificate
+              </DialogTitle>
+            </DialogHeader>
+            {certLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
+              </div>
+            ) : certData ? (
+              <div className="space-y-4 text-sm">
+                <p className="font-semibold text-gray-900 dark:text-[var(--text-primary)]">{certData.documentTitle}</p>
+                <p className="text-green-700 dark:text-green-400 font-medium">Electronically signed</p>
+                <div className="space-y-1 text-gray-700 dark:text-[var(--text-secondary)]">
+                  <p>
+                    <span className="text-gray-500">Signer:</span> {certData.signerFullName}
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Email:</span> {certData.signerEmail ?? '—'}
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Signed:</span>{' '}
+                    {new Date(certData.signatureTimestamp).toLocaleString('en-US', {
+                      timeZone: 'America/New_York',
+                      dateStyle: 'long',
+                      timeStyle: 'short',
+                    })}{' '}
+                    EST
+                  </p>
+                  <p>
+                    <span className="text-gray-500">IP address:</span> {certData.signerIpAddress ?? '—'}
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Device:</span>{' '}
+                    {formatUserAgentShort(certData.signerUserAgent)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs mb-1">Signature</p>
+                  <p className={`text-2xl ${dancingScript.className}`}>{certData.signatureText ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs mb-1">Document hash</p>
+                  <p className="font-mono text-xs break-all">{certData.documentHash}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500 text-xs mb-1">Legal basis</p>
+                  <p className="text-xs">{LEGAL_BASIS}</p>
+                </div>
+                {auditEvents.length > 0 ? (
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-[var(--text-primary)] mb-2">Audit trail</p>
+                    <ul className="space-y-1 text-xs text-gray-600 dark:text-[var(--text-tertiary)]">
+                      {auditEvents.map((ev, i) => (
+                        <li key={i}>
+                          {ev.timestamp
+                            ? new Date(ev.timestamp).toLocaleString('en-US', {
+                                timeZone: 'America/New_York',
+                                timeStyle: 'short',
+                              })
+                            : ''}{' '}
+                          — {ev.action ?? 'event'}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {certCompletionId ? (
+                  <Button asChild className="w-full bg-[#e36f1e] hover:bg-[#c85e18]">
+                    <a
+                      href={`/api/admin/rbts/${rbtProfileId}/completions/${certCompletionId}/certificate?format=pdf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Download certificate PDF
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
+        {(documents.length > 0 || completedWithPdf.length > 0 || completedAcknowledgments.length > 0) && (
           <div className="flex justify-end">
             <Button
               variant="outline"
@@ -206,6 +364,42 @@ export default function RBTProfileDocuments({
           </div>
         ) : null}
 
+        {completedAcknowledgments.length > 0 ? (
+          <div className="space-y-2 pt-4 border-t dark:border-[var(--border-subtle)]">
+            <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">
+              Acknowledgment documents (e-sign)
+            </p>
+            {completedAcknowledgments.map((c) => (
+              <div
+                key={c.id}
+                className="flex flex-wrap items-center gap-3 p-3 bg-white dark:bg-[var(--bg-elevated)] rounded-lg border border-gray-200 dark:border-[var(--border-subtle)]"
+              >
+                <FileText className="w-5 h-5 text-orange-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-[var(--text-primary)] truncate">
+                    {c.document.title}
+                  </p>
+                  {c.completedAt ? (
+                    <span className="text-xs text-gray-500">
+                      {new Date(c.completedAt).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                    </span>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="text-orange-600 border-orange-200 shrink-0"
+                  onClick={() => void openCertificate(c.id)}
+                >
+                  <ScrollText className="w-4 h-4 mr-1" />
+                  View certificate
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {completedWithPdf.length > 0 ? (
           <div className="space-y-2 pt-4 border-t dark:border-[var(--border-subtle)]">
             <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">
@@ -268,7 +462,7 @@ export default function RBTProfileDocuments({
           </div>
         ) : null}
 
-        {documents.length === 0 && completedWithPdf.length === 0 ? (
+        {documents.length === 0 && completedWithPdf.length === 0 && completedAcknowledgments.length === 0 ? (
           <div className="text-center py-8 text-gray-500 dark:text-[var(--text-tertiary)]">
             <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-[var(--text-disabled)]" />
             <p className="text-sm">No documents uploaded yet</p>

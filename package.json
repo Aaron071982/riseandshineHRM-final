@@ -17,7 +17,10 @@
     "db:clear-rbts": "tsx scripts/clear-rbts.ts",
     "db:backfill-onboarding": "tsx scripts/backfill-onboarding-tasks.ts",
     "fix:hired-rbts": "tsx scripts/fix-hired-rbts.ts",
-    "db:add-admin": "tsx scripts/add-admin.ts"
+    "db:add-admin": "tsx scripts/add-admin.ts",
+    "test:signature-hash": "tsx scripts/test-signature-certificate-hash.ts",
+    "audit:retroactive-signatures": "tsx scripts/run-retroactive-signature-audit.ts",
+    "audit:retroactive-signatures:dry": "tsx scripts/run-retroactive-signature-audit.ts --dry-run"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

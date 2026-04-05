@@ -1673,3 +1673,55 @@ export function generateNewMessageFromAdminEmail(firstName: string, portalUrl: s
   `
   return { subject, html }
 }
+
+export function generateDocumentSignedReceiptEmail(params: {
+  documentTitle: string
+  signerName: string
+  signedAtUtc: Date
+}): string {
+  const eastern = params.signedAtUtc.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    dateStyle: 'full',
+    timeStyle: 'short',
+  })
+  const documentTitle = params.documentTitle.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const signerName = params.signerName.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #E4893D 0%, #e36f1e 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: bold; }
+        .content { padding: 30px 20px; background-color: #ffffff; }
+        .content p { margin: 16px 0; }
+        .footer { padding: 24px 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Rise and Shine</h1>
+          <p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.95;">HRM Portal</p>
+        </div>
+        <div class="content">
+          <p>You have successfully signed <strong>${documentTitle}</strong>.</p>
+          <p><strong>Signed as:</strong> ${signerName}</p>
+          <p><strong>Date and time (Eastern):</strong> ${eastern}</p>
+          <p><strong>Document:</strong> ${documentTitle}</p>
+          <p>This email serves as your receipt of electronic signature. Please keep it for your records.</p>
+          <p style="color: #b45309; font-size: 14px;">If you did not sign this document, please contact us immediately at <a href="mailto:info@riseandshine.nyc" style="color: #e36f1e;">info@riseandshine.nyc</a>.</p>
+          <p style="margin-top: 24px;">Best regards,<br><strong>Rise and Shine</strong></p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise and Shine</strong> · <a href="mailto:info@riseandshine.nyc" style="color: #e36f1e;">info@riseandshine.nyc</a></p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}

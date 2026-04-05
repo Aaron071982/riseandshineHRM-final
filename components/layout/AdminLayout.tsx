@@ -22,6 +22,7 @@ import {
   MessageCircle,
   LayoutGrid,
   Network,
+  Shield,
 } from 'lucide-react'
 import ActionCenterNavLink from '@/components/admin/ActionCenterNavLink'
 import { useState, useEffect } from 'react'
@@ -48,6 +49,7 @@ const secondaryNavItems = [
   { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
+  { href: '/admin/settings/compliance', label: 'Compliance', icon: Shield },
   { href: '/admin/org-chart', label: 'Company hierarchy', icon: Network },
 ]
 
