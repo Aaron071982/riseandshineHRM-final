@@ -1363,7 +1363,14 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                     onboardingCompletions:
                       prev.onboardingCompletions?.map((c) =>
                         c.id === completionId
-                          ? { ...c, status: 'NOT_STARTED', signedPdfUrl: null, completedAt: null }
+                          ? {
+                              ...c,
+                              status: 'NOT_STARTED',
+                              signedPdfUrl: null,
+                              completedAt: null,
+                              hasSignedPdfData: false,
+                              hasSignatureCertificate: false,
+                            }
                           : c
                       ) ?? [],
                   }))

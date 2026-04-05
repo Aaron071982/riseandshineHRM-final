@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, XCircle, FileText, Download } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
+import { getAcknowledgmentAdminSummary } from '@/lib/acknowledgment-admin-summary'
 import type { RBTProfile } from './types'
 
 type ToastFn = (message: string, type: 'success' | 'error') => void
@@ -228,6 +229,34 @@ export default function RBTProfileOnboarding({ rbtProfile, showToast }: RBTProfi
                           Completed: {formatDateTime(completion.completedAt)}
                         </p>
                       )}
+                      {completion.document.type === 'ACKNOWLEDGMENT' &&
+                        completion.status === 'COMPLETED' &&
+                        (() => {
+                          const { topic, attestation } = getAcknowledgmentAdminSummary({
+                            documentTitle: completion.document.title,
+                            documentSlug: completion.document.slug,
+                            acknowledgmentJson: completion.acknowledgmentJson,
+                          })
+                          return (
+                            <div className="mt-3 ml-7 rounded-md border border-gray-200 dark:border-[var(--border-subtle)] bg-gray-50/80 dark:bg-[var(--bg-input)] p-3 space-y-2">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-[var(--text-disabled)]">
+                                Acknowledgment summary
+                              </p>
+                              <p className="text-sm text-gray-700 dark:text-[var(--text-secondary)] leading-snug">
+                                <span className="font-medium text-gray-800 dark:text-[var(--text-primary)]">
+                                  What they reviewed:{' '}
+                                </span>
+                                {topic}
+                              </p>
+                              <p className="text-sm text-gray-700 dark:text-[var(--text-secondary)] leading-snug">
+                                <span className="font-medium text-gray-800 dark:text-[var(--text-primary)]">
+                                  What they agreed to:{' '}
+                                </span>
+                                {attestation}
+                              </p>
+                            </div>
+                          )
+                        })()}
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge

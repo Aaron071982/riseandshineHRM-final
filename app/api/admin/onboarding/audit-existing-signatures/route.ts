@@ -15,12 +15,16 @@ export async function POST(request: NextRequest) {
         dryRun: true,
         scanned: result.scanned,
         wouldCreate: result.wouldCreate,
+        acknowledgments: result.acknowledgments,
+        fillablePdfs: result.fillablePdfs,
       })
     }
     return NextResponse.json({
       dryRun: false,
       scanned: result.scanned,
       created: result.created,
+      acknowledgments: result.acknowledgments,
+      fillablePdfs: result.fillablePdfs,
     })
   } catch (e) {
     console.error('[audit-existing-signatures]', e)

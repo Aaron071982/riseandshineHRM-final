@@ -177,6 +177,7 @@ export async function buildCertificatePdfBytes(cert: CertInput): Promise<Uint8Ar
   const json = cert.certificateJson as {
     auditTrail?: unknown[]
     preCompliance?: boolean
+    retroactiveFromStoredPdf?: boolean
     disclaimer?: string
     documentIntegrity?: { signingPayloadSha256?: string }
     certificateVersion?: string
@@ -210,7 +211,7 @@ export async function buildCertificatePdfBytes(cert: CertInput): Promise<Uint8Ar
   }
 
   drawHeading('Audit trail', 12)
-  if (json?.preCompliance && json?.disclaimer) {
+  if ((json?.preCompliance || json?.retroactiveFromStoredPdf) && json?.disclaimer) {
     for (const ln of wrapText(json.disclaimer, 90)) {
       ensureSpace(11)
       page.drawText(ln, { x: MARGIN_L, y, size: 8, font, color: rgb(0.45, 0.25, 0.1) })

@@ -29,8 +29,11 @@ export async function GET(
       return NextResponse.json({ error: 'Completion not found' }, { status: 404 })
     }
 
-    if (completion.document.type !== 'ACKNOWLEDGMENT') {
-      return NextResponse.json({ error: 'Certificate is only for acknowledgment documents' }, { status: 400 })
+    if (completion.document.type !== 'ACKNOWLEDGMENT' && completion.document.type !== 'FILLABLE_PDF') {
+      return NextResponse.json(
+        { error: 'Certificate is only for acknowledgment or fillable PDF documents' },
+        { status: 400 }
+      )
     }
 
     const cert = completion.signatureCertificate

@@ -19,14 +19,51 @@ const rbtProfileInclude = {
       status: true,
       completedAt: true,
       signedPdfUrl: true,
+      signedPdfData: true,
       acknowledgmentJson: true,
-      document: { select: { id: true, title: true, type: true } },
+      signatureCertificate: { select: { id: true } },
+      document: { select: { id: true, title: true, type: true, slug: true } },
     },
     orderBy: { createdAt: 'desc' as const },
   },
 } as const
 
 type RBTProfileWithRelations = Prisma.RBTProfileGetPayload<{ include: typeof rbtProfileInclude }>
+
+function sanitizeOnboardingCompletionsForClient(
+  completions: RBTProfileWithRelations['onboardingCompletions'] | undefined
+) {
+  if (!completions?.length) return completions
+  return completions.map((c) => {
+    const raw = c as Record<string, unknown>
+    const hasSignedPdfData =
+      typeof raw.hasSignedPdfData === 'boolean'
+        ? raw.hasSignedPdfData
+        : !!(c.signedPdfData && String(c.signedPdfData).trim().length > 0)
+    const hasSignatureCertificate =
+      typeof raw.hasSignatureCertificate === 'boolean'
+        ? raw.hasSignatureCertificate
+        : !!(raw.signatureCertificate as { id?: string } | null | undefined)?.id
+    const { signedPdfData: _drop, signatureCertificate: _cert, ...rest } = c as typeof c & {
+      signedPdfData?: string | null
+      signatureCertificate?: { id: string } | null
+      hasSignedPdfData?: boolean
+      hasSignatureCertificate?: boolean
+    }
+    return {
+      ...rest,
+      hasSignedPdfData,
+      hasSignatureCertificate,
+    }
+  })
+}
+
+function sanitizeRbtProfileForClient(profile: RBTProfileWithRelations): RBTProfileWithRelations {
+  return {
+    ...profile,
+    onboardingCompletions: sanitizeOnboardingCompletionsForClient(profile.onboardingCompletions) as any,
+  }
+}
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -73,6 +110,9 @@ async function loadRbtProfileMinimalRaw(
       acknowledgmentJson: unknown
       document_title: string
       document_type: string
+      document_slug: string
+      has_signed_pdf_data: boolean
+      has_certificate: boolean
     }> = []
     try {
       interviewsRows = await prisma.$queryRaw`
@@ -99,7 +139,10 @@ async function loadRbtProfileMinimalRaw(
                oc."signedPdfUrl",
                oc."acknowledgmentJson",
                od.title AS document_title,
-               od.type  AS document_type
+               od.type  AS document_type,
+               od.slug AS document_slug,
+               (COALESCE(length(trim(oc."signedPdfData")), 0) > 0) AS has_signed_pdf_data,
+               EXISTS (SELECT 1 FROM signature_certificates sc WHERE sc."onboardingCompletionId" = oc.id) AS has_certificate
         FROM onboarding_completions oc
         JOIN onboarding_documents od ON od.id = oc."documentId"
         WHERE oc."rbtProfileId" = ${id}
@@ -138,10 +181,13 @@ async function loadRbtProfileMinimalRaw(
       completedAt: c.completedAt,
       signedPdfUrl: c.signedPdfUrl ?? null,
       acknowledgmentJson: c.acknowledgmentJson,
+      hasSignedPdfData: Boolean(c.has_signed_pdf_data),
+      hasSignatureCertificate: Boolean(c.has_certificate),
       document: {
         id: c.documentId,
         title: c.document_title,
         type: c.document_type,
+        slug: c.document_slug,
       },
     }))
     return {
@@ -264,6 +310,9 @@ async function loadRbtProfileRaw(
       acknowledgmentJson: unknown
       document_title: string
       document_type: string
+      document_slug: string
+      has_signed_pdf_data: boolean
+      has_certificate: boolean
     }> = []
     try {
       interviewsRows = await prisma.$queryRaw`
@@ -290,7 +339,10 @@ async function loadRbtProfileRaw(
                oc."signedPdfUrl",
                oc."acknowledgmentJson",
                od.title AS document_title,
-               od.type  AS document_type
+               od.type  AS document_type,
+               od.slug AS document_slug,
+               (COALESCE(length(trim(oc."signedPdfData")), 0) > 0) AS has_signed_pdf_data,
+               EXISTS (SELECT 1 FROM signature_certificates sc WHERE sc."onboardingCompletionId" = oc.id) AS has_certificate
         FROM onboarding_completions oc
         JOIN onboarding_documents od ON od.id = oc."documentId"
         WHERE oc."rbtProfileId" = ${id}
@@ -329,10 +381,13 @@ async function loadRbtProfileRaw(
       completedAt: c.completedAt,
       signedPdfUrl: c.signedPdfUrl ?? null,
       acknowledgmentJson: c.acknowledgmentJson,
+      hasSignedPdfData: Boolean(c.has_signed_pdf_data),
+      hasSignatureCertificate: Boolean(c.has_certificate),
       document: {
         id: c.documentId,
         title: c.document_title,
         type: c.document_type,
+        slug: c.document_slug,
       },
     }))
     return {
@@ -451,6 +506,6 @@ export default async function RBTProfilePage({
     }
   }
 
-  return <RBTProfileCRMLayout rbtProfile={rbtProfile} searchParams={search} />
+  return <RBTProfileCRMLayout rbtProfile={sanitizeRbtProfileForClient(rbtProfile)} searchParams={search} />
 }
 

@@ -3,7 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
+import { getClientIpFromRequest } from '@/lib/client-ip'
 import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
+import { SIGNATURE_METHOD } from '@/lib/esign-constants'
+import { createFillablePdfSignatureCertificate, type AuditTrailEvent } from '@/lib/signature-certificate'
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,9 +21,11 @@ export async function POST(request: NextRequest) {
     if (!user || user.role !== 'RBT' || !user.rbtProfileId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    const rbtProfileId = user.rbtProfileId
 
     const formData = await request.formData()
-    const documentId = formData.get('documentId') as string
+    const documentIdRaw = formData.get('documentId')
+    const documentId = typeof documentIdRaw === 'string' ? documentIdRaw.trim() : ''
     const filledPdfBlob = formData.get('filledPdf') as File | null
     const fieldValuesStr = formData.get('fieldValues') as string | null
 
@@ -77,10 +82,10 @@ export async function POST(request: NextRequest) {
 
     // Generate storage path with document slug: rbts/{rbtProfileId}/{documentId}/{documentSlug}-{timestamp}.pdf
     const timestamp = Date.now()
-    const storagePath = `rbts/${user.rbtProfileId}/${documentId}/${document.slug}-${timestamp}.pdf`
+    const storagePath = `rbts/${rbtProfileId}/${documentId}/${document.slug}-${timestamp}.pdf`
 
     // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+    const { error: uploadError } = await supabaseAdmin.storage
       .from(STORAGE_BUCKET)
       .upload(storagePath, pdfBytes, {
         contentType: 'application/pdf',
@@ -95,33 +100,93 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Store the storage path in signedPdfUrl (per schema design)
-    // Update or create OnboardingCompletion record
-    const completion = await prisma.onboardingCompletion.upsert({
-      where: {
-        rbtProfileId_documentId: {
-          rbtProfileId: user.rbtProfileId,
-          documentId: documentId,
+    const signedAt = new Date()
+    const serverIp = getClientIpFromRequest(request) ?? null
+    const serverUa = request.headers.get('user-agent') ?? null
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'
+
+    const rbtProfile = await prisma.rBTProfile.findUnique({
+      where: { id: rbtProfileId },
+      select: { firstName: true, lastName: true, email: true },
+    })
+    if (!rbtProfile) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+    }
+
+    const signerLabel = `${rbtProfile.firstName} ${rbtProfile.lastName}`.trim()
+    const auditTrail: AuditTrailEvent[] = [
+      {
+        action: 'FILLABLE_PDF_SUBMITTED',
+        timestamp: signedAt.toISOString(),
+        ipAddress: serverIp,
+        userAgent: serverUa,
+      },
+    ]
+    const auditTrailJson = { events: auditTrail }
+
+    const pdfBuf = Buffer.from(pdfBytes)
+
+    const completion = await prisma.$transaction(async (tx) => {
+      const comp = await tx.onboardingCompletion.upsert({
+        where: {
+          rbtProfileId_documentId: {
+            rbtProfileId,
+            documentId,
+          },
         },
-      },
-      update: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        signedPdfUrl: storagePath, // Store the storage path in signedPdfUrl field
-        storageBucket: STORAGE_BUCKET,
-        fieldValues: fieldValues ? (fieldValues as Prisma.InputJsonValue) : Prisma.JsonNull,
-        // Clear draft data now that it's finalized
-        draftData: Prisma.JsonNull,
-      },
-      create: {
-        rbtProfileId: user.rbtProfileId,
-        documentId: documentId,
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        signedPdfUrl: storagePath, // Store the storage path in signedPdfUrl field
-        storageBucket: STORAGE_BUCKET,
-        fieldValues: fieldValues ? (fieldValues as Prisma.InputJsonValue) : Prisma.JsonNull,
-      },
+        update: {
+          status: 'COMPLETED',
+          completedAt: signedAt,
+          signedPdfUrl: storagePath,
+          signedPdfData: null,
+          storageBucket: STORAGE_BUCKET,
+          fieldValues: fieldValues ? (fieldValues as Prisma.InputJsonValue) : Prisma.JsonNull,
+          draftData: Prisma.JsonNull,
+          signatureText: signerLabel || null,
+          signatureTimestamp: signedAt,
+          signatureIpAddress: serverIp,
+          signatureUserAgent: serverUa,
+          signatureConsentGiven: true,
+          signatureMethod: SIGNATURE_METHOD.UPLOADED,
+          auditTrailJson: auditTrailJson as object,
+        },
+        create: {
+          rbtProfileId,
+          documentId,
+          status: 'COMPLETED',
+          completedAt: signedAt,
+          signedPdfUrl: storagePath,
+          storageBucket: STORAGE_BUCKET,
+          fieldValues: fieldValues ? (fieldValues as Prisma.InputJsonValue) : Prisma.JsonNull,
+          signatureText: signerLabel || null,
+          signatureTimestamp: signedAt,
+          signatureIpAddress: serverIp,
+          signatureUserAgent: serverUa,
+          signatureConsentGiven: true,
+          signatureMethod: SIGNATURE_METHOD.UPLOADED,
+          auditTrailJson: auditTrailJson as object,
+        },
+      })
+
+      await createFillablePdfSignatureCertificate(tx, {
+        completionId: comp.id,
+        rbtProfileId,
+        document: {
+          id: document.id,
+          title: document.title,
+          slug: document.slug,
+        },
+        rbtProfile,
+        userEmail: user.email ?? null,
+        pdfBuffer: pdfBuf,
+        signatureTimestamp: signedAt,
+        signerIpAddress: serverIp,
+        signerUserAgent: serverUa,
+        auditTrail,
+        timezone: tz,
+      })
+
+      return comp
     })
 
     return NextResponse.json({

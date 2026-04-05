@@ -1297,7 +1297,14 @@ export default function RBTProfileView({ rbtProfile: initialRbtProfile }: RBTPro
             onboardingCompletions:
               prev.onboardingCompletions?.map((c) =>
                 c.id === completionId
-                  ? { ...c, status: 'NOT_STARTED' as const, signedPdfUrl: null, completedAt: null }
+                  ? {
+                      ...c,
+                      status: 'NOT_STARTED' as const,
+                      signedPdfUrl: null,
+                      completedAt: null,
+                      hasSignedPdfData: false,
+                      hasSignatureCertificate: false,
+                    }
                   : c
               ) ?? [],
           }))

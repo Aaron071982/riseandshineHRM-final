@@ -24,6 +24,7 @@ import {
 import { ADMIN_RBT_DOCUMENT_TYPES, formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
 import { formatUserAgentShort } from '@/lib/user-agent-short'
 import { LEGAL_BASIS } from '@/lib/signature-certificate'
+import { getAcknowledgmentAdminSummary } from '@/lib/acknowledgment-admin-summary'
 import type { RBTProfileDocument, RBTProfileOnboardingCompletion } from './types'
 
 const dancingScript = Dancing_Script({ weight: '400', subsets: ['latin'] })
@@ -66,7 +67,10 @@ export default function RBTProfileDocuments({
     onFilesSelected(files, uploadDocType)
   }
   const completedWithPdf = onboardingCompletions.filter(
-    (c) => c.status === 'COMPLETED' && c.signedPdfUrl
+    (c) =>
+      c.status === 'COMPLETED' &&
+      c.document.type === 'FILLABLE_PDF' &&
+      (Boolean(c.signedPdfUrl?.trim()) || Boolean(c.hasSignedPdfData))
   )
   const completedAcknowledgments = onboardingCompletions.filter(
     (c) => c.status === 'COMPLETED' && c.document.type === 'ACKNOWLEDGMENT'
@@ -384,6 +388,28 @@ export default function RBTProfileDocuments({
                       {new Date(c.completedAt).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                     </span>
                   ) : null}
+                  {(() => {
+                    const { topic, attestation } = getAcknowledgmentAdminSummary({
+                      documentTitle: c.document.title,
+                      documentSlug: c.document.slug,
+                      acknowledgmentJson: c.acknowledgmentJson,
+                    })
+                    return (
+                      <div className="mt-2 rounded-md border border-gray-200 dark:border-[var(--border-subtle)] bg-gray-50/80 dark:bg-[var(--bg-input)] p-2.5 space-y-1.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-[var(--text-disabled)]">
+                          Summary
+                        </p>
+                        <p className="text-xs text-gray-700 dark:text-[var(--text-secondary)] leading-snug">
+                          <span className="font-medium text-gray-800 dark:text-[var(--text-primary)]">Reviewed: </span>
+                          {topic}
+                        </p>
+                        <p className="text-xs text-gray-700 dark:text-[var(--text-secondary)] leading-snug">
+                          <span className="font-medium text-gray-800 dark:text-[var(--text-primary)]">Agreed: </span>
+                          {attestation}
+                        </p>
+                      </div>
+                    )
+                  })()}
                 </div>
                 <Button
                   type="button"
@@ -426,7 +452,7 @@ export default function RBTProfileDocuments({
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
@@ -441,6 +467,18 @@ export default function RBTProfileDocuments({
                       Download
                     </a>
                   </Button>
+                  {c.hasSignatureCertificate ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-orange-600 border-orange-200 shrink-0"
+                      onClick={() => void openCertificate(c.id)}
+                    >
+                      <ScrollText className="w-4 h-4 mr-1" />
+                      View certificate
+                    </Button>
+                  ) : null}
                   {onRequestReupload && (
                     <Button
                       variant="outline"

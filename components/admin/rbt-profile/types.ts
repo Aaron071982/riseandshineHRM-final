@@ -61,11 +61,15 @@ export interface RBTProfileOnboardingCompletion {
   status: string
   completedAt: Date | null
   signedPdfUrl?: string | null
+  /** True when a completed PDF is stored in DB (base64); not the raw payload (stripped on the client). */
+  hasSignedPdfData?: boolean
+  hasSignatureCertificate?: boolean
   acknowledgmentJson?: unknown
   document: {
     id: string
     title: string
     type: string
+    slug?: string
   }
 }
 

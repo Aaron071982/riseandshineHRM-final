@@ -14,6 +14,8 @@ export default function ComplianceSettingsPage() {
     scanned: number
     created?: number
     wouldCreate?: number
+    acknowledgments?: { scanned: number; created?: number; wouldCreate?: number }
+    fillablePdfs?: { scanned: number; created?: number; wouldCreate?: number }
   } | null>(null)
 
   const runAudit = async (dryRun: boolean) => {
@@ -37,6 +39,8 @@ export default function ComplianceSettingsPage() {
           dryRun: true,
           scanned: data.scanned ?? 0,
           wouldCreate: data.wouldCreate ?? 0,
+          acknowledgments: data.acknowledgments,
+          fillablePdfs: data.fillablePdfs,
         })
         showToast(`Dry run: ${data.wouldCreate ?? 0} certificate(s) would be created (no changes saved).`, 'success')
       } else {
@@ -44,6 +48,8 @@ export default function ComplianceSettingsPage() {
           dryRun: false,
           scanned: data.scanned ?? 0,
           created: data.created ?? 0,
+          acknowledgments: data.acknowledgments,
+          fillablePdfs: data.fillablePdfs,
         })
         showToast(`Created ${data.created ?? 0} compliance record(s).`, 'success')
       }
@@ -68,10 +74,11 @@ export default function ComplianceSettingsPage() {
 
       <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
         <CardHeader>
-          <CardTitle className="text-lg">Existing acknowledgments</CardTitle>
+          <CardTitle className="text-lg">Retroactive signature certificates</CardTitle>
           <CardDescription>
-            One-time utility: create signature certificate rows for acknowledgment completions that were finished before
-            the compliance upgrade. Safe to run multiple times — completions that already have a certificate are skipped.
+            One-time utility: create signature certificate rows for completed acknowledgment and fillable-PDF onboarding
+            documents that are missing a certificate (e.g. finished before this feature). Safe to run multiple times —
+            completions that already have a certificate are skipped.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -97,22 +104,55 @@ export default function ComplianceSettingsPage() {
             </Button>
           </div>
           <p className="text-xs text-gray-500 dark:text-[var(--text-tertiary)]">
-            Dry run only counts completed acknowledgments missing a certificate — nothing is written to the database.
+            Dry run counts completed acknowledgments and fillable PDFs missing a certificate — nothing is written to the
+            database.
           </p>
           {lastResult ? (
-            <p className="text-sm text-gray-600 dark:text-[var(--text-secondary)]">
-              {lastResult.dryRun ? (
-                <>
-                  Dry run: <strong>{lastResult.wouldCreate ?? 0}</strong> certificate(s) would be created from{' '}
-                  <strong>{lastResult.scanned}</strong> completion(s) scanned. No rows were inserted.
-                </>
-              ) : (
-                <>
-                  Scanned <strong>{lastResult.scanned}</strong> completion(s); created{' '}
-                  <strong>{lastResult.created ?? 0}</strong> new certificate(s).
-                </>
-              )}
-            </p>
+            <div className="text-sm text-gray-600 dark:text-[var(--text-secondary)] space-y-2">
+              <p>
+                {lastResult.dryRun ? (
+                  <>
+                    Dry run: <strong>{lastResult.wouldCreate ?? 0}</strong> certificate(s) would be created from{' '}
+                    <strong>{lastResult.scanned}</strong> completion(s) scanned. No rows were inserted.
+                  </>
+                ) : (
+                  <>
+                    Scanned <strong>{lastResult.scanned}</strong> completion(s); created{' '}
+                    <strong>{lastResult.created ?? 0}</strong> new certificate(s).
+                  </>
+                )}
+              </p>
+              {lastResult.acknowledgments ? (
+                <p className="text-xs text-gray-500 dark:text-[var(--text-tertiary)]">
+                  Acknowledgments:{' '}
+                  {lastResult.dryRun ? (
+                    <>
+                      {lastResult.acknowledgments.wouldCreate ?? 0} would be created (of {lastResult.acknowledgments.scanned}{' '}
+                      scanned)
+                    </>
+                  ) : (
+                    <>
+                      {lastResult.acknowledgments.created ?? 0} created (of {lastResult.acknowledgments.scanned} scanned)
+                    </>
+                  )}
+                </p>
+              ) : null}
+              {lastResult.fillablePdfs ? (
+                <p className="text-xs text-gray-500 dark:text-[var(--text-tertiary)]">
+                  Fillable PDFs:{' '}
+                  {lastResult.dryRun ? (
+                    <>
+                      {lastResult.fillablePdfs.wouldCreate ?? 0} would be created (of {lastResult.fillablePdfs.scanned}{' '}
+                      scanned)
+                    </>
+                  ) : (
+                    <>
+                      {lastResult.fillablePdfs.created ?? 0} created (of {lastResult.fillablePdfs.scanned} scanned)
+                    </>
+                  )}
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </CardContent>
       </Card>
