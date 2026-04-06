@@ -19,6 +19,7 @@ import {
   ApplicationStepReview,
 } from './application-wizard'
 import type { ApplicationData } from './application-wizard'
+import { effectiveFileMime } from '@/lib/public-application-file'
 
 const STEPS = ['Personal Info', 'RBT Readiness', 'Availability', 'Compliance', 'Resume', 'Review']
 
@@ -30,6 +31,7 @@ export default function PublicRBTApplicationWizard() {
   const [submitting, setSubmitting] = useState(false)
   const [draftToken, setDraftToken] = useState<string | null>(null)
   const [consent, setConsent] = useState(false)
+  const [step5Uploading, setStep5Uploading] = useState(false)
 
   const [data, setData] = useState<ApplicationData>({
     firstName: '',
@@ -155,6 +157,10 @@ export default function PublicRBTApplicationWizard() {
         }
         return true
       case 6:
+        if (!data.resumeUrl?.trim() || !data.idDocumentUrl?.trim()) {
+          setError('Your resume and ID must finish uploading. Go back to the Resume step and click Next again.')
+          return false
+        }
         if (!consent) {
           setError('Please confirm that the information provided is accurate')
           return false
@@ -165,12 +171,26 @@ export default function PublicRBTApplicationWizard() {
     }
   }
 
-  const handleNext = () => {
-    if (validateStep(currentStep)) {
-      if (currentStep < STEPS.length) {
-        setCurrentStep(currentStep + 1)
-        window.scrollTo({ top: 0, behavior: 'smooth' })
+  const handleNext = async () => {
+    if (!validateStep(currentStep)) return
+
+    if (currentStep === 5) {
+      setStep5Uploading(true)
+      setError('')
+      try {
+        const updated = await uploadResumeAndIdIfNeeded(data)
+        setData(updated)
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Upload failed. Please try again.')
+        setStep5Uploading(false)
+        return
       }
+      setStep5Uploading(false)
+    }
+
+    if (currentStep < STEPS.length) {
+      setCurrentStep(currentStep + 1)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
@@ -189,7 +209,8 @@ export default function PublicRBTApplicationWizard() {
         return
       }
       const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-      if (!allowedTypes.includes(file.type)) {
+      const mime = effectiveFileMime(file)
+      if (!allowedTypes.includes(mime)) {
         setError('Resume must be a PDF, DOC, or DOCX file')
         return
       }
@@ -200,15 +221,64 @@ export default function PublicRBTApplicationWizard() {
         return
       }
       const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
-      if (!allowedTypes.includes(file.type)) {
+      const mime = effectiveFileMime(file)
+      if (!allowedTypes.includes(mime)) {
         setError('ID must be a PDF, JPG, or PNG file')
         return
       }
     }
 
-    setData({ ...data, [field]: file })
+    setData((prev) => ({
+      ...prev,
+      [field]: file,
+      ...(field === 'resume' ? { resumeUrl: null } : {}),
+      ...(field === 'idDocument' ? { idDocumentUrl: null } : {}),
+    }))
     setError('')
   }
+
+  /** Upload resume + ID to storage so step 6 only submits JSON (mobile Safari can fail on large JSON + File). */
+  const uploadResumeAndIdIfNeeded = useCallback(
+    async (d: ApplicationData): Promise<ApplicationData> => {
+      if (!d.resume || !d.idDocument) {
+        throw new Error('Please upload your resume and government-issued ID')
+      }
+      let resumeUrl = d.resumeUrl
+      if (!resumeUrl) {
+        const formData = new FormData()
+        formData.append('file', d.resume)
+        formData.append('documentType', 'resume')
+        if (draftToken) formData.append('token', draftToken)
+        const res = await fetch('/api/public/apply/upload', { method: 'POST', body: formData })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || `Failed to upload resume (${res.status})`)
+        }
+        const json = await res.json()
+        resumeUrl = json.url
+      }
+      let idDocumentUrl = d.idDocumentUrl
+      if (!idDocumentUrl) {
+        const idForm = new FormData()
+        idForm.append('file', d.idDocument)
+        idForm.append('documentType', 'GOVERNMENT_ID')
+        if (draftToken) idForm.append('token', draftToken)
+        const idRes = await fetch('/api/public/apply/upload', { method: 'POST', body: idForm })
+        if (!idRes.ok) {
+          const err = await idRes.json().catch(() => ({}))
+          throw new Error(err.error || `Failed to upload ID (${idRes.status})`)
+        }
+        const idJson = await idRes.json()
+        idDocumentUrl = idJson.url
+      }
+      return {
+        ...d,
+        resumeUrl,
+        idDocumentUrl,
+      }
+    },
+    [draftToken]
+  )
 
   const handleSubmit = async () => {
     if (!validateStep(6)) return
@@ -217,143 +287,81 @@ export default function PublicRBTApplicationWizard() {
     setError('')
 
     try {
-      if (!data.resume) {
-        setError('Please upload your resume')
-        setSubmitting(false)
-        return
-      }
-      if (!data.idDocument) {
-        setError('Please upload your government-issued ID')
-        setSubmitting(false)
-        return
-      }
-
-      let resumeUrl = data.resumeUrl
-
-      if (!resumeUrl) {
-        const formData = new FormData()
-        formData.append('file', data.resume)
-        if (draftToken) {
-          formData.append('token', draftToken)
+      let working = data
+      if (!data.resumeUrl?.trim() || !data.idDocumentUrl?.trim()) {
+        if (!data.resume || !data.idDocument) {
+          setError('Please upload your resume and government-issued ID')
+          setSubmitting(false)
+          return
         }
-
-        const uploadResponse = await fetch('/api/public/apply/upload', {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (!uploadResponse.ok) {
-          let message = 'Failed to upload resume'
-          try {
-            const errorData = await uploadResponse.json()
-            if (errorData?.error) message = errorData.error
-          } catch {
-            if (uploadResponse.status === 429) {
-              message = 'Too many resume uploads. Please wait a minute and try again.'
-            } else if (uploadResponse.status === 413) {
-              message = 'File is too large for upload. Please use a smaller file.'
-            } else {
-              message = `Failed to upload resume (status ${uploadResponse.status})`
-            }
-          }
-          throw new Error(message)
-        }
-
-        const uploadResult = await uploadResponse.json()
-        resumeUrl = uploadResult.url
+        working = await uploadResumeAndIdIfNeeded(data)
+        setData(working)
       }
+
+      const resumeUrl = working.resumeUrl!.trim()
+      const idDocumentUrl = working.idDocumentUrl!.trim()
 
       let rbtCertificateUrl: string | null = null
       let rbtCertificateFileName: string | null = null
       let rbtCertificateMimeType: string | null = null
-      if (data.rbtCertificate) {
+      if (working.rbtCertificate) {
         const certForm = new FormData()
-        certForm.append('file', data.rbtCertificate)
+        certForm.append('file', working.rbtCertificate)
         certForm.append('documentType', 'RBT_CERTIFICATE')
         if (draftToken) certForm.append('token', draftToken)
         const certRes = await fetch('/api/public/apply/upload', { method: 'POST', body: certForm })
         if (certRes.ok) {
           const certResult = await certRes.json()
           rbtCertificateUrl = certResult.url
-          rbtCertificateFileName = certResult.fileName || data.rbtCertificate.name
-          rbtCertificateMimeType = certResult.mimeType || data.rbtCertificate.type
+          rbtCertificateFileName = certResult.fileName || working.rbtCertificate.name
+          rbtCertificateMimeType = certResult.mimeType || effectiveFileMime(working.rbtCertificate)
         }
       }
 
       let cprCardUrl: string | null = null
       let cprCardFileName: string | null = null
       let cprCardMimeType: string | null = null
-      if (data.cprCard) {
+      if (working.cprCard) {
         const cprForm = new FormData()
-        cprForm.append('file', data.cprCard)
+        cprForm.append('file', working.cprCard)
         cprForm.append('documentType', 'CPR_CARD')
         if (draftToken) cprForm.append('token', draftToken)
         const cprRes = await fetch('/api/public/apply/upload', { method: 'POST', body: cprForm })
         if (cprRes.ok) {
           const cprResult = await cprRes.json()
           cprCardUrl = cprResult.url
-          cprCardFileName = cprResult.fileName || data.cprCard.name
-          cprCardMimeType = cprResult.mimeType || data.cprCard.type
+          cprCardFileName = cprResult.fileName || working.cprCard.name
+          cprCardMimeType = cprResult.mimeType || effectiveFileMime(working.cprCard)
         }
       }
 
-      let idDocumentUrl = data.idDocumentUrl
-      let idDocumentFileName: string | null = null
-      let idDocumentMimeType: string | null = null
-      if (data.idDocument) {
-        const idForm = new FormData()
-        idForm.append('file', data.idDocument)
-        idForm.append('documentType', 'GOVERNMENT_ID')
-        if (draftToken) idForm.append('token', draftToken)
-        const idRes = await fetch('/api/public/apply/upload', { method: 'POST', body: idForm })
-        if (!idRes.ok) {
-          let message = 'Failed to upload ID'
-          try {
-            const errData = await idRes.json()
-            if (errData?.error) message = errData.error
-          } catch {
-            if (idRes.status === 429) {
-              message = 'Too many ID uploads. Please wait a minute and try again.'
-            } else if (idRes.status === 413) {
-              message = 'ID file is too large. Please upload a smaller file.'
-            } else {
-              message = `Failed to upload ID (status ${idRes.status})`
-            }
-          }
-          throw new Error(message)
-        }
-        const idResult = await idRes.json()
-        idDocumentUrl = idResult.url
-        idDocumentFileName = idResult.fileName || data.idDocument.name
-        idDocumentMimeType = idResult.mimeType || data.idDocument.type
-      }
+      const { resume, idDocument, rbtCertificate: _cert, cprCard: _cpr, ...serializable } = working
 
-      // Submit application
       const submitResponse = await fetch('/api/public/apply/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...data,
+          ...serializable,
           resumeUrl,
-          resumeFileName: data.resume?.name || null,
-          resumeMimeType: data.resume?.type || null,
-          resumeSize: data.resume?.size || null,
-          experienceYearsDisplay: data.experienceYears,
-          preferredAgeGroups: data.preferredAgeGroups,
-          authorizedToWork: data.authorizedToWork,
-          canPassBackgroundCheck: data.canPassBackgroundCheck,
-          cprFirstAidCertified: data.cprFirstAidCertified,
+          idDocumentUrl,
+          resumeFileName: resume?.name || null,
+          resumeMimeType: resume ? effectiveFileMime(resume) : null,
+          resumeSize: resume?.size ?? null,
+          idDocumentFileName: idDocument?.name || null,
+          idDocumentMimeType: idDocument ? effectiveFileMime(idDocument) : null,
+          experienceYearsDisplay: working.experienceYears,
+          preferredAgeGroups: working.preferredAgeGroups,
+          authorizedToWork: working.authorizedToWork,
+          canPassBackgroundCheck: working.canPassBackgroundCheck,
+          cprFirstAidCertified: working.cprFirstAidCertified,
           rbtCertificateUrl: rbtCertificateUrl || undefined,
           rbtCertificateFileName: rbtCertificateFileName || undefined,
           rbtCertificateMimeType: rbtCertificateMimeType || undefined,
           cprCardUrl: cprCardUrl || undefined,
           cprCardFileName: cprCardFileName || undefined,
           cprCardMimeType: cprCardMimeType || undefined,
-          idDocumentUrl: idDocumentUrl || undefined,
-          idDocumentFileName: idDocumentFileName || undefined,
-          idDocumentMimeType: idDocumentMimeType || undefined,
           draftToken: draftToken,
-          website: data.website || '', // Honeypot
+          website: working.website || '',
         }),
       })
 
@@ -482,11 +490,11 @@ export default function PublicRBTApplicationWizard() {
                     whileTap={{ scale: submitting ? 1 : 0.98 }}
                   >
                     <Button
-                      onClick={handleNext}
-                      disabled={submitting}
+                      onClick={() => void handleNext()}
+                      disabled={submitting || (currentStep === 5 && step5Uploading)}
                       className="gradient-primary text-white border-0 rounded-button shadow-button hover:shadow-buttonHover transition-all duration-200"
                     >
-                      Next
+                      {currentStep === 5 && step5Uploading ? 'Uploading…' : 'Next'}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   </motion.div>

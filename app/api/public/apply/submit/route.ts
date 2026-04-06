@@ -77,7 +77,14 @@ export async function POST(request: NextRequest) {
     ]
 
     for (const field of requiredFields) {
-      if (!body[field]) {
+      const v = body[field]
+      if (v === undefined || v === null) {
+        return NextResponse.json(
+          { error: `Missing required field: ${field}` },
+          { status: 400 }
+        )
+      }
+      if (typeof v === 'string' && !v.trim()) {
         return NextResponse.json(
           { error: `Missing required field: ${field}` },
           { status: 400 }

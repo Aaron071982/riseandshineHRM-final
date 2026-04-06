@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin, RESUMES_STORAGE_BUCKET } from '@/lib/supabase'
+import { effectiveFileMime } from '@/lib/public-application-file'
 import crypto from 'crypto'
 
 // Simple in-memory rate limiting store
@@ -29,9 +30,10 @@ function checkRateLimit(key: string, maxRequests: number, windowMs: number): boo
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting: 5 requests per IP per minute
+    // Rate limiting: generous limit for resume + ID + optional docs + retries
     const rateLimitKey = getRateLimitKey(request)
-    if (!checkRateLimit(rateLimitKey, 5, 60 * 1000)) {
+    // Allow resume + ID + optional docs + retries in one session (mobile users retry often)
+    if (!checkRateLimit(rateLimitKey, 25, 60 * 1000)) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
         { status: 429 }
@@ -84,7 +86,8 @@ export async function POST(request: NextRequest) {
       documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD' || documentType === 'GOVERNMENT_ID'
         ? optionalDocTypes
         : resumeTypes
-    if (!allowedTypes.includes(file.type)) {
+    const mime = effectiveFileMime(file)
+    if (!mime || !allowedTypes.includes(mime)) {
       return NextResponse.json(
         {
           error:
@@ -112,10 +115,10 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer)
 
     // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+    const { error: uploadError } = await supabaseAdmin.storage
       .from(RESUMES_STORAGE_BUCKET)
       .upload(storagePath, buffer, {
-        contentType: file.type,
+        contentType: mime || 'application/octet-stream',
         upsert: false,
       })
 
@@ -132,7 +135,7 @@ export async function POST(request: NextRequest) {
       url: storagePath,
       fileName: file.name,
       fileSize: file.size,
-      mimeType: file.type,
+      mimeType: mime,
     })
   } catch (error: any) {
     console.error('Error uploading file:', error)
