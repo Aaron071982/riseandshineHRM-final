@@ -114,24 +114,47 @@ export default function AcknowledgmentFlow({ document, completion, onComplete }:
     }
   }, [document.id, isCompleted])
 
+  /** PDFs usually scroll inside the iframe, so the outer div never fires scroll — treat as read when no overflow. */
+  const updateScrollProgress = useCallback(() => {
+    const container = containerRef.current
+    if (!container) return
+    const { scrollTop, scrollHeight, clientHeight } = container
+    const noOuterOverflow = scrollHeight <= clientHeight + 24
+    if (noOuterOverflow) {
+      setHasScrolledToBottom(true)
+      setAuditTrail((prev) => {
+        if (prev.some((e) => e.action === 'DOCUMENT_VIEWPORT_NO_OUTER_SCROLL')) return prev
+        return pushEvent(prev, { action: 'DOCUMENT_VIEWPORT_NO_OUTER_SCROLL', documentId: document.id })
+      })
+      return
+    }
+    if (scrollTop + clientHeight >= scrollHeight - 10) {
+      setHasScrolledToBottom(true)
+      setAuditTrail((prev) => {
+        if (prev.some((e) => e.action === 'DOCUMENT_SCROLLED_TO_BOTTOM')) return prev
+        return pushEvent(prev, { action: 'DOCUMENT_SCROLLED_TO_BOTTOM', documentId: document.id })
+      })
+    }
+  }, [document.id])
+
   useEffect(() => {
     const container = containerRef.current
     if (!container || isCompleted) return
 
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      if (scrollTop + clientHeight >= scrollHeight - 10) {
-        setHasScrolledToBottom(true)
-        setAuditTrail((prev) => {
-          if (prev.some((e) => e.action === 'DOCUMENT_SCROLLED_TO_BOTTOM')) return prev
-          return pushEvent(prev, { action: 'DOCUMENT_SCROLLED_TO_BOTTOM', documentId: document.id })
-        })
-      }
-    }
+    updateScrollProgress()
+    const handleScroll = () => updateScrollProgress()
 
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-  }, [document.id, isCompleted])
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    const ro = new ResizeObserver(() => updateScrollProgress())
+    ro.observe(container)
+    window.addEventListener('resize', handleScroll)
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      ro.disconnect()
+      window.removeEventListener('resize', handleScroll)
+    }
+  }, [document.id, isCompleted, updateScrollProgress])
 
   const onReadChange = useCallback(
     (checked: boolean) => {
@@ -270,9 +293,19 @@ export default function AcknowledgmentFlow({ document, completion, onComplete }:
                 src={`data:application/pdf;base64,${document.pdfData}`}
                 className="w-full h-full min-h-[400px]"
                 title={document.title}
+                onLoad={() => {
+                  requestAnimationFrame(() => updateScrollProgress())
+                }}
               />
             ) : document.pdfUrl ? (
-              <iframe src={document.pdfUrl} className="w-full h-full min-h-[400px]" title={document.title} />
+              <iframe
+                src={document.pdfUrl}
+                className="w-full h-full min-h-[400px]"
+                title={document.title}
+                onLoad={() => {
+                  requestAnimationFrame(() => updateScrollProgress())
+                }}
+              />
             ) : (
               <div className="flex items-center justify-center h-full min-h-[200px] text-gray-500">PDF not available</div>
             )}
