@@ -17,6 +17,7 @@ import {
   TrendingDown,
   Minus,
   LogIn,
+  MapPin,
 } from 'lucide-react'
 import {
   BarChart,
@@ -60,6 +61,8 @@ interface DashboardData {
   }
   pipeline: { stages: { name: string; count: number; dropOffPercent: number }[] }
   hiringActivity: { weeks: { weekLabel: string; candidatesAdded: number; hires: number }[] }
+  rbtByCity: { city: string; count: number }[]
+  rbtGenderSplit: { gender: string; count: number }[]
   sourceBreakdown: { publicApplication: number; adminCreated: number }
   recentSignIns: {
     id: string
@@ -171,7 +174,26 @@ export default function DashboardAnalytics() {
 
   if (!data) return null
 
-  const { kpis, pipeline, hiringActivity, sourceBreakdown, recentSignIns, upcomingInterviews, onboardingAlerts, unclaimedTodayCount } = data
+  const {
+    kpis,
+    pipeline,
+    hiringActivity,
+    rbtByCity,
+    rbtGenderSplit,
+    sourceBreakdown,
+    recentSignIns,
+    upcomingInterviews,
+    onboardingAlerts,
+    unclaimedTodayCount,
+  } = data
+
+  const GENDER_PIE_COLORS = ['#f97316', '#94a3b8', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b']
+
+  const genderPieData = rbtGenderSplit.map((g, i) => ({
+    name: g.gender,
+    value: g.count,
+    color: GENDER_PIE_COLORS[i % GENDER_PIE_COLORS.length],
+  }))
 
   const sourcePieData = [
     { name: 'Public application', value: sourceBreakdown.publicApplication, color: '#f97316' },
@@ -381,6 +403,92 @@ export default function DashboardAnalytics() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Hired RBT demographics: city + gender */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <Card className="lg:col-span-7 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-orange-500" />
+              Hired RBTs by city
+            </CardTitle>
+            <CardDescription>Location (city) for all hired RBTs; top cities + Other</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {rbtByCity.length === 0 ? (
+              <div className="h-64 flex items-center justify-center text-gray-500">No hired RBTs yet</div>
+            ) : (
+              <div className="h-72 min-h-[240px] w-full">
+                <ResponsiveContainer width="100%" height="100%" minHeight={240}>
+                  <BarChart
+                    layout="vertical"
+                    data={rbtByCity}
+                    margin={{ top: 0, right: 24, left: 12, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                    <XAxis type="number" tick={{ fontSize: 12 }} />
+                    <YAxis
+                      type="category"
+                      dataKey="city"
+                      width={120}
+                      tick={{ fontSize: 11 }}
+                    />
+                    <Tooltip
+                      formatter={(value) => [value, 'RBTs']}
+                      content={({ active, payload }) =>
+                        active && payload?.[0] ? (
+                          <div className="rounded-lg border bg-white dark:bg-gray-800 p-2 shadow-md text-sm">
+                            <p className="font-medium">{payload[0].payload?.city}</p>
+                            <p>Count: {payload[0].value}</p>
+                          </div>
+                        ) : null
+                      }
+                    />
+                    <Bar dataKey="count" fill="#f97316" name="RBTs" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="lg:col-span-5 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="h-5 w-5 text-orange-500" />
+              Hired RBTs by gender
+            </CardTitle>
+            <CardDescription>Distribution across all hired RBTs</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {genderPieData.length === 0 ? (
+              <div className="h-64 flex items-center justify-center text-gray-500">No hired RBTs yet</div>
+            ) : (
+              <div className="h-72 min-h-[240px] w-full">
+                <ResponsiveContainer width="100%" height="100%" minHeight={240}>
+                  <PieChart>
+                    <Pie
+                      data={genderPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, value }) => `${name}: ${value}`}
+                    >
+                      {genderPieData.map((entry, index) => (
+                        <Cell key={`gender-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Three-column: Recent sign-ins, Upcoming interviews, Onboarding alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

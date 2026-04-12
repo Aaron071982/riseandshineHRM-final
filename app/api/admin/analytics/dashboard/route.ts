@@ -256,6 +256,33 @@ export async function GET(request: NextRequest) {
       weeks.push({ weekLabel: label, candidatesAdded: added, hires })
     }
 
+    // ---- Hired RBT demographics: city + gender (all-time, hired only) ----
+    const hiredDemographics = await prisma.rBTProfile.findMany({
+      where: { status: 'HIRED' },
+      select: { locationCity: true, gender: true },
+    })
+    const cityCounts = new Map<string, number>()
+    const genderCounts = new Map<string, number>()
+    for (const r of hiredDemographics) {
+      const cityRaw = r.locationCity?.trim()
+      const cityLabel = cityRaw && cityRaw.length > 0 ? cityRaw : 'Unknown'
+      cityCounts.set(cityLabel, (cityCounts.get(cityLabel) ?? 0) + 1)
+      const gRaw = r.gender?.trim()
+      const genderLabel = gRaw && gRaw.length > 0 ? gRaw : 'Unknown'
+      genderCounts.set(genderLabel, (genderCounts.get(genderLabel) ?? 0) + 1)
+    }
+    const rbtByCity = Array.from(cityCounts.entries())
+      .map(([city, count]) => ({ city, count }))
+      .sort((a, b) => b.count - a.count)
+    const topCities = rbtByCity.slice(0, 16)
+    const otherCityTotal = rbtByCity.slice(16).reduce((s, x) => s + x.count, 0)
+    const rbtByCityChart =
+      otherCityTotal > 0 ? [...topCities, { city: 'Other', count: otherCityTotal }] : topCities
+
+    const rbtGenderSplit = Array.from(genderCounts.entries())
+      .map(([gender, count]) => ({ gender, count }))
+      .sort((a, b) => b.count - a.count)
+
     // ---- Source breakdown ----
     const sourceCounts = await prisma.rBTProfile.groupBy({
       by: ['source'],
@@ -351,6 +378,8 @@ export async function GET(request: NextRequest) {
       kpis,
       pipeline,
       hiringActivity: { weeks },
+      rbtByCity: rbtByCityChart,
+      rbtGenderSplit,
       sourceBreakdown,
       recentSignIns,
       upcomingInterviews,
