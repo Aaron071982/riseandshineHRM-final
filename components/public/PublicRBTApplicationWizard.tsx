@@ -220,10 +220,10 @@ export default function PublicRBTApplicationWizard() {
         setError(`ID file size exceeds 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)} MB.`)
         return
       }
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif', 'image/webp']
       const mime = effectiveFileMime(file)
       if (!allowedTypes.includes(mime)) {
-        setError('ID must be a PDF, JPG, or PNG file')
+        setError('ID must be a PDF, JPG, PNG, HEIC, or WEBP file')
         return
       }
     }

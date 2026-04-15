@@ -71,7 +71,7 @@ export default function ApplicationStepFiles({ data, onFileChange }: Application
           </div>
         </div>
         <div>
-          <Label htmlFor="idDocument">Government-issued ID * (PDF, JPG, or PNG, max 10MB)</Label>
+          <Label htmlFor="idDocument">Government-issued ID * (PDF, JPG, PNG, HEIC, or WEBP, max 10MB)</Label>
           <div className="mt-2">
             <label
               htmlFor="idDocument"
@@ -82,12 +82,12 @@ export default function ApplicationStepFiles({ data, onFileChange }: Application
                 <p className="mb-2 text-sm text-gray-500">
                   <span className="font-semibold">Click to upload</span> or drag and drop
                 </p>
-                <p className="text-xs text-gray-500">PDF, JPG, or PNG (MAX. 10MB)</p>
+                <p className="text-xs text-gray-500">PDF, JPG, PNG, HEIC, or WEBP (MAX. 10MB)</p>
               </div>
               <input
                 id="idDocument"
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.webp"
                 onChange={(e) => handleFileChange('idDocument', e.target.files?.[0] || null)}
                 className="hidden"
               />
@@ -122,7 +122,7 @@ export default function ApplicationStepFiles({ data, onFileChange }: Application
             <Input
               id="rbtCertificate"
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.webp"
               onChange={(e) => handleFileChange('rbtCertificate', e.target.files?.[0] || null)}
             />
             {data.rbtCertificate && (
@@ -139,7 +139,7 @@ export default function ApplicationStepFiles({ data, onFileChange }: Application
             <Input
               id="cprCard"
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept=".pdf,.jpg,.jpeg,.png,.heic,.heif,.webp"
               onChange={(e) => handleFileChange('cprCard', e.target.files?.[0] || null)}
             />
             {data.cprCard && (

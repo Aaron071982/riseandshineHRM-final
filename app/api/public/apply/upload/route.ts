@@ -81,6 +81,9 @@ export async function POST(request: NextRequest) {
       'image/jpeg',
       'image/jpg',
       'image/png',
+      'image/heic',
+      'image/heif',
+      'image/webp',
     ]
     const allowedTypes =
       documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD' || documentType === 'GOVERNMENT_ID'
@@ -92,9 +95,9 @@ export async function POST(request: NextRequest) {
         {
           error:
             documentType === 'GOVERNMENT_ID'
-              ? 'Invalid file type. Please upload a PDF, JPG, or PNG file for your ID.'
+              ? 'Invalid file type. Please upload a PDF, JPG, PNG, HEIC, or WEBP file for your ID.'
               : documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD'
-                ? 'Invalid file type. Please upload a PDF, JPG, or PNG file.'
+                ? 'Invalid file type. Please upload a PDF, JPG, PNG, HEIC, or WEBP file.'
                 : 'Invalid file type. Please upload a PDF, DOC, or DOCX file.',
         },
         { status: 400 }
