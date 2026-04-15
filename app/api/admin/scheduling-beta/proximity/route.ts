@@ -39,9 +39,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    /** Include all pipeline stages except rejected candidates. */
+    const notRejected = { status: { not: 'REJECTED' as const } }
+
     const [rbtsWithCoords, rbtsTotal] = await Promise.all([
       prisma.rBTProfile.findMany({
         where: {
+          ...notRejected,
           latitude: { not: null },
           longitude: { not: null },
         },
@@ -65,7 +69,7 @@ export async function POST(req: NextRequest) {
           availabilitySlots: { select: { dayOfWeek: true } },
         },
       }),
-      prisma.rBTProfile.count(),
+      prisma.rBTProfile.count({ where: notRejected }),
     ])
 
     const activeExcludedRows = await prisma.$queryRaw<Array<{ rbtProfileId: string }>>`
