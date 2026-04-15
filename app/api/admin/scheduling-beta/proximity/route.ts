@@ -39,10 +39,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const [hiredWithCoords, hiredTotal] = await Promise.all([
+    const [rbtsWithCoords, rbtsTotal] = await Promise.all([
       prisma.rBTProfile.findMany({
         where: {
-          status: 'HIRED',
           latitude: { not: null },
           longitude: { not: null },
         },
@@ -66,7 +65,7 @@ export async function POST(req: NextRequest) {
           availabilitySlots: { select: { dayOfWeek: true } },
         },
       }),
-      prisma.rBTProfile.count({ where: { status: 'HIRED' } }),
+      prisma.rBTProfile.count(),
     ])
 
     const activeExcludedRows = await prisma.$queryRaw<Array<{ rbtProfileId: string }>>`
@@ -77,7 +76,7 @@ export async function POST(req: NextRequest) {
     const activeExcludedIds = new Set(activeExcludedRows.map((row) => row.rbtProfileId))
     const activeExcludedCount = activeExcludedIds.size
 
-    const validCoords = hiredWithCoords.filter((r) => {
+    const validCoords = rbtsWithCoords.filter((r) => {
       if (activeExcludedIds.has(r.id)) return false
       const lat = r.latitude!
       const lng = r.longitude!
@@ -85,7 +84,7 @@ export async function POST(req: NextRequest) {
       if (lat === clientCoords.lat && lng === clientCoords.lng) return false
       return true
     })
-    const excludedCount = hiredTotal - validCoords.length
+    const excludedCount = rbtsTotal - validCoords.length
 
     const withDistance = validCoords
       .map((r) => ({
@@ -106,7 +105,7 @@ export async function POST(req: NextRequest) {
         rbts: [],
         excludedCount,
         activeExcludedCount,
-        message: 'No hired RBTs found within 30 miles of this address.',
+        message: 'No RBTs found within 30 miles of this address.',
       })
     }
 

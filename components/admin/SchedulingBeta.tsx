@@ -852,10 +852,10 @@ export default function SchedulingBeta() {
               <p className="text-sm text-amber-600 dark:text-amber-500">{proxError}</p>
             )}
             {proxResult && proxResult.rbts.length === 0 && !proxError && (
-              <p className="text-sm text-gray-500">No hired RBTs found within 30 miles of this address. Try a different location.</p>
+              <p className="text-sm text-gray-500">No RBTs found within 30 miles of this address. Try a different location.</p>
             )}
             {proxResult && proxResult.excludedCount != null && proxResult.excludedCount > 0 && (
-              <p className="text-xs text-gray-500 mb-2">{proxResult.excludedCount} hired RBTs could not be included — missing location data. Run Geocode All to fix.</p>
+              <p className="text-xs text-gray-500 mb-2">{proxResult.excludedCount} RBTs could not be included — missing location data. Run Geocode All to fix.</p>
             )}
             {proxResult && proxResult.rbts.length > 0 && (
               <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
