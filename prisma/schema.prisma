@@ -270,11 +270,98 @@ model User {
   adminNotifications       AdminNotification[]
   interviewerSettings     InterviewerSettings?
   interviewerAvailability InterviewerAvailability[]
+  adminAvailability       AdminAvailability[]
+  adminAvailabilityOverrides AdminAvailabilityOverride[]
+  adminCalendarNotes      AdminCalendarNote[]
+  adminStatus             AdminStatus?
   interviewSlots           InterviewSlot[]     @relation("InterviewSlotInterviewer")
   schedulingExclusions     SchedulingExclusion[] @relation("SchedulingExcludedByUser")
   linkedOrgNodes         OrgNode[]             @relation("OrgNodeLinkedUser")
+  clientsCreated         CrmClient[]           @relation("CrmClientCreatedBy")
+  clientRbtAssigned      ClientRbtAssignment[] @relation("ClientRbtAssignedBy")
+  clientBcbaAssigned     ClientBcbaAssignment[] @relation("ClientBcbaAssignedBy")
+  clientNotesAuthored    ClientNote[]          @relation("ClientNoteAuthor")
+  clientStatusChanges    ClientStatusHistory[] @relation("ClientStatusChangedBy")
 
   @@map("users")
+}
+
+model AdminAvailability {
+  id          String   @id @default(cuid())
+  userId      String
+  dayOfWeek   Int
+  startHour   Int
+  startMinute Int
+  endHour     Int
+  endMinute   Int
+  label       String?
+  color       String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([dayOfWeek])
+  @@index([userId, dayOfWeek])
+  @@map("admin_availability")
+}
+
+model AdminAvailabilityOverride {
+  id           String   @id @default(cuid())
+  userId       String
+  date         DateTime @db.Date
+  overrideType String
+  startHour    Int?
+  startMinute  Int?
+  endHour      Int?
+  endMinute    Int?
+  reason       String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([date])
+  @@index([userId, date])
+  @@map("admin_availability_overrides")
+}
+
+model AdminCalendarNote {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  content   String   @db.Text
+  color     String?
+  isPinned  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+  @@index([userId, date])
+  @@map("admin_calendar_notes")
+}
+
+model AdminStatus {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  status          String
+  statusEmoji     String?
+  statusMessage   String?  @db.Text
+  statusExpiresAt DateTime?
+  lastSeenAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([lastSeenAt])
+  @@map("admin_status")
 }
 
 /// Company hierarchy / org chart (admin-managed tree).
@@ -441,6 +528,7 @@ model RBTProfile {
   messages              RBTMessage[]
   interviewSlotsBooked  InterviewSlot[]
   schedulingExclusions  SchedulingExclusion[]
+  clientManagementAssignments ClientRbtAssignment[]
 
   @@map("rbt_profiles")
 }
@@ -503,6 +591,139 @@ model ClientAssignment {
   @@map("client_assignments")
 }
 
+// --- Client Management System (separate from scheduling_clients, compliance Client/clients table) ---
+
+model CrmClient {
+  id                       String    @id @default(cuid())
+  firstName                String
+  lastName                 String
+  dateOfBirth              DateTime? @db.Date
+  diagnosis                String?   @db.Text
+  status                   String // NEW_INTAKE | WAITING | ACTIVE | INACTIVE
+  addressLine1             String?
+  addressLine2             String?
+  city                     String?
+  state                    String?
+  zipCode                  String?
+  latitude                 Float?
+  longitude                Float?
+  insuranceProvider        String?
+  insuranceMemberId        String?
+  insuranceGroupNumber     String?
+  insurancePhone           String?
+  authorizationNumber      String?
+  authorizationStartDate   DateTime? @db.Date
+  authorizationEndDate     DateTime? @db.Date
+  authorizedHoursPerWeek   Float?
+  usedHoursTotal           Float     @default(0)
+  guardianName             String?
+  guardianPhone            String?
+  guardianEmail            String?
+  guardianRelationship     String?
+  preferredLanguage        String?
+  preferredRbtGender       String?
+  preferredRbtEthnicity    String?
+  intakeDate               DateTime? @db.Date
+  firstSessionDate         DateTime? @db.Date
+  notes                    String?   @db.Text
+  createdByUserId          String
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  createdBy       User                   @relation("CrmClientCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  rbtAssignments  ClientRbtAssignment[]
+  bcbaAssignments ClientBcbaAssignment[]
+  clientNotes     ClientNote[]
+  statusHistory   ClientStatusHistory[]
+
+  @@index([status])
+  @@index([authorizationEndDate])
+  @@index([createdByUserId])
+  @@map("cms_clients")
+}
+
+model ClientRbtAssignment {
+  id               String    @id @default(cuid())
+  clientId         String
+  rbtProfileId     String
+  assignedByUserId String
+  isPrimary        Boolean   @default(false)
+  startDate        DateTime? @db.Date
+  endDate          DateTime? @db.Date
+  daysOfWeek       String[]
+  timeStart        String?
+  timeEnd          String?
+  notes            String?   @db.Text
+  status           String    @default("ACTIVE") // ACTIVE | ENDED | ON_HOLD
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  client     CrmClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  assignedBy User       @relation("ClientRbtAssignedBy", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([clientId])
+  @@index([rbtProfileId])
+  @@index([status])
+  @@map("client_rbt_assignments")
+}
+
+model ClientBcbaAssignment {
+  id               String    @id @default(cuid())
+  clientId         String
+  bcbaProfileId    String
+  assignedByUserId String
+  isPrimary        Boolean   @default(true)
+  startDate        DateTime? @db.Date
+  endDate          DateTime? @db.Date
+  notes            String?   @db.Text
+  status           String    @default("ACTIVE")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  client      CrmClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  bcbaProfile BCBAProfile @relation(fields: [bcbaProfileId], references: [id], onDelete: Cascade)
+  assignedBy  User        @relation("ClientBcbaAssignedBy", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([clientId])
+  @@index([bcbaProfileId])
+  @@map("client_bcba_assignments")
+}
+
+model ClientNote {
+  id        String   @id @default(cuid())
+  clientId  String
+  authorId  String
+  content   String   @db.Text
+  noteType  String // GENERAL | CLINICAL | BILLING | SCHEDULING | FOLLOW_UP
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client CrmClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  author User      @relation("ClientNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([authorId])
+  @@map("client_notes")
+}
+
+model ClientStatusHistory {
+  id              String   @id @default(cuid())
+  clientId        String
+  fromStatus      String?
+  toStatus        String
+  changedByUserId String
+  reason          String?  @db.Text
+  createdAt       DateTime @default(now())
+
+  client    CrmClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  changedBy User      @relation("ClientStatusChangedBy", fields: [changedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([clientId])
+  @@index([createdAt])
+  @@map("client_status_history")
+}
+
 /// Interview reminder columns: reminderSentAt = 30-minute reminder sent at (cron: send-interview-reminders).
 /// reminder_15m_sent_at = 15-minute reminder sent at (cron: interview-reminders, env INTERVIEW_REMINDER_MINUTES).
 model Interview {
@@ -518,6 +739,7 @@ model Interview {
   reminderSentAt        DateTime?         // 30m reminder sent at
   reminder_15m_sent_at  DateTime?         // 15m reminder sent at
   reminder_1hr_sent_at  DateTime?         // 1hr reminder sent at
+  dailyDigestDate       DateTime?         @db.Date // last date included in daily digest
   claimedByUserId       String?           // admin who claimed this interview
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
@@ -528,6 +750,7 @@ model Interview {
   scorecards     InterviewScorecard[]
 
   @@index([reminder_15m_sent_at])
+  @@index([dailyDigestDate])
   @@index([claimedByUserId])
   @@map("interviews")
 }
@@ -960,6 +1183,8 @@ model BCBAProfile {
   status                 String? // e.g. Active, Inactive
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
+
+  clientAssignments ClientBcbaAssignment[]
 
   @@map("bcba_profiles")
 }

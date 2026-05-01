@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button'
 import InterviewNotesButton from '@/components/admin/InterviewNotesButton'
 import InterviewDeleteButton from '@/components/admin/InterviewDeleteButton'
 import InterviewCompleteButton from '@/components/admin/InterviewCompleteButton'
-import InterviewClaimButton from '@/components/admin/InterviewClaimButton'
+import InterviewClaimControls from '@/components/admin/InterviewClaimControls'
+import { cookies } from 'next/headers'
+import { validateSession } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -25,6 +27,10 @@ export default async function InterviewsPage({
   const view = searchParams?.view === 'calendar' ? 'calendar' : 'list'
   const weekOffset = Number.parseInt(searchParams?.weekOffset ?? '0', 10) || 0
   const interviewerId = searchParams?.interviewerId ?? 'all'
+  const cookieStore = await cookies()
+  const token = cookieStore.get('session')?.value
+  const sessionUser = token ? await validateSession(token) : null
+  const currentUserId = sessionUser?.id ?? ''
 
   let interviews: Array<{
     id: string
@@ -275,6 +281,7 @@ export default async function InterviewsPage({
     const endAt = new Date(new Date(interview.scheduledAt).getTime() + (interview.durationMinutes || 30) * 60000)
     const claimed = !!interview.claimedByUserId
     const claimerName = interview.claimedBy?.name || interview.claimedBy?.email || null
+    const candidateName = `${interview.rbtProfile.firstName} ${interview.rbtProfile.lastName}`
 
     return (
       <div key={interview.id} className="border border-gray-200 dark:border-[var(--border-subtle)] rounded-lg p-4 bg-white dark:bg-[var(--bg-elevated)] hover:shadow-sm transition-shadow">
@@ -300,13 +307,15 @@ export default async function InterviewsPage({
 
           {/* Interviewer / claimer */}
           <div className="text-sm text-gray-600 dark:text-gray-400 min-w-[140px]">
-            {claimed ? (
-              <span className="text-green-600 dark:text-green-400 font-medium">Claimed by {claimerName}</span>
-            ) : interview.status === 'SCHEDULED' ? (
-              <span className="text-orange-600 dark:text-orange-400 font-medium">Unclaimed</span>
-            ) : (
-              <span>{interview.interviewerName}</span>
-            )}
+            <InterviewClaimControls
+              interviewId={interview.id}
+              interviewStatus={interview.status}
+              candidateName={candidateName}
+              scheduledAt={interview.scheduledAt.toISOString()}
+              currentUserId={currentUserId}
+              claimedByUserId={interview.claimedByUserId}
+              claimedByName={claimerName}
+            />
           </div>
 
           {/* Status */}
@@ -316,9 +325,6 @@ export default async function InterviewsPage({
 
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
-            {showClaim && interview.status === 'SCHEDULED' && !claimed && (
-              <InterviewClaimButton interviewId={interview.id} />
-            )}
             {interview.meetingUrl && (
               <a href={interview.meetingUrl} target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 border border-blue-300 rounded-md hover:bg-blue-50 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-900/30">

@@ -3,10 +3,11 @@ import { Button } from '@/components/ui/button'
 import TrackedLink from '@/components/tracking/TrackedLink'
 import { Plus, Shield } from 'lucide-react'
 import { cookies } from 'next/headers'
-import { validateSession, isSuperAdmin } from '@/lib/auth'
+import { validateSession, isSuperAdmin, resolveClientManagerAccess } from '@/lib/auth'
 import SuperAdminCreateAdmin from '@/components/admin/SuperAdminCreateAdmin'
 import SuperAdminUserManagement from '@/components/admin/SuperAdminUserManagement'
 import DashboardAnalytics from '@/components/admin/DashboardAnalytics'
+import ClientOverviewStrip from '@/components/admin/ClientOverviewStrip'
 import { Suspense } from 'react'
 
 export const dynamic = 'force-dynamic'
@@ -42,6 +43,15 @@ export default async function AdminDashboard() {
           </TrackedLink>
         </div>
       </div>
+
+      {user && (await resolveClientManagerAccess(user)) && (
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-[var(--text-primary)]">
+            Client overview
+          </h2>
+          <ClientOverviewStrip />
+        </div>
+      )}
 
       <Suspense fallback={<div className="py-16 text-center text-gray-500">Loading analytics...</div>}>
         <DashboardAnalytics />

@@ -5,9 +5,8 @@
 # Add repo secret: CRON_SECRET (same value as in Vercel env). Optionally set repo variable REMINDER_APP_URL.
 name: Interview reminder cron
 
+# Replaced by Vercel cron jobs in vercel.json - do not re-enable schedule
 on:
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:

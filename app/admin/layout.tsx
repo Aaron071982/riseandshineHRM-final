@@ -1,6 +1,6 @@
 import AdminLayout from '@/components/layout/AdminLayout'
 import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
+import { validateSession, isAdmin } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -29,10 +29,11 @@ export default async function AdminLayoutWrapper({
     console.error('Admin layout: session validation failed', e)
     redirect('/login?session_error=1')
   }
-  if (!user || user.role !== 'ADMIN') {
+  if (!user || !isAdmin(user)) {
     redirect('/login?session_expired=1')
   }
 
-  return <AdminLayout>{children}</AdminLayout>
+  // Client Management is available to all admins; this layout only renders for admins.
+  return <AdminLayout initialClientMgmtAllowed>{children}</AdminLayout>
 }
 

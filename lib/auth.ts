@@ -247,6 +247,25 @@ export function isAdmin(user: SessionUser | null): user is SessionUser {
   return !!user && (user.role ?? '').toUpperCase() === 'ADMIN'
 }
 
+/** Client Management: any admin may access (nav + APIs gated like other admin routes). */
+export function isClientManagerAdmin(user: SessionUser | null): boolean {
+  return isAdmin(user)
+}
+
+export async function resolveClientManagerAccess(user: SessionUser | null): Promise<boolean> {
+  return isAdmin(user)
+}
+
+/**
+ * Client Management API routes: same as `requireAdminSession` (admin role only).
+ */
+export async function requireClientManagerSession(): Promise<
+  | { user: SessionUser; response: null }
+  | { user: null; response: NextResponse }
+> {
+  return requireAdminSession()
+}
+
 /** Get current session user from cookies (for use in server/API context). */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const cookieStore = await cookies()

@@ -1,2 +1,24 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/interview-reminders",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/interview-reminders-1hr",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/staleness-alerts",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/compliance-expiration",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/daily-interview-digest",
+      "schedule": "0 8 * * *"
+    }
+  ]
 }

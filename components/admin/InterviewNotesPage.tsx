@@ -31,7 +31,7 @@ import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 // ─── Types ────────────────────────────────────────────────────────
 interface InterviewNotesPageProps {
   interviewId: string
-  currentUser: { id: string; name: string }
+  currentUser: { id: string; name: string; role: string }
 }
 
 interface NotesData {
@@ -63,6 +63,7 @@ interface InterviewData {
   interviewerName: string
   meetingUrl: string | null
   claimedByUserId: string | null
+  claimedByName?: string | null
 }
 
 interface RBTProfile {
@@ -170,6 +171,9 @@ export default function InterviewNotesPage({ interviewId, currentUser }: Intervi
   const [completionDecision, setCompletionDecision] = useState<string>('PENDING')
   const [completionNotes, setCompletionNotes] = useState('')
   const [completing, setCompleting] = useState(false)
+  const [unclaimOpen, setUnclaimOpen] = useState(false)
+  const [unclaimReason, setUnclaimReason] = useState('')
+  const [unclaiming, setUnclaiming] = useState(false)
 
   // Refs to avoid stale closures in saveNotes — enables auto-save and
   // unmount-save to always read the latest values without re-creating
@@ -365,6 +369,36 @@ export default function InterviewNotesPage({ interviewId, currentUser }: Intervi
     }
   }
 
+  const handleUnclaim = async () => {
+    if (!interview) return
+    setUnclaiming(true)
+    try {
+      const res = await fetch(`/api/admin/interviews/${interviewId}/unclaim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: unclaimReason }),
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || 'Failed to release interview', 'error')
+        return
+      }
+      setInterview((prev) => prev ? { ...prev, claimedByUserId: null, claimedByName: null, interviewerName: 'Interviewer TBD' } : prev)
+      setUnclaimOpen(false)
+      setUnclaimReason('')
+      showToast('Interview released. All admins have been notified.', 'success')
+      const startsInMs = new Date(interview.scheduledAt).getTime() - Date.now()
+      if (startsInMs <= 2 * 60 * 60 * 1000) {
+        showToast('⚠️ This interview is very soon — please make sure someone claims it', 'error')
+      }
+    } catch {
+      showToast('Error releasing interview', 'error')
+    } finally {
+      setUnclaiming(false)
+    }
+  }
+
   // ─── Toggle script section ────────────────────────────────────
   const toggleSection = (num: number) => {
     setExpandedSections((prev) => {
@@ -396,6 +430,9 @@ export default function InterviewNotesPage({ interviewId, currentUser }: Intervi
   }
 
   const candidateName = rbtProfile ? `${rbtProfile.firstName} ${rbtProfile.lastName}` : 'Candidate'
+  const isClaimedByMe = interview?.claimedByUserId === currentUser.id
+  const isClaimedByOther = !!interview?.claimedByUserId && !isClaimedByMe
+  const startsInHours = interview ? (new Date(interview.scheduledAt).getTime() - Date.now()) / (1000 * 60 * 60) : 999
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 dark:bg-[var(--bg-primary)]">
@@ -414,6 +451,24 @@ export default function InterviewNotesPage({ interviewId, currentUser }: Intervi
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isClaimedByMe ? (
+            <div className="text-sm text-green-700 font-medium">
+              You have claimed this interview{' '}
+              <button className="underline text-gray-600 ml-1" onClick={() => setUnclaimOpen(true)}>
+                Release
+              </button>
+            </div>
+          ) : null}
+          {isClaimedByOther ? (
+            <div className="text-sm text-gray-600">
+              Claimed by <span className="font-medium">{interview?.claimedByName || 'Admin'}</span>
+              {currentUser.role === 'ADMIN' ? (
+                <button className="ml-2 underline text-red-600" onClick={() => setUnclaimOpen(true)}>
+                  Force Unclaim
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {interview?.meetingUrl && (
             <a href={interview.meetingUrl} target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
@@ -762,6 +817,40 @@ export default function InterviewNotesPage({ interviewId, currentUser }: Intervi
                   {completing ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Completing...</> : 'Confirm & Complete'}
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {unclaimOpen && interview && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-[var(--bg-secondary)] rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Release this interview?</h3>
+            <div className="mt-3 text-sm text-gray-600 space-y-1">
+              <p><span className="font-medium text-gray-800">Candidate:</span> {candidateName}</p>
+              <p><span className="font-medium text-gray-800">Date:</span> {new Date(interview.scheduledAt).toLocaleString('en-US', { timeZone: 'America/New_York' })}</p>
+            </div>
+            {startsInHours <= 24 ? (
+              <p className="mt-3 rounded-md border border-red-200 bg-red-50 text-red-700 text-xs px-2 py-1">
+                ⚠️ Urgent: this interview is within 24 hours.
+              </p>
+            ) : null}
+            <div className="mt-4">
+              <Label className="text-sm">Optional: Reason for unclaiming</Label>
+              <input
+                type="text"
+                value={unclaimReason}
+                onChange={(e) => setUnclaimReason(e.target.value)}
+                placeholder="e.g. Schedule conflict, emergency, etc."
+                className="mt-1 w-full rounded-md border border-gray-300 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-input)] px-3 py-2 text-sm"
+              />
+            </div>
+            <p className="mt-3 text-xs text-gray-500">All admins will be notified so someone else can claim it.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setUnclaimOpen(false)} disabled={unclaiming}>Keep It</Button>
+              <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={handleUnclaim} disabled={unclaiming}>
+                {unclaiming ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Releasing...</> : 'Release Interview'}
+              </Button>
             </div>
           </div>
         </div>

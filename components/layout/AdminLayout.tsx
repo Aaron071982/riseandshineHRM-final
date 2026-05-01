@@ -23,9 +23,10 @@ import {
   LayoutGrid,
   Network,
   Shield,
+  Building2,
 } from 'lucide-react'
 import ActionCenterNavLink from '@/components/admin/ActionCenterNavLink'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
 import { trackPageView } from '@/lib/activity-tracker'
 import { useTheme } from '@/components/theme/ThemeProvider'
@@ -33,6 +34,8 @@ import AdminNotificationBell from '@/components/admin/AdminNotificationBell'
 
 interface AdminLayoutProps {
   children: React.ReactNode
+  /** When true, show Clients in the More menu (last item). */
+  initialClientMgmtAllowed?: boolean
 }
 
 const mainNavItems = [
@@ -46,6 +49,7 @@ const mainNavItems = [
 const secondaryNavItems = [
   { href: '/admin/attendance', label: 'Attendance & Hours', icon: Clock },
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
+  { href: '/admin/team', label: 'Team', icon: Users },
   { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
@@ -55,11 +59,16 @@ const secondaryNavItems = [
 
 const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
 
-export default function AdminLayout({ children }: AdminLayoutProps) {
+export default function AdminLayout({
+  children,
+  initialClientMgmtAllowed = false,
+}: AdminLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [hasOnlineAdmins, setHasOnlineAdmins] = useState(false)
+  const [clientMgmtAllowed, setClientMgmtAllowed] = useState(initialClientMgmtAllowed)
   const { theme, setTheme } = useTheme()
 
   const cycleTheme = () => {
@@ -78,6 +87,49 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       })
     }
   }, [pathname])
+
+  useEffect(() => {
+    let active = true
+    const run = async () => {
+      try {
+        const res = await fetch('/api/admin/team/status', { credentials: 'include' })
+        if (!res.ok || !active) return
+        const data = await res.json()
+        setHasOnlineAdmins(Number(data.onlineCount) > 0)
+      } catch {
+        // ignore
+      }
+    }
+    run()
+    const id = setInterval(run, 30000)
+    return () => {
+      active = false
+      clearInterval(id)
+    }
+  }, [])
+
+  useEffect(() => {
+    setClientMgmtAllowed(initialClientMgmtAllowed)
+  }, [initialClientMgmtAllowed])
+
+  const moreDropdownItems = useMemo(() => {
+    const items = [...secondaryNavItems]
+    if (clientMgmtAllowed) {
+      items.push({ href: '/admin/clients', label: 'Clients', icon: Building2 })
+    }
+    return items
+  }, [clientMgmtAllowed])
+
+  const moreMenuHasActive = useMemo(() => {
+    const inSecondary = secondaryNavItems.some((i) =>
+      i.href === '/admin/org-chart'
+        ? pathname.startsWith('/admin/org-chart')
+        : pathname === i.href
+    )
+    const clientsActive =
+      clientMgmtAllowed && pathname.startsWith('/admin/clients')
+    return inSecondary || clientsActive
+  }, [pathname, clientMgmtAllowed])
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
@@ -135,18 +187,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     </Link>
                   )
                 })}
-                {/* More dropdown for secondary items */}
+                {/* More dropdown for secondary items + Clients (last) */}
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setMoreOpen((v) => !v)}
                     className={cn(
                       'inline-flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors',
-                      secondaryNavItems.some((i) =>
-                        i.href === '/admin/org-chart'
-                          ? pathname.startsWith('/admin/org-chart')
-                          : pathname === i.href
-                      )
+                      moreMenuHasActive
                         ? 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
                         : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-primary)]'
                     )}
@@ -157,9 +205,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                   {moreOpen && (
                     <div className="absolute mt-2 w-56 rounded-md border border-gray-200 bg-white shadow-lg dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)] z-20">
                       <div className="py-1">
-                        {secondaryNavItems.map((item) => {
+                        {moreDropdownItems.map((item) => {
                           const Icon = item.icon
-                          const isActive = pathname === item.href
+                          const isActive =
+                            item.href === '/admin/org-chart'
+                              ? pathname.startsWith('/admin/org-chart')
+                              : item.href === '/admin/clients'
+                                ? pathname.startsWith('/admin/clients')
+                                : pathname === item.href
                           return (
                             <Link
                               key={item.href}
@@ -174,6 +227,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                             >
                               {Icon ? <Icon className="w-4 h-4 mr-1" /> : null}
                               {item.label}
+                              {item.href === '/admin/team' && hasOnlineAdmins ? (
+                                <span className="ml-2 inline-block w-2 h-2 rounded-full bg-green-500" />
+                              ) : null}
                             </Link>
                           )
                         })}
@@ -220,11 +276,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {mobileMenuOpen && (
         <div className="md:hidden bg-white dark:bg-[var(--bg-elevated)] border-b border-gray-200 dark:border-[var(--border-subtle)]">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            {mainNavItems.concat(secondaryNavItems).map((item) => {
+            {mainNavItems
+              .concat(secondaryNavItems)
+              .concat(
+                clientMgmtAllowed
+                  ? [{ href: '/admin/clients', label: 'Clients', icon: Building2 }]
+                  : []
+              )
+              .map((item) => {
               const isActive =
                 item.href === '/admin/org-chart'
                   ? pathname.startsWith('/admin/org-chart')
-                  : pathname === item.href
+                  : item.href === '/admin/clients'
+                    ? pathname.startsWith('/admin/clients')
+                    : pathname === item.href
               if ('isActionCenter' in item && item.isActionCenter) {
                 return (
                   <ActionCenterNavLink
@@ -252,6 +317,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 >
                   {Icon ? <Icon className="w-4 h-4 mr-3" /> : null}
                   {item.label}
+                  {item.href === '/admin/team' && hasOnlineAdmins ? (
+                    <span className="ml-2 inline-block w-2 h-2 rounded-full bg-green-500" />
+                  ) : null}
                 </Link>
               )
             })}

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminSession } from '@/lib/auth'
+import { requireAdminSession, resolveClientManagerAccess } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getWorkflowSettings } from '@/lib/workflow-settings'
 import { startOfDay, endOfDay, subDays } from 'date-fns'
+import { hoursRunningLow } from '@/lib/crm-client/display'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,7 @@ async function getCounts(): Promise<{ urgent: number; warning: number; info: num
   const fortyEightHoursAgo = subDays(now, 2)
 
   const [
+    unclaimedUpcomingCount,
     interviewsNotCompleteCount,
     onboardingBlockedCount,
     staleReachOutCount,
@@ -37,7 +39,15 @@ async function getCounts(): Promise<{ urgent: number; warning: number; info: num
     newAppsCount,
     onboardingNearlyCount,
     flaggedSessionsCount,
+    schedulingConflictCount,
   ] = await Promise.all([
+    prisma.interview.count({
+      where: {
+        status: 'SCHEDULED',
+        claimedByUserId: null,
+        scheduledAt: { gte: now, lte: subDays(now, -2) },
+      },
+    }),
     prisma.interview.count({
       where: { status: 'SCHEDULED', scheduledAt: { lt: now } },
     }),
@@ -97,9 +107,31 @@ async function getCounts(): Promise<{ urgent: number; warning: number; info: num
         return (e.totalHours ?? 0) > 8
       }).length
     })(),
+    (async () => {
+      const prismaAny = prisma as unknown as {
+        adminAvailabilityOverride?: {
+          findMany: (args: unknown) => Promise<Array<{ userId: string; date: Date; overrideType: string }>>
+        }
+      }
+      if (!prismaAny.adminAvailabilityOverride?.findMany) return 0
+      const start = startOfDay(now)
+      const end = endOfDay(subDays(now, -14))
+      const [blocked, interviews] = await Promise.all([
+        prismaAny.adminAvailabilityOverride.findMany({
+          where: { overrideType: 'BLOCKED', date: { gte: start, lte: end } },
+          select: { userId: true, date: true, overrideType: true },
+        }).catch(() => []),
+        prisma.interview.findMany({
+          where: { status: 'SCHEDULED', scheduledAt: { gte: start, lte: end }, claimedByUserId: { not: null } },
+          select: { id: true, scheduledAt: true, claimedByUserId: true },
+        }),
+      ])
+      const blockedSet = new Set(blocked.map((b) => `${b.userId}:${b.date.toISOString().slice(0, 10)}`))
+      return interviews.filter((i) => i.claimedByUserId && blockedSet.has(`${i.claimedByUserId}:${i.scheduledAt.toISOString().slice(0, 10)}`)).length
+    })(),
   ])
 
-  const urgent = interviewsNotCompleteCount + onboardingBlockedCount + flaggedSessionsCount
+  const urgent = unclaimedUpcomingCount + interviewsNotCompleteCount + onboardingBlockedCount + flaggedSessionsCount + schedulingConflictCount
   const warning = staleReachOutCount + staleToInterviewCount + interviewsTodayCount + leavePendingCount
   const info = newAppsCount + onboardingNearlyCount
   return { urgent, warning, info }
@@ -132,6 +164,7 @@ export async function GET(request: NextRequest) {
   const fortyEightHoursAgo = subDays(now, 2)
 
   const [
+    unclaimedUpcoming,
     interviewsNotComplete,
     onboardingBlocked,
     staleReachOut,
@@ -141,7 +174,19 @@ export async function GET(request: NextRequest) {
     newApps,
     hiredWithTasks,
     flaggedSessions,
+    schedulingConflicts,
   ] = await Promise.all([
+    prisma.interview.findMany({
+      where: {
+        status: 'SCHEDULED',
+        claimedByUserId: null,
+        scheduledAt: { gte: now, lte: subDays(now, -2) },
+      },
+      include: {
+        rbtProfile: { select: { id: true, firstName: true, lastName: true } },
+      },
+      orderBy: { scheduledAt: 'asc' },
+    }),
     prisma.interview.findMany({
       where: { status: 'SCHEDULED', scheduledAt: { lt: now } },
       include: { rbtProfile: { select: { id: true, firstName: true, lastName: true } } },
@@ -215,6 +260,50 @@ export async function GET(request: NextRequest) {
       orderBy: { clockInTime: 'desc' },
       take: 200,
     }),
+    (async () => {
+      const prismaAny = prisma as unknown as {
+        adminAvailabilityOverride?: {
+          findMany: (args: unknown) => Promise<Array<{ id: string; userId: string; date: Date; overrideType: string; reason: string | null }>>
+        }
+      }
+      if (!prismaAny.adminAvailabilityOverride?.findMany) return []
+      const start = startOfDay(now)
+      const end = endOfDay(subDays(now, -14))
+      const [blocked, interviews] = await Promise.all([
+        prismaAny.adminAvailabilityOverride.findMany({
+          where: { overrideType: 'BLOCKED', date: { gte: start, lte: end } },
+          select: { id: true, userId: true, date: true, overrideType: true, reason: true },
+        }).catch(() => []),
+        prisma.interview.findMany({
+          where: { status: 'SCHEDULED', scheduledAt: { gte: start, lte: end }, claimedByUserId: { not: null } },
+          include: {
+            claimedBy: { select: { id: true, name: true, email: true } },
+            rbtProfile: { select: { firstName: true, lastName: true } },
+          },
+          orderBy: { scheduledAt: 'asc' },
+        }),
+      ])
+      type BlockedRow = (typeof blocked)[number]
+      const blockedMap = new Map<string, BlockedRow>(
+        blocked.map((b) => [`${b.userId}:${b.date.toISOString().slice(0, 10)}`, b])
+      )
+      return interviews
+        .map((i) => {
+          const claimedByUserId = i.claimedByUserId
+          if (!claimedByUserId) return null
+          const key = `${claimedByUserId}:${i.scheduledAt.toISOString().slice(0, 10)}`
+          const override = blockedMap.get(key)
+          if (!override) return null
+          return {
+            id: i.id,
+            scheduledAt: i.scheduledAt,
+            candidateName: `${i.rbtProfile.firstName} ${i.rbtProfile.lastName}`,
+            interviewerName: i.claimedBy?.name ?? i.claimedBy?.email ?? i.interviewerName,
+            reason: override.reason,
+          }
+        })
+        .filter(Boolean)
+    })(),
   ])
 
   const onboardingNearlyComplete = hiredWithTasks.filter((p) => {
@@ -227,7 +316,118 @@ export async function GET(request: NextRequest) {
 
     const sections: ActionCenterSection[] = []
 
+    if (await resolveClientManagerAccess(auth.user)) {
+      try {
+        const dayStart = startOfDay(now)
+        const thirtyOut = new Date(now.getTime() + 30 * dayMs)
+        const activeNoRbt = await prisma.crmClient.findMany({
+          where: {
+            status: 'ACTIVE',
+            rbtAssignments: {
+              none: {
+                status: 'ACTIVE',
+                OR: [{ endDate: null }, { endDate: { gte: dayStart } }],
+              },
+            },
+          },
+          select: { id: true, firstName: true, lastName: true },
+          take: 50,
+        })
+        sections.push({
+          id: 'crm-active-no-rbt',
+          title: 'Client Alerts — Active with no RBT',
+          severity: 'URGENT',
+          count: activeNoRbt.length,
+          items: activeNoRbt.map((c) => ({
+            id: c.id,
+            name: `${c.firstName} ${c.lastName}`,
+            href: `/admin/clients/${c.id}`,
+          })),
+        })
+
+        const authExpiring = await prisma.crmClient.findMany({
+          where: {
+            status: 'ACTIVE',
+            authorizationEndDate: {
+              not: null,
+              lte: thirtyOut,
+              gte: dayStart,
+            },
+          },
+          select: { id: true, firstName: true, lastName: true, authorizationEndDate: true },
+          take: 50,
+        })
+        sections.push({
+          id: 'crm-auth-expiring',
+          title: 'Client Alerts — Authorization expiring (30 days)',
+          severity: 'WARNING',
+          count: authExpiring.length,
+          items: authExpiring.map((c) => ({
+            id: c.id,
+            name: `${c.firstName} ${c.lastName}`,
+            authorizationEndDate: c.authorizationEndDate,
+            href: `/admin/clients/${c.id}`,
+          })),
+        })
+
+        const activeCrm = await prisma.crmClient.findMany({
+          where: { status: 'ACTIVE' },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            usedHoursTotal: true,
+            authorizedHoursPerWeek: true,
+            authorizationStartDate: true,
+          },
+          take: 150,
+        })
+        const hoursLow = activeCrm.filter((c) =>
+          hoursRunningLow({
+            usedHoursTotal: c.usedHoursTotal,
+            authorizedHoursPerWeek: c.authorizedHoursPerWeek,
+            authorizationStartDate: c.authorizationStartDate,
+          })
+        )
+        sections.push({
+          id: 'crm-hours-low',
+          title: 'Client Alerts — Authorization hours running low',
+          severity: 'WARNING',
+          count: hoursLow.length,
+          items: hoursLow.map((c) => ({
+            id: c.id,
+            name: `${c.firstName} ${c.lastName}`,
+            href: `/admin/clients/${c.id}`,
+          })),
+        })
+      } catch {
+        /* cms_clients table may not exist yet */
+      }
+    }
+
     const hasUnclaimed = interviewsToday.some((i) => !i.claimedByUserId)
+    sections.push({
+      id: 'unclaimed-interviews',
+      title: 'UNCLAIMED INTERVIEWS',
+      severity: 'URGENT',
+      count: unclaimedUpcoming.length,
+      items: unclaimedUpcoming.map((i) => ({
+        id: i.id,
+        rbtProfileId: i.rbtProfileId,
+        candidateName: `${i.rbtProfile.firstName} ${i.rbtProfile.lastName}`,
+        scheduledAt: i.scheduledAt,
+        hoursUntil: Math.max(0, Math.round((i.scheduledAt.getTime() - now.getTime()) / 3600000)),
+      })),
+    })
+
+    sections.push({
+      id: 'scheduling-conflicts',
+      title: 'Scheduling Conflicts',
+      severity: 'URGENT',
+      count: schedulingConflicts.length,
+      items: schedulingConflicts as Record<string, unknown>[],
+    })
+
     sections.push({
       id: 'flagged-sessions',
       title: 'Flagged sessions',

@@ -1,3 +1,13 @@
+/*
+ * SETUP REQUIRED:
+ * 1. Set CRON_SECRET in Vercel Dashboard:
+ *    Project → Settings → Environment Variables
+ *    → Add: CRON_SECRET = [any random string]
+ * 2. Vercel automatically signs cron requests
+ *    with this secret — no other config needed
+ * 3. Do NOT set this in GitHub secrets anymore
+ *    as GitHub Actions crons are now disabled
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { runExpirationEngine } from '@/lib/compliance/expiration'
 import { assertCronOrResponse } from '@/lib/cron-auth'

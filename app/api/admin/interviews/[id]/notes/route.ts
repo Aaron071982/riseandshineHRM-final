@@ -22,6 +22,7 @@ export async function GET(
         },
         interviewNotes: true,
         scorecards: true,
+        claimedBy: { select: { id: true, name: true, email: true } },
       },
     })
 
@@ -39,6 +40,7 @@ export async function GET(
         interviewerName: interview.interviewerName,
         meetingUrl: interview.meetingUrl,
         claimedByUserId: (interview as Record<string, unknown>).claimedByUserId ?? null,
+        claimedByName: interview.claimedBy?.name ?? interview.claimedBy?.email ?? null,
       },
       rbtProfile: interview.rbtProfile,
       scorecards: interview.scorecards,

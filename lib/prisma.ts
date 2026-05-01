@@ -90,8 +90,12 @@ if (databaseUrl.includes('pooler.supabase.com')) {
   // Check if using Transaction Pooler (port 6543) or Session Pooler (port 5432)
   const isTransactionPooler = url.port === '6543' || databaseUrl.includes(':6543')
   
-  // Keep this conservative in both dev and prod to reduce pool/TLS churn.
-  const connectionLimit = process.env.PRISMA_CONNECTION_LIMIT || url.searchParams.get('connection_limit') || '1'
+  // Production (Vercel): stay at 1 per instance to avoid exhausting Supabase session pooler slots.
+  // Local dev: Next.js fires many parallel API routes / Prisma calls; limit 1 causes
+  // "Timed out fetching a new connection from the connection pool" on the admin dashboard.
+  const defaultConnectionLimit = process.env.NODE_ENV === 'production' ? '1' : '8'
+  const connectionLimit =
+    process.env.PRISMA_CONNECTION_LIMIT || url.searchParams.get('connection_limit') || defaultConnectionLimit
 
   // Supabase pooler TLS behavior can vary between environments/pooler setups.
   // If `sslmode` isn't provided, default to `require` for safety.
@@ -141,10 +145,8 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Create Prisma client with optimized settings for Vercel serverless
-// Connection pool settings are configured via DATABASE_URL parameters:
-// - connection_limit: 1 (per instance; prevents MaxClientsInSessionMode on Supabase pooler)
-// - connect_timeout: 20 (increases timeout for connection acquisition)
-// - pool_timeout: 20 (increases timeout for pool operations)
+// Connection pool settings are configured via DATABASE_URL parameters (see Supabase block above).
+// Override with PRISMA_CONNECTION_LIMIT (e.g. 1 in prod, higher in dev if needed).
 const shouldReuseExisting = !!globalForPrisma.prisma && globalForPrisma.databaseUrl === databaseUrl
 
 export const prisma = shouldReuseExisting

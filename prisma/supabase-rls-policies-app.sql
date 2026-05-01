@@ -18,7 +18,12 @@ DECLARE
     'sessions', 'activity_logs', 'rbt_profiles', 'interview_scorecards',
     'rbt_messages', 'admin_notifications', 'session_notes', 'client_assignments',
     'scheduling_clients',
-    'org_nodes'
+    'org_nodes',
+    'cms_clients',
+    'client_rbt_assignments',
+    'client_bcba_assignments',
+    'client_notes',
+    'client_status_history'
   ];
   pol_name text;
 BEGIN

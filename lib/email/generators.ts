@@ -1633,6 +1633,76 @@ export function generateInterviewClaimedEmail(
   return { subject, html }
 }
 
+export function generateInterviewUnclaimedEmail(params: {
+  candidateName: string
+  profileUrl: string
+  scheduledAt: Date
+  previousClaimerName: string
+  claimUrl: string
+  reason: string | null
+  isUrgent: boolean
+}): { subject: string; html: string } {
+  const formattedTime = params.scheduledAt.toLocaleString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/New_York',
+    timeZoneName: 'short',
+  })
+
+  const subject = `🔓 Interview Unclaimed — ${params.candidateName}`
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); color: white; padding: 32px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: bold; }
+        .content { padding: 24px 20px; background-color: #ffffff; }
+        .content p { margin: 12px 0; }
+        .info-box { background-color: #FFF7ED; border-left: 4px solid #f97316; padding: 16px; margin: 20px 0; border-radius: 4px; }
+        .urgent-box { background-color: #FEF2F2; border: 2px solid #ef4444; border-radius: 8px; padding: 12px; margin: 16px 0; color: #b91c1c; font-weight: 600; }
+        .claim-button { display: inline-block; background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); color: white !important; padding: 16px 28px; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 16px; margin: 20px 0; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Interview Unclaimed</h1>
+        </div>
+        <div class="content">
+          <p>An interview has been released and needs a new interviewer.</p>
+          <div class="info-box">
+            <p style="margin:0 0 8px 0;"><strong>Candidate:</strong> ${params.candidateName}</p>
+            <p style="margin:0 0 8px 0;"><strong>Date & time:</strong> ${formattedTime}</p>
+            <p style="margin:0 0 8px 0;"><strong>Previously claimed by:</strong> ${params.previousClaimerName}</p>
+            ${params.reason ? `<p style="margin:0;"><strong>Reason:</strong> ${params.reason}</p>` : ''}
+          </div>
+          ${params.isUrgent ? '<div class="urgent-box">⚠️ This interview is in less than 24 hours — someone needs to claim it immediately.</div>' : ''}
+          <p><a href="${params.profileUrl}">View candidate profile</a></p>
+          <div style="text-align:center;">
+            <a href="${params.claimUrl}" class="claim-button">Claim This Interview</a>
+          </div>
+          <p style="margin-top: 20px; font-size: 14px; color: #666;">Best regards,<br><strong>Rise and Shine HRM</strong></p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise and Shine</strong> - HRM Portal</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}
+
 export function generateNewMessageFromAdminEmail(firstName: string, portalUrl: string): { subject: string; html: string } {
   const subject = 'You have a new message from Rise and Shine'
   const html = `

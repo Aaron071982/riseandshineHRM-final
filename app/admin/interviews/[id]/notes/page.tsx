@@ -11,5 +11,14 @@ export default async function NotesPage({ params }: { params: Promise<{ id: stri
   const user = await validateSession(token)
   if (!user || user.role !== 'ADMIN') redirect('/login')
 
-  return <InterviewNotesPage interviewId={id} currentUser={{ id: user.id, name: user.name || user.email || 'Admin' }} />
+  return (
+    <InterviewNotesPage
+      interviewId={id}
+      currentUser={{
+        id: user.id,
+        name: user.name || user.email || 'Admin',
+        role: user.role,
+      }}
+    />
+  )
 }
