@@ -27,7 +27,6 @@ export default function RBTProfileOnboarding({
   supervisionCountersignedAt,
 }: RBTProfileOnboardingProps) {
   const isHired = rbtProfile.status === 'HIRED'
-  if (!isHired) return null
 
   const [serverProgress, setServerProgress] = useState<{
     completedCount: number
@@ -166,6 +165,8 @@ export default function RBTProfileOnboarding({
       task.isCompleted &&
       !task.title?.toLowerCase().includes('download onboarding documents folder')
   )
+
+  if (!isHired) return null
 
   return (
     <>

@@ -324,8 +324,8 @@ export default function PublicCareersLandingPage() {
         </div>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 reveal-init" data-reveal>
           <blockquote className="rounded-2xl border-l-4 border-[#F97316] bg-white p-6 italic text-slate-700 shadow-sm">
-            "Rise & Shine actually trained me and supported me through the whole process. I went from having no experience to running
-            sessions within weeks."
+            &ldquo;Rise &amp; Shine actually trained me and supported me through the whole process. I went from having no
+            experience to running sessions within weeks.&rdquo;
             <footer className="mt-3 not-italic font-semibold text-[#0F172A]">- Maria R., RBT since 2024</footer>
           </blockquote>
         </div>
@@ -371,7 +371,7 @@ export default function PublicCareersLandingPage() {
           <div className="grid lg:grid-cols-2 gap-10 items-start">
             <div className="reveal-init" data-reveal>
               <p className="text-4xl sm:text-5xl font-bold text-[#0F172A] leading-tight">
-                You don't need experience.
+                You don&apos;t need experience.
                 <br />
                 You need heart.
               </p>
@@ -393,7 +393,7 @@ export default function PublicCareersLandingPage() {
                 ))}
               </ul>
               <div className="mt-6 rounded-2xl bg-[#F97316] p-5 text-white font-medium">
-                Already have your RBT certification? You'll be fast-tracked in our process.
+                Already have your RBT certification? You&apos;ll be fast-tracked in our process.
               </div>
             </div>
           </div>
