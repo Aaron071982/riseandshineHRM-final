@@ -176,11 +176,7 @@ export async function POST(
               ],
             })
 
-            console.log(`✅ 40-hour course certificate email sent to ${adminEmail} for RBT ${rbtName}`)
           } else {
-            console.log(`⚠️ [DEV MODE] Certificate email would be sent to ${adminEmail}`)
-            console.log(`   RBT: ${rbtName} (${rbtEmail})`)
-            console.log(`   File: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`)
           }
         } catch (emailError: any) {
           console.error('Error sending certificate email:', emailError)
@@ -217,9 +213,7 @@ export async function POST(
               subject: emailSubject,
               html: emailHtml,
             })
-            console.log(`✅ SSN upload notification sent to ${adminEmail} for RBT ${rbtName}`)
           } else {
-            console.log(`⚠️ [DEV MODE] SSN upload notification would be sent to ${adminEmail}`)
           }
         } catch (emailError: unknown) {
           console.error('Error sending SSN notification email:', emailError)
@@ -294,11 +288,7 @@ export async function POST(
             ],
           })
 
-          console.log(`✅ Onboarding package email sent to ${adminEmail} for RBT ${rbtName}`)
         } else {
-          console.log(`⚠️ [DEV MODE] Package upload email would be sent to ${adminEmail}`)
-          console.log(`   RBT: ${rbtName} (${rbtEmail})`)
-          console.log(`   File: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`)
         }
       } catch (emailError: any) {
         console.error('Error sending package upload email:', emailError)

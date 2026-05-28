@@ -81,7 +81,6 @@ export default function RBTMessageModal({ open, onOpenChange }: RBTMessageModalP
       } else {
         const data = await res.json().catch(() => ({}))
         setInput(text)
-        console.warn('[RBTMessageModal] Send failed:', res.status, data.error ?? res.statusText)
       }
     } catch {
       setInput(text)

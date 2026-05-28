@@ -23,7 +23,6 @@ export async function GET() {
       })
     } catch (e) {
       if (isPrismaTableError(e)) {
-        console.warn('[admin/messages] GET: rbt_messages table missing, returning empty conversations')
         return NextResponse.json({ conversations: [] })
       }
       throw e
@@ -66,7 +65,6 @@ export async function GET() {
       ])
     } catch (e) {
       if (isPrismaTableError(e)) {
-        console.warn('[admin/messages] GET: rbt_messages groupBy/findMany failed, returning basic list')
         const conversations = profiles.map((p) => ({
           rbtProfileId: p.id,
           name: `${p.firstName} ${p.lastName}`.trim(),

@@ -106,7 +106,6 @@ export function usePdfFormFiller(pdfDataBase64: string) {
                 filledCount++
               } catch (e) {
                 // Value might not be valid option, skip
-                console.log(`Could not select value "${value}" for field ${name}`)
               }
             }
           }
@@ -115,14 +114,12 @@ export function usePdfFormFiller(pdfDataBase64: string) {
         }
       }
 
-      console.log(`Filled ${filledCount} form fields with data`)
 
       // Flatten form to make it non-editable
       try {
         form.flatten()
       } catch (e) {
         // Some forms might not be flattenable
-        console.log('Could not flatten form (may already be flat)')
       }
 
       // Save PDF

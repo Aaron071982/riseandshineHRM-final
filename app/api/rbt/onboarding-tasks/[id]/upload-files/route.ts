@@ -111,7 +111,6 @@ export async function POST(
       // Check if the JSON is too large (PostgreSQL TEXT field limit is ~1GB, but be safe)
       // If too large, store a truncated version with just metadata
       if (uploadUrl.length > 50 * 1024 * 1024) { // 50MB limit
-        console.warn(`Upload data is very large (${(uploadUrl.length / 1024 / 1024).toFixed(2)} MB), storing metadata only`)
         uploadUrl = JSON.stringify({
           fileCount: uploadedFiles.length,
           fileNames: uploadedFiles.map(f => f.name),
@@ -264,11 +263,7 @@ export async function POST(
             ],
           })
           
-          console.log(`✅ Onboarding package email sent to ${adminEmail} for RBT ${rbtName}`)
         } else {
-          console.log(`⚠️ [DEV MODE] Onboarding package email would be sent to ${adminEmail}`)
-          console.log(`   RBT: ${rbtName} (${rbtEmail})`)
-          console.log(`   Files: ${files.length} file(s), Total size: ${(totalSize / 1024).toFixed(2)} KB`)
         }
       } catch (emailError: any) {
         console.error('Error creating zip or sending email:', emailError)

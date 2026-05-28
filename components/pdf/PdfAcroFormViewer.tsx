@@ -71,14 +71,12 @@ export default function PdfAcroFormViewer({
 
     // Check if already loaded
     if (loadedKeyRef.current === loadKey) {
-      console.log('[PdfAcroFormViewer] PDF already loaded for this document')
       setLoading(false)
       return
     }
 
     // Check if currently loading
     if (loadingRef.current) {
-      console.log('[PdfAcroFormViewer] PDF load already in progress')
       return
     }
 
@@ -90,7 +88,6 @@ export default function PdfAcroFormViewer({
     setLoading(true)
     setError(null)
 
-    console.log('[PdfAcroFormViewer] Starting PDF load for key:', loadKey)
 
     // Capture container ref for cleanup (ref may change by the time cleanup runs)
     let containerForCleanup: HTMLDivElement | null = null
@@ -109,7 +106,6 @@ export default function PdfAcroFormViewer({
           setLoading(false)
           return
         }
-        console.log(`[PdfAcroFormViewer] Container not yet available, retry ${retryCountRef.current}/20`)
         // Retry after a short delay
         retryTimeoutRef.current = setTimeout(() => {
           if (loadingRef.current && loadedKeyRef.current !== loadKey) {
@@ -127,7 +123,6 @@ export default function PdfAcroFormViewer({
         try {
           await loadPdf()
           loadedKeyRef.current = loadKey
-          console.log('[PdfAcroFormViewer] PDF loaded successfully')
         } catch (err: any) {
           console.error('[PdfAcroFormViewer] Error loading PDF:', err)
           setError(err.message || 'Failed to load PDF')
@@ -166,7 +161,6 @@ export default function PdfAcroFormViewer({
     }
 
     try {
-      console.log('[PdfAcroFormViewer] Loading PDF, data length:', pdfData.length)
 
       // Decode base64 PDF
       const binaryString = atob(pdfData)
@@ -174,17 +168,13 @@ export default function PdfAcroFormViewer({
       for (let i = 0; i < binaryString.length; i++) {
         pdfBytes[i] = binaryString.charCodeAt(i)
       }
-      console.log('[PdfAcroFormViewer] PDF bytes decoded, length:', pdfBytes.length)
 
       // Validate PDF bytes (should start with PDF magic bytes)
       if (pdfBytes.length < 4 || pdfBytes[0] !== 0x25 || pdfBytes[1] !== 0x50 || pdfBytes[2] !== 0x44 || pdfBytes[3] !== 0x46) {
-        console.warn('[PdfAcroFormViewer] PDF bytes do not start with PDF magic bytes - may not be valid PDF')
       } else {
-        console.log('[PdfAcroFormViewer] PDF bytes validated - valid PDF structure detected')
       }
 
       // Use data URL iframe first - most reliable for displaying PDFs
-      console.log('[PdfAcroFormViewer] Using data URL iframe for display (most reliable)')
       await renderPdfWithDataUrl(pdfData)
 
       // In parallel, try to load with PDF.js to get page count
@@ -193,15 +183,12 @@ export default function PdfAcroFormViewer({
         .promise.then((pdfDoc) => {
           pdfDocRef.current = pdfDoc
           setNumPages(pdfDoc.numPages)
-          console.log('[PdfAcroFormViewer] PDF.js loaded successfully, pages:', pdfDoc.numPages)
         })
         .catch((pdfJsErr) => {
-          console.warn('[PdfAcroFormViewer] PDF.js failed (non-critical, using iframe):', pdfJsErr)
         })
 
       // Extract form fields using pdf-lib (run in parallel, don't block rendering)
       extractFormFields(pdfBytes).catch((err) => {
-        console.warn('[PdfAcroFormViewer] Form field extraction failed (non-critical):', err)
       })
     } catch (err: any) {
       console.error('[PdfAcroFormViewer] Error in loadPdf:', err)
@@ -229,7 +216,6 @@ export default function PdfAcroFormViewer({
     iframe.style.backgroundColor = '#fff'
     iframe.setAttribute('title', documentTitle || 'PDF Document')
     iframe.onload = () => {
-      console.log('[PdfAcroFormViewer] PDF iframe loaded successfully')
     }
     iframe.onerror = (err) => {
       console.error('[PdfAcroFormViewer] PDF iframe load error:', err)
@@ -240,7 +226,6 @@ export default function PdfAcroFormViewer({
     ;(containerRef.current as any).__pdfBlobUrl = url
 
     containerRef.current.appendChild(iframe)
-    console.log('[PdfAcroFormViewer] PDF iframe added to container, src:', url.substring(0, 50) + '...')
 
     // Try to extract form fields
     try {
@@ -253,14 +238,12 @@ export default function PdfAcroFormViewer({
         await extractFormFields(pdfBytes)
       }
     } catch (err) {
-      console.warn('Could not extract form fields:', err)
     }
   }
 
   const renderPdfWithDataUrl = async (base64Data: string) => {
     if (!containerRef.current) return
 
-    console.log('[PdfAcroFormViewer] renderPdfWithDataUrl called')
 
     // Clear container
     containerRef.current.innerHTML = ''
@@ -277,7 +260,6 @@ export default function PdfAcroFormViewer({
     iframe.style.backgroundColor = '#fff'
     iframe.setAttribute('title', documentTitle || 'PDF Document')
     iframe.onload = () => {
-      console.log('[PdfAcroFormViewer] PDF iframe loaded successfully (data URL)')
     }
     iframe.onerror = (err) => {
       console.error('[PdfAcroFormViewer] PDF iframe load error (data URL):', err)
@@ -285,7 +267,6 @@ export default function PdfAcroFormViewer({
     }
 
     containerRef.current.appendChild(iframe)
-    console.log('[PdfAcroFormViewer] PDF iframe added with data URL, length:', base64Data.length)
 
     // Try to extract form fields
     try {
@@ -296,7 +277,6 @@ export default function PdfAcroFormViewer({
       }
       await extractFormFields(pdfBytes)
     } catch (err) {
-      console.warn('[PdfAcroFormViewer] Could not extract form fields:', err)
     }
   }
 
@@ -332,7 +312,6 @@ export default function PdfAcroFormViewer({
           canvas.className = 'pdf-canvas'
           const context = canvas.getContext('2d')
           if (!context) {
-            console.warn(`Could not get 2d context for page ${pageNum}`)
             continue
           }
 
@@ -357,7 +336,6 @@ export default function PdfAcroFormViewer({
 
       if (pagesContainer.children.length > 0) {
         containerRef.current.appendChild(pagesContainer)
-        console.log(`[PdfAcroFormViewer] Successfully rendered ${pagesContainer.children.length} PDF pages`)
       } else {
         console.error('[PdfAcroFormViewer] No pages were rendered - throwing error')
         throw new Error('No pages were rendered')
@@ -411,7 +389,6 @@ export default function PdfAcroFormViewer({
             }
           }
         } catch (e) {
-          console.warn(`Could not extract field ${name}:`, e)
           continue
         }
 
@@ -473,7 +450,7 @@ export default function PdfAcroFormViewer({
     }
 
     // Generate filled PDF with captured field values
-    const filledBlob = await fillPdfWithValues(pdfBytes, fieldValues)
+    const filledBlob = await fillPdfWithValues(pdfBytes, fieldValues, { flatten: true })
     return filledBlob
   }
 

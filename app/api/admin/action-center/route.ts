@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminSession, resolveClientManagerAccess } from '@/lib/auth'
+import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getWorkflowSettings } from '@/lib/workflow-settings'
 import { startOfDay, endOfDay, subDays } from 'date-fns'
-import { hoursRunningLow } from '@/lib/crm-client/display'
 
 export const dynamic = 'force-dynamic'
 
@@ -315,95 +314,6 @@ export async function GET(request: NextRequest) {
     })
 
     const sections: ActionCenterSection[] = []
-
-    if (await resolveClientManagerAccess(auth.user)) {
-      try {
-        const dayStart = startOfDay(now)
-        const thirtyOut = new Date(now.getTime() + 30 * dayMs)
-        const activeNoRbt = await prisma.crmClient.findMany({
-          where: {
-            status: 'ACTIVE',
-            rbtAssignments: {
-              none: {
-                status: 'ACTIVE',
-                OR: [{ endDate: null }, { endDate: { gte: dayStart } }],
-              },
-            },
-          },
-          select: { id: true, firstName: true, lastName: true },
-          take: 50,
-        })
-        sections.push({
-          id: 'crm-active-no-rbt',
-          title: 'Client Alerts — Active with no RBT',
-          severity: 'URGENT',
-          count: activeNoRbt.length,
-          items: activeNoRbt.map((c) => ({
-            id: c.id,
-            name: `${c.firstName} ${c.lastName}`,
-            href: `/admin/clients/${c.id}`,
-          })),
-        })
-
-        const authExpiring = await prisma.crmClient.findMany({
-          where: {
-            status: 'ACTIVE',
-            authorizationEndDate: {
-              not: null,
-              lte: thirtyOut,
-              gte: dayStart,
-            },
-          },
-          select: { id: true, firstName: true, lastName: true, authorizationEndDate: true },
-          take: 50,
-        })
-        sections.push({
-          id: 'crm-auth-expiring',
-          title: 'Client Alerts — Authorization expiring (30 days)',
-          severity: 'WARNING',
-          count: authExpiring.length,
-          items: authExpiring.map((c) => ({
-            id: c.id,
-            name: `${c.firstName} ${c.lastName}`,
-            authorizationEndDate: c.authorizationEndDate,
-            href: `/admin/clients/${c.id}`,
-          })),
-        })
-
-        const activeCrm = await prisma.crmClient.findMany({
-          where: { status: 'ACTIVE' },
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            usedHoursTotal: true,
-            authorizedHoursPerWeek: true,
-            authorizationStartDate: true,
-          },
-          take: 150,
-        })
-        const hoursLow = activeCrm.filter((c) =>
-          hoursRunningLow({
-            usedHoursTotal: c.usedHoursTotal,
-            authorizedHoursPerWeek: c.authorizedHoursPerWeek,
-            authorizationStartDate: c.authorizationStartDate,
-          })
-        )
-        sections.push({
-          id: 'crm-hours-low',
-          title: 'Client Alerts — Authorization hours running low',
-          severity: 'WARNING',
-          count: hoursLow.length,
-          items: hoursLow.map((c) => ({
-            id: c.id,
-            name: `${c.firstName} ${c.lastName}`,
-            href: `/admin/clients/${c.id}`,
-          })),
-        })
-      } catch {
-        /* cms_clients table may not exist yet */
-      }
-    }
 
     const hasUnclaimed = interviewsToday.some((i) => !i.claimedByUserId)
     sections.push({

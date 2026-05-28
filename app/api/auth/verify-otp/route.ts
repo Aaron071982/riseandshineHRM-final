@@ -3,8 +3,6 @@ import { verifyOTPEmail } from '@/lib/email-otp'
 import { createSession, LOCAL_DEV_SESSION_TOKEN } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-const LOG = (msg: string, data?: object) =>
-  console.log('[auth][verify-otp]', msg, data ?? '')
 
 /** Find user by email (case-insensitive) or id; include rbtProfile when possible (fallback without if rbt_profiles has schema issues so admins can still log in). */
 async function findUserByEmailWithProfile(
@@ -28,12 +26,6 @@ async function findUserByEmailWithProfile(
   } catch (err: unknown) {
     const msg = (err as Error)?.message ?? ''
     const code = (err as { code?: string })?.code
-    LOG('findUserByEmailWithProfile error (will retry without rbtProfile)', {
-      email: email ?? undefined,
-      userId,
-      prismaCode: code,
-      message: msg.slice(0, 200),
-    })
     if (msg.includes('rbt_profiles') || code === 'P2010') {
       if (userId) {
         return await prisma.user.findUnique({
@@ -58,10 +50,8 @@ export async function POST(request: NextRequest) {
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
     const otp = typeof body?.otp === 'string' ? body.otp.trim() : ''
 
-    LOG(`${logId} start`, { email: email ? `${email.slice(0, 3)}***@${email.split('@')[1] ?? ''}` : '', otpLength: otp.length })
 
     if (!email || !otp) {
-      LOG(`${logId} bad request`, { hasEmail: !!email, hasOtp: !!otp })
       return NextResponse.json(
         { error: 'Email and OTP are required' },
         { status: 400 }
@@ -82,7 +72,6 @@ export async function POST(request: NextRequest) {
 
     // RBT test account: aaronsiam22@gmail.com + 123456 on localhost/non-prod → real session if user is RBT with rbtProfileId
     if (isRbtTestBypass) {
-      LOG(`${logId} RBT test bypass: looking up user`)
       let rbtTestUser = await findUserByEmailWithProfile(email)
       if (!rbtTestUser) {
         const rbtProfile = await prisma.rBTProfile.findFirst({
@@ -118,7 +107,6 @@ export async function POST(request: NextRequest) {
         })
         return response
       }
-      LOG(`${logId} RBT test bypass: user not found or not RBT`)
       return NextResponse.json(
         { error: 'No RBT account found for this email. Create the RBT in Admin (Employees & Candidates), set status to HIRED, and use this email.' },
         { status: 403 }
@@ -128,7 +116,6 @@ export async function POST(request: NextRequest) {
     // For quick localhost / non-production testing, accept a fixed OTP (123456) and
     // short‑circuit before any database calls. This does NOT apply on production hosts.
     if (isDevBypass) {
-      LOG(`${logId} dev bypass OTP accepted; skipping DB lookups entirely`)
       const response = NextResponse.json({
         success: true,
         role: 'ADMIN',
@@ -144,7 +131,6 @@ export async function POST(request: NextRequest) {
       return response
     } else if (isAdminFallback) {
       isValid = true
-      LOG(`${logId} admin fallback OTP accepted`)
     } else {
       try {
         if (isTestAccount) {
@@ -153,7 +139,6 @@ export async function POST(request: NextRequest) {
           isValid = await verifyOTPEmail(email, otp)
         }
       } catch (verifyErr) {
-        LOG(`${logId} OTP verify threw`, { message: (verifyErr as Error)?.message })
         throw verifyErr
       }
     }
@@ -164,7 +149,6 @@ export async function POST(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
       }).catch(() => null)
       const isExpired = recentCode ? new Date(recentCode.expiresAt) < new Date() : null
-      LOG(`${logId} OTP invalid`, { hasRecentCode: !!recentCode, isExpired })
       let errorMessage = 'Invalid or expired verification code'
       if (recentCode && process.env.NODE_ENV === 'development') {
         errorMessage = isExpired
@@ -177,7 +161,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    LOG(`${logId} OTP valid, looking up user`)
     let user = await findUserByEmailWithProfile(email)
     if (!user) {
       // Case-insensitive lookup so hired RBTs can log in regardless of email casing in profile
@@ -185,7 +168,6 @@ export async function POST(request: NextRequest) {
         where: { email: { equals: email, mode: 'insensitive' } },
         select: { userId: true },
       }).catch((e) => {
-        LOG(`${logId} rbtProfile lookup by email failed`, { message: (e as Error)?.message?.slice(0, 150) })
         return null
       })
       if (rbtProfile) {
@@ -194,7 +176,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user) {
-      LOG(`${logId} no user for email`, { email: `${email.slice(0, 3)}***` })
       return NextResponse.json(
         { error: 'Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.' },
         { status: 403 }
@@ -202,14 +183,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user.isActive) {
-      LOG(`${logId} user inactive`, { userId: user.id, role: user.role })
       return NextResponse.json(
         { error: 'Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.' },
         { status: 403 }
       )
     }
 
-    LOG(`${logId} user found`, { userId: user.id, role: user.role })
 
     // Check if user is a hired RBT or admin
     if (user.role === 'CANDIDATE') {
@@ -223,7 +202,6 @@ export async function POST(request: NextRequest) {
       
       // If candidate is hired but role wasn't updated, fix it automatically
       if (user.rbtProfile.status === 'HIRED') {
-        console.log(`Auto-updating user ${user.id} role from CANDIDATE to RBT (profile is HIRED)`)
         await prisma.user.update({
           where: { id: user.id },
           data: {
@@ -241,7 +219,6 @@ export async function POST(request: NextRequest) {
     if (user.role === 'RBT') {
       // Ensure email matches RBTProfile email if available
       if (user.rbtProfile?.email && user.email !== user.rbtProfile.email) {
-        console.log(`Syncing user ${user.id} email to match RBTProfile email`)
         await prisma.user.update({
           where: { id: user.id },
           data: { email: user.rbtProfile.email },
@@ -257,7 +234,6 @@ export async function POST(request: NextRequest) {
 
     const { device, browser } = parseUserAgent(userAgent)
 
-    LOG(`${logId} creating session`)
     let sessionToken: string
     try {
       sessionToken = await createSession(user.id, {
@@ -295,7 +271,6 @@ export async function POST(request: NextRequest) {
 
     const roleNormalized = (user.role ?? '').toUpperCase()
     const role = roleNormalized === 'ADMIN' || roleNormalized === 'RBT' || roleNormalized === 'CANDIDATE' ? roleNormalized : null
-    LOG(`${logId} success`, { userId: user.id, role: role ?? user.role })
     const response = NextResponse.json({
       success: true,
       role: role ?? user.role,

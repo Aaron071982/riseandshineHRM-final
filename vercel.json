@@ -19,6 +19,14 @@
     {
       "path": "/api/cron/daily-interview-digest",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/training-reminders",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/onboarding-reminders",
+      "schedule": "0 10 * * *"
     }
   ]
 }

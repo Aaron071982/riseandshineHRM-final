@@ -157,7 +157,6 @@ export async function POST(
         )
     }
 
-    console.log(`📧 Attempting to send ${templateType} email to ${rbtProfile.email}...`)
 
     let emailSent = false
     try {
@@ -188,7 +187,6 @@ export async function POST(
       }, { status: 500 })
     }
 
-    console.log(`✅ Email sent successfully to ${rbtProfile.email}`)
 
     if (templateType === EmailTemplateType.REACH_OUT && schedulingToken) {
       const previousStatus = rbtProfile.status
@@ -208,7 +206,6 @@ export async function POST(
           createdBy: user?.email || user?.name || 'Admin',
         },
       })
-      console.log(`✅ Updated RBT status to REACH_OUT_EMAIL_SENT and stored scheduling token`)
     }
 
     return NextResponse.json({ 

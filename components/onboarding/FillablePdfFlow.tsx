@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
 import { Download, Upload, FileText, CheckCircle2, Loader2 } from 'lucide-react'
+import { rbtOnboardingPdfUrl } from '@/lib/onboarding/pdf'
 
 interface OnboardingDocument {
   id: string
@@ -12,7 +13,6 @@ interface OnboardingDocument {
   slug: string
   type: 'ACKNOWLEDGMENT' | 'FILLABLE_PDF'
   pdfUrl: string | null
-  pdfData: string | null
 }
 
 interface Completion {
@@ -48,32 +48,24 @@ export default function FillablePdfFlow({
     }
   }, [completion])
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     onDownload?.()
-    if (!document.pdfData) {
-      showToast('PDF data not available', 'error')
-      return
-    }
-
     try {
-      // Convert base64 to blob
-      const binaryString = atob(document.pdfData)
-      const bytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
+      const url = document.pdfUrl || rbtOnboardingPdfUrl(document.id)
+      const res = await fetch(url, { credentials: 'include' })
+      if (!res.ok) {
+        showToast('PDF not available', 'error')
+        return
       }
-      const blob = new Blob([bytes], { type: 'application/pdf' })
-      
-      // Create download link
-      const url = URL.createObjectURL(blob)
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
       const link = window.document.createElement('a')
-      link.href = url
+      link.href = objectUrl
       link.download = `${document.slug || document.title.replace(/[^a-z0-9]/gi, '_')}.pdf`
       window.document.body.appendChild(link)
       link.click()
       window.document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-      
+      URL.revokeObjectURL(objectUrl)
       showToast('PDF downloaded successfully', 'success')
     } catch (error) {
       console.error('Error downloading PDF:', error)
@@ -149,21 +141,6 @@ export default function FillablePdfFlow({
               </span>
             </div>
             <p className="text-gray-600">This document has been completed and submitted.</p>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (!document.pdfData) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-gray-500 py-12">
-            <p className="font-semibold mb-2">PDF not available</p>
-            <p className="text-sm">
-              The PDF data for this document is missing. Please contact support or try refreshing the page.
-            </p>
           </div>
         </CardContent>
       </Card>

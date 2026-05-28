@@ -573,7 +573,7 @@ export default function TeamHubEnhancedPage() {
                         overrides={overrides}
                         conflicts={conflicts}
                         adminsById={adminById}
-                        onOpenDay={(day) => setSelectedDayISO(dayISO(day))}
+                        onOpenDay={(day: Date) => setSelectedDayISO(dayISO(day))}
                         setViewMode={setViewMode}
                         setWeekStart={setWeekStart}
                       />
@@ -594,7 +594,7 @@ export default function TeamHubEnhancedPage() {
                       selectedDayConflicts={selectedDayConflicts}
                       selectedAdminOverride={selectedAdminOverride}
                       onClose={() => { setSelectedAdminId(null); setSelectedDayISO('') }}
-                      onBlockDay={(reason) => saveOverride({ date: selectedDayISO, overrideType: 'BLOCKED', reason })}
+                      onBlockDay={(reason: string) => saveOverride({ date: selectedDayISO, overrideType: 'BLOCKED', reason })}
                       onCustomHours={() => {
                         const [sh, sm] = customOverrideDraft.start.split(':').map(Number)
                         const [eh, em] = customOverrideDraft.end.split(':').map(Number)
@@ -688,7 +688,7 @@ export default function TeamHubEnhancedPage() {
             selectedDayConflicts={selectedDayConflicts}
             selectedAdminOverride={selectedAdminOverride}
             onClose={() => { setSelectedAdminId(null); setSelectedDayISO('') }}
-            onBlockDay={(reason) => saveOverride({ date: selectedDayISO, overrideType: 'BLOCKED', reason })}
+            onBlockDay={(reason: string) => saveOverride({ date: selectedDayISO, overrideType: 'BLOCKED', reason })}
             onCustomHours={() => {
               const [sh, sm] = customOverrideDraft.start.split(':').map(Number)
               const [eh, em] = customOverrideDraft.end.split(':').map(Number)
@@ -840,7 +840,13 @@ function EnhancedMonthView({ weekStart, effectiveAvailability, interviews, notes
       <div className="grid grid-cols-7">
         {days.map((day) => {
           const key = dayISO(day)
-          const dayAvailUsers = Array.from(new Set(effectiveAvailability.filter((a: EffectiveAvailability) => a.date === key && a.source !== 'BLOCKED_OVERRIDE').map((a: EffectiveAvailability) => a.userId)))
+          const dayAvailUsers = Array.from(
+            new Set(
+              effectiveAvailability
+                .filter((a: EffectiveAvailability) => a.date === key && a.source !== 'BLOCKED_OVERRIDE')
+                .map((a: EffectiveAvailability) => a.userId)
+            )
+          ) as string[]
           const blockedAny = overrides.some((o: AvailabilityOverride) => o.date === key && o.overrideType === 'BLOCKED')
           const dayInterviews = interviews.filter((i: Interview) => dayISO(new Date(i.scheduledAt)) === key)
           const pinned = notes.some((n: CalendarNote) => dayISO(new Date(n.date)) === key && n.isPinned)
@@ -853,7 +859,7 @@ function EnhancedMonthView({ weekStart, effectiveAvailability, interviews, notes
             >
               <div className="text-xs text-gray-500 flex items-center gap-1">{day.getDate()} {blockedAny ? '🚫' : ''} {pinned ? '📌' : ''} {hasConflict ? '⚠️' : ''}</div>
               <div className="flex gap-1 mt-1 flex-wrap">
-                {dayAvailUsers.slice(0, 4).map((uid) => (
+                {dayAvailUsers.slice(0, 4).map((uid: string) => (
                   <span key={uid} className="w-5 h-5 rounded-full text-[10px] text-white inline-flex items-center justify-center" style={{ backgroundColor: adminsById.get(uid)?.color || '#94a3b8' }}>
                     {(adminsById.get(uid)?.name || 'A').slice(0, 1).toUpperCase()}
                   </span>

@@ -82,7 +82,6 @@ export async function POST(request: NextRequest) {
     })
 
     if (rbtProfile && rbtProfile.email) {
-      console.log(`📧 Sending interview invite email to ${rbtProfile.email}...`)
       
       const emailContent = generateInterviewInviteEmail(rbtProfile, {
         scheduledAt: new Date(data.scheduledAt),
@@ -103,16 +102,13 @@ export async function POST(request: NextRequest) {
         console.error(`❌ Failed to send interview invite email to ${rbtProfile.email}`)
         // Still return success for interview creation, but log the email failure
       } else {
-        console.log(`✅ Interview invite email sent successfully to ${rbtProfile.email}`)
       }
     } else {
-      console.warn(`⚠️ No email address found for RBT profile ${data.rbtProfileId} - interview created but no email sent`)
     }
 
     // Notify all other admins about the new interview
     try {
       if (!rbtProfile) {
-        console.warn(`Skipping admin notifications: RBT profile not found for ${data.rbtProfileId}`)
       } else {
         const candidateName = `${rbtProfile.firstName} ${rbtProfile.lastName}`
         const interviewLink = makePublicUrl(`/admin/interviews`)

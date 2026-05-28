@@ -45,7 +45,6 @@ export async function DELETE(
       where: { id: rbtProfile.userId },
     }).catch((error) => {
       // If user already deleted by cascade, that's fine
-      console.log('User may have been deleted by cascade:', error.message)
     })
 
     return NextResponse.json({ success: true, message: 'RBT deleted successfully' })

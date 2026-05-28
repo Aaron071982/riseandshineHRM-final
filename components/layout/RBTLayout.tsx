@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Calendar,
   FileText,
+  BookOpen,
   Timer,
   LogOut,
   User,
@@ -31,6 +32,7 @@ const baseNavItems = [
   { href: '/rbt/tasks', label: 'My Tasks', icon: ClipboardList },
   { href: '/rbt/schedule', label: 'Schedule', icon: Calendar },
   { href: '/rbt/documents', label: 'Documents', icon: FileText },
+  { href: '/rbt/resources', label: 'Resources', icon: BookOpen },
   { href: '/rbt/profile', label: 'Profile', icon: User },
 ]
 

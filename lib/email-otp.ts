@@ -42,7 +42,6 @@ export async function sendOTPEmail(email: string, code: string): Promise<boolean
   // In development or if Resend is not configured, just log
   const resendApiKey = process.env.RESEND_API_KEY
   if (!resendApiKey) {
-    console.log(`[DEV MODE] OTP for ${email}: ${code}`)
     return true
   }
 
@@ -105,20 +104,11 @@ export async function verifyOTPEmail(email: string, code: string): Promise<boole
     })
 
     if (!otp) {
-      console.log('[auth][email-otp] No OTP found', {
-        email: cleanEmail ? `${cleanEmail.slice(0, 3)}***` : '',
-        codeLength: cleanCode.length,
-        codePreview: cleanCode ? `${cleanCode.slice(0, 2)}****` : '',
-      })
       return false
     }
 
     const now = new Date()
     if (otp.expiresAt < now) {
-      console.log('[auth][email-otp] OTP expired', {
-        expiresAt: otp.expiresAt.toISOString(),
-        now: now.toISOString(),
-      })
       return false
     }
 

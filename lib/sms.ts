@@ -16,7 +16,6 @@ export async function sendOTPSMS(phoneNumber: string, code: string): Promise<boo
 
   // In development or if Twilio is not configured, just log the OTP
   if (!twilioClient || !twilioPhoneNumber) {
-    console.log(`[DEV MODE] OTP for ${formattedPhone}: ${code}`)
     return true
   }
 

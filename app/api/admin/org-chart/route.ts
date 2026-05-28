@@ -86,7 +86,6 @@ export async function GET() {
   if (auth.response) return auth.response
 
   if (!hasOrgNodeDelegate()) {
-    console.warn('GET /api/admin/org-chart: prisma.orgNode delegate missing')
     return NextResponse.json({
       nodes: [],
       setupRequired: true,
@@ -107,7 +106,6 @@ export async function GET() {
     return NextResponse.json({ nodes })
   } catch (e) {
     if (isOrgNodesTableMissing(e)) {
-      console.warn('GET /api/admin/org-chart: org_nodes missing / P2021')
       return NextResponse.json({
         nodes: [],
         setupRequired: true,
@@ -115,7 +113,6 @@ export async function GET() {
       })
     }
     if (isOrgNodesPermissionDenied(e)) {
-      console.warn('GET /api/admin/org-chart: permission denied on org_nodes')
       return NextResponse.json({
         nodes: [],
         setupRequired: true,
@@ -123,7 +120,6 @@ export async function GET() {
       })
     }
     if (isDbUnreachable(e)) {
-      console.warn('GET /api/admin/org-chart: database unreachable', prismaErrorCode(e))
       return NextResponse.json({
         nodes: [],
         setupRequired: true,
@@ -131,7 +127,6 @@ export async function GET() {
       })
     }
 
-    console.warn('GET /api/admin/org-chart: primary query failed, retrying without linkedUser include', prismaErrorCode(e), (e as Error)?.message)
 
     try {
       const bare = await prisma.orgNode.findMany({

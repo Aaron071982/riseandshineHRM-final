@@ -38,6 +38,9 @@ export async function GET() {
     }
   }
 
+  const today = new Date()
+  const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
+
   if (!prismaAny.adminAvailabilityOverride?.findMany) {
     const overrides = await prisma.$queryRawUnsafe<
       Array<{
@@ -64,8 +67,6 @@ export async function GET() {
     return NextResponse.json({ overrides })
   }
 
-  const today = new Date()
-  const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
   let overrides: Array<{
     id: string
     userId: string

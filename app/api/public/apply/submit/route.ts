@@ -298,7 +298,6 @@ export async function POST(request: NextRequest) {
         })
       } catch (error) {
         // Draft might not exist, ignore error
-        console.log('Draft not found or already submitted:', error)
       }
     }
 
@@ -323,8 +322,6 @@ export async function POST(request: NextRequest) {
           console.error('Error sending internal notification email:', error)
         })
       } else {
-        console.log('⚠️ [DEV MODE] Internal notification email would be sent to:', adminEmail)
-        console.log('Subject:', internalEmail.subject)
       }
 
       // Send confirmation email to applicant
@@ -346,8 +343,6 @@ export async function POST(request: NextRequest) {
             console.error('Error sending confirmation email:', error)
           })
         } else {
-          console.log('⚠️ [DEV MODE] Confirmation email would be sent to:', rbtProfile.email)
-          console.log('Subject:', confirmationEmail.subject)
         }
       }
     } catch (error) {

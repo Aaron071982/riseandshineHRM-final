@@ -3,8 +3,6 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { validateSession } from '@/lib/auth'
 
-const LOG = (msg: string, data?: object) =>
-  console.log('[auth][profile]', msg, data ?? '')
 
 export async function GET(request: NextRequest) {
   const logId = `req_${Date.now().toString(36)}`
@@ -13,7 +11,6 @@ export async function GET(request: NextRequest) {
     const sessionToken = cookieStore.get('session')?.value
 
     if (!sessionToken) {
-      LOG(`${logId} no session cookie`)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -28,11 +25,9 @@ export async function GET(request: NextRequest) {
       )
     }
     if (!user) {
-      LOG(`${logId} validateSession returned null`)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    LOG(`${logId} session valid`, { userId: user.id })
     try {
       await prisma.session.updateMany({
         where: { token: sessionToken },
@@ -83,7 +78,6 @@ export async function GET(request: NextRequest) {
     }
 
     if (!dbUser) {
-      LOG(`${logId} user not found in DB`, { userId: user.id })
       return NextResponse.json({
         user: {
           id: user.id,
@@ -97,7 +91,6 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    LOG(`${logId} success`, { userId: dbUser.id, role: dbUser.role })
 
     const sessions = (dbUser.sessions as Array<{ id: string; device: string | null; browser: string | null; ipAddress: string | null; lastActiveAt: Date | null; createdAt: Date; expiresAt: Date; token: string }>).map((session) => ({
       id: session.id,

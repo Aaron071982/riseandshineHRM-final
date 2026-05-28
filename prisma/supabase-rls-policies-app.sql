@@ -13,17 +13,15 @@ DECLARE
   tables text[] := ARRAY[
     'availability_slots', 'users', 'otp_codes', 'interview_email_logs',
     'candidate_application_drafts', 'time_entries', 'shifts', 'onboarding_tasks',
-    'leave_requests', 'onboarding_documents', 'onboarding_completions', 'user_profiles',
+    'leave_requests', 'onboarding_documents', 'onboarding_completions', 'signature_certificates', 'user_profiles',
     'rbt_audit_logs', 'interviews', 'rbt_documents', 'interview_notes',
     'sessions', 'activity_logs', 'rbt_profiles', 'interview_scorecards',
     'rbt_messages', 'admin_notifications', 'session_notes', 'client_assignments',
     'scheduling_clients',
     'org_nodes',
-    'cms_clients',
-    'client_rbt_assignments',
-    'client_bcba_assignments',
-    'client_notes',
-    'client_status_history'
+    'training_sessions',
+    'training_bookings',
+    'training_email_log'
   ];
   pol_name text;
 BEGIN

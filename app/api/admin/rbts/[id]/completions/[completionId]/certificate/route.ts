@@ -18,10 +18,34 @@ export async function GET(
   try {
     const completion = await prisma.onboardingCompletion.findFirst({
       where: { id: completionId, rbtProfileId },
-      include: {
-        document: true,
+      select: {
+        id: true,
+        document: {
+          select: { type: true, slug: true, title: true },
+        },
         rbtProfile: { select: { firstName: true, lastName: true } },
-        signatureCertificate: true,
+        auditTrailJson: true,
+        signatureText: true,
+        signatureTimestamp: true,
+        signatureIpAddress: true,
+        signatureUserAgent: true,
+        acknowledgmentJson: true,
+        signatureCertificate: {
+          select: {
+            id: true,
+            documentTitle: true,
+            documentSlug: true,
+            signerFullName: true,
+            signerEmail: true,
+            signatureText: true,
+            signatureTimestamp: true,
+            signerIpAddress: true,
+            signerUserAgent: true,
+            documentHash: true,
+            consentStatement: true,
+            certificateGeneratedAt: true,
+          },
+        },
       },
     })
 
@@ -42,7 +66,27 @@ export async function GET(
     }
 
     if (format === 'pdf') {
-      const bytes = await buildCertificatePdfBytes(cert)
+      const fullCert = await prisma.signatureCertificate.findUnique({
+        where: { id: cert.id },
+        select: {
+          documentTitle: true,
+          documentSlug: true,
+          signerFullName: true,
+          signerEmail: true,
+          signatureText: true,
+          signatureTimestamp: true,
+          signerIpAddress: true,
+          signerUserAgent: true,
+          documentHash: true,
+          consentStatement: true,
+          certificateGeneratedAt: true,
+          certificateJson: true,
+        },
+      })
+      if (!fullCert) {
+        return NextResponse.json({ error: 'Certificate not found' }, { status: 404 })
+      }
+      const bytes = await buildCertificatePdfBytes(fullCert)
       const safeName = `${completion.rbtProfile.firstName}-${completion.rbtProfile.lastName}-${completion.document.slug}`
         .replace(/\s+/g, '-')
         .replace(/[^a-zA-Z0-9._-]/g, '')
@@ -55,6 +99,17 @@ export async function GET(
       })
     }
 
+    const { getCompletionAuditEvents } = await import('@/lib/acknowledgment-audit-display')
+    const auditTrail = getCompletionAuditEvents({
+      auditTrailJson: completion.auditTrailJson,
+      acknowledgmentJson: completion.acknowledgmentJson,
+      signatureText: completion.signatureText ?? cert.signatureText,
+      signatureTimestamp: completion.signatureTimestamp ?? cert.signatureTimestamp,
+      signatureIpAddress: completion.signatureIpAddress ?? cert.signerIpAddress,
+      signatureUserAgent: completion.signatureUserAgent ?? cert.signerUserAgent,
+      completedAt: null,
+    })
+
     return NextResponse.json({
       certificate: {
         id: cert.id,
@@ -63,13 +118,13 @@ export async function GET(
         signerFullName: cert.signerFullName,
         signerEmail: cert.signerEmail,
         signatureText: cert.signatureText,
-        signatureTimestamp: cert.signatureTimestamp,
+        signatureTimestamp: cert.signatureTimestamp.toISOString(),
         signerIpAddress: cert.signerIpAddress,
         signerUserAgent: cert.signerUserAgent,
         documentHash: cert.documentHash,
         consentStatement: cert.consentStatement,
-        certificateGeneratedAt: cert.certificateGeneratedAt,
-        certificateJson: cert.certificateJson,
+        certificateGeneratedAt: cert.certificateGeneratedAt.toISOString(),
+        certificateJson: { auditTrail },
       },
     })
   } catch (e) {

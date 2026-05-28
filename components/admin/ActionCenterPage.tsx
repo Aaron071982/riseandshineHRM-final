@@ -487,53 +487,6 @@ export default function ActionCenterPage() {
                   </div>
                 ))}
 
-              {section.id === 'crm-active-no-rbt' &&
-                items.map((item: Record<string, unknown>) => (
-                  <div
-                    key={String(item.id)}
-                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)]"
-                  >
-                    <p className="font-medium text-gray-900 dark:text-[var(--text-primary)]">{item.name as string}</p>
-                    <Link href={(item.href as string) || `/admin/clients/${item.id}`} className="text-sm text-orange-600">
-                      Open client
-                    </Link>
-                  </div>
-                ))}
-
-              {section.id === 'crm-auth-expiring' &&
-                items.map((item: Record<string, unknown>) => (
-                  <div
-                    key={String(item.id)}
-                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)]"
-                  >
-                    <div>
-                      <p className="font-medium">{item.name as string}</p>
-                      <p className="text-sm text-gray-500">
-                        Auth ends{' '}
-                        {item.authorizationEndDate
-                          ? format(new Date(item.authorizationEndDate as string), 'PP')
-                          : '—'}
-                      </p>
-                    </div>
-                    <Link href={(item.href as string) || `/admin/clients/${item.id}`} className="text-sm text-orange-600">
-                      View
-                    </Link>
-                  </div>
-                ))}
-
-              {section.id === 'crm-hours-low' &&
-                items.map((item: Record<string, unknown>) => (
-                  <div
-                    key={String(item.id)}
-                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)]"
-                  >
-                    <p className="font-medium">{item.name as string}</p>
-                    <Link href={(item.href as string) || `/admin/clients/${item.id}`} className="text-sm text-orange-600">
-                      Review hours
-                    </Link>
-                  </div>
-                ))}
-
               {section.id === 'scheduling-conflicts' &&
                 items.map((item: Record<string, unknown>) => (
                   <div

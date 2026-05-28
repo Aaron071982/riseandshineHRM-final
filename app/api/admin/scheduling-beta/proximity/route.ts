@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { RBTStatus } from '@prisma/client'
 import { requireAdminSession } from '@/lib/auth'
-import { runRbtProximitySearch } from '@/lib/crm-client/proximitySearch'
+import { runRbtProximitySearch } from '@/lib/scheduling-beta/proximitySearch'
 
 const DEFAULT_LIMIT = 6
 

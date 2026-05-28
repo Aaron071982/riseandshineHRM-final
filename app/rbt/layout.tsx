@@ -36,21 +36,11 @@ export default async function RBTLayoutWrapper({
       rbtFirstName = profile?.firstName ?? null
 
       if (profile?.status === 'HIRED') {
-        const [tasks, completedDocs, totalDocs] = await Promise.all([
-          prisma.onboardingTask.findMany({
-            where: { rbtProfileId: profile.id },
-            select: { isCompleted: true },
-          }),
-          prisma.onboardingCompletion.count({
-            where: { rbtProfileId: profile.id, status: 'COMPLETED' },
-          }),
-          prisma.onboardingDocument.count({ where: { isActive: true } }),
-        ])
-
-        const completedTasks = tasks.filter((t) => t.isCompleted).length
-        const totalSteps = tasks.length + totalDocs
-        const completedSteps = completedTasks + completedDocs
-        canAccessSessions = totalSteps > 0 && completedSteps >= totalSteps
+        const rbt = await prisma.rBTProfile.findUnique({
+          where: { id: profile.id },
+          select: { tierACompletedAt: true },
+        })
+        canAccessSessions = !!rbt?.tierACompletedAt
       }
 
       if (canAccessSessions) {

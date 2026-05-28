@@ -7,6 +7,7 @@ import { getClientIpFromRequest } from '@/lib/client-ip'
 import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
 import { SIGNATURE_METHOD } from '@/lib/esign-constants'
 import { createFillablePdfSignatureCertificate, type AuditTrailEvent } from '@/lib/signature-certificate'
+import { syncTierMilestones } from '@/lib/onboarding/progress'
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,7 +44,6 @@ export async function POST(request: NextRequest) {
       try {
         fieldValues = JSON.parse(fieldValuesStr)
       } catch (e) {
-        console.warn('Failed to parse fieldValues JSON:', e)
       }
     }
 
@@ -188,6 +188,8 @@ export async function POST(request: NextRequest) {
 
       return comp
     })
+
+    await syncTierMilestones(rbtProfileId)
 
     return NextResponse.json({
       success: true,

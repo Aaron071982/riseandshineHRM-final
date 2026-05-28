@@ -18,6 +18,7 @@ import { useToast } from '@/components/ui/toast'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -25,6 +26,12 @@ import { ADMIN_RBT_DOCUMENT_TYPES, formatRbtDocumentTypeLabel } from '@/lib/rbtD
 import { formatUserAgentShort } from '@/lib/user-agent-short'
 import { LEGAL_BASIS } from '@/lib/signature-certificate'
 import { getAcknowledgmentAdminSummary } from '@/lib/acknowledgment-admin-summary'
+import {
+  formatAuditActionLabel,
+  getCompletionAuditEvents,
+  getCompletionSignatureSummary,
+} from '@/lib/acknowledgment-audit-display'
+import AcknowledgmentAuditPanel from '@/components/admin/AcknowledgmentAuditPanel'
 import type { RBTProfileDocument, RBTProfileOnboardingCompletion } from './types'
 
 const dancingScript = Dancing_Script({ weight: '400', subsets: ['latin'] })
@@ -91,45 +98,23 @@ export default function RBTProfileDocuments({
     certificateJson: Record<string, unknown>
   } | null>(null)
 
-  const openCertificate = useCallback(
-    async (completionId: string) => {
-      setCertCompletionId(completionId)
-      setCertLoading(true)
-      setCertModalOpen(true)
-      setCertData(null)
-      try {
-        const res = await fetch(
-          `/api/admin/rbts/${rbtProfileId}/completions/${completionId}/certificate`,
-          { credentials: 'include' }
-        )
-        const body = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          showToast(body.error || 'No certificate found', 'error')
-          setCertModalOpen(false)
-          setCertCompletionId(null)
-          return
-        }
-        const c = body.certificate
-        setCertData({
-          documentTitle: c.documentTitle,
-          signerFullName: c.signerFullName,
-          signerEmail: c.signerEmail,
-          signatureText: c.signatureText,
-          signatureTimestamp: c.signatureTimestamp,
-          signerIpAddress: c.signerIpAddress,
-          signerUserAgent: c.signerUserAgent,
-          documentHash: c.documentHash,
-          certificateJson: (c.certificateJson || {}) as Record<string, unknown>,
-        })
-      } catch {
-        showToast('Failed to load certificate', 'error')
-        setCertModalOpen(false)
-      } finally {
-        setCertLoading(false)
-      }
-    },
-    [rbtProfileId, showToast]
-  )
+  const openCertificate = useCallback((completion: RBTProfileOnboardingCompletion) => {
+    const summary = getCompletionSignatureSummary(completion)
+    setCertCompletionId(completion.id)
+    setCertLoading(false)
+    setCertModalOpen(true)
+    setCertData({
+      documentTitle: completion.document.title,
+      signerFullName: summary.signerName ?? '—',
+      signerEmail: null,
+      signatureText: summary.signerName,
+      signatureTimestamp: summary.signedAt ?? new Date().toISOString(),
+      signerIpAddress: summary.ipAddress,
+      signerUserAgent: summary.userAgent,
+      documentHash: summary.documentHash ?? '—',
+      certificateJson: { auditTrail: getCompletionAuditEvents(completion) },
+    })
+  }, [])
 
   const handleDownloadAll = async () => {
     setDownloadingZip(true)
@@ -186,6 +171,9 @@ export default function RBTProfileDocuments({
                 <ScrollText className="w-5 h-5 text-orange-600" />
                 Signature certificate
               </DialogTitle>
+              <DialogDescription>
+                Electronic signature record for this onboarding document.
+              </DialogDescription>
             </DialogHeader>
             {certLoading ? (
               <div className="flex justify-center py-12">
@@ -243,13 +231,14 @@ export default function RBTProfileDocuments({
                                 timeStyle: 'short',
                               })
                             : ''}{' '}
-                          — {ev.action ?? 'event'}
+                          — {formatAuditActionLabel(ev.action ?? 'event')}
                         </li>
                       ))}
                     </ul>
                   </div>
                 ) : null}
-                {certCompletionId ? (
+                {certCompletionId &&
+                completedAcknowledgments.some((c) => c.id === certCompletionId && c.hasSignatureCertificate) ? (
                   <Button asChild className="w-full bg-[#e36f1e] hover:bg-[#c85e18]">
                     <a
                       href={`/api/admin/rbts/${rbtProfileId}/completions/${certCompletionId}/certificate?format=pdf`}
@@ -259,7 +248,12 @@ export default function RBTProfileDocuments({
                       Download certificate PDF
                     </a>
                   </Button>
-                ) : null}
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    Audit trail is shown above from the completion record. Use Admin → Settings → Compliance to
+                    generate missing formal certificates if needed.
+                  </p>
+                )}
               </div>
             ) : null}
           </DialogContent>
@@ -395,18 +389,21 @@ export default function RBTProfileDocuments({
                       acknowledgmentJson: c.acknowledgmentJson,
                     })
                     return (
-                      <div className="mt-2 rounded-md border border-gray-200 dark:border-[var(--border-subtle)] bg-gray-50/80 dark:bg-[var(--bg-input)] p-2.5 space-y-1.5">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-[var(--text-disabled)]">
-                          Summary
-                        </p>
-                        <p className="text-xs text-gray-700 dark:text-[var(--text-secondary)] leading-snug">
-                          <span className="font-medium text-gray-800 dark:text-[var(--text-primary)]">Reviewed: </span>
-                          {topic}
-                        </p>
-                        <p className="text-xs text-gray-700 dark:text-[var(--text-secondary)] leading-snug">
-                          <span className="font-medium text-gray-800 dark:text-[var(--text-primary)]">Agreed: </span>
-                          {attestation}
-                        </p>
+                      <div className="mt-2 space-y-2">
+                        <div className="rounded-md border border-gray-200 dark:border-[var(--border-subtle)] bg-gray-50/80 dark:bg-[var(--bg-input)] p-2.5 space-y-1.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-[var(--text-disabled)]">
+                            Summary
+                          </p>
+                          <p className="text-xs text-gray-700 dark:text-[var(--text-secondary)] leading-snug">
+                            <span className="font-medium text-gray-800 dark:text-[var(--text-primary)]">Reviewed: </span>
+                            {topic}
+                          </p>
+                          <p className="text-xs text-gray-700 dark:text-[var(--text-secondary)] leading-snug">
+                            <span className="font-medium text-gray-800 dark:text-[var(--text-primary)]">Agreed: </span>
+                            {attestation}
+                          </p>
+                        </div>
+                        <AcknowledgmentAuditPanel completion={c} documentTitle={c.document.title} />
                       </div>
                     )
                   })()}
@@ -416,7 +413,7 @@ export default function RBTProfileDocuments({
                   variant="outline"
                   size="sm"
                   className="text-orange-600 border-orange-200 shrink-0"
-                  onClick={() => void openCertificate(c.id)}
+                  onClick={() => openCertificate(c)}
                 >
                   <ScrollText className="w-4 h-4 mr-1" />
                   View certificate
@@ -473,7 +470,7 @@ export default function RBTProfileDocuments({
                       variant="outline"
                       size="sm"
                       className="text-orange-600 border-orange-200 shrink-0"
-                      onClick={() => void openCertificate(c.id)}
+                      onClick={() => openCertificate(c)}
                     >
                       <ScrollText className="w-4 h-4 mr-1" />
                       View certificate

@@ -21,8 +21,15 @@ const rbtProfileInclude = {
       signedPdfUrl: true,
       signedPdfData: true,
       acknowledgmentJson: true,
-      signatureCertificate: { select: { id: true } },
-      document: { select: { id: true, title: true, type: true, slug: true } },
+      auditTrailJson: true,
+      signatureText: true,
+      signatureTimestamp: true,
+      signatureIpAddress: true,
+      signatureUserAgent: true,
+      signatureCertificate: { select: { id: true, documentHash: true } },
+      document: {
+        select: { id: true, title: true, type: true, slug: true, stepNumber: true },
+      },
     },
     orderBy: { createdAt: 'desc' as const },
   },
@@ -50,10 +57,12 @@ function sanitizeOnboardingCompletionsForClient(
       hasSignedPdfData?: boolean
       hasSignatureCertificate?: boolean
     }
+    const cert = raw.signatureCertificate as { id?: string; documentHash?: string } | null
     return {
       ...rest,
       hasSignedPdfData,
       hasSignatureCertificate,
+      documentHash: cert?.documentHash ?? null,
     }
   })
 }
@@ -111,6 +120,7 @@ async function loadRbtProfileMinimalRaw(
       document_title: string
       document_type: string
       document_slug: string
+      document_step_number: number | null
       has_signed_pdf_data: boolean
       has_certificate: boolean
     }> = []
@@ -141,12 +151,13 @@ async function loadRbtProfileMinimalRaw(
                od.title AS document_title,
                od.type  AS document_type,
                od.slug AS document_slug,
+               od."stepNumber" AS document_step_number,
                (COALESCE(length(trim(oc."signedPdfData")), 0) > 0) AS has_signed_pdf_data,
                EXISTS (SELECT 1 FROM signature_certificates sc WHERE sc."onboardingCompletionId" = oc.id) AS has_certificate
         FROM onboarding_completions oc
         JOIN onboarding_documents od ON od.id = oc."documentId"
         WHERE oc."rbtProfileId" = ${id}
-        ORDER BY oc."createdAt" DESC
+        ORDER BY od."stepNumber" ASC NULLS LAST, oc."createdAt" DESC
       `
     } catch (e) {
       console.error('Admin rbts [id]: minimal raw onboarding_completions failed', e)
@@ -188,6 +199,7 @@ async function loadRbtProfileMinimalRaw(
         title: c.document_title,
         type: c.document_type,
         slug: c.document_slug,
+        stepNumber: c.document_step_number,
       },
     }))
     return {
@@ -311,6 +323,7 @@ async function loadRbtProfileRaw(
       document_title: string
       document_type: string
       document_slug: string
+      document_step_number: number | null
       has_signed_pdf_data: boolean
       has_certificate: boolean
     }> = []
@@ -341,12 +354,13 @@ async function loadRbtProfileRaw(
                od.title AS document_title,
                od.type  AS document_type,
                od.slug AS document_slug,
+               od."stepNumber" AS document_step_number,
                (COALESCE(length(trim(oc."signedPdfData")), 0) > 0) AS has_signed_pdf_data,
                EXISTS (SELECT 1 FROM signature_certificates sc WHERE sc."onboardingCompletionId" = oc.id) AS has_certificate
         FROM onboarding_completions oc
         JOIN onboarding_documents od ON od.id = oc."documentId"
         WHERE oc."rbtProfileId" = ${id}
-        ORDER BY oc."createdAt" DESC
+        ORDER BY od."stepNumber" ASC NULLS LAST, oc."createdAt" DESC
       `
     } catch (e) {
       console.error('Admin rbts [id]: raw onboarding_completions fallback failed', e)
@@ -388,6 +402,7 @@ async function loadRbtProfileRaw(
         title: c.document_title,
         type: c.document_type,
         slug: c.document_slug,
+        stepNumber: c.document_step_number,
       },
     }))
     return {

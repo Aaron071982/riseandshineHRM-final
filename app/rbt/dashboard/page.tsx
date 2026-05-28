@@ -58,7 +58,6 @@ function checkEnvironmentVariables() {
   
   // Log env check in production to help debug
   if (process.env.NODE_ENV === 'production') {
-    console.log('[RBT Dashboard] Environment check:', JSON.stringify(envCheck))
   }
   
   return envCheck
@@ -243,10 +242,8 @@ async function RBTDashboardPageInner() {
   if (needsRepair) {
     try {
       if (onboardingTasks.length > 0) {
-        console.log(`[RBT Dashboard] Repairing onboarding tasks for RBT ${user.rbtProfileId}: had ${onboardingTasks.length}, expected ${expectedTaskCount}, needsFortyHour: ${needsFortyHourCourse}`)
         await prisma.onboardingTask.deleteMany({ where: { rbtProfileId: user.rbtProfileId! } })
       } else {
-        console.log(`[RBT Dashboard] RBT ${user.rbtProfileId} is HIRED but has no tasks. Creating canonical tasks (40-hour: ${needsFortyHourCourse})...`)
       }
       await createCanonicalTasksForRbt(user.rbtProfileId!, needsFortyHourCourse)
       onboardingTasks = await prisma.onboardingTask.findMany({
@@ -363,29 +360,24 @@ async function RBTDashboardPageInner() {
     }
   }
 
-  // Compute onboarding progress (tasks + documents)
-  const totalSteps = onboardingTasks.length + onboardingDocuments.length
-  const completedTaskCount = onboardingTasks.filter((t) => t.isCompleted).length
-  const completedDocCount = completions.filter((c) => c.status === 'COMPLETED').length
-  const completedSteps = completedTaskCount + completedDocCount
-  const onboardingPercent = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 100
+  const catalogDocs = onboardingDocuments.filter((d) => (d as { stepNumber?: number | null }).stepNumber != null)
+  const totalSteps = catalogDocs.length || 30
+  const completedDocCount = completions.filter(
+    (c) => c.status === 'COMPLETED' && catalogDocs.some((d) => d.id === c.documentId)
+  ).length
+  const completedSteps = completedDocCount
+  const onboardingPercent = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0
 
-  const remainingTasks = [
-    ...onboardingTasks.filter((t) => !t.isCompleted).map((t) => ({ id: t.id, title: t.title, isCompleted: false })),
-    ...onboardingDocuments
-      .filter((d) => completions.find((c) => c.documentId === d.id)?.status !== 'COMPLETED')
-      .map((d) => ({ id: d.id, title: d.title, isCompleted: false })),
-  ]
-  const completedTasks = [
-    ...onboardingTasks.filter((t) => t.isCompleted).map((t) => ({ id: t.id, title: t.title, isCompleted: true })),
-    ...completions
-      .filter((c) => c.status === 'COMPLETED')
-      .map((c) => ({
-        id: c.documentId,
-        title: (c as any).document?.title ?? 'Document',
-        isCompleted: true,
-      })),
-  ]
+  const remainingTasks = catalogDocs
+    .filter((d) => completions.find((c) => c.documentId === d.id)?.status !== 'COMPLETED')
+    .map((d) => ({ id: d.id, title: d.title, isCompleted: false }))
+  const completedTasks = completions
+    .filter((c) => c.status === 'COMPLETED')
+    .map((c) => ({
+      id: c.documentId,
+      title: (c as { document?: { title?: string } }).document?.title ?? 'Document',
+      isCompleted: true,
+    }))
 
   // Fillable PDFs: downloaded but not yet uploaded (for reminder banner)
   const pendingUploadTitles = completions

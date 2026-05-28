@@ -6,6 +6,8 @@ import { getClientIpFromRequest } from '@/lib/client-ip'
 import { PER_DOCUMENT_SIGNATURE_CONSENT_STATEMENT, SIGNATURE_METHOD } from '@/lib/esign-constants'
 import { createLiveSignatureCertificate, type AuditTrailEvent } from '@/lib/signature-certificate'
 import { sendEmail, EmailTemplateType, generateDocumentSignedReceiptEmail } from '@/lib/email'
+import { ESIGN_CONSENT_SLUG } from '@/lib/onboarding/catalog'
+import { syncTierMilestones, canUnlockStep, completedStepNumbers } from '@/lib/onboarding/progress'
 
 function isTwoOrMoreWords(name: string): boolean {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -73,17 +75,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const profile = await prisma.userProfile.findUnique({
-      where: { userId: user.id },
-      select: { eSignConsentGiven: true },
-    })
-    if (!profile?.eSignConsentGiven) {
-      return NextResponse.json(
-        { error: 'Portal electronic signature consent is required. Return to My Tasks and accept the consent banner first.' },
-        { status: 403 }
-      )
-    }
-
     const document = await prisma.onboardingDocument.findUnique({
       where: { id: documentId },
     })
@@ -92,8 +83,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
 
-    if (document.type !== 'ACKNOWLEDGMENT') {
-      return NextResponse.json({ error: 'Document is not an acknowledgment type' }, { status: 400 })
+    if (document.flowType !== 'ESIGN' && document.type !== 'ACKNOWLEDGMENT') {
+      return NextResponse.json({ error: 'Document is not an e-sign acknowledgment' }, { status: 400 })
+    }
+
+    const isEsignConsent = document.slug === ESIGN_CONSENT_SLUG
+
+    if (!isEsignConsent) {
+      const docs = await prisma.onboardingDocument.findMany({
+        where: { isActive: true, stepNumber: { not: null } },
+      })
+      const completions = await prisma.onboardingCompletion.findMany({
+        where: { rbtProfileId: user.rbtProfileId! },
+      })
+      const rbtFlags = await prisma.rBTProfile.findUniqueOrThrow({
+        where: { id: user.rbtProfileId! },
+        select: {
+          artemisTrainingCompleted: true,
+          backgroundCheckClearedAt: true,
+          supervisionCountersignedAt: true,
+        },
+      })
+      const done = completedStepNumbers(docs, completions, rbtFlags)
+      if (document.stepNumber && !canUnlockStep(document.stepNumber, done)) {
+        return NextResponse.json({ error: 'This step is locked' }, { status: 403 })
+      }
+      const esignDone = completions.some(
+        (c) =>
+          c.status === 'COMPLETED' &&
+          docs.find((d) => d.id === c.documentId)?.slug === ESIGN_CONSENT_SLUG
+      )
+      if (!esignDone) {
+        return NextResponse.json(
+          { error: 'Complete E-Signature Consent (Task 1) before signing other documents.' },
+          { status: 403 }
+        )
+      }
     }
 
     const serverIp = getClientIpFromRequest(request) ?? 'unknown'
@@ -198,8 +223,25 @@ export async function POST(request: NextRequest) {
         timezone: tz,
       })
 
+      if (document.slug === ESIGN_CONSENT_SLUG) {
+        await tx.userProfile.upsert({
+          where: { userId: user.id },
+          create: { userId: user.id, eSignConsentGiven: true, eSignConsentTimestamp: signedAt },
+          update: { eSignConsentGiven: true, eSignConsentTimestamp: signedAt },
+        })
+      }
+
+      if (document.slug === 'rbt-supervision-contract') {
+        await tx.rBTProfile.update({
+          where: { id: user.rbtProfileId! },
+          data: { supervisionContractStatus: 'PENDING_BCBA' },
+        })
+      }
+
       return comp
     })
+
+    await syncTierMilestones(user.rbtProfileId!)
 
     const toEmail = rbtProfile.email || user.email
     if (toEmail) {

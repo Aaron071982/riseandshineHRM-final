@@ -236,7 +236,6 @@ export default function InterviewNotesPage({ interviewId, currentUser }: Intervi
     setSaving(true)
 
     const payload = { ...notesRef.current, updateProfile: updateProfileRef.current }
-    console.log('[InterviewNotes] Saving...', { isAutoSave, quickNotesLen: payload.quickNotes?.length ?? 0, recommendation: payload.recommendation })
 
     try {
       const res = await fetch(`/api/admin/interviews/${interviewId}/notes`, {
@@ -247,7 +246,6 @@ export default function InterviewNotesPage({ interviewId, currentUser }: Intervi
       })
       if (res.ok) {
         const result = await res.json()
-        console.log('[InterviewNotes] Save success:', result.notes?.id)
         setLastSaved(new Date())
         setDirty(false)
         dirtyRef.current = false

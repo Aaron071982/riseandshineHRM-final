@@ -337,21 +337,23 @@ export default function PublicCareersLandingPage() {
             <SectionIntro number="02" title="Why RBTs Choose Rise & Shine" />
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              [Users, 'Competitive Pay', 'Fair weekly compensation that reflects your dedication.'],
-              [CalendarDays, 'Flexible Hours', 'Most sessions after 2PM and on weekends - built around your life.'],
-              [Sparkles, 'Free Training Support', 'We guide you through the 40-hour course and certification process.'],
-              [HeartHandshake, 'BCBA Supervision', 'Learn directly from certified clinicians on every case.'],
-              [MapPin, 'Local to You', 'Sessions matched to your neighborhood and travel preference.'],
-              [ArrowRight, 'Career Pathway', 'A real pathway from RBT to BCBA with our support.'],
-            ].map(([Icon, title, text]) => (
+            {(
+              [
+                { Icon: Users, title: 'Competitive Pay', text: 'Fair weekly compensation that reflects your dedication.' },
+                { Icon: CalendarDays, title: 'Flexible Hours', text: 'Most sessions after 2PM and on weekends - built around your life.' },
+                { Icon: Sparkles, title: 'Free Training Support', text: 'We guide you through the 40-hour course and certification process.' },
+                { Icon: HeartHandshake, title: 'BCBA Supervision', text: 'Learn directly from certified clinicians on every case.' },
+                { Icon: MapPin, title: 'Local to You', text: 'Sessions matched to your neighborhood and travel preference.' },
+                { Icon: ArrowRight, title: 'Career Pathway', text: 'A real pathway from RBT to BCBA with our support.' },
+              ] as const
+            ).map(({ Icon, title, text }) => (
               <div
                 key={title}
                 data-reveal
                 className="reveal-init rounded-2xl border border-slate-200 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-[#F97316] hover:shadow-orange-100"
               >
                 <div className="w-11 h-11 rounded-xl bg-orange-50 flex items-center justify-center text-[#F97316]">
-                  {Icon ? <Icon className="w-5 h-5" /> : null}
+                  <Icon className="w-5 h-5" />
                 </div>
                 <h3 className="mt-4 font-semibold text-[#0F172A]">{title}</h3>
                 <p className="mt-2 text-sm text-slate-600">{text}</p>

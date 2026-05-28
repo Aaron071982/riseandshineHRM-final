@@ -108,11 +108,6 @@ export async function POST(
       recommendation: strOrNull(data.recommendation),
     }
 
-    console.log('[notes/POST] Saving notes for interview:', id, {
-      hasQuickNotes: !!updateData.quickNotes,
-      recommendation: updateData.recommendation,
-      hasFullName: !!updateData.fullName,
-    })
 
     const notes = await prisma.interviewNotes.upsert({
       where: { interviewId: id },
@@ -124,7 +119,6 @@ export async function POST(
       },
     })
 
-    console.log('[notes/POST] Saved successfully:', notes.id)
 
     if (data.updateProfile === true) {
       const profileUpdate: Record<string, string> = {}

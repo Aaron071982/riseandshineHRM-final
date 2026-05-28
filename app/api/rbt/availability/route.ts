@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
     } catch (error: any) {
       // If table doesn't exist, return empty array
       if (error.code === 'P2021' || error.message?.includes('does not exist')) {
-        console.warn('AvailabilitySlot table not found, returning empty array')
         return NextResponse.json([])
       }
       throw error
@@ -104,7 +103,6 @@ export async function POST(request: NextRequest) {
           })
         } catch (error: any) {
           if (error.code === 'P2021' || error.message?.includes('does not exist')) {
-            console.warn('AvailabilitySlot table not found, skipping delete')
           } else {
             throw error
           }
@@ -122,7 +120,6 @@ export async function POST(request: NextRequest) {
             })
           } catch (error: any) {
             if (error.code === 'P2021' || error.message?.includes('does not exist')) {
-              console.warn('AvailabilitySlot table not found, cannot create slots')
               return []
             }
             throw error
@@ -137,7 +134,6 @@ export async function POST(request: NextRequest) {
           })
         } catch (error: any) {
           if (error.code === 'P2021' || error.message?.includes('scheduleCompleted')) {
-            console.warn('scheduleCompleted field not found, skipping update')
           } else {
             throw error
           }
@@ -163,7 +159,6 @@ export async function POST(request: NextRequest) {
       })
     } catch (error: any) {
       if (error.code === 'P2021' || error.message?.includes('does not exist')) {
-        console.warn('Database schema not fully updated, returning success with empty slots')
         return NextResponse.json({ success: true, slots: [] })
       }
       throw error

@@ -35,7 +35,6 @@ export async function GET(
           slots = slotRows
         } catch (slotErr: any) {
           if (slotErr.code === 'P2021' || slotErr.message?.includes('does not exist')) {
-            console.warn('AvailabilitySlot table not found, returning empty slots')
           } else {
             throw slotErr
           }

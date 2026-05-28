@@ -33,7 +33,6 @@ export default async function AdminLayoutWrapper({
     redirect('/login?session_expired=1')
   }
 
-  // Client Management is available to all admins; this layout only renders for admins.
-  return <AdminLayout initialClientMgmtAllowed>{children}</AdminLayout>
+  return <AdminLayout>{children}</AdminLayout>
 }
 

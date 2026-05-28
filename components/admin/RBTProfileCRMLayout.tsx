@@ -46,6 +46,8 @@ import { trackButtonClick } from '@/lib/activity-tracker'
 import { formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
 import RBTProfileInterviews from './rbt-profile/RBTProfileInterviews'
 import RBTProfileOnboarding from './rbt-profile/RBTProfileOnboarding'
+import AdminOnboardingActivation from './AdminOnboardingActivation'
+import AdminHrInitiatedDocuments from './AdminHrInitiatedDocuments'
 import RBTProfileDocuments from './rbt-profile/RBTProfileDocuments'
 import AdminOnboardingOverride from './AdminOnboardingOverride'
 import InterviewScheduleForm from './rbt-profile/InterviewScheduleForm'
@@ -1329,7 +1331,58 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                         }))
                       }
                     />
-                    <RBTProfileOnboarding rbtProfile={rbtProfile} showToast={showToast} />
+                    <div id="hr-initiated-documents">
+                      <AdminHrInitiatedDocuments rbtProfileId={rbtProfile.id} />
+                    </div>
+                    <AdminOnboardingActivation
+                      rbtProfileId={rbtProfile.id}
+                      backgroundCheckClearedAt={
+                        (rbtProfile as unknown as { backgroundCheckClearedAt?: Date | string | null })
+                          .backgroundCheckClearedAt
+                          ? String(
+                              (rbtProfile as unknown as { backgroundCheckClearedAt: Date | string })
+                                .backgroundCheckClearedAt
+                            )
+                          : null
+                      }
+                      supervisionCountersignedAt={
+                        (rbtProfile as unknown as { supervisionCountersignedAt?: Date | string | null })
+                          .supervisionCountersignedAt
+                          ? String(
+                              (rbtProfile as unknown as { supervisionCountersignedAt: Date | string })
+                                .supervisionCountersignedAt
+                            )
+                          : null
+                      }
+                      supervisionContractStatus={
+                        String(
+                          (rbtProfile as unknown as { supervisionContractStatus?: string | null })
+                            .supervisionContractStatus ?? ''
+                        ) || null
+                      }
+                    />
+                    <RBTProfileOnboarding
+                      rbtProfile={rbtProfile}
+                      showToast={showToast}
+                      backgroundCheckClearedAt={
+                        (rbtProfile as unknown as { backgroundCheckClearedAt?: Date | string | null })
+                          .backgroundCheckClearedAt
+                          ? String(
+                              (rbtProfile as unknown as { backgroundCheckClearedAt: Date | string })
+                                .backgroundCheckClearedAt
+                            )
+                          : null
+                      }
+                      supervisionCountersignedAt={
+                        (rbtProfile as unknown as { supervisionCountersignedAt?: Date | string | null })
+                          .supervisionCountersignedAt
+                          ? String(
+                              (rbtProfile as unknown as { supervisionCountersignedAt: Date | string })
+                                .supervisionCountersignedAt
+                            )
+                          : null
+                      }
+                    />
                   </>
                 )}
               </div>

@@ -8,7 +8,8 @@ import { PDFDocument } from 'pdf-lib'
  */
 export async function fillPdfWithValues(
   pdfBytes: Uint8Array,
-  fieldValues: Record<string, any>
+  fieldValues: Record<string, any>,
+  options?: { flatten?: boolean }
 ): Promise<Blob> {
   try {
     // Load PDF document
@@ -34,7 +35,6 @@ export async function fillPdfWithValues(
       try {
         const field = fieldMap.get(fieldName)
         if (!field) {
-          console.warn(`Field "${fieldName}" not found in PDF`)
           continue
         }
 
@@ -62,12 +62,10 @@ export async function fillPdfWithValues(
               field.select(String(value))
             } catch (selectError) {
               // Value might not be a valid option, try to find similar
-              console.warn(`Could not select "${value}" for field "${fieldName}"`, selectError)
             }
             break
 
           default:
-            console.warn(`Unknown field type "${fieldType}" for field "${fieldName}"`)
         }
       } catch (fieldError) {
         console.error(`Error filling field "${fieldName}":`, fieldError)
@@ -75,12 +73,12 @@ export async function fillPdfWithValues(
       }
     }
 
-    // Flatten the form to make fields permanent (non-editable)
-    try {
-      form.flatten()
-    } catch (flattenError) {
-      // Some forms might not be flattenable, that's okay
-      console.warn('Could not flatten form (may already be flat or have restrictions):', flattenError)
+    if (options?.flatten) {
+      try {
+        form.flatten()
+      } catch {
+        // Some government PDFs fail flatten — save without it
+      }
     }
 
     // Generate PDF bytes (returns Uint8Array)

@@ -38,9 +38,18 @@ export interface EmailOptions {
 /**
  * Send an email without logging to interviewEmailLog (e.g. for non-RBT team members).
  */
-export async function sendGenericEmail(to: string, subject: string, html: string): Promise<boolean> {
+export type GenericEmailAttachment = {
+  filename: string
+  content: string
+}
+
+export async function sendGenericEmail(
+  to: string,
+  subject: string,
+  html: string,
+  attachments?: GenericEmailAttachment[]
+): Promise<boolean> {
   if (!resend) {
-    console.log(`⚠️ [DEV MODE] Resend not configured. Email would be sent to ${to}:`, subject)
     return true
   }
   const plainText = html
@@ -58,12 +67,19 @@ export async function sendGenericEmail(to: string, subject: string, html: string
       html,
       text: plainText,
       reply_to: 'info@riseandshine.nyc',
+      ...(attachments?.length
+        ? {
+            attachments: attachments.map((a) => ({
+              filename: a.filename,
+              content: a.content,
+            })),
+          }
+        : {}),
     })
     if (result.error) {
       console.error('sendGenericEmail failed:', result.error)
       return false
     }
-    console.log(`✅ Generic email sent to ${to}`)
     return true
   } catch (e) {
     console.error('sendGenericEmail error:', e)
@@ -88,14 +104,9 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   }
 
   if (!resend) {
-    console.log(`⚠️ [DEV MODE] Resend not configured. Email would be sent to ${options.to}:`)
-    console.log(`Subject: ${options.subject}`)
-    console.log(`RESEND_API_KEY is: ${process.env.RESEND_API_KEY ? 'SET' : 'NOT SET'}`)
-    console.log(`Email logged to database but NOT sent. Add RESEND_API_KEY to .env to send real emails.`)
     return true
   }
 
-  console.log(`📧 Attempting to send email to ${options.to} via Resend...`)
 
   try {
     const plainText = options.html
@@ -131,7 +142,6 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       },
     })
 
-    console.log(`✅ Email sent successfully to ${options.to}:`, result)
 
     try {
       await prisma.interviewEmailLog.updateMany({

@@ -95,11 +95,9 @@ export default function AdminMessagesPage() {
         setMessages((prev) => [...prev, created])
       } else {
         const data = await res.json().catch(() => ({}))
-        console.warn('[AdminMessagesPage] Send failed:', res.status, data.error ?? res.statusText)
         setInput(text)
       }
     } catch (e) {
-      console.warn('[AdminMessagesPage] Send error:', e)
       setInput(text)
     } finally {
       setSending(false)

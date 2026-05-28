@@ -71,3 +71,31 @@ After setup:
 2. Verify file appears in Supabase Storage under `resumes` bucket
 3. Verify admin can download resume via `/admin/rbts/[id]`
 4. Verify public cannot access resume URLs directly
+
+---
+
+## Onboarding documents bucket (`onboarding-documents`)
+
+Used for signed/filled onboarding PDFs (e-sign completions). Defined in [`lib/constants.ts`](lib/constants.ts) as `STORAGE_BUCKET`.
+
+### 1. Create the bucket
+
+In Supabase Dashboard:
+
+1. **Storage** → **Buckets** → **New Bucket**
+2. Name: `onboarding-documents`
+3. Public: **No** (private)
+4. File size limit: 15 MB (recommended)
+5. Allowed MIME types: `application/pdf` (and optionally `image/png`, `image/jpeg` for uploads)
+
+### 2. Access pattern
+
+- **Upload:** server-side only via `supabaseAdmin` — [`app/api/onboarding/pdf/upload/route.ts`](app/api/onboarding/pdf/upload/route.ts)
+- **Download:** authenticated API routes only (RBT/admin), never public URLs — e.g. [`app/api/rbt/documents/company/[completionId]/download/route.ts`](app/api/rbt/documents/company/[completionId]/download/route.ts)
+- Paths stored on `onboarding_completions.signedPdfUrl` with `storageBucket = 'onboarding-documents'`
+
+### 3. Security
+
+- Private bucket; no anon/public SELECT policies
+- Service role for writes; reads through HRM API after session check
+- Run [`prisma/supabase-rls-policies-app.sql`](prisma/supabase-rls-policies-app.sql) so `signature_certificates` and related tables have app policies when RLS is enabled

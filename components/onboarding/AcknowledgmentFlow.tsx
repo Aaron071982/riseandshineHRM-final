@@ -18,6 +18,7 @@ import {
 import { useToast } from '@/components/ui/toast'
 import { PER_DOCUMENT_SIGNATURE_CONSENT_STATEMENT } from '@/lib/esign-constants'
 import type { AuditTrailEvent } from '@/lib/signature-certificate'
+import OnboardingPdfViewer from '@/components/onboarding/OnboardingPdfViewer'
 
 const dancingScript = Dancing_Script({ weight: '400', subsets: ['latin'] })
 
@@ -27,7 +28,6 @@ interface OnboardingDocument {
   slug: string
   type: 'ACKNOWLEDGMENT' | 'FILLABLE_PDF'
   pdfUrl: string | null
-  pdfData: string | null
 }
 
 interface Completion {
@@ -61,7 +61,6 @@ export default function AcknowledgmentFlow({ document, completion, onComplete }:
   const [perDocConsent, setPerDocConsent] = useState(false)
   const [typedName, setTypedName] = useState('')
   const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(false)
   const [isCompleted, setIsCompleted] = useState(completion?.status === 'COMPLETED')
   const [auditTrail, setAuditTrail] = useState<AuditTrailEvent[]>([])
@@ -114,47 +113,13 @@ export default function AcknowledgmentFlow({ document, completion, onComplete }:
     }
   }, [document.id, isCompleted])
 
-  /** PDFs usually scroll inside the iframe, so the outer div never fires scroll — treat as read when no overflow. */
-  const updateScrollProgress = useCallback(() => {
-    const container = containerRef.current
-    if (!container) return
-    const { scrollTop, scrollHeight, clientHeight } = container
-    const noOuterOverflow = scrollHeight <= clientHeight + 24
-    if (noOuterOverflow) {
-      setHasScrolledToBottom(true)
-      setAuditTrail((prev) => {
-        if (prev.some((e) => e.action === 'DOCUMENT_VIEWPORT_NO_OUTER_SCROLL')) return prev
-        return pushEvent(prev, { action: 'DOCUMENT_VIEWPORT_NO_OUTER_SCROLL', documentId: document.id })
-      })
-      return
-    }
-    if (scrollTop + clientHeight >= scrollHeight - 10) {
-      setHasScrolledToBottom(true)
-      setAuditTrail((prev) => {
-        if (prev.some((e) => e.action === 'DOCUMENT_SCROLLED_TO_BOTTOM')) return prev
-        return pushEvent(prev, { action: 'DOCUMENT_SCROLLED_TO_BOTTOM', documentId: document.id })
-      })
-    }
+  const handleScrolledToBottom = useCallback(() => {
+    setHasScrolledToBottom(true)
+    setAuditTrail((prev) => {
+      if (prev.some((e) => e.action === 'DOCUMENT_SCROLLED_TO_BOTTOM')) return prev
+      return pushEvent(prev, { action: 'DOCUMENT_SCROLLED_TO_BOTTOM', documentId: document.id })
+    })
   }, [document.id])
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container || isCompleted) return
-
-    updateScrollProgress()
-    const handleScroll = () => updateScrollProgress()
-
-    container.addEventListener('scroll', handleScroll, { passive: true })
-    const ro = new ResizeObserver(() => updateScrollProgress())
-    ro.observe(container)
-    window.addEventListener('resize', handleScroll)
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll)
-      ro.disconnect()
-      window.removeEventListener('resize', handleScroll)
-    }
-  }, [document.id, isCompleted, updateScrollProgress])
 
   const onReadChange = useCallback(
     (checked: boolean) => {
@@ -281,37 +246,12 @@ export default function AcknowledgmentFlow({ document, completion, onComplete }:
 
   return (
     <div className="space-y-6">
-      <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
-        <CardContent className="pt-6">
-          <div
-            ref={containerRef}
-            className="border rounded-lg overflow-auto max-h-[min(600px,70vh)] touch-pan-y"
-            style={{ height: 'min(600px, 70vh)' }}
-          >
-            {document.pdfData ? (
-              <iframe
-                src={`data:application/pdf;base64,${document.pdfData}`}
-                className="w-full h-full min-h-[400px]"
-                title={document.title}
-                onLoad={() => {
-                  requestAnimationFrame(() => updateScrollProgress())
-                }}
-              />
-            ) : document.pdfUrl ? (
-              <iframe
-                src={document.pdfUrl}
-                className="w-full h-full min-h-[400px]"
-                title={document.title}
-                onLoad={() => {
-                  requestAnimationFrame(() => updateScrollProgress())
-                }}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full min-h-[200px] text-gray-500">PDF not available</div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <OnboardingPdfViewer
+        documentId={document.id}
+        pdfUrl={document.pdfUrl}
+        title={document.title}
+        onScrolledToBottom={handleScrolledToBottom}
+      />
 
       <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
         <CardContent className="pt-6 space-y-6">

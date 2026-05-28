@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     const log = await prisma.staffHoursLog.create({
       data: {
-        employeeType: employeeType as any,
+        employeeType: employeeType as (typeof VALID_TYPES)[number],
         referenceId: referenceId.trim(),
         periodStart: start,
         periodEnd: end,

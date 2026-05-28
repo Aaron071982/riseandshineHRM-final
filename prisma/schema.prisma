@@ -19,6 +19,29 @@ enum UserRole {
   MARKETING
   CALL_CENTER
   DEV
+  TRAINER
+}
+
+enum TrainingSessionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TrainingBookingAttendanceStatus {
+  BOOKED
+  ATTENDED
+  NO_SHOW
+  CANCELLED
+}
+
+enum TrainingEmailType {
+  NEW_SESSION_AVAILABLE
+  BOOKING_CONFIRMATION
+  REMINDER
+  SESSION_CANCELLED
+  COMPLETION
 }
 
 enum PreferredContactMethod {
@@ -108,6 +131,49 @@ enum EmailTemplateType {
 enum OnboardingDocumentType {
   ACKNOWLEDGMENT
   FILLABLE_PDF
+}
+
+enum OnboardingDocumentCategory {
+  ESIGN_ONLY
+  DOWNLOAD_REUPLOAD
+  HR_INITIATED
+  POST_ASSIGNMENT
+}
+
+enum OnboardingFlowType {
+  ESIGN
+  NOTICE
+  NATIVE_FORM
+  UPLOAD
+  TRAINING_QUIZ
+  BOOKING
+  ADMIN_ONLY
+}
+
+enum OnboardingTier {
+  TIER_A
+  TIER_B
+  ACTIVATION
+}
+
+enum SupervisionContractStatus {
+  PENDING_RBT
+  PENDING_BCBA
+  COUNTERSIGNED
+}
+
+enum HRTaskStatus {
+  PENDING_HR
+  PENDING_BT
+  PENDING_HR_SIGNOFF
+  COMPLETE
+}
+
+enum FolderType {
+  RBT_CERTIFICATE
+  PERSONAL_DOCUMENTS
+  ACKNOWLEDGMENT_FORMS
+  COMPLETED_ONBOARDING_FORMS
 }
 
 enum OnboardingCompletionStatus {
@@ -254,34 +320,31 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  rbtProfile               RBTProfile?
-  profile                  UserProfile?
-  sessions                 Session[]
-  activities               ActivityLog[]
-  interviewScorecards      InterviewScorecard[]
-  claimedInterviews        Interview[]          @relation("InterviewClaimedBy")
-  employees                Employee[]           @relation("UserEmployee")
-  employmentDocuments      EmploymentDocument[] @relation("UserEmploymentDocuments")
-  verifiedCredentials      Credential[]         @relation("UserVerifiedCredentials")
-  createdClinicalLogs      ClinicalServiceLog[] @relation("UserCreatedClinicalLogs")
-  createdSupervisionEvents SupervisionEvent[]   @relation("UserCreatedSupervisionEvents")
-  resolvedComplianceAlerts ComplianceAlert[]    @relation("UserResolvedComplianceAlerts")
-  auditLogs                AuditLog[]           @relation("UserAuditLogs")
-  adminNotifications       AdminNotification[]
-  interviewerSettings     InterviewerSettings?
-  interviewerAvailability InterviewerAvailability[]
-  adminAvailability       AdminAvailability[]
+  rbtProfile                 RBTProfile?
+  profile                    UserProfile?
+  sessions                   Session[]
+  activities                 ActivityLog[]
+  interviewScorecards        InterviewScorecard[]
+  claimedInterviews          Interview[]                 @relation("InterviewClaimedBy")
+  employees                  Employee[]                  @relation("UserEmployee")
+  employmentDocuments        EmploymentDocument[]        @relation("UserEmploymentDocuments")
+  verifiedCredentials        Credential[]                @relation("UserVerifiedCredentials")
+  createdClinicalLogs        ClinicalServiceLog[]        @relation("UserCreatedClinicalLogs")
+  createdSupervisionEvents   SupervisionEvent[]          @relation("UserCreatedSupervisionEvents")
+  resolvedComplianceAlerts   ComplianceAlert[]           @relation("UserResolvedComplianceAlerts")
+  auditLogs                  AuditLog[]                  @relation("UserAuditLogs")
+  adminNotifications         AdminNotification[]
+  interviewerSettings        InterviewerSettings?
+  interviewerAvailability    InterviewerAvailability[]
+  adminAvailability          AdminAvailability[]
   adminAvailabilityOverrides AdminAvailabilityOverride[]
-  adminCalendarNotes      AdminCalendarNote[]
-  adminStatus             AdminStatus?
-  interviewSlots           InterviewSlot[]     @relation("InterviewSlotInterviewer")
-  schedulingExclusions     SchedulingExclusion[] @relation("SchedulingExcludedByUser")
-  linkedOrgNodes         OrgNode[]             @relation("OrgNodeLinkedUser")
-  clientsCreated         CrmClient[]           @relation("CrmClientCreatedBy")
-  clientRbtAssigned      ClientRbtAssignment[] @relation("ClientRbtAssignedBy")
-  clientBcbaAssigned     ClientBcbaAssignment[] @relation("ClientBcbaAssignedBy")
-  clientNotesAuthored    ClientNote[]          @relation("ClientNoteAuthor")
-  clientStatusChanges    ClientStatusHistory[] @relation("ClientStatusChangedBy")
+  adminCalendarNotes         AdminCalendarNote[]
+  adminStatus                AdminStatus?
+  interviewSlots             InterviewSlot[]             @relation("InterviewSlotInterviewer")
+  schedulingExclusions       SchedulingExclusion[]       @relation("SchedulingExcludedByUser")
+  linkedOrgNodes             OrgNode[]                   @relation("OrgNodeLinkedUser")
+  hostedTrainingSessions     TrainingSession[]           @relation("TrainingSessionHost")
+  trainingBookingsMarked     TrainingBooking[]           @relation("TrainingBookingMarkedBy")
 
   @@map("users")
 }
@@ -347,15 +410,15 @@ model AdminCalendarNote {
 }
 
 model AdminStatus {
-  id              String   @id @default(cuid())
-  userId          String   @unique
+  id              String    @id @default(cuid())
+  userId          String    @unique
   status          String
   statusEmoji     String?
-  statusMessage   String?  @db.Text
+  statusMessage   String?   @db.Text
   statusExpiresAt DateTime?
-  lastSeenAt      DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  lastSeenAt      DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -366,24 +429,24 @@ model AdminStatus {
 
 /// Company hierarchy / org chart (admin-managed tree).
 model OrgNode {
-  id           String   @id @default(cuid())
-  parentId     String?
-  parent       OrgNode?  @relation("OrgNodeHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children     OrgNode[] @relation("OrgNodeHierarchy")
-  name            String
-  title           String
-  department      String?
+  id            String    @id @default(cuid())
+  parentId      String?
+  parent        OrgNode?  @relation("OrgNodeHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children      OrgNode[] @relation("OrgNodeHierarchy")
+  name          String
+  title         String
+  department    String?
   /// Subgroup within department (e.g. Recruiting under HR).
-  subDepartment   String?
-  email        String?
-  phone        String?
-  linkedUserId String?
-  linkedUser   User?     @relation("OrgNodeLinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
-  avatarColor  String    @default("#f97316")
-  sortOrder    Int       @default(0)
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  subDepartment String?
+  email         String?
+  phone         String?
+  linkedUserId  String?
+  linkedUser    User?     @relation("OrgNodeLinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  avatarColor   String    @default("#f97316")
+  sortOrder     Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([parentId])
   @@index([linkedUserId])
@@ -510,27 +573,113 @@ model RBTProfile {
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
 
-  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  interviews            Interview[]
-  onboardingTasks       OnboardingTask[]
-  shifts                Shift[]
-  timeEntries           TimeEntry[]
-  leaveRequests         LeaveRequest[]
-  interviewEmailLogs    InterviewEmailLog[]
-  availabilitySlots     AvailabilitySlot[]
-  documents             RBTDocument[]
-  interviewNotes        InterviewNotes[]
-  onboardingCompletions  OnboardingCompletion[]
-  signatureCertificates  SignatureCertificate[]
-  auditLogs             RBTAuditLog[]
-  clientAssignments     ClientAssignment[]
-  sessionNotes          SessionNote[]
-  messages              RBTMessage[]
-  interviewSlotsBooked  InterviewSlot[]
-  schedulingExclusions  SchedulingExclusion[]
-  clientManagementAssignments ClientRbtAssignment[]
+  user                        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interviews                  Interview[]
+  onboardingTasks             OnboardingTask[]
+  shifts                      Shift[]
+  timeEntries                 TimeEntry[]
+  leaveRequests               LeaveRequest[]
+  interviewEmailLogs          InterviewEmailLog[]
+  availabilitySlots           AvailabilitySlot[]
+  documents                   RBTDocument[]
+  interviewNotes              InterviewNotes[]
+  onboardingCompletions       OnboardingCompletion[]
+  signatureCertificates       SignatureCertificate[]
+  auditLogs                   RBTAuditLog[]
+  clientAssignments           ClientAssignment[]
+  sessionNotes                SessionNote[]
+  messages                    RBTMessage[]
+  interviewSlotsBooked        InterviewSlot[]
+  schedulingExclusions        SchedulingExclusion[]
+  artemisTrainingCompleted    Boolean                @default(false)
+  artemisTrainingCompletedAt  DateTime?
+  artemisTrainingSessionId    String?
+  artemisTrainingSession      TrainingSession?       @relation("ArtemisCompletionSession", fields: [artemisTrainingSessionId], references: [id], onDelete: SetNull)
+  trainingBookings            TrainingBooking[]
+  trainingEmailLogs           TrainingEmailLog[]
+  hrDocumentTasks             HRDocumentTask[]
+  employeeDocumentFolders     EmployeeDocumentFolder[]
+  tierACompletedAt            DateTime?
+  tierBCompletedAt            DateTime?
+  fullyActivatedAt            DateTime?
+  backgroundCheckClearedAt    DateTime?
+  backgroundCheckClearedBy    String?
+  supervisionCountersignedAt  DateTime?
+  supervisionCountersignedBy  String?
+  supervisionContractStatus   SupervisionContractStatus?
+  quizAttempts                OnboardingQuizAttempt[]
+  quizCertificates            OnboardingQuizCertificate[]
+  oigScreeningLogs            OigScreeningLog[]
 
+  @@index([artemisTrainingCompleted])
   @@map("rbt_profiles")
+}
+
+model TrainingSession {
+  id               String                @id @default(cuid())
+  hostUserId       String
+  title            String                @default("Artemis Training")
+  description      String?               @db.Text
+  sessionDate      DateTime              @db.Date
+  startTime        DateTime
+  endTime          DateTime
+  meetingUrl       String                @db.Text
+  maxAttendees     Int                   @default(10)
+  currentAttendees Int                   @default(0)
+  status           TrainingSessionStatus @default(SCHEDULED)
+  notes            String?               @db.Text
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  host              User               @relation("TrainingSessionHost", fields: [hostUserId], references: [id], onDelete: Cascade)
+  bookings          TrainingBooking[]
+  emailLogs         TrainingEmailLog[]
+  completedProfiles RBTProfile[]       @relation("ArtemisCompletionSession")
+
+  @@index([sessionDate])
+  @@index([status])
+  @@index([hostUserId])
+  @@index([startTime])
+  @@map("training_sessions")
+}
+
+model TrainingBooking {
+  id                String                          @id @default(cuid())
+  trainingSessionId String
+  rbtProfileId      String
+  bookedAt          DateTime                        @default(now())
+  attendanceStatus  TrainingBookingAttendanceStatus @default(BOOKED)
+  markedAttendedBy  String?
+  markedAttendedAt  DateTime?
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+
+  trainingSession TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  rbtProfile      RBTProfile      @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  markedByUser    User?           @relation("TrainingBookingMarkedBy", fields: [markedAttendedBy], references: [id], onDelete: SetNull)
+
+  @@unique([trainingSessionId, rbtProfileId])
+  @@index([rbtProfileId])
+  @@index([trainingSessionId])
+  @@index([attendanceStatus])
+  @@map("training_bookings")
+}
+
+model TrainingEmailLog {
+  id                String            @id @default(cuid())
+  trainingSessionId String
+  rbtProfileId      String
+  emailType         TrainingEmailType
+  sentAt            DateTime          @default(now())
+  createdAt         DateTime          @default(now())
+
+  trainingSession TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  rbtProfile      RBTProfile      @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@index([trainingSessionId])
+  @@index([rbtProfileId])
+  @@index([emailType, sentAt])
+  @@map("training_email_log")
 }
 
 model SchedulingExclusion {
@@ -545,10 +694,10 @@ model SchedulingExclusion {
   rbtProfile     RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
   excludedByUser User       @relation("SchedulingExcludedByUser", fields: [excludedByUserId], references: [id], onDelete: Cascade)
 
+  @@unique([rbtProfileId])
   @@index([rbtProfileId])
   @@index([excludedByUserId])
   @@index([expiresAt])
-  @@unique([rbtProfileId])
   @@map("scheduling_exclusions")
 }
 
@@ -572,16 +721,16 @@ model SchedulingClient {
 
 // RBT–client assignment: which days and time range (e.g. Mon/Tue/Wed 4–7 PM)
 model ClientAssignment {
-  id                 String    @id @default(cuid())
+  id                 String   @id @default(cuid())
   rbtProfileId       String
   schedulingClientId String
   daysOfWeek         Int[] // 0=Sunday, 1=Monday, ..., 6=Saturday
   timeStart          String? // e.g. "16:00" or "4:00 PM"
   timeEnd            String? // e.g. "19:00" or "7:00 PM"
-  hourlyRate         Decimal?  @db.Decimal(10, 2) // RBT pay per hour for this client (USD)
-  notes              String?   @db.Text
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  hourlyRate         Decimal? @db.Decimal(10, 2) // RBT pay per hour for this client (USD)
+  notes              String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   rbtProfile RBTProfile       @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
   client     SchedulingClient @relation(fields: [schedulingClientId], references: [id], onDelete: Cascade)
@@ -591,158 +740,25 @@ model ClientAssignment {
   @@map("client_assignments")
 }
 
-// --- Client Management System (separate from scheduling_clients, compliance Client/clients table) ---
-
-model CrmClient {
-  id                       String    @id @default(cuid())
-  firstName                String
-  lastName                 String
-  dateOfBirth              DateTime? @db.Date
-  diagnosis                String?   @db.Text
-  status                   String // NEW_INTAKE | WAITING | ACTIVE | INACTIVE
-  addressLine1             String?
-  addressLine2             String?
-  city                     String?
-  state                    String?
-  zipCode                  String?
-  latitude                 Float?
-  longitude                Float?
-  insuranceProvider        String?
-  insuranceMemberId        String?
-  insuranceGroupNumber     String?
-  insurancePhone           String?
-  authorizationNumber      String?
-  authorizationStartDate   DateTime? @db.Date
-  authorizationEndDate     DateTime? @db.Date
-  authorizedHoursPerWeek   Float?
-  usedHoursTotal           Float     @default(0)
-  guardianName             String?
-  guardianPhone            String?
-  guardianEmail            String?
-  guardianRelationship     String?
-  preferredLanguage        String?
-  preferredRbtGender       String?
-  preferredRbtEthnicity    String?
-  intakeDate               DateTime? @db.Date
-  firstSessionDate         DateTime? @db.Date
-  notes                    String?   @db.Text
-  createdByUserId          String
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
-
-  createdBy       User                   @relation("CrmClientCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  rbtAssignments  ClientRbtAssignment[]
-  bcbaAssignments ClientBcbaAssignment[]
-  clientNotes     ClientNote[]
-  statusHistory   ClientStatusHistory[]
-
-  @@index([status])
-  @@index([authorizationEndDate])
-  @@index([createdByUserId])
-  @@map("cms_clients")
-}
-
-model ClientRbtAssignment {
-  id               String    @id @default(cuid())
-  clientId         String
-  rbtProfileId     String
-  assignedByUserId String
-  isPrimary        Boolean   @default(false)
-  startDate        DateTime? @db.Date
-  endDate          DateTime? @db.Date
-  daysOfWeek       String[]
-  timeStart        String?
-  timeEnd          String?
-  notes            String?   @db.Text
-  status           String    @default("ACTIVE") // ACTIVE | ENDED | ON_HOLD
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  client     CrmClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
-  assignedBy User       @relation("ClientRbtAssignedBy", fields: [assignedByUserId], references: [id], onDelete: Restrict)
-
-  @@index([clientId])
-  @@index([rbtProfileId])
-  @@index([status])
-  @@map("client_rbt_assignments")
-}
-
-model ClientBcbaAssignment {
-  id               String    @id @default(cuid())
-  clientId         String
-  bcbaProfileId    String
-  assignedByUserId String
-  isPrimary        Boolean   @default(true)
-  startDate        DateTime? @db.Date
-  endDate          DateTime? @db.Date
-  notes            String?   @db.Text
-  status           String    @default("ACTIVE")
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  client      CrmClient   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  bcbaProfile BCBAProfile @relation(fields: [bcbaProfileId], references: [id], onDelete: Cascade)
-  assignedBy  User        @relation("ClientBcbaAssignedBy", fields: [assignedByUserId], references: [id], onDelete: Restrict)
-
-  @@index([clientId])
-  @@index([bcbaProfileId])
-  @@map("client_bcba_assignments")
-}
-
-model ClientNote {
-  id        String   @id @default(cuid())
-  clientId  String
-  authorId  String
-  content   String   @db.Text
-  noteType  String // GENERAL | CLINICAL | BILLING | SCHEDULING | FOLLOW_UP
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  client CrmClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  author User      @relation("ClientNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-
-  @@index([clientId])
-  @@index([authorId])
-  @@map("client_notes")
-}
-
-model ClientStatusHistory {
-  id              String   @id @default(cuid())
-  clientId        String
-  fromStatus      String?
-  toStatus        String
-  changedByUserId String
-  reason          String?  @db.Text
-  createdAt       DateTime @default(now())
-
-  client    CrmClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  changedBy User      @relation("ClientStatusChangedBy", fields: [changedByUserId], references: [id], onDelete: Restrict)
-
-  @@index([clientId])
-  @@index([createdAt])
-  @@map("client_status_history")
-}
-
 /// Interview reminder columns: reminderSentAt = 30-minute reminder sent at (cron: send-interview-reminders).
 /// reminder_15m_sent_at = 15-minute reminder sent at (cron: interview-reminders, env INTERVIEW_REMINDER_MINUTES).
 model Interview {
-  id                    String            @id @default(cuid())
-  rbtProfileId          String
-  scheduledAt           DateTime
-  durationMinutes       Int               @default(30)
-  interviewerName       String
-  status                InterviewStatus   @default(SCHEDULED)
-  decision              InterviewDecision @default(PENDING)
-  meetingUrl            String?
-  notes                 String?
-  reminderSentAt        DateTime?         // 30m reminder sent at
-  reminder_15m_sent_at  DateTime?         // 15m reminder sent at
-  reminder_1hr_sent_at  DateTime?         // 1hr reminder sent at
-  dailyDigestDate       DateTime?         @db.Date // last date included in daily digest
-  claimedByUserId       String?           // admin who claimed this interview
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  id                   String            @id @default(cuid())
+  rbtProfileId         String
+  scheduledAt          DateTime
+  durationMinutes      Int               @default(30)
+  interviewerName      String
+  status               InterviewStatus   @default(SCHEDULED)
+  decision             InterviewDecision @default(PENDING)
+  meetingUrl           String?
+  notes                String?
+  reminderSentAt       DateTime? // 30m reminder sent at
+  reminder_15m_sent_at DateTime? // 15m reminder sent at
+  reminder_1hr_sent_at DateTime? // 1hr reminder sent at
+  dailyDigestDate      DateTime?         @db.Date // last date included in daily digest
+  claimedByUserId      String? // admin who claimed this interview
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   rbtProfile     RBTProfile           @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
   claimedBy      User?                @relation("InterviewClaimedBy", fields: [claimedByUserId], references: [id], onDelete: SetNull)
@@ -772,19 +788,19 @@ model InterviewerSettings {
 
 /// Weekly availability windows per admin (e.g. Mon 9–11, Mon 15–17).
 model InterviewerAvailability {
-  id           String   @id @default(cuid())
-  userId       String
-  dayOfWeek    Int      // 0=Sunday .. 6=Saturday
-  startHour    Int      // 0-23
-  startMinute  Int      // 0 or 30
-  endHour      Int      // 0-23
-  endMinute    Int      // 0 or 30
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  userId      String
+  dayOfWeek   Int // 0=Sunday .. 6=Saturday
+  startHour   Int // 0-23
+  startMinute Int // 0 or 30
+  endHour     Int // 0-23
+  endMinute   Int // 0 or 30
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  slots  InterviewSlot[]
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slots InterviewSlot[]
 
   @@index([userId])
   @@index([userId, dayOfWeek])
@@ -806,8 +822,8 @@ model InterviewSlot {
   updatedAt                 DateTime  @updatedAt
 
   availability InterviewerAvailability @relation(fields: [interviewerAvailabilityId], references: [id], onDelete: Cascade)
-  user         User                     @relation("InterviewSlotInterviewer", fields: [userId], references: [id], onDelete: Cascade)
-  bookedBy     RBTProfile?               @relation(fields: [bookedByRbtProfileId], references: [id], onDelete: SetNull)
+  user         User                    @relation("InterviewSlotInterviewer", fields: [userId], references: [id], onDelete: Cascade)
+  bookedBy     RBTProfile?             @relation(fields: [bookedByRbtProfileId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([slotDate])
@@ -1025,48 +1041,105 @@ model RBTDocument {
 }
 
 model OnboardingDocument {
-  id        String                 @id @default(cuid())
-  title     String
-  slug      String                 @unique
-  type      OnboardingDocumentType
-  pdfUrl    String?                @db.Text // URL or path to the PDF file
-  pdfData   String?                @db.Text // base64 encoded PDF (alternative to pdfUrl)
-  sortOrder Int                    @default(0)
-  isActive  Boolean                @default(true)
-  createdAt DateTime               @default(now())
-  updatedAt DateTime               @updatedAt
-
-  completions            OnboardingCompletion[]
-  signatureCertificates  SignatureCertificate[]
-
-  @@map("onboarding_documents")
-}
-
-model OnboardingCompletion {
   id                 String                     @id @default(cuid())
-  rbtProfileId       String
-  documentId         String
-  status             OnboardingCompletionStatus @default(NOT_STARTED)
-  completedAt        DateTime?
-  downloadedAt       DateTime? // When RBT downloaded fillable PDF (for reminder emails)
-  acknowledgmentJson Json? // Stores acknowledgment data (name, checkboxes, timestamp, etc.)
-  signedPdfUrl       String?                    @db.Text // URL or path to the signed/completed PDF (Supabase Storage path)
-  signedPdfData      String?                    @db.Text // base64 encoded signed PDF (legacy/backward compatibility)
-  storageBucket      String? // Supabase Storage bucket name (e.g., 'onboarding-documents')
-  fieldValues        Json? // Stores extracted field values for debugging/audit
-  draftData          Json? // Stores draft form field data for fillable PDFs
-  signatureText              String?                @db.Text
-  signatureTimestamp         DateTime?
-  signatureIpAddress         String?
-  signatureUserAgent         String?                @db.Text
-  signatureConsentGiven      Boolean                @default(false)
-  signatureMethod            String? // TYPED_NAME, DRAWN, UPLOADED, PRE_COMPLIANCE
-  auditTrailJson             Json?
+  title              String
+  slug               String                     @unique
+  type               OnboardingDocumentType
+  category           OnboardingDocumentCategory @default(ESIGN_ONLY)
+  flowType           OnboardingFlowType         @default(ESIGN)
+  tier               OnboardingTier             @default(TIER_A)
+  stepNumber         Int?
+  unlockGroup        String?
+  pdfUrl             String?                    @db.Text // URL or path to the PDF file
+  pdfData            String?                    @db.Text // base64 encoded PDF (alternative to pdfUrl)
+  downloadUrl        String?                    @db.Text // blank template for download tasks
+  uploadedFileUrl    String?                    @db.Text // BT completed upload
+  hrInitiatedFileUrl String?                    @db.Text // HR-prepared file (HR_INITIATED)
+  hrCompletedAt      DateTime?
+  hrCompletedBy      String?
+  isRequired         Boolean                    @default(true)
+  displayOrder       Int                        @default(0)
+  folder             String?
+  sortOrder          Int                        @default(0)
+  isActive           Boolean                    @default(true)
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
 
-  rbtProfile         RBTProfile            @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
-  document           OnboardingDocument    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  completions           OnboardingCompletion[]
+  signatureCertificates SignatureCertificate[]
+
+  @@unique([stepNumber])
+  @@index([tier, isActive])
+  @@map("onboarding_documents")
+}
+
+model HRDocumentTask {
+  id            String       @id @default(cuid())
+  rbtProfileId  String
+  documentType  String
+  status        HRTaskStatus @default(PENDING_HR)
+  hrFileUrl     String?      @db.Text
+  btFileUrl     String?      @db.Text
+  hrUploadedAt  DateTime?
+  hrUploadedBy  String?
+  btUploadedAt  DateTime?
+  hrSignedOffAt DateTime?
+  hrSignedOffBy String?
+  notes         String?      @db.Text
+  emailSent     Boolean      @default(false)
+  emailSentAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId])
+  @@index([status])
+  @@map("hr_document_tasks")
+}
+
+model EmployeeDocumentFolder {
+  id           String     @id @default(cuid())
+  rbtProfileId String
+  folderType   FolderType
+  fileUrl      String     @db.Text
+  fileName     String
+  uploadedAt   DateTime   @default(now())
+  uploadedBy   String?
+  notes        String?    @db.Text
+
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId])
+  @@index([folderType])
+  @@map("employee_document_folders")
+}
+
+model OnboardingCompletion {
+  id                    String                     @id @default(cuid())
+  rbtProfileId          String
+  documentId            String
+  status                OnboardingCompletionStatus @default(NOT_STARTED)
+  completedAt           DateTime?
+  downloadedAt          DateTime? // When RBT downloaded fillable PDF (for reminder emails)
+  acknowledgmentJson    Json? // Stores acknowledgment data (name, checkboxes, timestamp, etc.)
+  signedPdfUrl          String?                    @db.Text // URL or path to the signed/completed PDF (Supabase Storage path)
+  signedPdfData         String?                    @db.Text // base64 encoded signed PDF (legacy/backward compatibility)
+  storageBucket         String? // Supabase Storage bucket name (e.g., 'onboarding-documents')
+  fieldValues           Json? // Stores extracted field values for debugging/audit
+  draftData             Json? // Stores draft form field data for fillable PDFs
+  signatureText         String?                    @db.Text
+  signatureTimestamp    DateTime?
+  signatureIpAddress    String?
+  signatureUserAgent    String?                    @db.Text
+  signatureConsentGiven Boolean                    @default(false)
+  signatureMethod       String? // TYPED_NAME, DRAWN, UPLOADED, PRE_COMPLIANCE
+  auditTrailJson        Json?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+
+  rbtProfile           RBTProfile            @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  document             OnboardingDocument    @relation(fields: [documentId], references: [id], onDelete: Cascade)
   signatureCertificate SignatureCertificate?
 
   @@unique([rbtProfileId, documentId])
@@ -1101,13 +1174,67 @@ model SignatureCertificate {
   @@map("signature_certificates")
 }
 
+model OnboardingQuizAttempt {
+  id              String   @id @default(cuid())
+  rbtProfileId    String
+  documentId      String
+  score           Int
+  totalQuestions  Int      @default(10)
+  passed          Boolean
+  answersJson     Json
+  attemptedAt     DateTime @default(now())
+  nextAttemptAt   DateTime?
+
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId, documentId])
+  @@map("onboarding_quiz_attempts")
+}
+
+model OnboardingQuizCertificate {
+  id                   String   @id @default(cuid())
+  rbtProfileId         String
+  documentId           String
+  employeeName         String
+  score                Int
+  totalQuestions       Int      @default(10)
+  completedAt          DateTime
+  trainingSource       String
+  nextRequiredAt       DateTime
+  certificateJson      Json
+  storagePath          String?  @db.Text
+  createdAt            DateTime @default(now())
+
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId])
+  @@map("onboarding_quiz_certificates")
+}
+
+model OigScreeningLog {
+  id              String   @id @default(cuid())
+  rbtProfileId    String
+  screenedAt      DateTime @default(now())
+  screenedBy      String?
+  samResult       String?
+  oigResult       String?
+  omigResult      String?
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId])
+  @@map("oig_screening_logs")
+}
+
 model RBTMessage {
-  id           String              @id @default(cuid())
+  id           String               @id @default(cuid())
   rbtProfileId String
   senderRole   RBTMessageSenderRole
-  message      String              @db.Text
-  isRead       Boolean             @default(false)
-  createdAt    DateTime            @default(now())
+  message      String               @db.Text
+  isRead       Boolean              @default(false)
+  createdAt    DateTime             @default(now())
 
   rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
 
@@ -1183,8 +1310,6 @@ model BCBAProfile {
   status                 String? // e.g. Active, Inactive
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
-
-  clientAssignments ClientBcbaAssignment[]
 
   @@map("bcba_profiles")
 }
@@ -1476,7 +1601,7 @@ model ComplianceAlert {
   createdAt        DateTime            @default(now())
 
   employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  resolvedBy User?    @relation("UserResolvedComplianceAlerts", fields: [resolvedByUserId], references: [id])
+  resolvedBy User?     @relation("UserResolvedComplianceAlerts", fields: [resolvedByUserId], references: [id])
 
   @@index([employeeId, resolvedAt])
   @@index([alertType])

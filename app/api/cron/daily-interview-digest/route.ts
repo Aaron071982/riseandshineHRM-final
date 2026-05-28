@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       },
       select: { userId: true },
     }).catch(() => [])
-    const blockedUserIds = new Set(overrides.map((o) => o.userId))
+    const blockedUserIds = new Set(overrides.map((o: { userId: string }) => o.userId))
 
     const admins = await prisma.user.findMany({
       where: { role: 'ADMIN', isActive: true },
@@ -84,8 +84,9 @@ export async function GET(request: NextRequest) {
     }
 
     const totalCount = interviews.length
+    type DigestInterview = (typeof interviews)[number]
     const rows = interviews
-      .map((interview) => {
+      .map((interview: DigestInterview) => {
         const candidateName =
           `${interview.rbtProfile?.firstName ?? ''} ${interview.rbtProfile?.lastName ?? ''}`.trim() ||
           'Unknown candidate'
@@ -120,7 +121,7 @@ export async function GET(request: NextRequest) {
           </tr>`,
         }
       })
-    const bodyRows = rows.map((r) => r.html).join('')
+    const bodyRows = rows.map((r: { html: string }) => r.html).join('')
     const html = `
       <!DOCTYPE html>
       <html><head><meta charset="UTF-8"></head>
@@ -157,7 +158,7 @@ export async function GET(request: NextRequest) {
     }
 
     await prismaAny.interview.updateMany({
-      where: { id: { in: interviews.map((i) => i.id) } },
+      where: { id: { in: interviews.map((i: DigestInterview) => i.id) } },
       data: { dailyDigestDate: digestDate },
     })
 

@@ -1703,6 +1703,52 @@ export function generateInterviewUnclaimedEmail(params: {
   return { subject, html }
 }
 
+/** Sent when HR sends LS-54 (or similar) and RBT must complete new onboarding documents. */
+export function generateOnboardingDocumentsNotifyEmail(
+  firstName: string,
+  portalUrl: string
+): { subject: string; html: string } {
+  const subject = 'Action Required: New Onboarding Documents to Sign — Rise & Shine ABA'
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 26px; font-weight: bold; }
+        .content { padding: 30px 20px; background-color: #ffffff; }
+        .content p { margin: 16px 0; }
+        .cta-button { display: inline-block; padding: 12px 24px; background: #E4893D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0; }
+        .footer { padding: 24px 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Rise &amp; Shine ABA</h1>
+        </div>
+        <div class="content">
+          <p>Hi <strong>${firstName}</strong>,</p>
+          <p>Thank you for your interest in joining the Rise &amp; Shine ABA team!</p>
+          <p>As part of some new updates to our onboarding process, we have a few additional documents that require your signature. Please log in to your RBT portal and complete them at your earliest convenience.</p>
+          <p><a href="${portalUrl}" class="cta-button">Log in to RBT portal</a></p>
+          <p>If you have any questions, feel free to reach out to us.</p>
+          <p>Thank you,<br><strong>Rise &amp; Shine ABA HR Team</strong></p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise &amp; Shine ABA</strong></p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}
+
 export function generateNewMessageFromAdminEmail(firstName: string, portalUrl: string): { subject: string; html: string } {
   const subject = 'You have a new message from Rise and Shine'
   const html = `
@@ -1794,4 +1840,134 @@ export function generateDocumentSignedReceiptEmail(params: {
     </body>
     </html>
   `
+}
+
+function artemisEmailShell(title: string, bodyHtml: string): string {
+  return `
+    <!DOCTYPE html>
+    <html><head><meta charset="UTF-8"></head>
+    <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;line-height:1.6;color:#111827;margin:0;padding:24px;background:#f3f4f6;">
+      <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;">
+        <h1 style="margin:0 0 16px;font-size:22px;color:#e36f1e;">${title}</h1>
+        ${bodyHtml}
+        <p style="margin-top:24px;font-size:13px;color:#6b7280;">Rise and Shine ABA</p>
+      </div>
+    </body></html>
+  `
+}
+
+function formatEtDateTime(d: Date): string {
+  return d.toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'full', timeStyle: 'short' })
+}
+
+export function generateArtemisNewSessionEmail(params: {
+  firstName: string
+  featuredSession: {
+    title: string
+    startTime: Date
+    endTime: Date
+    seatsLeft: number
+    maxAttendees: number
+    bookingUrl: string
+  }
+  otherSessions: Array<{ title: string; whenLine: string; bookingUrl: string }>
+}): { subject: string; html: string } {
+  const when = formatEtDateTime(params.featuredSession.startTime)
+  const others =
+    params.otherSessions.length > 0
+      ? `<ul>${params.otherSessions.map((s) => `<li><strong>${s.title}</strong> — ${s.whenLine}</li>`).join('')}</ul>`
+      : ''
+  const html = artemisEmailShell(
+    'New Artemis training session',
+    `<p>Hi ${params.firstName},</p>
+     <p>A new <strong>${params.featuredSession.title}</strong> session is open on <strong>${when}</strong> (${params.featuredSession.seatsLeft} of ${params.featuredSession.maxAttendees} seats left).</p>
+     <p><a href="${params.featuredSession.bookingUrl}" style="color:#e36f1e;font-weight:700;">Book your seat</a></p>
+     ${others}`
+  )
+  return { subject: 'New Artemis training session available', html }
+}
+
+export function generateArtemisBookingConfirmationEmail(params: {
+  firstName: string
+  sessionTitle: string
+  startTime: Date
+  endTime: Date
+  meetingUrl: string
+  portalTrainingUrl: string
+}): { subject: string; html: string } {
+  const when = formatEtDateTime(params.startTime)
+  const html = artemisEmailShell(
+    'Artemis training booked',
+    `<p>Hi ${params.firstName},</p>
+     <p>You are booked for <strong>${params.sessionTitle}</strong> on <strong>${when}</strong>.</p>
+     <p><a href="${params.meetingUrl}">Join meeting</a> · <a href="${params.portalTrainingUrl}">Training portal</a></p>
+     <p>A calendar invite is attached to this email.</p>`
+  )
+  return { subject: `Confirmed: ${params.sessionTitle}`, html }
+}
+
+export function generateArtemisCompletionEmail(params: {
+  firstName: string
+  completedAt: Date
+  trainerName: string | null
+  profileUrl: string
+}): { subject: string; html: string } {
+  const when = formatEtDateTime(params.completedAt)
+  const trainer = params.trainerName ? ` with ${params.trainerName}` : ''
+  const html = artemisEmailShell(
+    'Artemis training complete',
+    `<p>Hi ${params.firstName},</p>
+     <p>Your Artemis training was marked complete on <strong>${when}</strong>${trainer}.</p>
+     <p><a href="${params.profileUrl}">Go to your dashboard</a></p>`
+  )
+  return { subject: 'Artemis training complete — welcome aboard', html }
+}
+
+export function generateArtemisReminderEmail(params: {
+  firstName: string
+  sessionTitle: string
+  startTime: Date
+  meetingUrl: string
+}): { subject: string; html: string } {
+  const when = formatEtDateTime(params.startTime)
+  const html = artemisEmailShell(
+    'Artemis training tomorrow',
+    `<p>Hi ${params.firstName},</p>
+     <p>Reminder: <strong>${params.sessionTitle}</strong> is tomorrow at <strong>${when}</strong>.</p>
+     <p><a href="${params.meetingUrl}">Join meeting</a></p>`
+  )
+  return { subject: `Reminder: ${params.sessionTitle} tomorrow`, html }
+}
+
+export function generateArtemisStaleReminderEmail(params: {
+  firstName: string
+  trainingUrl: string
+}): { subject: string; html: string } {
+  const html = artemisEmailShell(
+    'Complete your Artemis training',
+    `<p>Hi ${params.firstName},</p>
+     <p>Please book your required Artemis training session as soon as possible.</p>
+     <p><a href="${params.trainingUrl}" style="color:#e36f1e;font-weight:700;">Book training</a></p>`
+  )
+  return { subject: 'Reminder: book your Artemis training', html }
+}
+
+export function generateArtemisSessionCancelledEmail(params: {
+  firstName: string
+  sessionTitle: string
+  sessionDate: string
+  reason: string
+  alternativesHtml: string
+  portalUrl: string
+}): { subject: string; html: string } {
+  const html = artemisEmailShell(
+    'Artemis session cancelled',
+    `<p>Hi ${params.firstName},</p>
+     <p><strong>${params.sessionTitle}</strong> on ${params.sessionDate} was cancelled.</p>
+     <p>${params.reason}</p>
+     <p>Other open sessions:</p>
+     ${params.alternativesHtml}
+     <p><a href="${params.portalUrl}">Book another session</a></p>`
+  )
+  return { subject: `Cancelled: ${params.sessionTitle}`, html }
 }

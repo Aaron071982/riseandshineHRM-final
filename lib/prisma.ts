@@ -23,10 +23,8 @@ function logConnectionInfo(databaseUrl: string) {
       nodeEnv: process.env.NODE_ENV,
       timestamp: new Date().toISOString(),
     }
-    console.log('[Prisma] Connection configuration:', JSON.stringify(connectionInfo, null, 2))
   } catch (error) {
     // If URL parsing fails, just log that we have a URL
-    console.log('[Prisma] DATABASE_URL is set but could not parse URL structure')
   }
 }
 

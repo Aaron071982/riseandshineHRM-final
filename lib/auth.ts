@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { prisma } from './prisma'
 import crypto from 'crypto'
+import { isSuperAdminEmail } from './constants'
 
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
 
@@ -15,6 +16,7 @@ export type SessionUserRole =
   | 'MARKETING'
   | 'CALL_CENTER'
   | 'DEV'
+  | 'TRAINER'
 
 export interface SessionUser {
   id: string
@@ -60,6 +62,7 @@ const VALID_ROLES: SessionUserRole[] = [
   'MARKETING',
   'CALL_CENTER',
   'DEV',
+  'TRAINER',
 ]
 function normalizeRole(role: string | null | undefined): SessionUserRole | null {
   const r = (role ?? '').toUpperCase()
@@ -149,8 +152,6 @@ export async function validateSession(token: string): Promise<SessionUser | null
       rbtProfileId: null,
     }
   }
-  const log = (msg: string, data?: object) =>
-    console.log('[auth][validateSession]', msg, data ?? '')
 
   try {
     let session: Awaited<ReturnType<typeof prisma.session.findUnique>> = null
@@ -168,10 +169,6 @@ export async function validateSession(token: string): Promise<SessionUser | null
     } catch (err: unknown) {
       const msg = (err as Error)?.message ?? ''
       const code = (err as { code?: string })?.code
-      log('session lookup error, will retry without rbtProfile', {
-        prismaCode: code,
-        message: msg.slice(0, 180),
-      })
       if (msg.includes('rbt_profiles') || code === 'P2010') {
         try {
           session = await prisma.session.findUnique({
@@ -179,21 +176,17 @@ export async function validateSession(token: string): Promise<SessionUser | null
             include: { user: true },
           })
         } catch {
-          log('fallback session lookup failed, trying raw SQL')
           return validateSessionRawSql(token)
         }
       } else {
-        log('session lookup failed, trying raw SQL', { message: msg.slice(0, 120) })
         return validateSessionRawSql(token)
       }
     }
 
     if (!session) {
-      log('no session found for token')
       return null
     }
     if (session.expiresAt < new Date()) {
-      log('session expired', { expiresAt: session.expiresAt.toISOString() })
       return null
     }
     type SessionWithUser = typeof session & {
@@ -203,10 +196,8 @@ export async function validateSession(token: string): Promise<SessionUser | null
     const { user } = sessionWithUser
     const role = normalizeRole(user.role)
     if (!role) {
-      log('invalid role', { role: user.role })
       return null
     }
-    log('valid', { userId: user.id, role })
     return attachRbtProfileIdIfNeeded({
       id: user.id,
       phoneNumber: user.phoneNumber,
@@ -216,7 +207,6 @@ export async function validateSession(token: string): Promise<SessionUser | null
       rbtProfileId: user.rbtProfile?.id ?? null,
     })
   } catch (err: unknown) {
-    log('validateSession threw, using raw SQL', { message: (err as Error)?.message?.slice(0, 120) })
     return validateSessionRawSql(token)
   }
 }
@@ -237,33 +227,11 @@ export async function cleanupExpiredSessions(): Promise<void> {
   })
 }
 
-export function isSuperAdmin(email: string | null | undefined): boolean {
-  const superAdmins = ['aaronsiam21@gmail.com', 'kazi@siyam.nyc']
-  return !!email && superAdmins.includes(email.toLowerCase())
-}
+export { isSuperAdminEmail as isSuperAdmin } from '@/lib/constants'
 
 /** Use for route guards so role casing or edge cases never cause false 403. */
 export function isAdmin(user: SessionUser | null): user is SessionUser {
   return !!user && (user.role ?? '').toUpperCase() === 'ADMIN'
-}
-
-/** Client Management: any admin may access (nav + APIs gated like other admin routes). */
-export function isClientManagerAdmin(user: SessionUser | null): boolean {
-  return isAdmin(user)
-}
-
-export async function resolveClientManagerAccess(user: SessionUser | null): Promise<boolean> {
-  return isAdmin(user)
-}
-
-/**
- * Client Management API routes: same as `requireAdminSession` (admin role only).
- */
-export async function requireClientManagerSession(): Promise<
-  | { user: SessionUser; response: null }
-  | { user: null; response: NextResponse }
-> {
-  return requireAdminSession()
 }
 
 /** Get current session user from cookies (for use in server/API context). */
@@ -293,6 +261,65 @@ export async function requireAdminSession(): Promise<
     return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   }
   if (!isAdmin(user)) {
+    return { user: null, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+  return { user, response: null }
+}
+
+/** Artemis training portal: admins and trainer-role users. */
+export function canAccessTrainingPortal(user: SessionUser | null): boolean {
+  if (!user) return false
+  const role = (user.role ?? '').toUpperCase()
+  return role === 'ADMIN' || role === 'TRAINER'
+}
+
+/** Can manage Artemis sessions, attendance, and trainee outreach. */
+export function isTrainingManager(user: SessionUser | null): boolean {
+  if (!user) return false
+  if ((user.role ?? '').toUpperCase() === 'TRAINER') return true
+  return isAdmin(user)
+}
+
+/** Super admins may mark Artemis complete without attending a session. */
+export function canOverrideTrainingRequirement(user: SessionUser | null): boolean {
+  if (!user) return false
+  return isSuperAdminEmail(user.email)
+}
+
+export async function requireTrainingPortalSession(): Promise<
+  | { user: SessionUser; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const cookieStore = await cookies()
+  const sessionToken = cookieStore.get('session')?.value
+  if (!sessionToken) {
+    return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+  const user = await validateSession(sessionToken)
+  if (!user) {
+    return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+  if (!canAccessTrainingPortal(user)) {
+    return { user: null, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+  return { user, response: null }
+}
+
+export async function requireRbtSession(): Promise<
+  | { user: SessionUser; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const cookieStore = await cookies()
+  const sessionToken = cookieStore.get('session')?.value
+  if (!sessionToken) {
+    return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+  const user = await validateSession(sessionToken)
+  if (!user) {
+    return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+  const role = (user.role ?? '').toUpperCase()
+  if ((role !== 'RBT' && role !== 'CANDIDATE') || !user.rbtProfileId) {
     return { user: null, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
   }
   return { user, response: null }

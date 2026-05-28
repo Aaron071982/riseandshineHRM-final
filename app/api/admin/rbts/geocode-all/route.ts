@@ -46,9 +46,6 @@ export async function POST() {
       const isFirstThree = attemptIndex <= 3
       const debugLog = isFirstThree
         ? (format: string, url: string, response: unknown, failureReason?: string) => {
-            console.log('[geocode-all] attempt', attemptIndex, 'format', format, 'URL', url)
-            console.log('[geocode-all] attempt', attemptIndex, 'response', JSON.stringify(response)?.slice(0, 500))
-            if (failureReason) console.log('[geocode-all] attempt', attemptIndex, 'failure', failureReason)
           }
         : undefined
 
@@ -68,11 +65,9 @@ export async function POST() {
           data: { latitude: result.lat, longitude: result.lng },
         })
         geocoded++
-        console.log('[geocode-all] geocoded', p.firstName, p.lastName, 'format:', result.formatUsed)
       } else {
         failed++
         failedNames.push(`${p.firstName} ${p.lastName}`)
-        console.log('[geocode-all] failed', p.firstName, p.lastName, 'all formats failed or out of US bounds')
       }
     }
 

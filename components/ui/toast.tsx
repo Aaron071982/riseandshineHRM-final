@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react'
+import { useState, useCallback, useMemo, createContext, useContext, ReactNode } from 'react'
 import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,25 +22,30 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined)
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
-  const showToast = (message: string, type: ToastType = 'info', duration: number = 4000) => {
-    const id = Math.random().toString(36).substring(7)
-    const newToast: Toast = { id, message, type, duration }
-    
-    setToasts((prev) => [...prev, newToast])
-
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id)
-      }, duration)
-    }
-  }
-
-  const removeToast = (id: string) => {
+  const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id))
-  }
+  }, [])
+
+  const showToast = useCallback(
+    (message: string, type: ToastType = 'info', duration: number = 4000) => {
+      const id = Math.random().toString(36).substring(7)
+      const newToast: Toast = { id, message, type, duration }
+
+      setToasts((prev) => [...prev, newToast])
+
+      if (duration > 0) {
+        setTimeout(() => {
+          removeToast(id)
+        }, duration)
+      }
+    },
+    [removeToast]
+  )
+
+  const contextValue = useMemo(() => ({ showToast }), [showToast])
 
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 w-full max-w-sm">
         {toasts.map((toast) => (

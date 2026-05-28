@@ -41,7 +41,6 @@ export async function GET() {
       })
     } catch (e) {
       if (isPrismaOrSchemaError(e)) {
-        console.warn('[rbt/messages] GET: rbt_messages inaccessible:', (e as Error)?.message)
         return NextResponse.json({ messages: [], unreadFromAdmin: 0 })
       }
       throw e
@@ -135,7 +134,6 @@ export async function POST(request: NextRequest) {
         }).catch(() => {})
       }
     } catch (notifyErr) {
-      console.warn('[rbt/messages] POST: admin notifications skipped', notifyErr)
     }
 
     return NextResponse.json({

@@ -1,11 +1,14 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, XCircle, FileText, Download } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import { getAcknowledgmentAdminSummary } from '@/lib/acknowledgment-admin-summary'
+import { ONBOARDING_CATALOG, RBT_VISIBLE_STEPS } from '@/lib/onboarding/catalog'
+import AcknowledgmentAuditPanel from '@/components/admin/AcknowledgmentAuditPanel'
 import type { RBTProfile } from './types'
 
 type ToastFn = (message: string, type: 'success' | 'error') => void
@@ -13,19 +16,94 @@ type ToastFn = (message: string, type: 'success' | 'error') => void
 interface RBTProfileOnboardingProps {
   rbtProfile: RBTProfile
   showToast: ToastFn
+  backgroundCheckClearedAt?: string | null
+  supervisionCountersignedAt?: string | null
 }
 
-export default function RBTProfileOnboarding({ rbtProfile, showToast }: RBTProfileOnboardingProps) {
+export default function RBTProfileOnboarding({
+  rbtProfile,
+  showToast,
+  backgroundCheckClearedAt,
+  supervisionCountersignedAt,
+}: RBTProfileOnboardingProps) {
   const isHired = rbtProfile.status === 'HIRED'
   if (!isHired) return null
 
-  const completedOnboardingTasks = rbtProfile.onboardingTasks.filter((t) => t.isCompleted).length
-  const totalOnboardingTasks = rbtProfile.onboardingTasks.length
-  const filteredTasks = rbtProfile.onboardingTasks.filter(
-    (task) =>
-      !task.title?.toLowerCase().includes('download onboarding documents folder') &&
-      !task.documentDownloadUrl?.includes('onboarding-package')
-  )
+  const [serverProgress, setServerProgress] = useState<{
+    completedCount: number
+    totalRbtSteps: number
+    tierACompleted: number
+    tierATotal: number
+    backgroundCheckClearedAt: string | null
+    supervisionCountersignedAt: string | null
+  } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/admin/rbts/${rbtProfile.id}/onboarding-progress`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data.completedCount != null) {
+          setServerProgress({
+            completedCount: data.completedCount,
+            totalRbtSteps: data.totalRbtSteps,
+            tierACompleted: data.tierACompleted,
+            tierATotal: data.tierATotal,
+            backgroundCheckClearedAt: data.backgroundCheckClearedAt ?? null,
+            supervisionCountersignedAt: data.supervisionCountersignedAt ?? null,
+          })
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [rbtProfile.id])
+
+  const bgClearedAt = backgroundCheckClearedAt ?? serverProgress?.backgroundCheckClearedAt ?? null
+  const supCountersignedAt =
+    supervisionCountersignedAt ?? serverProgress?.supervisionCountersignedAt ?? null
+
+  const completions = useMemo(() => {
+    const slugToStep = new Map(
+      ONBOARDING_CATALOG.filter((e) => e.stepNumber != null).map((e) => [e.slug, e.stepNumber!])
+    )
+    const list = (rbtProfile.onboardingCompletions ?? []).map((c) => {
+      const step =
+        c.document.stepNumber ??
+        (c.document.slug ? slugToStep.get(c.document.slug) : undefined) ??
+        null
+      return {
+        ...c,
+        document: { ...c.document, stepNumber: step },
+      }
+    })
+    const rbtOnly = list.filter((c) => {
+      const step = c.document.stepNumber
+      if (step == null) return true
+      return step <= RBT_VISIBLE_STEPS
+    })
+    return [...rbtOnly].sort((a, b) => {
+      const sa = a.document.stepNumber ?? 999
+      const sb = b.document.stepNumber ?? 999
+      return sa - sb
+    })
+  }, [rbtProfile.onboardingCompletions])
+
+  const isStepComplete = (c: (typeof completions)[0]) => {
+    if (c.status === 'COMPLETED') return true
+    const slug = c.document.slug
+    if (slug === 'background-check-cleared' && bgClearedAt) return true
+    if (slug === 'supervision-countersigned' && supCountersignedAt) return true
+    return false
+  }
+
+  const completedCount =
+    serverProgress?.completedCount ??
+    completions.filter((c) => isStepComplete(c)).length
+  const totalCount = serverProgress?.totalRbtSteps ?? RBT_VISIBLE_STEPS
+  const progressPct =
+    totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   const handleDownloadSsnTask = async (taskId: string) => {
     try {
@@ -82,12 +160,23 @@ export default function RBTProfileOnboarding({ rbtProfile, showToast }: RBTProfi
     }
   }
 
+  const legacySsnTasks = rbtProfile.onboardingTasks.filter(
+    (task) =>
+      task.taskType === 'SOCIAL_SECURITY_DOCUMENT' &&
+      task.isCompleted &&
+      !task.title?.toLowerCase().includes('download onboarding documents folder')
+  )
+
   return (
     <>
-      {/* Onboarding Progress */}
       <Card className="border-2 border-gray-200 dark:border-[var(--border-subtle)] dark:bg-[var(--bg-elevated)]">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Onboarding Progress</CardTitle>
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
+            Onboarding Progress
+          </CardTitle>
+          <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)]">
+            Based on catalog document completions (same as the list below)
+          </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -95,120 +184,111 @@ export default function RBTProfileOnboarding({ rbtProfile, showToast }: RBTProfi
               <div className="flex justify-between text-sm">
                 <span className="font-medium dark:text-[var(--text-tertiary)]">Overall Progress</span>
                 <span className="font-bold dark:text-[var(--text-primary)]">
-                  {completedOnboardingTasks} / {totalOnboardingTasks} tasks completed
+                  {completedCount} / {totalCount} steps completed
                 </span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-[var(--bg-input)] rounded-full h-4 overflow-hidden">
                 <div
                   className={`h-4 rounded-full transition-all ${
-                    totalOnboardingTasks > 0 && (completedOnboardingTasks / totalOnboardingTasks) * 100 === 100
-                      ? 'bg-green-500'
-                      : 'bg-orange-600'
+                    progressPct === 100 ? 'bg-green-500' : 'bg-orange-600'
                   }`}
-                  style={{
-                    width: `${totalOnboardingTasks > 0 ? (completedOnboardingTasks / totalOnboardingTasks) * 100 : 0}%`,
-                  }}
+                  style={{ width: `${progressPct}%` }}
                 />
               </div>
               <div className="text-sm text-gray-600 dark:text-[var(--text-disabled)]">
-                {totalOnboardingTasks > 0 ? Math.round((completedOnboardingTasks / totalOnboardingTasks) * 100) : 0}% complete
+                {progressPct}% complete
+                {serverProgress ? (
+                  <span className="block text-xs mt-0.5">
+                    Tier A: {serverProgress.tierACompleted}/{serverProgress.tierATotal}
+                  </span>
+                ) : null}
               </div>
             </div>
 
-            <div className="space-y-3 mt-6">
-              <h3 className="font-semibold text-gray-900 dark:text-[var(--text-primary)]">Tasks</h3>
-              {filteredTasks.map((task) => (
-                <div key={task.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-elevated)]">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        {task.isCompleted ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500 dark:text-[var(--status-hired-text)]" />
-                        ) : (
-                          <XCircle className="w-5 h-5 text-gray-400 dark:text-[var(--text-disabled)]" />
-                        )}
-                        <h4 className="font-medium dark:text-[var(--text-primary)]">{task.title}</h4>
-                      </div>
-                      {task.description && (
-                        <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1 ml-7">{task.description}</p>
-                      )}
-                      {task.isCompleted && task.completedAt && (
-                        <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-1 ml-7">
-                          Completed: {formatDateTime(task.completedAt)}
-                        </p>
-                      )}
-                    </div>
-                    <Badge
-                      className={
-                        task.isCompleted
-                          ? 'bg-green-100 text-green-700 dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)]'
-                          : 'bg-gray-100 text-gray-600 dark:bg-[var(--bg-elevated)] dark:text-[var(--text-tertiary)]'
-                      }
+            {completions.length > 0 && (
+              <div className="space-y-3 mt-6">
+                <h3 className="font-semibold text-gray-900 dark:text-[var(--text-primary)]">Steps</h3>
+                {completions.map((completion) => {
+                  const step = (completion.document as { stepNumber?: number | null }).stepNumber
+                  return (
+                    <div
+                      key={completion.id}
+                      className="border dark:border-[var(--border-subtle)] rounded-lg p-3 dark:bg-[var(--bg-elevated)] flex items-center justify-between gap-2"
                     >
-                      {task.isCompleted ? 'Completed' : 'Pending'}
-                    </Badge>
-                  </div>
-                  {task.taskType === 'SIGNATURE' && task.isCompleted && task.uploadUrl && (
-                    <div className="mt-4 ml-7 p-4 bg-gray-50 dark:bg-[var(--bg-input)] rounded-lg">
-                      <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)] mb-2">Digital Signature:</p>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={task.uploadUrl}
-                        alt="Signature"
-                        className="max-w-md border border-gray-300 dark:border-[var(--border-subtle)] rounded bg-white dark:bg-[var(--bg-elevated)] p-2"
-                      />
-                    </div>
-                  )}
-                  {task.taskType === 'PACKAGE_UPLOAD' && task.isCompleted && task.uploadUrl && (
-                    <div className="mt-4 ml-7 p-4 bg-gray-50 dark:bg-[var(--bg-input)] rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <FileText className="w-5 h-5 text-green-600 dark:text-[var(--status-hired-text)]" />
-                        <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">Uploaded Package:</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {isStepComplete(completion) ? (
+                          <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-gray-400 shrink-0" />
+                        )}
+                        <span className="text-sm font-medium truncate dark:text-[var(--text-primary)]">
+                          {step != null ? `Step ${step}: ` : ''}
+                          {completion.document.title}
+                        </span>
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)]">
-                        Package uploaded and sent to administrator email
-                      </p>
-                    </div>
-                  )}
-                  {task.taskType === 'SOCIAL_SECURITY_DOCUMENT' && task.isCompleted && (
-                    <div className="mt-4 ml-7 flex flex-wrap items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex items-center gap-2 dark:border-[var(--border-subtle)]"
-                        onClick={() => handleDownloadSsnTask(task.id)}
+                      <Badge
+                        className={
+                          completion.status === 'COMPLETED'
+                            ? 'bg-green-100 text-green-700 shrink-0'
+                            : 'bg-gray-100 text-gray-600 shrink-0'
+                        }
                       >
-                        <Download className="w-4 h-4" />
-                        Download Social Security card
-                      </Button>
-                      <p className="text-xs text-gray-500 dark:text-[var(--text-tertiary)] w-full">
-                        Stored securely; handle per your data policy.
-                      </p>
+                        {isStepComplete(completion)
+                          ? 'Completed'
+                          : completion.status === 'IN_PROGRESS'
+                            ? 'In progress'
+                            : 'Not started'}
+                      </Badge>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {legacySsnTasks.length > 0 && (
+              <div className="space-y-2 pt-4 border-t dark:border-[var(--border-subtle)]">
+                <h3 className="font-semibold text-sm text-gray-700 dark:text-[var(--text-secondary)]">
+                  Legacy uploads
+                </h3>
+                {legacySsnTasks.map((task) => (
+                  <Button
+                    key={task.id}
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDownloadSsnTask(task.id)}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download SSN card
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Onboarding Documents */}
       <Card className="border-2 border-gray-200 dark:border-[var(--border-subtle)] dark:bg-[var(--bg-elevated)]">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Onboarding Documents</CardTitle>
-          <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1">Acknowledgment and fillable PDF completions</p>
+          <CardTitle className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
+            Onboarding Documents
+          </CardTitle>
+          <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] mt-1">
+            Acknowledgment and fillable PDF completions
+          </p>
         </CardHeader>
         <CardContent>
-          {!rbtProfile.onboardingCompletions || rbtProfile.onboardingCompletions.length === 0 ? (
+          {completions.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-[var(--text-tertiary)]">
               <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-[var(--text-disabled)]" />
               <p className="text-sm">No onboarding documents completed yet</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {rbtProfile.onboardingCompletions.map((completion) => (
-                <div key={completion.id} className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-elevated)]">
+              {completions.map((completion) => (
+                <div
+                  key={completion.id}
+                  className="border dark:border-[var(--border-subtle)] rounded-lg p-4 dark:bg-[var(--bg-elevated)]"
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -219,8 +299,10 @@ export default function RBTProfileOnboarding({ rbtProfile, showToast }: RBTProfi
                         ) : (
                           <XCircle className="w-5 h-5 text-gray-400 dark:text-[var(--text-disabled)]" />
                         )}
-                        <h4 className="font-medium dark:text-[var(--text-primary)]">{completion.document.title}</h4>
-                        <Badge variant="outline" className="ml-2 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)]">
+                        <h4 className="font-medium dark:text-[var(--text-primary)]">
+                          {completion.document.title}
+                        </h4>
+                        <Badge variant="outline" className="ml-2 dark:border-[var(--border-subtle)]">
                           {completion.document.type === 'ACKNOWLEDGMENT' ? 'Acknowledgment' : 'Fillable PDF'}
                         </Badge>
                       </div>
@@ -230,80 +312,64 @@ export default function RBTProfileOnboarding({ rbtProfile, showToast }: RBTProfi
                         </p>
                       )}
                       {completion.document.type === 'ACKNOWLEDGMENT' &&
-                        completion.status === 'COMPLETED' &&
-                        (() => {
-                          const { topic, attestation } = getAcknowledgmentAdminSummary({
-                            documentTitle: completion.document.title,
-                            documentSlug: completion.document.slug,
-                            acknowledgmentJson: completion.acknowledgmentJson,
-                          })
-                          return (
-                            <div className="mt-3 ml-7 rounded-md border border-gray-200 dark:border-[var(--border-subtle)] bg-gray-50/80 dark:bg-[var(--bg-input)] p-3 space-y-2">
-                              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-[var(--text-disabled)]">
-                                Acknowledgment summary
-                              </p>
-                              <p className="text-sm text-gray-700 dark:text-[var(--text-secondary)] leading-snug">
-                                <span className="font-medium text-gray-800 dark:text-[var(--text-primary)]">
-                                  What they reviewed:{' '}
-                                </span>
-                                {topic}
-                              </p>
-                              <p className="text-sm text-gray-700 dark:text-[var(--text-secondary)] leading-snug">
-                                <span className="font-medium text-gray-800 dark:text-[var(--text-primary)]">
-                                  What they agreed to:{' '}
-                                </span>
-                                {attestation}
-                              </p>
+                        completion.status === 'COMPLETED' && (
+                          <>
+                            {(() => {
+                              const { topic, attestation } = getAcknowledgmentAdminSummary({
+                                documentTitle: completion.document.title,
+                                documentSlug: completion.document.slug,
+                                acknowledgmentJson: completion.acknowledgmentJson,
+                              })
+                              return (
+                                <div className="mt-3 ml-7 rounded-md border border-gray-200 dark:border-[var(--border-subtle)] bg-gray-50/80 dark:bg-[var(--bg-input)] p-3 space-y-2">
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                    Acknowledgment summary
+                                  </p>
+                                  <p className="text-sm text-gray-700 dark:text-[var(--text-secondary)]">
+                                    <span className="font-medium">What they reviewed: </span>
+                                    {topic}
+                                  </p>
+                                  <p className="text-sm text-gray-700 dark:text-[var(--text-secondary)]">
+                                    <span className="font-medium">What they agreed to: </span>
+                                    {attestation}
+                                  </p>
+                                </div>
+                              )
+                            })()}
+                            <div className="ml-7">
+                              <AcknowledgmentAuditPanel
+                                completion={completion}
+                                documentTitle={completion.document.title}
+                              />
                             </div>
-                          )
-                        })()}
+                          </>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge
                         className={
                           completion.status === 'COMPLETED'
-                            ? 'bg-green-100 text-green-700 dark:bg-[var(--status-hired-bg)] dark:text-[var(--status-hired-text)]'
+                            ? 'bg-green-100 text-green-700'
                             : completion.status === 'IN_PROGRESS'
-                              ? 'bg-yellow-100 text-yellow-700 dark:bg-[var(--status-warning-bg)] dark:text-[var(--status-warning-text)]'
-                              : 'bg-gray-100 text-gray-600 dark:bg-[var(--bg-elevated)] dark:text-[var(--text-tertiary)]'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-gray-100 text-gray-600'
                         }
                       >
-                        {completion.status === 'COMPLETED' ? 'Completed' : completion.status === 'IN_PROGRESS' ? 'In Progress' : 'Not Started'}
+                        {completion.status === 'COMPLETED'
+                          ? 'Completed'
+                          : completion.status === 'IN_PROGRESS'
+                            ? 'In Progress'
+                            : 'Not Started'}
                       </Badge>
-                      {completion.status === 'COMPLETED' && (
-                        <>
-                          {completion.document.type === 'FILLABLE_PDF' ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex items-center gap-2 dark:border-[var(--border-subtle)] dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)]"
-                              onClick={() => handleDownloadCompletion(completion.id, completion.document.title)}
-                            >
-                              <Download className="w-4 h-4" />
-                              Download PDF
-                            </Button>
-                          ) : (
-                            completion.acknowledgmentJson &&
-                            (completion.acknowledgmentJson as { signatureData?: string; typedName?: string }).signatureData != null && (
-                              <div className="flex flex-col gap-2">
-                                <div className="border dark:border-[var(--border-subtle)] rounded p-2 bg-gray-50 dark:bg-[var(--bg-input)]">
-                                  <p className="text-xs text-gray-600 dark:text-[var(--text-tertiary)] mb-1">Signature:</p>
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={(completion.acknowledgmentJson as { signatureData: string }).signatureData}
-                                    alt="Signature"
-                                    className="max-w-[200px] max-h-[80px] border rounded"
-                                  />
-                                </div>
-                                {(completion.acknowledgmentJson as { typedName?: string }).typedName && (
-                                  <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
-                                    Signed: {(completion.acknowledgmentJson as { typedName: string }).typedName}
-                                  </p>
-                                )}
-                              </div>
-                            )
-                          )}
-                        </>
+                      {completion.status === 'COMPLETED' && completion.document.type === 'FILLABLE_PDF' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDownloadCompletion(completion.id, completion.document.title)}
+                        >
+                          <Download className="w-4 h-4" />
+                          Download PDF
+                        </Button>
                       )}
                     </div>
                   </div>
