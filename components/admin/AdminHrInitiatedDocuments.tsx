@@ -30,6 +30,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfileId: string }) {
   const { showToast } = useToast()
   const [tasks, setTasks] = useState<HrTaskRow[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedSlug, setExpandedSlug] = useState<string | null>(LS54_SLUG)
   const [hourlyRate, setHourlyRate] = useState('')
@@ -42,18 +43,25 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await fetch(`/api/admin/rbts/${rbtProfileId}/hr-documents`, {
         credentials: 'include',
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        showToast(data.error || 'Failed to load HR documents', 'error')
+        const msg = data.error || 'Failed to load HR documents'
+        setLoadError(msg)
+        setTasks([])
+        showToast(msg, 'error')
         return
       }
       setTasks(data.tasks ?? [])
     } catch {
-      showToast('Failed to load HR documents', 'error')
+      const msg = 'Failed to load HR documents'
+      setLoadError(msg)
+      setTasks([])
+      showToast(msg, 'error')
     } finally {
       setLoading(false)
     }
@@ -124,6 +132,14 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
         {loading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-[#e36f1e]" />
+          </div>
+        ) : loadError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 p-4 text-sm text-red-800 dark:text-red-200">
+            <p className="font-medium">Could not load HR documents</p>
+            <p className="mt-1">{loadError}</p>
+            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => load()}>
+              Retry
+            </Button>
           </div>
         ) : tasks.length === 0 ? (
           <p className="text-sm text-gray-500">No HR-initiated document tasks for this RBT.</p>

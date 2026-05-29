@@ -6,6 +6,59 @@ import { ONBOARDING_CATALOG } from '@/lib/onboarding/catalog'
 
 const PDF_FOLDER = join(process.cwd(), 'onboarding-documents')
 
+const HR_TASK_BASE_SELECT = {
+  id: true,
+  documentType: true,
+  status: true,
+  hrFileUrl: true,
+  hrUploadedAt: true,
+  btFileUrl: true,
+  notes: true,
+} as const
+
+export type HrDocumentTaskRow = {
+  id: string
+  documentType: string
+  status: string
+  hrFileUrl: string | null
+  hrUploadedAt: Date | null
+  btFileUrl: string | null
+  notes: string | null
+  emailSent?: boolean
+  emailSentAt?: Date | null
+}
+
+function isMissingEmailColumnError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return (
+    msg.includes('email_sent') ||
+    msg.includes('emailSent') ||
+    msg.includes('column') && msg.includes('does not exist')
+  )
+}
+
+/** Load HR tasks; works before email_sent / email_sent_at columns are migrated. */
+export async function listHrDocumentTasksForRbt(rbtProfileId: string): Promise<HrDocumentTaskRow[]> {
+  try {
+    return await prisma.hRDocumentTask.findMany({
+      where: { rbtProfileId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        ...HR_TASK_BASE_SELECT,
+        emailSent: true,
+        emailSentAt: true,
+      },
+    })
+  } catch (err) {
+    if (!isMissingEmailColumnError(err)) throw err
+    return prisma.hRDocumentTask.findMany({
+      where: { rbtProfileId },
+      orderBy: { createdAt: 'asc' },
+      select: HR_TASK_BASE_SELECT,
+    })
+  }
+}
+
 /** Create HR document tasks for each HR_INITIATED catalog step. */
 export async function ensureHrDocumentTasksForRbt(rbtProfileId: string): Promise<void> {
   const slugs = ONBOARDING_CATALOG.filter((e) => e.category === 'HR_INITIATED').map((e) => e.slug)

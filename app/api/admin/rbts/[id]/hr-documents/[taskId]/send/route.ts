@@ -154,10 +154,14 @@ export async function POST(
     )
     const sent = await sendGenericEmail(profile.email.trim(), subject, html)
     if (sent) {
-      updated = await prisma.hRDocumentTask.update({
-        where: { id: taskId },
-        data: { emailSent: true, emailSentAt: new Date() },
-      })
+      try {
+        updated = await prisma.hRDocumentTask.update({
+          where: { id: taskId },
+          data: { emailSent: true, emailSentAt: new Date() },
+        })
+      } catch (emailColErr) {
+        console.error('[hr-documents/send] emailSent columns may be missing', emailColErr)
+      }
     } else {
       console.error('[hr-documents/send] notify email failed', {
         rbtProfileId,
@@ -172,8 +176,11 @@ export async function POST(
 
   return NextResponse.json({
     hrTask: updated,
-    emailSent: updated.emailSent,
-    emailSentAt: updated.emailSentAt?.toISOString() ?? null,
+    emailSent: 'emailSent' in updated ? Boolean(updated.emailSent) : false,
+    emailSentAt:
+      'emailSentAt' in updated && updated.emailSentAt
+        ? updated.emailSentAt.toISOString()
+        : null,
     ...(emailWarning ? { emailWarning } : {}),
   })
 }
