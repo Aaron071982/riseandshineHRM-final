@@ -18,6 +18,15 @@ function getDateRange(range: RangeKey): { start: Date | null; end: Date; prevSta
   return { start, end, prevStart, prevEnd }
 }
 
+function formatEthnicityLabel(ethnicity: string | null | undefined): string {
+  if (!ethnicity?.trim()) return 'Unknown'
+  return ethnicity
+    .trim()
+    .split('_')
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
 export async function GET(request: NextRequest) {
   const auth = await requireAdminSession()
   if (auth.response) return auth.response
@@ -259,10 +268,11 @@ export async function GET(request: NextRequest) {
     // ---- Hired RBT demographics: city + gender (all-time, hired only) ----
     const hiredDemographics = await prisma.rBTProfile.findMany({
       where: { status: 'HIRED' },
-      select: { locationCity: true, gender: true },
+      select: { locationCity: true, gender: true, ethnicity: true },
     })
     const cityCounts = new Map<string, number>()
     const genderCounts = new Map<string, number>()
+    const ethnicityCounts = new Map<string, number>()
     for (const r of hiredDemographics) {
       const cityRaw = r.locationCity?.trim()
       const cityLabel = cityRaw && cityRaw.length > 0 ? cityRaw : 'Unknown'
@@ -270,6 +280,8 @@ export async function GET(request: NextRequest) {
       const gRaw = r.gender?.trim()
       const genderLabel = gRaw && gRaw.length > 0 ? gRaw : 'Unknown'
       genderCounts.set(genderLabel, (genderCounts.get(genderLabel) ?? 0) + 1)
+      const ethnicityLabel = formatEthnicityLabel(r.ethnicity)
+      ethnicityCounts.set(ethnicityLabel, (ethnicityCounts.get(ethnicityLabel) ?? 0) + 1)
     }
     const rbtByCity = Array.from(cityCounts.entries())
       .map(([city, count]) => ({ city, count }))
@@ -283,14 +295,9 @@ export async function GET(request: NextRequest) {
       .map(([gender, count]) => ({ gender, count }))
       .sort((a, b) => b.count - a.count)
 
-    // ---- Source breakdown ----
-    const sourceCounts = await prisma.rBTProfile.groupBy({
-      by: ['source'],
-      _count: true,
-    })
-    const publicApplication = sourceCounts.find((s) => s.source === 'PUBLIC_APPLICATION')?._count ?? 0
-    const adminCreated = sourceCounts.find((s) => s.source === 'ADMIN_CREATED')?._count ?? 0
-    const sourceBreakdown = { publicApplication, adminCreated }
+    const rbtEthnicitySplit = Array.from(ethnicityCounts.entries())
+      .map(([ethnicity, count]) => ({ ethnicity, count }))
+      .sort((a, b) => b.count - a.count)
 
     // ---- Recent sign-ins (admin + RBT): one row per successful OTP session ----
     const recentSessionRows = await prisma.session.findMany({
@@ -380,7 +387,7 @@ export async function GET(request: NextRequest) {
       hiringActivity: { weeks },
       rbtByCity: rbtByCityChart,
       rbtGenderSplit,
-      sourceBreakdown,
+      rbtEthnicitySplit,
       recentSignIns,
       upcomingInterviews,
       onboardingAlerts: onboardingProgressList,

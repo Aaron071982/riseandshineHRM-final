@@ -23,9 +23,12 @@
 
 New `OnboardingDocumentCategory` fields extend the document catalog; do not remove `OnboardingTask` until migration plan is explicit.
 
-## Schema prepared (not migrated)
+## Production SQL (Supabase)
 
-- `OnboardingDocumentCategory`, extra fields on `OnboardingDocument`
-- `HRDocumentTask`, `EmployeeDocumentFolder`, `HRTaskStatus`, `FolderType`
+If **HR-Initiated Documents** shows “table is missing”, run:
 
-Run migration only after review.
+`prisma/scripts/create-hr-document-tasks-table.sql`
+
+If the table exists but **Send to RBT** email tracking fails, run:
+
+`prisma/scripts/add-hr-document-email-columns.sql`

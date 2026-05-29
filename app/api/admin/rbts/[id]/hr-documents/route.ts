@@ -3,6 +3,7 @@ import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   ensureHrDocumentTasksForRbt,
+  isMissingHrDocumentTasksTableError,
   listHrDocumentTasksForRbt,
 } from '@/lib/onboarding/hr-tasks'
 import { ONBOARDING_CATALOG } from '@/lib/onboarding/catalog'
@@ -54,13 +55,13 @@ export async function GET(
   } catch (err) {
     console.error('[hr-documents GET]', err)
     const message = err instanceof Error ? err.message : 'Unknown error'
-    const needsMigration =
-      message.includes('hr_document_tasks') && message.includes('does not exist')
+    const needsMigration = isMissingHrDocumentTasksTableError(err)
     return NextResponse.json(
       {
         error: needsMigration
-          ? 'HR document tasks table is missing. Run the onboarding database migration in Supabase.'
+          ? 'HR document tasks table is missing. In Supabase SQL Editor, run prisma/scripts/create-hr-document-tasks-table.sql from the repo, then click Retry.'
           : 'Failed to load HR documents',
+        code: needsMigration ? 'HR_DOCUMENT_TASKS_TABLE_MISSING' : undefined,
         details: process.env.NODE_ENV === 'development' ? message : undefined,
       },
       { status: 500 }

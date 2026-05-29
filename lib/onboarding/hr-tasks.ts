@@ -33,7 +33,15 @@ function isMissingEmailColumnError(err: unknown): boolean {
   return (
     msg.includes('email_sent') ||
     msg.includes('emailSent') ||
-    msg.includes('column') && msg.includes('does not exist')
+    (msg.includes('column') && msg.includes('does not exist'))
+  )
+}
+
+export function isMissingHrDocumentTasksTableError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return (
+    msg.includes('hr_document_tasks') &&
+    (msg.includes('does not exist') || msg.includes('relation') && msg.includes('not exist'))
   )
 }
 

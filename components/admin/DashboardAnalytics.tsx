@@ -63,7 +63,7 @@ interface DashboardData {
   hiringActivity: { weeks: { weekLabel: string; candidatesAdded: number; hires: number }[] }
   rbtByCity: { city: string; count: number }[]
   rbtGenderSplit: { gender: string; count: number }[]
-  sourceBreakdown: { publicApplication: number; adminCreated: number }
+  rbtEthnicitySplit: { ethnicity: string; count: number }[]
   recentSignIns: {
     id: string
     signedInAt: string
@@ -180,25 +180,26 @@ export default function DashboardAnalytics() {
     hiringActivity,
     rbtByCity,
     rbtGenderSplit,
-    sourceBreakdown,
+    rbtEthnicitySplit,
     recentSignIns,
     upcomingInterviews,
     onboardingAlerts,
     unclaimedTodayCount,
   } = data
 
-  const GENDER_PIE_COLORS = ['#f97316', '#94a3b8', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b']
+  const DEMO_PIE_COLORS = ['#f97316', '#94a3b8', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#64748b']
 
   const genderPieData = rbtGenderSplit.map((g, i) => ({
     name: g.gender,
     value: g.count,
-    color: GENDER_PIE_COLORS[i % GENDER_PIE_COLORS.length],
+    color: DEMO_PIE_COLORS[i % DEMO_PIE_COLORS.length],
   }))
 
-  const sourcePieData = [
-    { name: 'Public application', value: sourceBreakdown.publicApplication, color: '#f97316' },
-    { name: 'Admin created', value: sourceBreakdown.adminCreated, color: '#94a3b8' },
-  ].filter((d) => d.value > 0)
+  const ethnicityPieData = rbtEthnicitySplit.map((e, i) => ({
+    name: e.ethnicity,
+    value: e.count,
+    color: DEMO_PIE_COLORS[i % DEMO_PIE_COLORS.length],
+  }))
 
   return (
     <div className="space-y-6">
@@ -282,7 +283,7 @@ export default function DashboardAnalytics() {
         </Card>
       </div>
 
-      {/* Funnel + Source: 12-col grid */}
+      {/* Funnel + Ethnicity: 12-col grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <Card className="lg:col-span-7 shadow-sm">
           <CardHeader>
@@ -333,18 +334,18 @@ export default function DashboardAnalytics() {
         </Card>
         <Card className="lg:col-span-5 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Source Breakdown</CardTitle>
-            <CardDescription>Candidates by application source</CardDescription>
+            <CardTitle className="text-lg">Hired RBTs by ethnicity</CardTitle>
+            <CardDescription>Distribution across all hired RBTs</CardDescription>
           </CardHeader>
           <CardContent>
-            {sourcePieData.length === 0 ? (
-              <div className="h-64 flex items-center justify-center text-gray-500">No data</div>
+            {ethnicityPieData.length === 0 ? (
+              <div className="h-64 flex items-center justify-center text-gray-500">No hired RBTs yet</div>
             ) : (
               <div className="h-64 min-h-[200px] w-full">
-                <ResponsiveContainer width="100%" height="100%" minHeight={200}>
+                <ResponsiveContainer width="100%" height="100%" minHeight={200} minWidth={0}>
                   <PieChart>
                     <Pie
-                      data={sourcePieData}
+                      data={ethnicityPieData}
                       cx="50%"
                       cy="50%"
                       innerRadius={50}
@@ -354,8 +355,8 @@ export default function DashboardAnalytics() {
                       nameKey="name"
                       label={({ name, value }) => `${name}: ${value}`}
                     >
-                      {sourcePieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      {ethnicityPieData.map((entry, index) => (
+                        <Cell key={`ethnicity-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip />
@@ -464,7 +465,7 @@ export default function DashboardAnalytics() {
               <div className="h-64 flex items-center justify-center text-gray-500">No hired RBTs yet</div>
             ) : (
               <div className="h-72 min-h-[240px] w-full">
-                <ResponsiveContainer width="100%" height="100%" minHeight={240}>
+                <ResponsiveContainer width="100%" height="100%" minHeight={240} minWidth={0}>
                   <PieChart>
                     <Pie
                       data={genderPieData}
