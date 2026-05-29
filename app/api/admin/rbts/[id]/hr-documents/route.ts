@@ -3,6 +3,7 @@ import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   ensureHrDocumentTasksForRbt,
+  hrDocumentTasksTableExists,
   isMissingHrDocumentTasksTableError,
   listHrDocumentTasksForRbt,
 } from '@/lib/onboarding/hr-tasks'
@@ -26,6 +27,18 @@ export async function GET(
       select: { id: true, firstName: true, lastName: true },
     })
     if (!profile) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    const tableExists = await hrDocumentTasksTableExists()
+    if (!tableExists) {
+      return NextResponse.json(
+        {
+          error:
+            'Table hr_document_tasks was not found in the database this app uses. Run prisma/scripts/create-hr-document-tasks-table.sql in the same Supabase project as DATABASE_URL on Vercel, then Retry.',
+          code: 'HR_DOCUMENT_TASKS_TABLE_MISSING',
+        },
+        { status: 500 }
+      )
+    }
 
     await ensureHrDocumentTasksForRbt(rbtProfileId)
 
@@ -56,13 +69,22 @@ export async function GET(
     console.error('[hr-documents GET]', err)
     const message = err instanceof Error ? err.message : 'Unknown error'
     const needsMigration = isMissingHrDocumentTasksTableError(err)
+    const missingEmailCols =
+      message.includes('emailSent') || message.includes('email_sent')
+
     return NextResponse.json(
       {
         error: needsMigration
-          ? 'HR document tasks table is missing. In Supabase SQL Editor, run prisma/scripts/create-hr-document-tasks-table.sql from the repo, then click Retry.'
-          : 'Failed to load HR documents',
-        code: needsMigration ? 'HR_DOCUMENT_TASKS_TABLE_MISSING' : undefined,
-        details: process.env.NODE_ENV === 'development' ? message : undefined,
+          ? 'Table hr_document_tasks was not found in the database this app uses. Run prisma/scripts/create-hr-document-tasks-table.sql in the same Supabase project as DATABASE_URL on Vercel, then Retry.'
+          : missingEmailCols
+            ? 'HR documents table is missing email columns. Run prisma/scripts/add-hr-document-email-columns.sql in Supabase, then Retry.'
+            : 'Failed to load HR documents',
+        code: needsMigration
+          ? 'HR_DOCUMENT_TASKS_TABLE_MISSING'
+          : missingEmailCols
+            ? 'HR_DOCUMENT_TASKS_COLUMNS_MISSING'
+            : undefined,
+        details: message,
       },
       { status: 500 }
     )

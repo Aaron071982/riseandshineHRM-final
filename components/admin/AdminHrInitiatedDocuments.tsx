@@ -31,6 +31,7 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
   const { showToast } = useToast()
   const [tasks, setTasks] = useState<HrTaskRow[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadErrorDetails, setLoadErrorDetails] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedSlug, setExpandedSlug] = useState<string | null>(LS54_SLUG)
   const [hourlyRate, setHourlyRate] = useState('')
@@ -44,6 +45,7 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
   const load = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
+    setLoadErrorDetails(null)
     try {
       const res = await fetch(`/api/admin/rbts/${rbtProfileId}/hr-documents`, {
         credentials: 'include',
@@ -52,6 +54,7 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
       if (!res.ok) {
         const msg = data.error || 'Failed to load HR documents'
         setLoadError(msg)
+        setLoadErrorDetails(typeof data.details === 'string' ? data.details : null)
         setTasks([])
         showToast(msg, 'error')
         return
@@ -60,6 +63,7 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
     } catch {
       const msg = 'Failed to load HR documents'
       setLoadError(msg)
+      setLoadErrorDetails(null)
       setTasks([])
       showToast(msg, 'error')
     } finally {
@@ -137,6 +141,9 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
           <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 p-4 text-sm text-red-800 dark:text-red-200">
             <p className="font-medium">Could not load HR documents</p>
             <p className="mt-1">{loadError}</p>
+            {loadErrorDetails && loadErrorDetails !== loadError ? (
+              <p className="mt-2 text-xs opacity-80 font-mono break-all">{loadErrorDetails}</p>
+            ) : null}
             <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => load()}>
               Retry
             </Button>
