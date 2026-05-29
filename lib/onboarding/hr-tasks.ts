@@ -17,6 +17,23 @@ const HR_TASK_BASE_SELECT = {
   notes: true,
 } as const
 
+/** Minimal fields for send / status checks (avoids loading optional email columns). */
+export const HR_TASK_SEND_SELECT = {
+  id: true,
+  documentType: true,
+  status: true,
+} as const
+
+export async function findHrDocumentTaskForSend(
+  taskId: string,
+  rbtProfileId: string
+): Promise<{ id: string; documentType: string; status: string } | null> {
+  return prisma.hRDocumentTask.findFirst({
+    where: { id: taskId, rbtProfileId },
+    select: HR_TASK_SEND_SELECT,
+  })
+}
+
 export type HrDocumentTaskRow = {
   id: string
   documentType: string

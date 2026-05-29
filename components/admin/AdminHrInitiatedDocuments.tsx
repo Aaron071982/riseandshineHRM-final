@@ -100,7 +100,11 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
       clearTimeout(timeout)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        showToast(data.error || 'Failed to send', 'error')
+        const detail =
+          typeof data.details === 'string' && data.details !== data.error
+            ? `: ${data.details}`
+            : ''
+        showToast(`${data.error || 'Failed to send'}${detail}`, 'error')
         return
       }
       if (data.emailWarning) {
