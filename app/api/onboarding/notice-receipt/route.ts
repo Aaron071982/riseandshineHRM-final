@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import { syncTierMilestones, canUnlockStep, completedStepNumbers } from '@/lib/onboarding/progress'
 import { ESIGN_CONSENT_SLUG } from '@/lib/onboarding/catalog'
+import { isMissingColumnError, migrationHintForAcknowledgmentError, prismaErrorMessage } from '@/lib/db/prisma-errors'
+import type { Prisma } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,16 +20,21 @@ export async function POST(request: NextRequest) {
     const { documentId } = await request.json()
     if (!documentId) return NextResponse.json({ error: 'documentId required' }, { status: 400 })
 
-    const document = await prisma.onboardingDocument.findUnique({ where: { id: documentId } })
+    const document = await prisma.onboardingDocument.findUnique({
+      where: { id: documentId },
+      select: { id: true, flowType: true, stepNumber: true },
+    })
     if (!document || document.flowType !== 'NOTICE') {
       return NextResponse.json({ error: 'Invalid notice document' }, { status: 400 })
     }
 
     const docs = await prisma.onboardingDocument.findMany({
       where: { isActive: true, stepNumber: { not: null } },
+      select: { id: true, stepNumber: true, flowType: true, slug: true },
     })
     const completions = await prisma.onboardingCompletion.findMany({
       where: { rbtProfileId: user.rbtProfileId },
+      select: { documentId: true, status: true },
     })
     const profile = await prisma.rBTProfile.findUniqueOrThrow({
       where: { id: user.rbtProfileId },
@@ -53,43 +60,60 @@ export async function POST(request: NextRequest) {
     const ua = request.headers.get('user-agent') ?? 'unknown'
     const now = new Date()
 
-    await prisma.onboardingCompletion.upsert({
-      where: {
-        rbtProfileId_documentId: { rbtProfileId: user.rbtProfileId, documentId },
-      },
-      create: {
-        rbtProfileId: user.rbtProfileId,
-        documentId,
-        status: 'COMPLETED',
-        completedAt: now,
-        acknowledgmentJson: {
-          type: 'NOTICE_RECEIPT',
-          receivedAt: now.toISOString(),
-          ip,
-          userAgent: ua,
-          userId: user.id,
-        },
-        signatureIpAddress: ip,
-        signatureUserAgent: ua,
-        signatureMethod: 'CLICK_TO_ACKNOWLEDGE',
-      },
-      update: {
-        status: 'COMPLETED',
-        completedAt: now,
-        acknowledgmentJson: {
-          type: 'NOTICE_RECEIPT',
-          receivedAt: now.toISOString(),
-          ip,
-          userAgent: ua,
-          userId: user.id,
-        },
-      },
-    })
+    const where = {
+      rbtProfileId_documentId: { rbtProfileId: user.rbtProfileId, documentId },
+    }
+    const receiptJson = {
+      type: 'NOTICE_RECEIPT',
+      receivedAt: now.toISOString(),
+      ip,
+      userAgent: ua,
+      userId: user.id,
+    } as Prisma.InputJsonValue
 
-    await syncTierMilestones(user.rbtProfileId)
+    const minimal = {
+      status: 'COMPLETED' as const,
+      completedAt: now,
+      acknowledgmentJson: receiptJson,
+    }
+    const extended = {
+      ...minimal,
+      signatureIpAddress: ip,
+      signatureUserAgent: ua,
+      signatureMethod: 'CLICK_TO_ACKNOWLEDGE',
+    }
+
+    try {
+      await prisma.onboardingCompletion.upsert({
+        where,
+        create: { rbtProfileId: user.rbtProfileId, documentId, ...extended },
+        update: extended,
+      })
+    } catch (err) {
+      if (!isMissingColumnError(err)) throw err
+      await prisma.onboardingCompletion.upsert({
+        where,
+        create: { rbtProfileId: user.rbtProfileId, documentId, ...minimal },
+        update: minimal,
+      })
+    }
+
+    try {
+      await syncTierMilestones(user.rbtProfileId)
+    } catch (milestoneErr) {
+      console.error('[notice-receipt] syncTierMilestones failed (receipt saved)', milestoneErr)
+    }
+
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('[notice-receipt]', e)
-    return NextResponse.json({ error: 'Failed to save receipt' }, { status: 500 })
+    const migrationHint = migrationHintForAcknowledgmentError(e)
+    return NextResponse.json(
+      {
+        error: 'Failed to save receipt',
+        ...(migrationHint ? { details: migrationHint } : { details: prismaErrorMessage(e) }),
+      },
+      { status: 500 }
+    )
   }
 }

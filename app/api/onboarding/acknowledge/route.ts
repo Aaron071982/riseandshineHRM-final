@@ -4,15 +4,33 @@ import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import { PER_DOCUMENT_SIGNATURE_CONSENT_STATEMENT, SIGNATURE_METHOD } from '@/lib/esign-constants'
-import { createLiveSignatureCertificate, type AuditTrailEvent } from '@/lib/signature-certificate'
+import { sha256DocumentPdfSource, type AuditTrailEvent } from '@/lib/signature-certificate'
 import { sendEmail, EmailTemplateType, generateDocumentSignedReceiptEmail } from '@/lib/email'
 import { ESIGN_CONSENT_SLUG } from '@/lib/onboarding/catalog'
 import { syncTierMilestones, canUnlockStep, completedStepNumbers } from '@/lib/onboarding/progress'
+import {
+  tryCreateAcknowledgmentCertificate,
+  trySetSupervisionContractPending,
+  upsertAcknowledgmentCompletion,
+  upsertEsignConsentProfile,
+} from '@/lib/onboarding/acknowledge-persist'
+import { migrationHintForAcknowledgmentError, prismaErrorMessage } from '@/lib/db/prisma-errors'
 
 function isTwoOrMoreWords(name: string): boolean {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   return parts.length >= 2
 }
+
+const DOCUMENT_SELECT = {
+  id: true,
+  title: true,
+  slug: true,
+  type: true,
+  flowType: true,
+  stepNumber: true,
+  pdfData: true,
+  pdfUrl: true,
+} as const
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,6 +95,7 @@ export async function POST(request: NextRequest) {
 
     const document = await prisma.onboardingDocument.findUnique({
       where: { id: documentId },
+      select: DOCUMENT_SELECT,
     })
 
     if (!document) {
@@ -92,9 +111,11 @@ export async function POST(request: NextRequest) {
     if (!isEsignConsent) {
       const docs = await prisma.onboardingDocument.findMany({
         where: { isActive: true, stepNumber: { not: null } },
+        select: { id: true, stepNumber: true, flowType: true, slug: true },
       })
       const completions = await prisma.onboardingCompletion.findMany({
         where: { rbtProfileId: user.rbtProfileId! },
+        select: { documentId: true, status: true },
       })
       const rbtFlags = await prisma.rBTProfile.findUniqueOrThrow({
         where: { id: user.rbtProfileId! },
@@ -155,6 +176,7 @@ export async function POST(request: NextRequest) {
       consentStatement: PER_DOCUMENT_SIGNATURE_CONSENT_STATEMENT,
       signatureConsentGiven: true,
       signatureMethod: SIGNATURE_METHOD.TYPED_NAME,
+      auditTrail: auditTrailJson,
     }
 
     const rbtProfile = await prisma.rBTProfile.findUnique({
@@ -165,43 +187,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
+    const { documentHash, integrityNote } = await sha256DocumentPdfSource({
+      pdfData: document.pdfData,
+      pdfUrl: document.pdfUrl,
+    })
+
+    let certificateCreated = true
     const completion = await prisma.$transaction(async (tx) => {
-      const comp = await tx.onboardingCompletion.upsert({
-        where: {
-          rbtProfileId_documentId: {
-            rbtProfileId: user.rbtProfileId!,
-            documentId,
-          },
-        },
-        update: {
-          status: 'COMPLETED',
-          completedAt: signedAt,
-          acknowledgmentJson: acknowledgmentJson as object,
-          signatureText: trimmedName,
-          signatureTimestamp: signedAt,
-          signatureIpAddress: serverIp,
-          signatureUserAgent: serverUa,
-          signatureConsentGiven: true,
-          signatureMethod: SIGNATURE_METHOD.TYPED_NAME,
-          auditTrailJson: auditTrailJson as object,
-        },
-        create: {
-          rbtProfileId: user.rbtProfileId!,
-          documentId,
-          status: 'COMPLETED',
-          completedAt: signedAt,
-          acknowledgmentJson: acknowledgmentJson as object,
-          signatureText: trimmedName,
-          signatureTimestamp: signedAt,
-          signatureIpAddress: serverIp,
-          signatureUserAgent: serverUa,
-          signatureConsentGiven: true,
-          signatureMethod: SIGNATURE_METHOD.TYPED_NAME,
-          auditTrailJson: auditTrailJson as object,
-        },
+      const comp = await upsertAcknowledgmentCompletion(tx, {
+        rbtProfileId: user.rbtProfileId!,
+        documentId,
+        signedAt,
+        acknowledgmentJson,
+        trimmedName,
+        serverIp,
+        serverUa,
+        auditTrailJson,
       })
 
-      await createLiveSignatureCertificate(tx, {
+      const certResult = await tryCreateAcknowledgmentCertificate(tx, {
         completionId: comp.id,
         rbtProfileId: user.rbtProfileId!,
         document: {
@@ -221,27 +225,27 @@ export async function POST(request: NextRequest) {
         consentAgreedAtIso: signedAt.toISOString(),
         auditTrail,
         timezone: tz,
+        documentHash,
+        integrityNote,
       })
+      certificateCreated = certResult.created
 
       if (document.slug === ESIGN_CONSENT_SLUG) {
-        await tx.userProfile.upsert({
-          where: { userId: user.id },
-          create: { userId: user.id, eSignConsentGiven: true, eSignConsentTimestamp: signedAt },
-          update: { eSignConsentGiven: true, eSignConsentTimestamp: signedAt },
-        })
+        await upsertEsignConsentProfile(tx, user.id, signedAt)
       }
 
       if (document.slug === 'rbt-supervision-contract') {
-        await tx.rBTProfile.update({
-          where: { id: user.rbtProfileId! },
-          data: { supervisionContractStatus: 'PENDING_BCBA' },
-        })
+        await trySetSupervisionContractPending(tx, user.rbtProfileId!)
       }
 
       return comp
     })
 
-    await syncTierMilestones(user.rbtProfileId!)
+    try {
+      await syncTierMilestones(user.rbtProfileId!)
+    } catch (milestoneErr) {
+      console.error('[onboarding/acknowledge] syncTierMilestones failed (completion saved)', milestoneErr)
+    }
 
     const toEmail = rbtProfile.email || user.email
     if (toEmail) {
@@ -263,9 +267,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, completion })
+    return NextResponse.json({
+      success: true,
+      completion,
+      certificateCreated,
+      ...(certificateCreated
+        ? {}
+        : {
+            certificateWarning:
+              'Document signed, but the signature certificate could not be saved. HR has been notified via your completion record.',
+          }),
+    })
   } catch (error: unknown) {
     console.error('Error saving acknowledgment:', error)
-    return NextResponse.json({ error: 'Failed to save acknowledgment' }, { status: 500 })
+    const message = prismaErrorMessage(error)
+    const migrationHint = migrationHintForAcknowledgmentError(error)
+    return NextResponse.json(
+      {
+        error: 'Failed to save acknowledgment',
+        ...(migrationHint ? { details: migrationHint } : { details: message }),
+      },
+      { status: 500 }
+    )
   }
 }

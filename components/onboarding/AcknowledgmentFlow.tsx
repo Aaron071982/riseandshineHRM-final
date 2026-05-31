@@ -203,7 +203,11 @@ export default function AcknowledgmentFlow({ document, completion, onComplete }:
         showToast('Document signed successfully', 'success')
       } else {
         const error = await response.json()
-        showToast(error.error || 'Failed to save acknowledgment', 'error')
+        const detail =
+          typeof error.details === 'string' && error.details !== error.error
+            ? `: ${error.details}`
+            : ''
+        showToast(`${error.error || 'Failed to save acknowledgment'}${detail}`, 'error')
       }
     } catch {
       showToast('An error occurred. Please try again.', 'error')

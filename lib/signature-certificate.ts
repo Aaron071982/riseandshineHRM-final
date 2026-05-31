@@ -169,12 +169,18 @@ export interface CreateLiveCertificateParams {
 
 export async function createLiveSignatureCertificate(
   tx: Prisma.TransactionClient,
-  params: CreateLiveCertificateParams
+  params: CreateLiveCertificateParams & {
+    documentHash?: string
+    integrityNote?: string
+  }
 ): Promise<void> {
-  const { documentHash, integrityNote } = await sha256DocumentPdfSource({
-    pdfData: params.document.pdfData,
-    pdfUrl: params.document.pdfUrl,
-  })
+  const { documentHash, integrityNote } =
+    params.documentHash != null
+      ? { documentHash: params.documentHash, integrityNote: params.integrityNote }
+      : await sha256DocumentPdfSource({
+          pdfData: params.document.pdfData,
+          pdfUrl: params.document.pdfUrl,
+        })
 
   const signerFullName = `${params.rbtProfile.firstName} ${params.rbtProfile.lastName}`.trim()
   const signerEmail = params.rbtProfile.email ?? params.userEmail

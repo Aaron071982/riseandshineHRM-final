@@ -65,7 +65,7 @@ export type OnboardingProgressSnapshot = {
 
 function isDocComplete(
   doc: Pick<OnboardingDocument, 'flowType' | 'slug'>,
-  completion: OnboardingCompletion | undefined | null,
+  completion: Pick<OnboardingCompletion, 'status'> | undefined | null,
   profile: Pick<RBTProfile, 'artemisTrainingCompleted' | 'backgroundCheckClearedAt' | 'supervisionCountersignedAt'>
 ): boolean {
   if (doc.flowType === 'ADMIN_ONLY') {
@@ -81,7 +81,7 @@ function isDocComplete(
 
 export function completedStepNumbers(
   documents: Array<Pick<OnboardingDocument, 'id' | 'stepNumber' | 'flowType' | 'slug'>>,
-  completions: OnboardingCompletion[],
+  completions: Array<Pick<OnboardingCompletion, 'documentId' | 'status'>>,
   profile: Pick<RBTProfile, 'artemisTrainingCompleted' | 'backgroundCheckClearedAt' | 'supervisionCountersignedAt'>
 ): Set<number> {
   const byDoc = new Map(completions.map((c) => [c.documentId, c]))

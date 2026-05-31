@@ -228,14 +228,14 @@ export async function POST(
         ...updated,
         hrUploadedAt: updated.hrUploadedAt?.toISOString() ?? null,
         emailSentAt:
-          'emailSentAt' in updated && updated.emailSentAt
+          'emailSentAt' in updated && updated.emailSentAt instanceof Date
             ? updated.emailSentAt.toISOString()
             : null,
         emailSent: 'emailSent' in updated ? Boolean(updated.emailSent) : false,
       },
       emailSent: 'emailSent' in updated ? Boolean(updated.emailSent) : false,
       emailSentAt:
-        'emailSentAt' in updated && updated.emailSentAt
+        'emailSentAt' in updated && updated.emailSentAt instanceof Date
           ? updated.emailSentAt.toISOString()
           : null,
       ...(emailWarning ? { emailWarning } : {}),
