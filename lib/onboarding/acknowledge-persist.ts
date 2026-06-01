@@ -5,6 +5,7 @@ import {
   createLiveSignatureCertificate,
   type CreateLiveCertificateParams,
 } from '@/lib/signature-certificate'
+import { setUserEsignConsent } from '@/lib/user-profile-esign'
 
 export type AcknowledgmentCompletionPayload = {
   rbtProfileId: string
@@ -83,31 +84,19 @@ export async function upsertAcknowledgmentCompletion(
   }
 }
 
+/** Updates user_profiles e-sign flags; never fails the signing transaction. */
 export async function upsertEsignConsentProfile(
   tx: Prisma.TransactionClient,
   userId: string,
   signedAt: Date
 ): Promise<void> {
   try {
-    await tx.userProfile.upsert({
-      where: { userId },
-      create: { userId, eSignConsentGiven: true, eSignConsentTimestamp: signedAt },
-      update: { eSignConsentGiven: true, eSignConsentTimestamp: signedAt },
-    })
-    return
+    await setUserEsignConsent(tx, userId, signedAt)
   } catch (err) {
-    if (!isMissingColumnError(err)) throw err
-  }
-
-  try {
-    await tx.userProfile.upsert({
-      where: { userId },
-      create: { userId, eSignConsentGiven: true },
-      update: { eSignConsentGiven: true },
-    })
-  } catch (err) {
-    if (!isMissingColumnError(err)) throw err
-    console.warn('[acknowledge] user_profiles e-sign columns missing — skipping profile upsert')
+    console.error(
+      '[acknowledge] user_profiles e-sign update failed (completion still saved)',
+      err
+    )
   }
 }
 

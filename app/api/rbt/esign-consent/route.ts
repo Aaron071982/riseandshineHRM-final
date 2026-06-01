@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
+import { setUserEsignConsent } from '@/lib/user-profile-esign'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(_request: NextRequest) {
@@ -20,22 +21,13 @@ export async function POST(_request: NextRequest) {
     }
 
     const now = new Date()
-    await prisma.userProfile.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        skills: [],
-        languages: [],
-        eSignConsentGiven: true,
-        eSignConsentTimestamp: now,
-      },
-      update: {
-        eSignConsentGiven: true,
-        eSignConsentTimestamp: now,
-      },
-    })
+    await setUserEsignConsent(prisma, user.id, now)
 
-    return NextResponse.json({ success: true, eSignConsentGiven: true, eSignConsentTimestamp: now.toISOString() })
+    return NextResponse.json({
+      success: true,
+      eSignConsentGiven: true,
+      eSignConsentTimestamp: now.toISOString(),
+    })
   } catch (e) {
     console.error('[rbt/esign-consent]', e)
     return NextResponse.json({ error: 'Failed to save consent' }, { status: 500 })

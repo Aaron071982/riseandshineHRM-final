@@ -481,8 +481,8 @@ model UserProfile {
   timezone                     String?
   preferredContactMethod       PreferredContactMethod?
   bio                          String?                 @db.Text
-  skills                       String[]
-  languages                    String[]
+  skills                       String[]                @default([])
+  languages                    String[]                @default([])
   emergencyContactName         String?
   emergencyContactRelationship String?
   emergencyContactPhone        String?
