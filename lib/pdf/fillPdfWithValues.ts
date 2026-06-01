@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 
 /**
  * Fills a PDF form with field values and returns a filled PDF as a Blob
@@ -9,7 +9,7 @@ import { PDFDocument } from 'pdf-lib'
 export async function fillPdfWithValues(
   pdfBytes: Uint8Array,
   fieldValues: Record<string, any>,
-  options?: { flatten?: boolean }
+  options?: { flatten?: boolean; updateAppearances?: boolean }
 ): Promise<Blob> {
   try {
     // Load PDF document
@@ -78,6 +78,13 @@ export async function fillPdfWithValues(
         form.flatten()
       } catch {
         // Some government PDFs fail flatten — save without it
+      }
+    } else if (options?.updateAppearances !== false) {
+      try {
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+        form.updateFieldAppearances(font)
+      } catch (appearanceErr) {
+        console.warn('[fillPdfWithValues] updateFieldAppearances failed:', appearanceErr)
       }
     }
 

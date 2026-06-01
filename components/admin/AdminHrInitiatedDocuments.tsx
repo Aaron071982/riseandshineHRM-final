@@ -36,6 +36,7 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
   const [expandedSlug, setExpandedSlug] = useState<string | null>(LS54_SLUG)
   const [hourlyRate, setHourlyRate] = useState('')
   const [sending, setSending] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
 
   const overtimePreview = (() => {
     const h = parseHourlyRate(hourlyRate)
@@ -76,6 +77,27 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
   }, [load])
 
   const pendingTasks = tasks.filter((t) => t.status === 'PENDING_HR')
+
+  const regenerateLs54 = async (taskId: string) => {
+    setRegenerating(true)
+    try {
+      const res = await fetch(
+        `/api/admin/rbts/${rbtProfileId}/hr-documents/${taskId}/regenerate`,
+        { method: 'POST', credentials: 'include' }
+      )
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || 'Failed to regenerate PDF', 'error')
+        return
+      }
+      showToast('LS-54 PDF regenerated with employer and pay details', 'success')
+      await load()
+    } catch {
+      showToast('Failed to regenerate PDF', 'error')
+    } finally {
+      setRegenerating(false)
+    }
+  }
 
   const sendLs54 = async (taskId: string) => {
     const h = parseHourlyRate(hourlyRate)
@@ -202,19 +224,33 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
                 {expanded && isLs54 && (
                   <div className="px-4 pb-4 border-t dark:border-[var(--border-subtle)] space-y-4 bg-slate-50/50 dark:bg-slate-900/20">
                     {task.status !== 'PENDING_HR' && task.hrFileUrl && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          window.open(
-                            `/api/admin/rbts/${rbtProfileId}/hr-documents/${task.id}/hr-file`,
-                            '_blank'
-                          )
-                        }
-                      >
-                        Preview HR-prepared PDF
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            window.open(
+                              `/api/admin/rbts/${rbtProfileId}/hr-documents/${task.id}/hr-file`,
+                              '_blank'
+                            )
+                          }
+                        >
+                          Preview HR-prepared PDF
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={regenerating}
+                          onClick={() => regenerateLs54(task.id)}
+                        >
+                          {regenerating ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          ) : null}
+                          Regenerate PDF
+                        </Button>
+                      </div>
                     )}
 
                     {task.status === 'PENDING_HR' ? (
@@ -233,8 +269,12 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
                             <p className="font-medium">{LS54_EMPLOYER.physicalAddress}</p>
                           </div>
                           <div>
+                            <span className="text-gray-500">Pay frequency</span>
+                            <p className="font-medium">{LS54_EMPLOYER.payFrequency}</p>
+                          </div>
+                          <div>
                             <span className="text-gray-500">Regular payday</span>
-                            <p className="font-medium">{LS54_EMPLOYER.regularPayday}</p>
+                            <p className="font-medium">{LS54_EMPLOYER.regularPaydaySchedule}</p>
                           </div>
                         </div>
 

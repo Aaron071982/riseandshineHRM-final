@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
-import { fillPdfWithValues } from '@/lib/pdf/fillPdfWithValues'
 import {
   findHrDocumentTaskForSend,
   isMissingEmailColumnError,
-  loadCatalogPdfBytes,
 } from '@/lib/onboarding/hr-tasks'
-import {
-  LS54_SLUG,
-  buildLs54FieldValues,
-  formatOvertimeRate,
-  parseHourlyRate,
-} from '@/lib/onboarding/ls54'
+import { generateLs54HrPdfForRbt } from '@/lib/onboarding/ls54-hr-send'
+import { LS54_SLUG, formatOvertimeRate, parseHourlyRate } from '@/lib/onboarding/ls54'
 import { sendGenericEmail, generateOnboardingDocumentsNotifyEmail } from '@/lib/email'
 import { makePublicUrl } from '@/lib/baseUrl'
 
@@ -71,73 +64,28 @@ export async function POST(
       )
     }
 
-    const pdfBytes = await loadCatalogPdfBytes(LS54_SLUG)
-    if (!pdfBytes) {
-      return NextResponse.json(
-        {
-          error: 'LS-54 PDF template not found on the server',
-          details:
-            'Ensure onboarding-documents/LS54.pdf is deployed. Re-deploy the app after confirming the file is in the repo.',
-        },
-        { status: 500 }
-      )
-    }
-
     const employeeName = `${profile.firstName} ${profile.lastName}`.trim()
-    const fieldValues = buildLs54FieldValues({
+    const generated = await generateLs54HrPdfForRbt(rbtProfileId, {
       employeeName,
-      employeeRateOfPay: employeeRateOfPay,
+      employeeRateOfPay,
       overtimeRate,
     })
 
-    let filledBuffer: Buffer
-    try {
-      const filledBlob = await fillPdfWithValues(pdfBytes, fieldValues, { flatten: false })
-      filledBuffer = Buffer.from(await filledBlob.arrayBuffer())
-    } catch (fillErr) {
-      console.error('[hr-documents/send] fill PDF', fillErr)
+    if (!generated.ok) {
       return NextResponse.json(
-        { error: 'Failed to fill LS-54 form. Try again or contact support.' },
+        { error: generated.error, details: generated.details },
         { status: 500 }
       )
     }
 
-    if (filledBuffer.length > 15 * 1024 * 1024) {
+    if (generated.buffer.length > 15 * 1024 * 1024) {
       return NextResponse.json({ error: 'Generated PDF is too large' }, { status: 500 })
     }
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        {
-          error: 'Storage not configured',
-          details: 'SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL is missing on the server.',
-        },
-        { status: 500 }
-      )
-    }
-
-    const storagePath = `hr-documents/${rbtProfileId}/${LS54_SLUG}-hr-${Date.now()}.pdf`
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, filledBuffer, {
-        contentType: 'application/pdf',
-        upsert: true,
-      })
-
-    if (uploadError) {
-      console.error('[hr-documents/send] upload', uploadError)
-      return NextResponse.json(
-        {
-          error: 'Failed to store PDF',
-          details: uploadError.message,
-        },
-        { status: 500 }
-      )
-    }
-
+    const storagePath = generated.storagePath
     const now = new Date()
     const formMeta = {
-      employeeRateOfPay,
+      employeeRateOfPay: String(hourly),
       overtimeRate,
       employeeName,
       sentAt: now.toISOString(),
