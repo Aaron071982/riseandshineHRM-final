@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     if (!supabaseAdmin) {
       return NextResponse.json(
-        { error: 'Supabase Storage not configured. Please set SUPABASE_SERVICE_ROLE_KEY.' },
+        { error: 'Supabase Storage not configured. Please set SUPABASE_SECRET_KEY.' },
         { status: 500 }
       )
     }

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     // Check if Supabase admin client is available
     if (!supabaseAdmin) {
       return NextResponse.json(
-        { error: 'Supabase Storage not configured. Please set SUPABASE_SERVICE_ROLE_KEY.' },
+        { error: 'Supabase Storage not configured. Please set SUPABASE_SECRET_KEY.' },
         { status: 500 }
       )
     }
