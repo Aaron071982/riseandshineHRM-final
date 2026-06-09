@@ -274,6 +274,25 @@ export async function syncTierMilestones(rbtProfileId: string): Promise<void> {
   }
 }
 
+export function isSocialSecurityUploadComplete(progress: OnboardingProgressSnapshot): boolean {
+  const step = progress.steps.find((s) => s.document.slug === 'upload-social-security-card')
+  return step?.isComplete ?? false
+}
+
+export function incompleteRbtOnboardingSteps(progress: OnboardingProgressSnapshot): Array<{
+  title: string
+  description: string | null
+  taskType: string
+}> {
+  return progress.steps
+    .filter((s) => !s.isComplete && s.document.flowType !== 'ADMIN_ONLY')
+    .map((s) => ({
+      title: s.document.title,
+      description: null,
+      taskType: s.document.type,
+    }))
+}
+
 export function firstIncompleteStep(progress: OnboardingProgressSnapshot): number | null {
   const visible = getRbtVisibleCatalog()
   const done = new Set(

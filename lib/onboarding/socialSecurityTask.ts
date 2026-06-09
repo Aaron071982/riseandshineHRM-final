@@ -20,28 +20,41 @@ export async function ensureSocialSecurityOnboardingTask(
     return { added: false }
   }
   const sig = tasks.find((t) => t.taskType === 'SIGNATURE')
-  if (!sig) return { added: false }
-
   const hasForty = tasks.some((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')
-  const ssnSort = hasForty ? 7 : 6
-  const newSigSort = hasForty ? 8 : 7
 
-  await prisma.$transaction([
-    prisma.onboardingTask.update({
-      where: { id: sig.id },
-      data: { sortOrder: newSigSort },
-    }),
-    prisma.onboardingTask.create({
-      data: {
-        rbtProfileId,
-        taskType: 'SOCIAL_SECURITY_DOCUMENT',
-        title: SSN_TITLE,
-        description: SSN_DESCRIPTION,
-        documentDownloadUrl: null,
-        sortOrder: ssnSort,
-      },
-    }),
-  ])
+  if (sig) {
+    const ssnSort = hasForty ? 7 : 6
+    const newSigSort = hasForty ? 8 : 7
+    await prisma.$transaction([
+      prisma.onboardingTask.update({
+        where: { id: sig.id },
+        data: { sortOrder: newSigSort },
+      }),
+      prisma.onboardingTask.create({
+        data: {
+          rbtProfileId,
+          taskType: 'SOCIAL_SECURITY_DOCUMENT',
+          title: SSN_TITLE,
+          description: SSN_DESCRIPTION,
+          documentDownloadUrl: null,
+          sortOrder: ssnSort,
+        },
+      }),
+    ])
+    return { added: true }
+  }
+
+  const maxSort = tasks.reduce((max, t) => Math.max(max, t.sortOrder), 0)
+  await prisma.onboardingTask.create({
+    data: {
+      rbtProfileId,
+      taskType: 'SOCIAL_SECURITY_DOCUMENT',
+      title: SSN_TITLE,
+      description: SSN_DESCRIPTION,
+      documentDownloadUrl: null,
+      sortOrder: maxSort + 1,
+    },
+  })
   return { added: true }
 }
 

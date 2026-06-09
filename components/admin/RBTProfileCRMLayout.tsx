@@ -150,6 +150,11 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
   const [addAssignmentNotes, setAddAssignmentNotes] = useState('')
   const [addAssignmentSubmitting, setAddAssignmentSubmitting] = useState(false)
   const [clientsLoading, setClientsLoading] = useState(false)
+  const [onboardingProgress, setOnboardingProgress] = useState<{
+    completedCount: number
+    totalRbtSteps: number
+    fullyActivated: boolean
+  } | null>(null)
 
   const DAYS: Array<{ value: number; label: string }> = [
     { value: 0, label: 'Sun' },
@@ -297,6 +302,29 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
       })
       .catch(() => setSchedulingExclusion(null))
   }, [rbtProfile.id])
+
+  useEffect(() => {
+    if (rbtProfile.status !== 'HIRED') {
+      setOnboardingProgress(null)
+      return
+    }
+    let cancelled = false
+    fetch(`/api/admin/rbts/${rbtProfile.id}/onboarding-progress`, { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.completedCount != null) {
+          setOnboardingProgress({
+            completedCount: data.completedCount,
+            totalRbtSteps: data.totalRbtSteps,
+            fullyActivated: data.fullyActivated === true,
+          })
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [rbtProfile.id, rbtProfile.status])
 
   const handleRestoreSchedulingExclusion = async () => {
     if (!schedulingExclusion) return
@@ -649,9 +677,19 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
   const isHired = rbtProfile.status === 'HIRED'
   const incompleteTasks = rbtProfile.onboardingTasks.filter((t) => !t.isCompleted)
   const ssnOnboardingTask = rbtProfile.onboardingTasks.find((t) => t.taskType === 'SOCIAL_SECURITY_DOCUMENT')
+  const catalogSsnComplete = rbtProfile.onboardingCompletions?.some(
+    (c) => c.document.slug === 'upload-social-security-card' && c.status === 'COMPLETED'
+  )
+  const hasIncompleteCatalogOnboarding =
+    onboardingProgress != null &&
+    !onboardingProgress.fullyActivated &&
+    onboardingProgress.completedCount < onboardingProgress.totalRbtSteps
+  const canSendMissingOnboardingReminder =
+    isHired && (incompleteTasks.length > 0 || hasIncompleteCatalogOnboarding)
   const canSendSsnReminder =
     isHired &&
     !!rbtProfile.email?.trim() &&
+    !catalogSsnComplete &&
     (!ssnOnboardingTask || !ssnOnboardingTask.isCompleted)
 
   const fullAddress = [rbtProfile.addressLine1, rbtProfile.addressLine2, rbtProfile.locationCity, rbtProfile.locationState, rbtProfile.zipCode].filter(Boolean).join(', ') || '—'
@@ -1484,7 +1522,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
           </DialogHeader>
           <div className="space-y-2">
             {canSendReachOut && <Button variant="outline" className="w-full justify-start" onClick={() => handleSendEmailByTemplate('REACH_OUT')}>Reach out</Button>}
-            {isHired && incompleteTasks.length > 0 && (
+            {canSendMissingOnboardingReminder && (
               <Button variant="outline" className="w-full justify-start" onClick={() => handleSendEmailByTemplate('MISSING_ONBOARDING')}>
                 Missing onboarding reminder
               </Button>

@@ -11,7 +11,49 @@ import {
 } from '@/lib/email'
 import { makePublicUrl } from '@/lib/baseUrl'
 import { ensureSocialSecurityOnboardingTask } from '@/lib/onboarding/socialSecurityTask'
+import {
+  getOnboardingProgress,
+  incompleteRbtOnboardingSteps,
+  isSocialSecurityUploadComplete,
+} from '@/lib/onboarding/progress'
 import { randomBytes } from 'crypto'
+
+type RbtProfileWithTasks = {
+  id: string
+  firstName: string
+  lastName: string
+  email: string | null
+  status?: string
+  onboardingTasks: Array<{ title: string; description: string | null; taskType: string; isCompleted: boolean }>
+}
+
+async function loadRbtProfileForEmail(id: string): Promise<RbtProfileWithTasks | null> {
+  try {
+    const profile = await prisma.rBTProfile.findUnique({
+      where: { id },
+      include: { onboardingTasks: true },
+    })
+    if (profile) return profile as RbtProfileWithTasks
+  } catch (err) {
+    console.error('Send-email: Prisma findUnique failed', err)
+  }
+
+  try {
+    const profileOnly = await prisma.rBTProfile.findUnique({
+      where: { id },
+      select: { id: true, firstName: true, lastName: true, email: true, status: true },
+    })
+    if (!profileOnly) return null
+    const onboardingTasks = await prisma.onboardingTask.findMany({
+      where: { rbtProfileId: id },
+      select: { title: true, description: true, taskType: true, isCompleted: true },
+    })
+    return { ...profileOnly, onboardingTasks }
+  } catch (fallbackErr) {
+    console.error('Send-email: fallback load failed', fallbackErr)
+    return null
+  }
+}
 
 export async function POST(
   request: NextRequest,
@@ -30,56 +72,7 @@ export async function POST(
       return NextResponse.json({ error: 'templateType is required' }, { status: 400 })
     }
 
-    type RbtProfileWithTasks = Awaited<ReturnType<typeof prisma.rBTProfile.findUnique>> & {
-      onboardingTasks: Array<{ title: string; description: string | null; taskType: string; isCompleted: boolean }>
-    }
-    let rbtProfile: RbtProfileWithTasks | null = null
-
-    try {
-      rbtProfile = await prisma.rBTProfile.findUnique({
-        where: { id },
-        include: { onboardingTasks: true },
-      }) as RbtProfileWithTasks | null
-    } catch (err) {
-      console.error('Send-email: Prisma findUnique failed', err)
-    }
-
-    // Fallback: load profile and tasks in separate queries (avoids raw SQL column naming issues)
-    if (!rbtProfile && templateType === EmailTemplateType.MISSING_ONBOARDING) {
-      try {
-        const profileOnly = await prisma.rBTProfile.findUnique({
-          where: { id },
-          select: { id: true, firstName: true, lastName: true, email: true },
-        })
-        if (!profileOnly?.email) {
-          return NextResponse.json(
-            { error: 'RBT profile not found or email missing' },
-            { status: 404 }
-          )
-        }
-        const incompleteTasksList = await prisma.onboardingTask.findMany({
-          where: { rbtProfileId: id, isCompleted: false },
-          select: { title: true, description: true, taskType: true },
-        })
-        if (incompleteTasksList.length === 0) {
-          return NextResponse.json(
-            { error: 'This RBT has no incomplete onboarding tasks' },
-            { status: 400 }
-          )
-        }
-        rbtProfile = {
-          ...profileOnly,
-          onboardingTasks: incompleteTasksList.map((t) => ({ ...t, isCompleted: false })),
-        } as RbtProfileWithTasks
-      } catch (fallbackErr) {
-        console.error('Send-email: fallback load failed', fallbackErr)
-        const msg = fallbackErr instanceof Error ? fallbackErr.message : 'Could not load RBT profile'
-        return NextResponse.json(
-          { error: process.env.NODE_ENV === 'development' ? msg : 'Could not load RBT profile. Try again later.' },
-          { status: 500 }
-        )
-      }
-    }
+    const rbtProfile = await loadRbtProfileForEmail(id)
 
     if (!rbtProfile || !rbtProfile.email) {
       return NextResponse.json(
@@ -112,13 +105,23 @@ export async function POST(
         emailContent = generateRejectionEmail(rbtProfile)
         break
       case EmailTemplateType.MISSING_ONBOARDING: {
-        const incompleteTasks = (rbtProfile.onboardingTasks || [])
-          .filter(task => !task.isCompleted)
-          .map(task => ({
+        let incompleteTasks = (rbtProfile.onboardingTasks || [])
+          .filter((task) => !task.isCompleted)
+          .map((task) => ({
             title: task.title,
             description: task.description,
             taskType: task.taskType,
           }))
+        if (incompleteTasks.length === 0) {
+          try {
+            const progress = await getOnboardingProgress(rbtProfile.id)
+            if (!progress.fullyActivated) {
+              incompleteTasks = incompleteRbtOnboardingSteps(progress)
+            }
+          } catch (progressErr) {
+            console.error('Send-email: onboarding progress load failed', progressErr)
+          }
+        }
         if (incompleteTasks.length === 0) {
           return NextResponse.json(
             { error: 'This RBT has no incomplete onboarding tasks' },
@@ -129,23 +132,33 @@ export async function POST(
         break
       }
       case EmailTemplateType.SOCIAL_SECURITY_UPLOAD_REMINDER: {
-        await ensureSocialSecurityOnboardingTask(prisma, rbtProfile.id)
-        const refreshed = await prisma.onboardingTask.findMany({
-          where: { rbtProfileId: rbtProfile.id, taskType: 'SOCIAL_SECURITY_DOCUMENT' },
-        })
-        const ssnTask = refreshed[0]
-        if (!ssnTask) {
-          return NextResponse.json(
-            { error: 'Could not add Social Security onboarding task. Ensure the RBT has a signature step in onboarding.' },
-            { status: 400 }
-          )
+        try {
+          await ensureSocialSecurityOnboardingTask(prisma, rbtProfile.id)
+        } catch (taskErr) {
+          console.error('Send-email: ensure SSN task failed (continuing)', taskErr)
         }
-        if (ssnTask.isCompleted) {
+
+        const ssnLegacyTask = (rbtProfile.onboardingTasks || []).find(
+          (task) => task.taskType === 'SOCIAL_SECURITY_DOCUMENT'
+        )
+        let ssnAlreadyUploaded = ssnLegacyTask?.isCompleted === true
+
+        if (!ssnAlreadyUploaded) {
+          try {
+            const progress = await getOnboardingProgress(rbtProfile.id)
+            ssnAlreadyUploaded = isSocialSecurityUploadComplete(progress)
+          } catch (progressErr) {
+            console.error('Send-email: SSN progress check failed', progressErr)
+          }
+        }
+
+        if (ssnAlreadyUploaded) {
           return NextResponse.json(
             { error: 'Social Security card has already been uploaded for this RBT.' },
             { status: 400 }
           )
         }
+
         const tasksUrl = makePublicUrl('/rbt/tasks')
         emailContent = generateSocialSecurityUploadReminderEmail(rbtProfile.firstName, tasksUrl)
         break
