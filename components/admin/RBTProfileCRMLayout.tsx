@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -121,6 +122,9 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
     active: boolean
   } | null>(null)
   const [restoringSchedulingExclusion, setRestoringSchedulingExclusion] = useState(false)
+  const [removeActiveDialogOpen, setRemoveActiveDialogOpen] = useState(false)
+  const [removeActiveReason, setRemoveActiveReason] = useState('')
+  const [activeWorkingLoading, setActiveWorkingLoading] = useState(false)
 
   const [clientAssignments, setClientAssignments] = useState<Array<{
     id: string
@@ -692,6 +696,73 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
     !catalogSsnComplete &&
     (!ssnOnboardingTask || !ssnOnboardingTask.isCompleted)
 
+  const isActivelyWorking = rbtProfile.postHireStage === 'ACTIVE_DELIVERY'
+  const clientAssignmentCount = clientAssignments.length
+
+  const handleMarkActivelyWorking = async () => {
+    setActiveWorkingLoading(true)
+    try {
+      const res = await fetch(`/api/admin/rbts/${rbtProfile.id}/active-working`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'mark' }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || 'Failed to update status', 'error')
+        return
+      }
+      setRbtProfile({
+        ...rbtProfile,
+        postHireStage: 'ACTIVE_DELIVERY',
+        activeWorkingSince: rbtProfile.activeWorkingSince ?? new Date().toISOString(),
+        activeWorkingManualOverride: true,
+      })
+      showToast('Marked as actively working', 'success')
+      fetchAuditLogs()
+    } catch {
+      showToast('Failed to update status', 'error')
+    } finally {
+      setActiveWorkingLoading(false)
+    }
+  }
+
+  const handleRemoveActiveStatus = async () => {
+    if (!removeActiveReason.trim()) {
+      showToast('Please enter a reason', 'error')
+      return
+    }
+    setActiveWorkingLoading(true)
+    try {
+      const res = await fetch(`/api/admin/rbts/${rbtProfile.id}/active-working`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'remove', reason: removeActiveReason.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || 'Failed to remove active status', 'error')
+        return
+      }
+      setRbtProfile({
+        ...rbtProfile,
+        postHireStage: 'MATCHING',
+        activeWorkingSince: null,
+        activeWorkingManualOverride: true,
+      })
+      setRemoveActiveDialogOpen(false)
+      setRemoveActiveReason('')
+      showToast('Active status removed', 'success')
+      fetchAuditLogs()
+    } catch {
+      showToast('Failed to remove active status', 'error')
+    } finally {
+      setActiveWorkingLoading(false)
+    }
+  }
+
   const fullAddress = [rbtProfile.addressLine1, rbtProfile.addressLine2, rbtProfile.locationCity, rbtProfile.locationState, rbtProfile.zipCode].filter(Boolean).join(', ') || '—'
   const daysSinceApplication = rbtProfile.submittedAt
     ? Math.floor((Date.now() - new Date(rbtProfile.submittedAt).getTime()) / (24 * 60 * 60 * 1000))
@@ -1026,6 +1097,11 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                 <Badge variant="outline" className="dark:border-[var(--border-subtle)]">
                   {rbtProfile.source === 'PUBLIC_APPLICATION' ? 'Applied Online' : 'Admin Created'}
                 </Badge>
+                {isActivelyWorking && (
+                  <Badge className="bg-green-500 hover:bg-green-500 text-white border-0 font-semibold">
+                    Actively Working
+                  </Badge>
+                )}
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {canSendReachOut && (
@@ -1064,6 +1140,64 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
               </div>
             </CardHeader>
           </Card>
+
+          {isHired && (
+            <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm font-semibold text-gray-700 dark:text-[var(--text-secondary)]">
+                  Pipeline status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3">
+                {isActivelyWorking ? (
+                  <div className="space-y-2">
+                    <Badge className="bg-green-500 hover:bg-green-500 text-white border-0 font-semibold">
+                      Actively Working
+                    </Badge>
+                    {rbtProfile.activeWorkingSince && (
+                      <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+                        Actively working since {formatDate(rbtProfile.activeWorkingSince)}
+                      </p>
+                    )}
+                    {clientAssignmentCount > 0 && (
+                      <Badge variant="outline" className="dark:border-[var(--border-subtle)]">
+                        {clientAssignmentCount} client{clientAssignmentCount === 1 ? '' : 's'}
+                      </Badge>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setRemoveActiveDialogOpen(true)}
+                      disabled={activeWorkingLoading}
+                    >
+                      Remove Active Status
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+                      Post-hire stage: {rbtProfile.postHireStage?.replace(/_/g, ' ') || 'Matching'}
+                    </p>
+                    {clientAssignmentCount > 0 && (
+                      <p className="text-sm text-gray-500 dark:text-[var(--text-disabled)]">
+                        {clientAssignmentCount} client assignment{clientAssignmentCount === 1 ? '' : 's'}
+                      </p>
+                    )}
+                    <Button
+                      size="sm"
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                      onClick={handleMarkActivelyWorking}
+                      disabled={activeWorkingLoading}
+                    >
+                      {activeWorkingLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                      Mark as Actively Working
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)]">
             <CardHeader className="py-3">
@@ -1537,6 +1671,36 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
               </Button>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove actively working dialog */}
+      <Dialog open={removeActiveDialogOpen} onOpenChange={setRemoveActiveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove active status</DialogTitle>
+            <DialogDescription>
+              Remove {rbtProfile.firstName} {rbtProfile.lastName} from Actively Working? They will no longer show as actively delivering sessions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="remove-active-reason">Reason</Label>
+            <Textarea
+              id="remove-active-reason"
+              value={removeActiveReason}
+              onChange={(e) => setRemoveActiveReason(e.target.value)}
+              placeholder="Why is this BT no longer actively working?"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveActiveDialogOpen(false)} disabled={activeWorkingLoading}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveActiveStatus} disabled={activeWorkingLoading || !removeActiveReason.trim()}>
+              {activeWorkingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Remove Active Status'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

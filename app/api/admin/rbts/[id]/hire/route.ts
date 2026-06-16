@@ -96,7 +96,7 @@ export async function POST(
     const previousStatus = rbtProfile.status
     await prisma.rBTProfile.update({
       where: { id },
-      data: { status: 'HIRED' },
+      data: { status: 'HIRED', postHireStage: 'MATCHING' },
     })
     await prisma.rBTAuditLog.create({
       data: {

@@ -1,8 +1,10 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { PostHireStage } from '@prisma/client'
 import { Suspense } from 'react'
 import EmployeesList from '@/components/admin/EmployeesList'
 import EmployeesPageHero from '@/components/admin/EmployeesPageHero'
+import { getActiveWorkingStats, getAssignmentCountsByRbt } from '@/lib/rbt/activeWorking'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -14,6 +16,7 @@ interface SearchParams {
   search?: string
   status?: string
   view?: string
+  workFilter?: string
 }
 
 export default async function EmployeesPage({
@@ -24,6 +27,7 @@ export default async function EmployeesPage({
   const type = (searchParams.type || 'RBT') as EmployeeListType
   const search = searchParams.search || ''
   const statusFilter = searchParams.status || ''
+  const workFilter = searchParams.workFilter || ''
   const viewMode = searchParams.view === 'board' ? 'board' : 'list'
 
   const validTypes: EmployeeListType[] = ['RBT', 'BCBA', 'BILLING', 'MARKETING', 'CALL_CENTER', 'DEV_TEAM']
@@ -35,6 +39,8 @@ export default async function EmployeesPage({
   let marketingProfiles: { id: string; fullName: string; email: string | null; phone: string | null; status: string | null; updatedAt: Date }[] = []
   let callCenterProfiles: { id: string; fullName: string; email: string | null; phone: string | null; status: string | null; updatedAt: Date }[] = []
   let devTeams: { id: string; name: string; description: string | null; _count: { members: number }; updatedAt: Date }[] = []
+  let assignmentCounts: Record<string, number> = {}
+  let activeWorkingStats = { activelyWorking: 0, idleHires: 0 }
   let loadError = false
 
   try {
@@ -51,11 +57,29 @@ export default async function EmployeesPage({
           { phoneNumber: { contains: search, mode: 'insensitive' } },
         ]
       }
+      if (workFilter === 'actively_working') {
+        where.postHireStage = PostHireStage.ACTIVE_DELIVERY
+      } else if (workFilter === 'idle_hired') {
+        where.status = 'HIRED'
+        where.AND = [
+          {
+            OR: [
+              { postHireStage: null },
+              { postHireStage: { not: PostHireStage.ACTIVE_DELIVERY } },
+            ],
+          },
+        ]
+      } else if (workFilter === 'all_hired') {
+        where.status = 'HIRED'
+      }
       rbts = await prisma.rBTProfile.findMany({
         where,
         include: { user: true },
         orderBy: { updatedAt: 'desc' },
       })
+      const countsMap = await getAssignmentCountsByRbt(rbts.map((r) => r.id))
+      assignmentCounts = Object.fromEntries(countsMap)
+      activeWorkingStats = await getActiveWorkingStats()
     } else if (currentType === 'BCBA') {
       const where: any = {}
       if (search) {
@@ -139,6 +163,9 @@ export default async function EmployeesPage({
           currentType={currentType}
           viewMode={viewMode}
           initialRbts={currentType === 'RBT' ? rbts : []}
+          assignmentCounts={assignmentCounts}
+          activeWorkingStats={activeWorkingStats}
+          initialWorkFilter={workFilter}
           bcbaProfiles={currentType === 'BCBA' ? bcbaProfiles : []}
           billingProfiles={currentType === 'BILLING' ? billingProfiles : []}
           marketingProfiles={currentType === 'MARKETING' ? marketingProfiles : []}

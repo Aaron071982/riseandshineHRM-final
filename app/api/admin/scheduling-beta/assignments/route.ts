@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { tryAutoMarkActivelyWorking } from '@/lib/rbt/activeWorking'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await requireAdminSession()
     if (auth.response) return auth.response
+    const user = auth.user
     const body = await req.json()
     const { client, clientId, rbtProfileId, daysOfWeek, timeStart, timeEnd, notes, hourlyRate: hourlyRateRaw } = body
 
@@ -121,6 +123,12 @@ export async function POST(req: NextRequest) {
         rbtProfile: { select: { id: true, firstName: true, lastName: true } },
       },
     })
+
+    try {
+      await tryAutoMarkActivelyWorking(rbtProfileId, user?.email ?? user?.name ?? null)
+    } catch (autoMarkErr) {
+      console.error('[scheduling-beta] auto-mark actively working failed:', autoMarkErr)
+    }
 
     return NextResponse.json({
       assignment: {

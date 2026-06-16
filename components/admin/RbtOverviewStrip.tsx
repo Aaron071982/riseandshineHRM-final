@@ -10,6 +10,8 @@ export default function RbtOverviewStrip() {
     inPipeline: number
     awaitingArtemis: number
     onboardingComplete: number
+    activelyWorking: number
+    idleHires: number
   } | null>(null)
 
   useEffect(() => {
@@ -32,13 +34,27 @@ export default function RbtOverviewStrip() {
         </Link>
         <span className="text-gray-500 dark:text-gray-400"> — schedule sessions and mark attendance.</span>
       </p>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Link
-          href="/admin/rbts"
+          href="/admin/employees?type=RBT&workFilter=all_hired"
           className="rounded-xl border bg-white dark:bg-[var(--bg-elevated)] p-4 shadow-sm hover:shadow-md transition-shadow"
         >
           <p className="text-sm text-gray-500">Hired RBTs</p>
           <p className="text-2xl font-bold text-green-600 dark:text-green-500">{data.hiredRBTs}</p>
+        </Link>
+        <Link
+          href="/admin/employees?type=RBT&workFilter=actively_working"
+          className="rounded-xl border border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-800 p-4 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <p className="text-sm text-gray-500">Actively Working</p>
+          <p className="text-2xl font-bold text-green-700 dark:text-green-400">{data.activelyWorking}</p>
+        </Link>
+        <Link
+          href="/admin/employees?type=RBT&workFilter=idle_hired"
+          className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <p className="text-sm text-gray-500">Idle Hires</p>
+          <p className="text-2xl font-bold text-amber-800 dark:text-amber-200">{data.idleHires}</p>
         </Link>
         <Link
           href="/admin/rbts"

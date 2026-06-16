@@ -63,6 +63,11 @@ enum RBTStatus {
   REJECTED
 }
 
+enum PostHireStage {
+  MATCHING
+  ACTIVE_DELIVERY
+}
+
 enum InterviewStatus {
   SCHEDULED
   COMPLETED
@@ -208,6 +213,7 @@ enum ActivityType {
   FORM_SUBMISSION
   LOGIN
   LOGOUT
+  MCP_TOOL_CALL
 }
 
 // Employee types for filtering (Dev team is represented by DevTeam/DevTeamMember)
@@ -607,11 +613,15 @@ model RBTProfile {
   supervisionCountersignedAt  DateTime?
   supervisionCountersignedBy  String?
   supervisionContractStatus   SupervisionContractStatus?
+  postHireStage               PostHireStage?
+  activeWorkingSince          DateTime?
+  activeWorkingManualOverride Boolean                    @default(false)
   quizAttempts                OnboardingQuizAttempt[]
   quizCertificates            OnboardingQuizCertificate[]
   oigScreeningLogs            OigScreeningLog[]
 
   @@index([artemisTrainingCompleted])
+  @@index([postHireStage])
   @@map("rbt_profiles")
 }
 

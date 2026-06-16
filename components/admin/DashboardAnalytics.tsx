@@ -120,22 +120,35 @@ export default function DashboardAnalytics() {
   const range: RangeKey = ['7', '30', '90', 'all'].includes(rangeParam) ? (rangeParam as RangeKey) : '30'
 
   const [data, setData] = useState<DashboardData | null>(null)
+  const [rbtStats, setRbtStats] = useState<{ activelyWorking: number; idleHires: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const loadDashboard = useCallback(() => {
     setLoading(true)
     setError(null)
-    fetch(`/api/admin/analytics/dashboard?range=${range}`, { credentials: 'include' })
-      .then(async (res) => {
+    Promise.all([
+      fetch(`/api/admin/analytics/dashboard?range=${range}`, { credentials: 'include' }).then(async (res) => {
         const body = await res.json().catch(() => ({}))
         if (!res.ok) {
-          const msg = (body && typeof body.error === 'string') ? body.error : res.statusText
+          const msg = body && typeof body.error === 'string' ? body.error : res.statusText
           throw new Error(msg)
         }
         return body
+      }),
+      fetch('/api/admin/dashboard/rbt-stats', { credentials: 'include' })
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
+    ])
+      .then(([dashboardBody, statsBody]) => {
+        setData(dashboardBody)
+        if (statsBody && typeof statsBody.activelyWorking === 'number') {
+          setRbtStats({
+            activelyWorking: statsBody.activelyWorking,
+            idleHires: statsBody.idleHires ?? 0,
+          })
+        }
       })
-      .then(setData)
       .catch((err) => setError(err?.message || 'Failed to load'))
       .finally(() => setLoading(false))
   }, [range])
@@ -282,6 +295,29 @@ export default function DashboardAnalytics() {
           </CardContent>
         </Card>
       </div>
+
+      {rbtStats && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link href="/admin/employees?type=RBT&workFilter=actively_working">
+            <Card className="shadow-sm border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20 hover:shadow-md transition-shadow h-full">
+              <CardContent className="p-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Actively Working BTs</p>
+                <p className="text-2xl font-bold mt-1 text-green-600 dark:text-green-500">{rbtStats.activelyWorking}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Delivering sessions with client assignments</p>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/admin/employees?type=RBT&workFilter=idle_hired">
+            <Card className="shadow-sm border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 hover:shadow-md transition-shadow h-full">
+              <CardContent className="p-4">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Idle Hires</p>
+                <p className="text-2xl font-bold mt-1 text-amber-700 dark:text-amber-300">{rbtStats.idleHires}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Hired but not actively working — may need client matching</p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+      )}
 
       {/* Funnel + Ethnicity: 12-col grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

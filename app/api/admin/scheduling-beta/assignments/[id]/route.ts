@@ -107,8 +107,15 @@ export async function DELETE(
     const user = auth.user
 
     const { id } = await params
+    const existing = await prisma.clientAssignment.findUnique({
+      where: { id },
+      select: { rbtProfileId: true },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
+    }
     await prisma.clientAssignment.delete({ where: { id } })
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true, rbtProfileId: existing.rbtProfileId })
   } catch (e) {
     console.error('[scheduling-beta] DELETE assignment error:', e)
     return NextResponse.json({ error: 'Failed to delete assignment' }, { status: 500 })

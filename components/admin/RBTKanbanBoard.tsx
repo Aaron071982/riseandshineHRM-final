@@ -30,6 +30,7 @@ export interface RBTKanbanProfile {
   zipCode: string | null
   status: string
   source: string | null
+  postHireStage?: string | null
   updatedAt: Date | string
   user: { role: string; isActive: boolean }
 }
@@ -77,6 +78,7 @@ interface RBTKanbanBoardProps {
   rbts: RBTKanbanProfile[]
   statusFilter: string
   searchFilter?: string
+  assignmentCounts?: Record<string, number>
   onRbtsChange?: (rbts: RBTKanbanProfile[]) => void
 }
 
@@ -84,6 +86,7 @@ export default function RBTKanbanBoard({
   rbts: initialRbts,
   statusFilter,
   searchFilter = '',
+  assignmentCounts = {},
   onRbtsChange,
 }: RBTKanbanBoardProps) {
   const { showToast } = useToast()
@@ -304,6 +307,16 @@ export default function RBTKanbanBoard({
                                       ) : (
                                         <Badge variant="outline" className="text-xs">
                                           Admin Created
+                                        </Badge>
+                                      )}
+                                      {rbt.postHireStage === 'ACTIVE_DELIVERY' && (
+                                        <Badge className="bg-green-500 hover:bg-green-500 text-white border-0 text-xs font-semibold">
+                                          Actively Working
+                                        </Badge>
+                                      )}
+                                      {rbt.postHireStage === 'ACTIVE_DELIVERY' && (assignmentCounts[rbt.id] ?? 0) > 0 && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {assignmentCounts[rbt.id]} client{(assignmentCounts[rbt.id] ?? 0) === 1 ? '' : 's'}
                                         </Badge>
                                       )}
                                     </div>

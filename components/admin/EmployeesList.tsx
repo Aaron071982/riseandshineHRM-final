@@ -31,6 +31,8 @@ interface RBTProfile {
   zipCode: string | null
   status: string
   source: string | null
+  postHireStage?: string | null
+  activeWorkingSince?: Date | string | null
   updatedAt: Date
   user: { role: string; isActive: boolean }
 }
@@ -56,6 +58,9 @@ interface EmployeesListProps {
   currentType: EmployeeListType
   viewMode?: 'list' | 'board'
   initialRbts: RBTProfile[]
+  assignmentCounts?: Record<string, number>
+  activeWorkingStats?: { activelyWorking: number; idleHires: number }
+  initialWorkFilter?: string
   bcbaProfiles: GenericProfile[]
   billingProfiles: GenericProfile[]
   marketingProfiles: GenericProfile[]
@@ -90,6 +95,9 @@ export default function EmployeesList({
   currentType,
   viewMode = 'list',
   initialRbts,
+  assignmentCounts = {},
+  activeWorkingStats = { activelyWorking: 0, idleHires: 0 },
+  initialWorkFilter = '',
   bcbaProfiles,
   billingProfiles,
   marketingProfiles,
@@ -101,6 +109,7 @@ export default function EmployeesList({
   const searchParams = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const [status, setStatus] = useState(searchParams.get('status') || '')
+  const [workFilter, setWorkFilter] = useState(initialWorkFilter || searchParams.get('workFilter') || '')
   const [type, setType] = useState(currentType)
   const [isPending, startTransition] = useTransition()
 
@@ -137,6 +146,19 @@ export default function EmployeesList({
     })
   }
 
+  const handleWorkFilterChange = (value: string) => {
+    setWorkFilter(value)
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('type', currentType)
+      if (value) params.set('workFilter', value)
+      else params.delete('workFilter')
+      router.push(`/admin/employees?${params.toString()}`)
+    })
+  }
+
+  const isActivelyWorking = (rbt: RBTProfile) => rbt.postHireStage === 'ACTIVE_DELIVERY'
+
   const statusCounts = initialRbts.reduce<Record<string, number>>((acc, rbt) => {
     acc[rbt.status] = (acc[rbt.status] || 0) + 1
     return acc
@@ -160,7 +182,7 @@ export default function EmployeesList({
   return (
     <div className="space-y-6">
       {/* Stats - type-aware */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -195,6 +217,28 @@ export default function EmployeesList({
                     <p className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)] mt-1">{statusCounts['NEW'] || 0}</p>
                   </div>
                   <UserPlus className="h-8 w-8 text-blue-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Actively Working</p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-500 mt-1">{activeWorkingStats.activelyWorking}</p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Idle Hires</p>
+                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-500 mt-1">{activeWorkingStats.idleHires}</p>
+                  </div>
+                  <UserPlus className="h-8 w-8 text-amber-500" />
                 </div>
               </CardContent>
             </Card>
@@ -244,23 +288,36 @@ export default function EmployeesList({
               />
             </div>
             {showStatusFilter && (
-              <Select value={status || 'all'} onValueChange={(v) => handleStatusChange(v === 'all' ? '' : v)}>
-                <SelectTrigger className="w-full md:w-[220px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="NEW">New</SelectItem>
-                  <SelectItem value="REACH_OUT">Reach Out</SelectItem>
-                  <SelectItem value="TO_INTERVIEW">To Interview</SelectItem>
-                  <SelectItem value="INTERVIEW_SCHEDULED">Interview Scheduled</SelectItem>
-                  <SelectItem value="INTERVIEW_COMPLETED">Interview Completed</SelectItem>
-                  <SelectItem value="HIRED">Hired</SelectItem>
-                  <SelectItem value="ONBOARDING_COMPLETED">Onboarding Completed</SelectItem>
-                  <SelectItem value="STALLED">Stalled</SelectItem>
-                  <SelectItem value="REJECTED">Rejected</SelectItem>
-                </SelectContent>
-              </Select>
+              <>
+                <Select value={status || 'all'} onValueChange={(v) => handleStatusChange(v === 'all' ? '' : v)}>
+                  <SelectTrigger className="w-full md:w-[220px]">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="NEW">New</SelectItem>
+                    <SelectItem value="REACH_OUT">Reach Out</SelectItem>
+                    <SelectItem value="TO_INTERVIEW">To Interview</SelectItem>
+                    <SelectItem value="INTERVIEW_SCHEDULED">Interview Scheduled</SelectItem>
+                    <SelectItem value="INTERVIEW_COMPLETED">Interview Completed</SelectItem>
+                    <SelectItem value="HIRED">Hired</SelectItem>
+                    <SelectItem value="ONBOARDING_COMPLETED">Onboarding Completed</SelectItem>
+                    <SelectItem value="STALLED">Stalled</SelectItem>
+                    <SelectItem value="REJECTED">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={workFilter || 'all'} onValueChange={(v) => handleWorkFilterChange(v === 'all' ? '' : v)}>
+                  <SelectTrigger className="w-full md:w-[220px]">
+                    <SelectValue placeholder="Work status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All work status</SelectItem>
+                    <SelectItem value="actively_working">Actively Working</SelectItem>
+                    <SelectItem value="idle_hired">Hired - Not Working</SelectItem>
+                    <SelectItem value="all_hired">All Hired</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
             )}
           </div>
         </CardContent>
@@ -280,6 +337,7 @@ export default function EmployeesList({
             rbts={filteredRbts as RBTKanbanProfile[]}
             statusFilter={status}
             searchFilter={search}
+            assignmentCounts={assignmentCounts}
           />
         ) : filteredRbts.length === 0 ? (
           <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
@@ -292,9 +350,12 @@ export default function EmployeesList({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredRbts.map((rbt) => {
               const statusConfig = statusColors[rbt.status] || statusColors.NEW
+              const clientCount = assignmentCounts[rbt.id] ?? 0
+              const activelyWorking = isActivelyWorking(rbt)
               const q = new URLSearchParams()
               if (currentType === 'RBT' && status) q.set('status', status)
               if (currentType === 'RBT' && search) q.set('search', search)
+              if (workFilter) q.set('workFilter', workFilter)
               const viewHref = `/admin/rbts/${rbt.id}${q.toString() ? `?${q.toString()}` : ''}`
               const redirectHref = `/admin/employees?type=RBT${status ? `&status=${encodeURIComponent(status)}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`
               return (
@@ -315,6 +376,16 @@ export default function EmployeesList({
                           <Badge variant="outline" className={`${statusConfig.bg} ${statusConfig.text} ${statusConfig.darkBg} ${statusConfig.darkText} border-0`}>
                             {rbt.status.replace(/_/g, ' ')}
                           </Badge>
+                          {activelyWorking && (
+                            <Badge className="bg-green-500 hover:bg-green-500 text-white border-0 font-semibold">
+                              Actively Working
+                            </Badge>
+                          )}
+                          {activelyWorking && clientCount > 0 && (
+                            <Badge variant="outline" className="dark:border-[var(--border-subtle)]">
+                              {clientCount} client{clientCount === 1 ? '' : 's'}
+                            </Badge>
+                          )}
                           {rbt.source === 'PUBLIC_APPLICATION' && (
                             <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-[var(--orange-subtle)] dark:text-[var(--orange-primary)] dark:border-[var(--orange-border)]">
                               Applied Online

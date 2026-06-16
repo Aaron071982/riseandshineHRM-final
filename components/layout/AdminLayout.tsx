@@ -21,6 +21,7 @@ import {
   MessageCircle,
   LayoutGrid,
   Network,
+  Plug,
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
@@ -45,6 +46,7 @@ const secondaryNavItems = [
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
   { href: '/admin/org-chart', label: 'Company hierarchy', icon: Network },
+  { href: '/admin/mcp-activity', label: 'MCP Activity', icon: Plug },
 ]
 
 const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']

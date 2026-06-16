@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export const dynamic = 'force-dynamic'
+import { getActiveWorkingStats } from '@/lib/rbt/activeWorking'
 
 const PIPELINE_STATUSES = [
   'NEW',
@@ -13,18 +13,21 @@ const PIPELINE_STATUSES = [
   'INTERVIEW_COMPLETED',
 ] as const
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const auth = await requireAdminSession()
   if (auth.response) return auth.response
 
   try {
-    const [hiredCount, pipelineCount, awaitingArtemis, onboardingComplete] = await Promise.all([
+    const [hiredCount, pipelineCount, awaitingArtemis, onboardingComplete, activeStats] = await Promise.all([
       prisma.rBTProfile.count({ where: { status: 'HIRED' } }),
       prisma.rBTProfile.count({ where: { status: { in: [...PIPELINE_STATUSES] } } }),
       prisma.rBTProfile.count({
         where: { status: 'HIRED', artemisTrainingCompleted: false },
       }),
       prisma.rBTProfile.count({ where: { status: 'ONBOARDING_COMPLETED' } }),
+      getActiveWorkingStats(),
     ])
 
     return NextResponse.json({
@@ -32,6 +35,8 @@ export async function GET() {
       inPipeline: pipelineCount,
       awaitingArtemis,
       onboardingComplete,
+      activelyWorking: activeStats.activelyWorking,
+      idleHires: activeStats.idleHires,
     })
   } catch (e) {
     return NextResponse.json(

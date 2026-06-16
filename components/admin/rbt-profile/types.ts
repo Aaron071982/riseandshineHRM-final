@@ -114,6 +114,9 @@ export interface RBTProfile {
   cprFirstAidCertified: string | null
   transportation: boolean | null
   preferredHoursRange: string | null
+  postHireStage?: string | null
+  activeWorkingSince?: Date | string | null
+  activeWorkingManualOverride?: boolean
   createdAt: Date
   updatedAt: Date
   user: {

@@ -135,6 +135,7 @@ export async function POST(request: NextRequest) {
         ethnicity: data.ethnicity as any,
         fortyHourCourseCompleted: data.fortyHourCourseCompleted,
         status,
+        ...(status === 'HIRED' ? { postHireStage: 'MATCHING' as const } : {}),
         authorizedToWork: data.authorizedToWork,
         canPassBackgroundCheck: data.canPassBackgroundCheck,
         cprFirstAidCertified: data.cprFirstAidCertified,

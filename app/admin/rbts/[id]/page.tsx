@@ -238,6 +238,9 @@ async function loadRbtProfileMinimalRaw(
       transportation: null,
       preferredHoursRange: null,
       schedulingToken: null,
+      postHireStage: null,
+      activeWorkingSince: null,
+      activeWorkingManualOverride: false,
       createdAt: profileRow.updatedAt,
       updatedAt: profileRow.updatedAt,
       user: {
@@ -441,6 +444,9 @@ async function loadRbtProfileRaw(
       transportation: null,
       preferredHoursRange: null,
       schedulingToken: null,
+      postHireStage: null,
+      activeWorkingSince: null,
+      activeWorkingManualOverride: false,
       createdAt: profileRow.createdAt,
       updatedAt: profileRow.updatedAt,
       user: {

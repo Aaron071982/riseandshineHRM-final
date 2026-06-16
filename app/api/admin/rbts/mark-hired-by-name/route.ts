@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     for (const profile of profiles) {
       await prisma.rBTProfile.update({
         where: { id: profile.id },
-        data: { status: 'HIRED' },
+        data: { status: 'HIRED', postHireStage: 'MATCHING' },
       })
 
       // Ensure user role is RBT

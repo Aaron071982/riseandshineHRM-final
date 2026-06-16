@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getWorkflowSettings } from '@/lib/workflow-settings'
+import { listBtReviewNoClients } from '@/lib/rbt/activeWorking'
 import { startOfDay, endOfDay, subDays } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
@@ -507,6 +508,23 @@ export async function GET(request: NextRequest) {
         tasksRemaining,
       }
     }),
+    })
+
+    const btReviewNoClients = await listBtReviewNoClients()
+    sections.push({
+      id: 'bt-review-no-clients',
+      title: 'BTs to Review — No Active Clients',
+      severity: 'WARNING',
+      count: btReviewNoClients.length,
+      items: btReviewNoClients.map((p) => ({
+        id: p.rbtProfileId,
+        rbtProfileId: p.rbtProfileId,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        email: p.email ?? undefined,
+        activeWorkingSince: p.activeWorkingSince,
+        lastAssignmentEndedAt: p.lastAssignmentEndedAt,
+      })),
     })
 
     const scheduleCandidates = await prisma.rBTProfile.findMany({

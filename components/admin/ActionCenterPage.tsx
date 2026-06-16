@@ -73,6 +73,12 @@ export default function ActionCenterPage() {
   const [scheduleCandidateId, setScheduleCandidateId] = useState<string | null>(null)
   const [scheduleForm, setScheduleForm] = useState({ date: '', time: '', interviewerName: '' })
   const [scheduleSubmitting, setScheduleSubmitting] = useState(false)
+  const [removeActiveModal, setRemoveActiveModal] = useState<{
+    rbtProfileId: string
+    name: string
+  } | null>(null)
+  const [removeActiveReason, setRemoveActiveReason] = useState('')
+  const [removeActiveSubmitting, setRemoveActiveSubmitting] = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoadError(false)
@@ -166,6 +172,52 @@ export default function ActionCenterPage() {
       fetchData()
     } catch (e) {
       showToast((e as Error).message || 'Failed to send reminder', 'error')
+    }
+  }
+
+  const handleKeepActivelyWorking = async (rbtProfileId: string) => {
+    if (!rbtProfileId) return
+    try {
+      const res = await fetch(`/api/admin/rbts/${rbtProfileId}/active-working`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'mark', keepActiveReview: true }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Failed')
+      showToast('Kept actively working status', 'success')
+      fetchData()
+    } catch (e) {
+      showToast((e as Error).message || 'Failed to update status', 'error')
+    }
+  }
+
+  const handleRemoveActiveStatus = async () => {
+    if (!removeActiveModal) return
+    const reason = removeActiveReason.trim()
+    if (!reason) {
+      showToast('Please provide a reason', 'error')
+      return
+    }
+    setRemoveActiveSubmitting(true)
+    try {
+      const res = await fetch(`/api/admin/rbts/${removeActiveModal.rbtProfileId}/active-working`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'remove', reason }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'Failed')
+      showToast('Active status removed', 'success')
+      setRemoveActiveModal(null)
+      setRemoveActiveReason('')
+      fetchData()
+    } catch (e) {
+      showToast((e as Error).message || 'Failed to remove active status', 'error')
+    } finally {
+      setRemoveActiveSubmitting(false)
     }
   }
 
@@ -717,6 +769,55 @@ export default function ActionCenterPage() {
                     </div>
                   </div>
                 ))}
+
+              {section.id === 'bt-review-no-clients' &&
+                items.map((item: Record<string, unknown>) => {
+                  const rbtProfileId = String(item.rbtProfileId ?? item.id)
+                  const name = `${item.firstName} ${item.lastName}`
+                  const since = item.activeWorkingSince
+                    ? format(new Date(item.activeWorkingSince as string), 'PP')
+                    : null
+                  const lastEnded = item.lastAssignmentEndedAt
+                    ? format(new Date(item.lastAssignmentEndedAt as string), 'PP')
+                    : null
+                  return (
+                    <div
+                      key={rbtProfileId}
+                      className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)]"
+                    >
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-[var(--text-primary)]">{name}</p>
+                        <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)]">
+                          Actively working{since ? ` since ${since}` : ''}
+                          {lastEnded ? ` · Last assignment ended ${lastEnded}` : ' · No active client assignments'}
+                          {item.email ? ` · ${String(item.email)}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => handleKeepActivelyWorking(rbtProfileId)}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" /> Keep Active
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setRemoveActiveModal({ rbtProfileId, name })}
+                        >
+                          Remove Active Status
+                        </Button>
+                        <Link href={`/admin/rbts/${rbtProfileId}`} className="text-sm text-orange-600 dark:text-[var(--orange-primary)]">
+                          View Profile
+                        </Link>
+                        <Button variant="ghost" size="sm" onClick={() => { setSnooze(section.id, rbtProfileId); setSnoozeVersion((v) => v + 1) }} title="Snooze 24 hours">
+                          <BellOff className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
             </div>
           </ActionCenterSection>
         )
@@ -834,6 +935,49 @@ export default function ActionCenterPage() {
             ) : (
               <Button variant="outline" onClick={() => setScheduleModalOpen(false)}>Cancel</Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!removeActiveModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemoveActiveModal(null)
+            setRemoveActiveReason('')
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove active status</DialogTitle>
+            <DialogDescription>
+              Remove actively working status for {removeActiveModal?.name}. This will move them back to matching.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <label className="block text-sm font-medium mb-1">Reason (required)</label>
+            <textarea
+              value={removeActiveReason}
+              onChange={(e) => setRemoveActiveReason(e.target.value)}
+              rows={3}
+              className="w-full rounded-md border border-gray-300 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-input)] px-3 py-2 text-sm"
+              placeholder="Why is this BT no longer actively working?"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRemoveActiveModal(null)
+                setRemoveActiveReason('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleRemoveActiveStatus} disabled={removeActiveSubmitting}>
+              {removeActiveSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Remove Active Status
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
