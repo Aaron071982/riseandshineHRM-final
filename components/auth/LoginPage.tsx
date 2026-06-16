@@ -13,6 +13,7 @@ import { motion } from 'framer-motion'
 import PublicBackground from '@/components/public/PublicBackground'
 import PublicFooter from '@/components/public/PublicFooter'
 import IconChip from '@/components/public/IconChip'
+import { OAUTH_RETURN_URL_KEY, isSafeOAuthReturnUrl } from '@/lib/oauth/returnUrl'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -24,6 +25,13 @@ export default function LoginPage() {
 
   const sessionError = searchParams.get('session_error')
   const sessionExpired = searchParams.get('session_expired')
+  const returnUrl = searchParams.get('returnUrl')
+
+  useEffect(() => {
+    if (returnUrl && isSafeOAuthReturnUrl(returnUrl)) {
+      sessionStorage.setItem(OAUTH_RETURN_URL_KEY, returnUrl)
+    }
+  }, [returnUrl])
   useEffect(() => {
     if (sessionError === '1') {
       setError('Your session expired or could not be verified. Please log in again.')

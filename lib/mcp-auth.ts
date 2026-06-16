@@ -1,27 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { hashToken } from '@/lib/oauth/crypto'
 
 /**
- * MCP connector auth: Authorization: Bearer <MCP_API_KEY> must match env.
- * In production, MCP_API_KEY must be configured (otherwise endpoints return 503).
+ * MCP connector auth: OAuth 2.0 Bearer access token (primary) or static MCP_API_KEY (dev/testing fallback).
  */
-export function assertMcpAuth(request: NextRequest): NextResponse | null {
+export async function assertMcpAuth(request: NextRequest): Promise<NextResponse | null> {
   const MCP_API_KEY = process.env.MCP_API_KEY
   const authHeader = request.headers.get('authorization')
   const bearerToken = authHeader?.replace(/^Bearer\s+/i, '') ?? ''
-  const isProd = process.env.NODE_ENV === 'production'
 
-  if (isProd) {
-    if (!MCP_API_KEY) {
-      return NextResponse.json({ error: 'MCP_API_KEY not configured' }, { status: 503 })
-    }
-    if (bearerToken !== MCP_API_KEY) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  if (!bearerToken) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (MCP_API_KEY && bearerToken === MCP_API_KEY) {
     return null
   }
 
-  if (MCP_API_KEY && bearerToken !== MCP_API_KEY) {
+  const tokenHash = hashToken(bearerToken)
+  const record = await prisma.oAuthAccessToken.findUnique({
+    where: { id: tokenHash },
+    select: { id: true, expiresAt: true, revokedAt: true },
+  })
+
+  if (!record || record.revokedAt || record.expiresAt < new Date()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  prisma.oAuthAccessToken
+    .update({ where: { id: tokenHash }, data: { lastUsedAt: new Date() } })
+    .catch(() => {})
+
   return null
 }

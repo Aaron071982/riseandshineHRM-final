@@ -70,6 +70,11 @@ export default function McpActivityPage() {
           <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)] mt-1">
             Audit trail of all tool calls made through the Claude MCP connector.
           </p>
+          <p className="text-sm mt-2">
+            <a href="/admin/mcp-connections" className="text-orange-600 dark:text-[var(--orange-primary)] hover:underline">
+              Manage OAuth connections →
+            </a>
+          </p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}

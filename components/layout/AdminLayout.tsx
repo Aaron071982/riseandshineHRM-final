@@ -47,6 +47,7 @@ const secondaryNavItems = [
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
   { href: '/admin/org-chart', label: 'Company hierarchy', icon: Network },
   { href: '/admin/mcp-activity', label: 'MCP Activity', icon: Plug },
+  { href: '/admin/mcp-connections', label: 'MCP Connections', icon: Plug },
 ]
 
 const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
+import { OAUTH_RETURN_URL_KEY, isSafeOAuthReturnUrl } from '@/lib/oauth/returnUrl'
 
 export default function VerifyOTPPage() {
   const router = useRouter()
@@ -50,6 +51,13 @@ export default function VerifyOTPPage() {
       // Clear pending email and any stored OTP from sessionStorage
       sessionStorage.removeItem('pendingEmail')
       sessionStorage.removeItem('devOTP')
+
+      const oauthReturn = sessionStorage.getItem(OAUTH_RETURN_URL_KEY)
+      if (oauthReturn && isSafeOAuthReturnUrl(oauthReturn)) {
+        sessionStorage.removeItem(OAUTH_RETURN_URL_KEY)
+        window.location.href = oauthReturn
+        return
+      }
 
       // Full-page redirect so the browser sends the new session cookie (router.push can miss it)
       const role = (data.role ?? '').toUpperCase()

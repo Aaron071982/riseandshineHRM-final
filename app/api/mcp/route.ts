@@ -21,7 +21,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 async function handleMcpRequest(request: NextRequest): Promise<Response> {
-  const denied = assertMcpAuth(request)
+  const denied = await assertMcpAuth(request)
   if (denied) return denied
 
   const transport = new WebStandardStreamableHTTPServerTransport()

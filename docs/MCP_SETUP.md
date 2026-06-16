@@ -2,7 +2,9 @@
 
 This guide explains how to connect Claude as a custom MCP connector to your Rise & Shine HRM app.
 
-## 1. Generate the API key
+> **Claude custom connectors use OAuth 2.0** — see [MCP_OAUTH_SETUP.md](./MCP_OAUTH_SETUP.md) for the recommended setup (no static token in Claude).
+
+## 1. Generate the API key (optional dev/curl fallback)
 
 Run locally:
 

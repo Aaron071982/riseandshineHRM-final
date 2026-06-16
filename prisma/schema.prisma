@@ -1305,6 +1305,56 @@ model ActivityLog {
   @@map("activity_logs")
 }
 
+model OAuthClient {
+  id           String   @id
+  clientSecret String?
+  clientName   String
+  redirectUris String[]
+  grantTypes   String[]
+  createdAt    DateTime @default(now())
+
+  authorizationCodes OAuthAuthorizationCode[]
+  accessTokens       OAuthAccessToken[]
+
+  @@map("oauth_clients")
+}
+
+model OAuthAuthorizationCode {
+  id                  String   @id
+  clientId            String
+  redirectUri         String
+  codeChallenge       String
+  codeChallengeMethod String
+  scope               String
+  expiresAt           DateTime
+  used                Boolean  @default(false)
+  approvedByUserId    String?
+  createdAt           DateTime @default(now())
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([expiresAt])
+  @@map("oauth_authorization_codes")
+}
+
+model OAuthAccessToken {
+  id         String    @id
+  clientId   String
+  scope      String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@map("oauth_access_tokens")
+}
+
 // --- Employees and Candidates (non-RBT) ---
 
 model BCBAProfile {
