@@ -49,6 +49,11 @@ function buildRedirect(base: string, params: Record<string, string>): string {
   return url.toString()
 }
 
+/** OAuth callback redirects must use 303 so the browser follows with GET (not POST). */
+function redirectToClient(redirectUrl: string): NextResponse {
+  return NextResponse.redirect(redirectUrl, { status: 303 })
+}
+
 function consentHtml(params: AuthorizeParams, clientName: string): string {
   const q = new URLSearchParams({
     client_id: params.clientId,
@@ -193,7 +198,8 @@ export async function POST(request: NextRequest) {
       error: 'access_denied',
       state: parsed.state,
     })
-    return NextResponse.redirect(redirect)
+    logOAuthRoute('authorize', { method: 'POST', outcome: 'deny', status: 303 })
+    return redirectToClient(redirect)
   }
 
   const code = generateSecureToken(32)
@@ -222,5 +228,6 @@ export async function POST(request: NextRequest) {
     code,
     state: parsed.state,
   })
-  return NextResponse.redirect(redirect)
+  logOAuthRoute('authorize', { method: 'POST', outcome: 'approve', status: 303 })
+  return redirectToClient(redirect)
 }
