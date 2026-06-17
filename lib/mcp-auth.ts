@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hashToken } from '@/lib/oauth/crypto'
+import { mcpUnauthorizedResponse } from '@/lib/oauth/http'
 
 /**
  * MCP connector auth: OAuth 2.0 Bearer access token (primary) or static MCP_API_KEY (dev/testing fallback).
+ * Unauthenticated requests return 401 with WWW-Authenticate pointing at protected resource metadata.
  */
 export async function assertMcpAuth(request: NextRequest): Promise<NextResponse | null> {
   const MCP_API_KEY = process.env.MCP_API_KEY
@@ -11,7 +13,7 @@ export async function assertMcpAuth(request: NextRequest): Promise<NextResponse 
   const bearerToken = authHeader?.replace(/^Bearer\s+/i, '') ?? ''
 
   if (!bearerToken) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return mcpUnauthorizedResponse('missing_bearer_token')
   }
 
   if (MCP_API_KEY && bearerToken === MCP_API_KEY) {
@@ -25,7 +27,7 @@ export async function assertMcpAuth(request: NextRequest): Promise<NextResponse 
   })
 
   if (!record || record.revokedAt || record.expiresAt < new Date()) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return mcpUnauthorizedResponse('invalid_or_expired_token')
   }
 
   prisma.oAuthAccessToken

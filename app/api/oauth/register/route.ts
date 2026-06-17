@@ -1,15 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateClientId, generateClientSecret } from '@/lib/oauth/crypto'
 import { validateRedirectUris } from '@/lib/oauth/redirect'
 import { logOAuthEvent } from '@/lib/oauth/audit'
+import { logOAuthRoute, oauthJsonResponse, oauthOptionsResponse } from '@/lib/oauth/http'
 
 export const dynamic = 'force-dynamic'
+
+export async function OPTIONS() {
+  logOAuthRoute('register', { method: 'OPTIONS' })
+  return oauthOptionsResponse()
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))
-    const clientName = typeof body.client_name === 'string' ? body.client_name.trim() : ''
+    const clientName =
+      typeof body.client_name === 'string' && body.client_name.trim()
+        ? body.client_name.trim()
+        : 'Claude MCP Connector'
     const redirectUris = Array.isArray(body.redirect_uris) ? body.redirect_uris : []
     const grantTypes = Array.isArray(body.grant_types)
       ? body.grant_types
@@ -19,13 +28,27 @@ export async function POST(request: NextRequest) {
         ? body.token_endpoint_auth_method
         : 'none'
 
-    if (!clientName) {
-      return NextResponse.json({ error: 'invalid_client_metadata', error_description: 'client_name required' }, { status: 400 })
+    logOAuthRoute('register', {
+      method: 'POST',
+      clientName,
+      redirectUriCount: redirectUris.length,
+      grantTypes,
+      tokenEndpointAuthMethod,
+    })
+
+    if (redirectUris.length === 0) {
+      return oauthJsonResponse(
+        { error: 'invalid_client_metadata', error_description: 'redirect_uris is required' },
+        400
+      )
     }
 
     const redirectCheck = validateRedirectUris(redirectUris)
     if (!redirectCheck.ok) {
-      return NextResponse.json({ error: 'invalid_redirect_uri', error_description: redirectCheck.error }, { status: 400 })
+      return oauthJsonResponse(
+        { error: 'invalid_redirect_uri', error_description: redirectCheck.error },
+        400
+      )
     }
 
     const clientId = generateClientId()
@@ -62,9 +85,10 @@ export async function POST(request: NextRequest) {
       response.client_secret = clientSecret
     }
 
-    return NextResponse.json(response, { status: 201 })
+    logOAuthRoute('register', { method: 'POST', status: 201, clientId })
+    return oauthJsonResponse(response, 201)
   } catch (err) {
     console.error('[oauth/register]', err)
-    return NextResponse.json({ error: 'server_error' }, { status: 500 })
+    return oauthJsonResponse({ error: 'server_error' }, 500)
   }
 }

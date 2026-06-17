@@ -8,6 +8,7 @@ import {
 } from '@/lib/oauth/crypto'
 import { clientAllowsRedirectUri } from '@/lib/oauth/redirect'
 import { logOAuthEvent } from '@/lib/oauth/audit'
+import { logOAuthRoute } from '@/lib/oauth/http'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,6 +119,11 @@ async function validateClientAndRedirect(params: AuthorizeParams) {
 }
 
 export async function GET(request: NextRequest) {
+  logOAuthRoute('authorize', {
+    method: 'GET',
+    clientId: request.nextUrl.searchParams.get('client_id'),
+    hasChallenge: !!request.nextUrl.searchParams.get('code_challenge'),
+  })
   const parsed = parseAuthorizeParams(request)
   if ('error' in parsed) {
     return new NextResponse(errorHtml(parsed.error), { status: 400, headers: { 'Content-Type': 'text/html' } })
@@ -150,6 +156,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  logOAuthRoute('authorize', {
+    method: 'POST',
+    clientId: request.nextUrl.searchParams.get('client_id'),
+  })
   const parsed = parseAuthorizeParams(request)
   if ('error' in parsed) {
     return new NextResponse(errorHtml(parsed.error), { status: 400, headers: { 'Content-Type': 'text/html' } })

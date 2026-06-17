@@ -16,33 +16,61 @@ import { NextRequest, NextResponse } from 'next/server'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { assertMcpAuth } from '@/lib/mcp-auth'
 import { createMcpServer } from '@/lib/mcp/server'
+import { logMcpRequest, oauthOptionsResponse, withCors } from '@/lib/oauth/http'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
+async function withCorsResponse(response: Response): Promise<Response> {
+  const headers = new Headers(response.headers)
+  headers.set('Access-Control-Allow-Origin', '*')
+  headers.set(
+    'Access-Control-Allow-Headers',
+    'Authorization, Content-Type, Accept, MCP-Protocol-Version, mcp-session-id, Last-Event-ID'
+  )
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
+}
+
 async function handleMcpRequest(request: NextRequest): Promise<Response> {
   const denied = await assertMcpAuth(request)
-  if (denied) return denied
+  if (denied) {
+    logMcpRequest(request, 'unauthorized')
+    return denied
+  }
+
+  logMcpRequest(request, 'authorized')
 
   const transport = new WebStandardStreamableHTTPServerTransport()
   const server = createMcpServer()
 
   try {
     await server.connect(transport)
-    return await transport.handleRequest(request)
+    const response = await transport.handleRequest(request)
+    return withCorsResponse(response)
   } catch (err) {
     console.error('[mcp] request failed:', err)
-    return NextResponse.json(
-      {
-        jsonrpc: '2.0',
-        error: { code: -32603, message: 'Internal server error' },
-        id: null,
-      },
-      { status: 500 }
+    return withCors(
+      NextResponse.json(
+        {
+          jsonrpc: '2.0',
+          error: { code: -32603, message: 'Internal server error' },
+          id: null,
+        },
+        { status: 500 }
+      )
     )
   } finally {
     await server.close().catch(() => {})
   }
+}
+
+export async function OPTIONS() {
+  console.log('[mcp]', JSON.stringify({ method: 'OPTIONS', outcome: 'preflight' }))
+  return oauthOptionsResponse()
 }
 
 export async function GET(request: NextRequest) {

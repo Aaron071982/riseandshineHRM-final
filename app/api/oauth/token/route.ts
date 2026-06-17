@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   ACCESS_TOKEN_TTL_SECONDS,
@@ -7,6 +7,7 @@ import {
   verifyPkce,
 } from '@/lib/oauth/crypto'
 import { logOAuthEvent } from '@/lib/oauth/audit'
+import { logOAuthRoute, oauthJsonResponse, oauthOptionsResponse } from '@/lib/oauth/http'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,13 +28,26 @@ async function parseTokenBody(request: NextRequest): Promise<Record<string, stri
   return out
 }
 
+export async function OPTIONS() {
+  logOAuthRoute('token', { method: 'OPTIONS' })
+  return oauthOptionsResponse()
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await parseTokenBody(request)
     const grantType = body.grant_type
 
+    logOAuthRoute('token', {
+      method: 'POST',
+      grantType,
+      clientId: body.client_id ?? null,
+      hasCode: !!body.code,
+      hasVerifier: !!body.code_verifier,
+    })
+
     if (grantType !== 'authorization_code') {
-      return NextResponse.json({ error: 'unsupported_grant_type' }, { status: 400 })
+      return oauthJsonResponse({ error: 'unsupported_grant_type' }, 400)
     }
 
     const code = body.code
@@ -42,39 +56,51 @@ export async function POST(request: NextRequest) {
     const codeVerifier = body.code_verifier
 
     if (!code || !clientId || !redirectUri || !codeVerifier) {
-      return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+      return oauthJsonResponse({ error: 'invalid_request' }, 400)
     }
 
     const client = await prisma.oAuthClient.findUnique({ where: { id: clientId } })
     if (!client) {
-      return NextResponse.json({ error: 'invalid_client' }, { status: 401 })
+      return oauthJsonResponse({ error: 'invalid_client' }, 401)
     }
 
     if (client.clientSecret) {
       const providedSecret = body.client_secret ?? ''
       if (providedSecret !== client.clientSecret) {
-        return NextResponse.json({ error: 'invalid_client' }, { status: 401 })
+        return oauthJsonResponse({ error: 'invalid_client' }, 401)
       }
     }
 
     const authCode = await prisma.oAuthAuthorizationCode.findUnique({ where: { id: code } })
     if (!authCode || authCode.clientId !== clientId) {
-      return NextResponse.json({ error: 'invalid_grant' }, { status: 400 })
+      return oauthJsonResponse({ error: 'invalid_grant' }, 400)
     }
     if (authCode.used) {
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'code already used' }, { status: 400 })
+      return oauthJsonResponse(
+        { error: 'invalid_grant', error_description: 'code already used' },
+        400
+      )
     }
     if (authCode.expiresAt < new Date()) {
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'code expired' }, { status: 400 })
+      return oauthJsonResponse(
+        { error: 'invalid_grant', error_description: 'code expired' },
+        400
+      )
     }
     if (authCode.redirectUri !== redirectUri) {
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'redirect_uri mismatch' }, { status: 400 })
+      return oauthJsonResponse(
+        { error: 'invalid_grant', error_description: 'redirect_uri mismatch' },
+        400
+      )
     }
     if (authCode.codeChallengeMethod !== 'S256') {
-      return NextResponse.json({ error: 'invalid_grant' }, { status: 400 })
+      return oauthJsonResponse({ error: 'invalid_grant' }, 400)
     }
     if (!verifyPkce(codeVerifier, authCode.codeChallenge)) {
-      return NextResponse.json({ error: 'invalid_grant', error_description: 'PKCE verification failed' }, { status: 400 })
+      return oauthJsonResponse(
+        { error: 'invalid_grant', error_description: 'PKCE verification failed' },
+        400
+      )
     }
 
     await prisma.oAuthAuthorizationCode.update({
@@ -102,7 +128,9 @@ export async function POST(request: NextRequest) {
       approvedByUserId: authCode.approvedByUserId,
     })
 
-    return NextResponse.json({
+    logOAuthRoute('token', { method: 'POST', status: 200, clientId })
+
+    return oauthJsonResponse({
       access_token: accessToken,
       token_type: 'Bearer',
       expires_in: ACCESS_TOKEN_TTL_SECONDS,
@@ -110,6 +138,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (err) {
     console.error('[oauth/token]', err)
-    return NextResponse.json({ error: 'server_error' }, { status: 500 })
+    return oauthJsonResponse({ error: 'server_error' }, 500)
   }
 }

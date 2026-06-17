@@ -12,6 +12,11 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/api/public/')) {
     return NextResponse.next()
   }
+
+  // OAuth discovery + MCP must be reachable without a session cookie
+  if (pathname.startsWith('/.well-known/')) {
+    return NextResponse.next()
+  }
   
   if (publicRoutes.includes(pathname)) {
     return NextResponse.next()
