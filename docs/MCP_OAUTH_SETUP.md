@@ -10,7 +10,7 @@ Claude's MCP custom connectors use **OAuth 2.0 Authorization Code + PKCE** with 
 -- prisma/scripts/add-oauth-tables.sql
 ```
 
-2. Ensure `NEXT_PUBLIC_BASE_URL` is set to your production domain (e.g. `https://riseandshinehrm.com`).
+2. Ensure `NEXT_PUBLIC_BASE_URL` is set to `https://www.riseandshinehrm.com` in Vercel (canonical destination; non-www redirects to www).
 
 3. Deploy the app.
 
@@ -30,7 +30,7 @@ Claude discovers OAuth configuration automatically:
 2. Enter only the MCP URL (no token):
 
 ```
-https://riseandshinehrm.com/api/mcp
+https://www.riseandshinehrm.com/api/mcp
 ```
 
 3. Claude registers a client via `POST /api/oauth/register` and redirects you to authorize.
@@ -78,7 +78,7 @@ Claude should call `get_onboarding_status` and return hired RBTs with incomplete
 If `MCP_API_KEY` is set in your environment:
 
 ```bash
-curl -s -X POST "https://riseandshinehrm.com/api/mcp" \
+curl -s -X POST "https://www.riseandshinehrm.com/api/mcp" \
   -H "Authorization: Bearer $MCP_API_KEY" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \

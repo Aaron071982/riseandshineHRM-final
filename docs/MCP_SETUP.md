@@ -49,7 +49,7 @@ npx prisma generate
 ## 4. MCP server URL
 
 ```
-https://riseandshinehrm.com/api/mcp
+https://www.riseandshinehrm.com/api/mcp
 ```
 
 Replace with your domain in non-production environments (e.g. `http://localhost:3000/api/mcp`).
