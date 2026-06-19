@@ -19,6 +19,20 @@ export function isSuperAdminEmail(email: string | null | undefined): boolean {
   return getSuperAdminEmails().includes(email.toLowerCase())
 }
 
+/** Fixed OTP `000000` on send + verify — works in development and production. */
+export const OTP_TEST_ACCOUNT_CODE = '000000'
+
+const OTP_TEST_ACCOUNT_EMAILS = ['hrmtesting@gmail.com', 'aaronsiam22@gmail.com'] as const
+
+export function isOtpTestAccount(email: string | null | undefined): boolean {
+  if (!email) return false
+  return (OTP_TEST_ACCOUNT_EMAILS as readonly string[]).includes(email.toLowerCase())
+}
+
+export function getOtpTestCode(): string {
+  return OTP_TEST_ACCOUNT_CODE
+}
+
 /** Supabase storage bucket for signed onboarding PDFs (private). */
 export const STORAGE_BUCKET = 'onboarding-documents'
 
