@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateOTP } from '@/lib/otp'
 import { sendOTPEmail, storeOTPEmail } from '@/lib/email-otp'
+import { getOtpTestCode, isOtpTestAccount } from '@/lib/constants'
+import { provisionBillingLoginIfNeeded } from '@/lib/billing-portal-users'
 
 
 export async function POST(request: NextRequest) {
@@ -17,7 +19,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const isTestAccount = email === 'hrmtesting@gmail.com'
+    // Ensure billing portal users exist before OTP (fixes login when only billing_profiles row exists).
+    await provisionBillingLoginIfNeeded(email)
+
+    if (isOtpTestAccount(email)) {
+      const code = getOtpTestCode()
+      try {
+        await storeOTPEmail(email, code)
+      } catch {
+        // still allow login with fixed code if store fails
+      }
+      return NextResponse.json({
+        success: true,
+        isTestAccount: true,
+        devOTP: code,
+      })
+    }
 
     // Localhost / development bypass: no email, no OTP table required. Use fixed code 123456.
     const isDevBypass = process.env.NODE_ENV === 'development'
@@ -35,16 +52,6 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      if (isTestAccount) {
-        const code = '000000'
-        await storeOTPEmail(email, code)
-        return NextResponse.json({
-          success: true,
-          isTestAccount: true,
-          devOTP: code,
-        })
-      }
-
       const code = generateOTP()
       await storeOTPEmail(email, code)
 

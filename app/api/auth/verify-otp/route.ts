@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTPEmail } from '@/lib/email-otp'
 import { createSession, LOCAL_DEV_SESSION_TOKEN } from '@/lib/auth'
 import { getOtpTestCode, isOtpTestAccount } from '@/lib/constants'
-import { ensureBillingPortalUser, ensureBillingLoginUser, isBillingPortalEmail } from '@/lib/billing-portal-users'
+import { provisionBillingLoginIfNeeded, shouldProvisionBillingLogin } from '@/lib/billing-portal-users'
 import { prisma } from '@/lib/prisma'
 
 
@@ -43,6 +43,14 @@ async function findUserByEmailWithProfile(
     }
     throw err
   }
+}
+
+/** Lightweight lookup (no rbtProfile join) — used after billing user provisioning. */
+async function findUserByEmailSimple(email: string) {
+  return prisma.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    select: { id: true, email: true, role: true, isActive: true },
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -158,7 +166,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Create billing login user before lookup (production may only have billing_profiles row).
+    await provisionBillingLoginIfNeeded(email)
+
     let user = await findUserByEmailWithProfile(email)
+    if (!user) {
+      const simple = await findUserByEmailSimple(email)
+      if (simple) {
+        user = { ...simple, rbtProfile: null }
+      }
+    }
     if (!user) {
       // Case-insensitive lookup so hired RBTs can log in regardless of email casing in profile
       const rbtProfile = await prisma.rBTProfile.findFirst({
@@ -172,21 +189,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!user && isBillingPortalEmail(email)) {
-      await ensureBillingPortalUser(email)
-      user = await findUserByEmailWithProfile(email)
-    }
-
     if (!user) {
-      const billingProfile = await prisma.billingProfile
-        .findFirst({
-          where: { email: { equals: email, mode: 'insensitive' } },
-          select: { email: true, fullName: true },
-        })
-        .catch(() => null)
-      if (billingProfile?.email) {
-        await ensureBillingLoginUser(billingProfile.email, billingProfile.fullName)
-        user = await findUserByEmailWithProfile(email)
+      await provisionBillingLoginIfNeeded(email)
+      const simple = await findUserByEmailSimple(email)
+      if (simple) {
+        user = { ...simple, rbtProfile: null }
       }
     }
 
@@ -204,6 +211,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+
+    // Billing portal: never block as CANDIDATE — upgrade role if mis-assigned.
+    if (user.role === 'CANDIDATE' && (await shouldProvisionBillingLogin(email))) {
+      await provisionBillingLoginIfNeeded(email)
+      const upgraded = await findUserByEmailSimple(email)
+      if (upgraded?.role === 'BILLING') {
+        user = { ...upgraded, rbtProfile: null }
+      }
+    }
 
     // Check if user is a hired RBT or admin
     if (user.role === 'CANDIDATE') {
