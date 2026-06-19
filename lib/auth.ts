@@ -305,6 +305,33 @@ export async function requireTrainingPortalSession(): Promise<
   return { user, response: null }
 }
 
+/** Billing & Payroll portal: BILLING role, admins, or super-admin emails. */
+export function isBillingManager(user: SessionUser | null): boolean {
+  if (!user) return false
+  const role = (user.role ?? '').toUpperCase()
+  if (role === 'ADMIN' || role === 'BILLING') return true
+  return isSuperAdminEmail(user.email)
+}
+
+export async function requireBillingManagerSession(): Promise<
+  | { user: SessionUser; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const cookieStore = await cookies()
+  const sessionToken = cookieStore.get('session')?.value
+  if (!sessionToken) {
+    return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+  const user = await validateSession(sessionToken)
+  if (!user) {
+    return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  }
+  if (!isBillingManager(user)) {
+    return { user: null, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+  return { user, response: null }
+}
+
 export async function requireRbtSession(): Promise<
   | { user: SessionUser; response: null }
   | { user: null; response: NextResponse }

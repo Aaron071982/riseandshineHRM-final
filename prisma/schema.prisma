@@ -316,6 +316,21 @@ enum StaffHoursLogType {
   DEV_TEAM_MEMBER
 }
 
+enum BillingCycleStatus {
+  DRAFT
+  REVIEW
+  FINALIZED
+  PAID
+}
+
+enum BillingMatchStatus {
+  MATCHED
+  PAYROLL_ONLY
+  NEEDS_REVIEW
+  UNMATCHED
+  IGNORED
+}
+
 model User {
   id          String   @id @default(cuid())
   name        String?
@@ -351,6 +366,8 @@ model User {
   linkedOrgNodes             OrgNode[]                   @relation("OrgNodeLinkedUser")
   hostedTrainingSessions     TrainingSession[]           @relation("TrainingSessionHost")
   trainingBookingsMarked     TrainingBooking[]           @relation("TrainingBookingMarkedBy")
+  billingCyclesUploaded      BillingCycle[]              @relation("BillingCycleUploadedBy")
+  billingCyclesFinalized     BillingCycle[]              @relation("BillingCycleFinalizedBy")
 
   @@map("users")
 }
@@ -619,6 +636,12 @@ model RBTProfile {
   quizAttempts                OnboardingQuizAttempt[]
   quizCertificates            OnboardingQuizCertificate[]
   oigScreeningLogs            OigScreeningLog[]
+  hourlyPayRate               Float?
+  artemisProviderName         String?
+  payRateUpdatedAt            DateTime?
+  payRateUpdatedBy            String?
+  billingEntries              BillingEntry[]
+  billingHoursConfirmations   BillingHoursConfirmation[]
 
   @@index([artemisTrainingCompleted])
   @@index([postHireStage])
@@ -1690,4 +1713,120 @@ model CompanySetting {
   updatedAt DateTime @default(now())
 
   @@map("company_settings")
+}
+
+model BillingCycle {
+  id             String             @id @default(cuid())
+  label          String
+  periodStart    DateTime           @db.Date
+  periodEnd      DateTime           @db.Date
+  status         BillingCycleStatus @default(DRAFT)
+  sourceFileName String?
+  totalHours     Float              @default(0)
+  totalGrossPay  Float              @default(0)
+  rbtCount       Int                @default(0)
+  uploadedById   String
+  finalizedById  String?
+  finalizedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  uploadedBy  User           @relation("BillingCycleUploadedBy", fields: [uploadedById], references: [id])
+  finalizedBy User?          @relation("BillingCycleFinalizedBy", fields: [finalizedById], references: [id])
+  entries     BillingEntry[]
+  hoursConfirmations BillingHoursConfirmation[]
+
+  @@index([status])
+  @@map("billing_cycles")
+}
+
+model BillingEntry {
+  id                    String             @id @default(cuid())
+  billingCycleId        String
+  rbtProfileId          String?
+  payrollOnlyId         String?
+  providerNameRaw       String
+  matchStatus           BillingMatchStatus
+  matchConfidence       Float              @default(0)
+  suggestedRbtProfileId String?
+  totalSessions         Int                @default(0)
+  totalMinutes          Float              @default(0)
+  totalHours            Float              @default(0)
+  hourlyRate            Float?
+  grossPay              Float              @default(0)
+  adjustment            Float              @default(0)
+  adjustmentNote        String?
+  finalPay              Float              @default(0)
+  role                  String?
+  notes                 String?
+  isExcluded            Boolean            @default(false)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  billingCycle BillingCycle     @relation(fields: [billingCycleId], references: [id], onDelete: Cascade)
+  rbtProfile   RBTProfile?      @relation(fields: [rbtProfileId], references: [id], onDelete: SetNull)
+  payrollOnly  PayrollOnlyPerson? @relation(fields: [payrollOnlyId], references: [id], onDelete: SetNull)
+  sessions     BillingSession[]
+
+  @@index([billingCycleId])
+  @@index([matchStatus])
+  @@index([payrollOnlyId])
+  @@map("billing_entries")
+}
+
+model BillingSession {
+  id               String   @id @default(cuid())
+  billingEntryId   String
+  clientName       String
+  dos              DateTime @db.Date
+  scheduledMinutes Float    @default(0)
+  actualMinutes    Float    @default(0)
+  procedureCode    String?
+  location         String?
+  rawStatus        String?
+  createdAt        DateTime @default(now())
+
+  billingEntry BillingEntry @relation(fields: [billingEntryId], references: [id], onDelete: Cascade)
+
+  @@index([billingEntryId])
+  @@map("billing_sessions")
+}
+
+model PayrollOnlyPerson {
+  id                  String   @id @default(cuid())
+  fullName            String
+  artemisProviderName String   @unique
+  email               String?
+  hourlyPayRate       Float?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  billingEntries          BillingEntry[]
+  billingHoursConfirmations BillingHoursConfirmation[]
+
+  @@map("payroll_only_people")
+}
+
+enum BillingHoursConfirmationStatus {
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model BillingHoursConfirmation {
+  id             String                         @id @default(cuid())
+  billingCycleId String
+  rbtProfileId   String?
+  payrollOnlyId  String?
+  email          String
+  sentAt         DateTime?
+  status         BillingHoursConfirmationStatus @default(SENT)
+  createdAt      DateTime                       @default(now())
+
+  billingCycle BillingCycle       @relation(fields: [billingCycleId], references: [id], onDelete: Cascade)
+  rbtProfile   RBTProfile?        @relation(fields: [rbtProfileId], references: [id], onDelete: SetNull)
+  payrollOnly  PayrollOnlyPerson? @relation(fields: [payrollOnlyId], references: [id], onDelete: SetNull)
+
+  @@index([billingCycleId])
+  @@map("billing_hours_confirmations")
 }

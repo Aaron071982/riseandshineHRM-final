@@ -21,7 +21,12 @@ DECLARE
     'org_nodes',
     'training_sessions',
     'training_bookings',
-    'training_email_log'
+    'training_email_log',
+    'billing_cycles',
+    'billing_entries',
+    'billing_sessions',
+    'payroll_only_people',
+    'billing_hours_confirmations'
   ];
   pol_name text;
 BEGIN

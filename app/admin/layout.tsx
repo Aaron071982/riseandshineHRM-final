@@ -1,6 +1,6 @@
 import AdminLayout from '@/components/layout/AdminLayout'
 import { cookies } from 'next/headers'
-import { validateSession, isAdmin } from '@/lib/auth'
+import { validateSession, isAdmin, isBillingManager } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +33,6 @@ export default async function AdminLayoutWrapper({
     redirect('/login?session_expired=1')
   }
 
-  return <AdminLayout>{children}</AdminLayout>
+  return <AdminLayout showBillingNav={isBillingManager(user)}>{children}</AdminLayout>
 }
 
