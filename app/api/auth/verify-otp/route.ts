@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTPEmail } from '@/lib/email-otp'
 import { createSession, LOCAL_DEV_SESSION_TOKEN } from '@/lib/auth'
+import { getOtpTestCode, isOtpTestAccount } from '@/lib/constants'
+import { ensureBillingPortalUser, isBillingPortalEmail } from '@/lib/billing-portal-users'
 import { prisma } from '@/lib/prisma'
 
 
@@ -63,41 +65,40 @@ export async function POST(request: NextRequest) {
     const hostname = request.nextUrl.hostname
     const isLocalhostHost = hostname === 'localhost' || hostname === '127.0.0.1'
     const isNonProdEnv = process.env.NODE_ENV !== 'production'
-    const isDevBypass = (isNonProdEnv || isLocalhostHost) && otp === '123456'
+    const isDevBypass =
+      (isNonProdEnv || isLocalhostHost) && otp === '123456' && !isOtpTestAccount(email)
     const adminFallbackList = (process.env.ADMIN_FALLBACK_EMAIL ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
     const isAdminFallback = adminFallbackList.length > 0 && adminFallbackList.includes(email) && otp === '123456'
-    const isTestAccount = email === 'hrmtesting@gmail.com'
-    const isRbtTestBypass = (isNonProdEnv || isLocalhostHost) && email === 'aaronsiam22@gmail.com' && otp === '123456'
+    const isFixedOtpTestLogin = isOtpTestAccount(email) && otp === getOtpTestCode()
+    const isBillingTestBypass =
+      (isNonProdEnv || isLocalhostHost) && email === 'aaronsiam23@gmail.com' && otp === '123456'
     let isValid = false
 
-    // RBT test account: aaronsiam22@gmail.com + 123456 on localhost/non-prod → real session if user is RBT with rbtProfileId
-    if (isRbtTestBypass) {
-      let rbtTestUser = await findUserByEmailWithProfile(email)
-      if (!rbtTestUser) {
-        const rbtProfile = await prisma.rBTProfile.findFirst({
-          where: { email: { equals: email, mode: 'insensitive' } },
-          select: { userId: true },
-        }).catch(() => null)
-        if (rbtProfile) rbtTestUser = await findUserByEmailWithProfile(null, rbtProfile.userId)
-      }
-      if (rbtTestUser?.role === 'RBT' && rbtTestUser.rbtProfile?.id && rbtTestUser.isActive) {
-        const userAgent = request.headers.get('user-agent') || ''
-        const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || null
-        const { device, browser } = parseUserAgent(userAgent)
-        const sessionToken = await createSession(rbtTestUser.id, { device, browser, ipAddress })
-        try {
-          await prisma.activityLog.create({
+    if (isFixedOtpTestLogin) {
+      isValid = true
+    } else if (isBillingTestBypass) {
+      let billingUser = await findUserByEmailWithProfile(email)
+      if (!billingUser) {
+        billingUser = await prisma.user
+          .create({
             data: {
-              userId: rbtTestUser.id,
-              activityType: 'LOGIN',
-              action: 'User logged in',
-              ipAddress,
-              userAgent: request.headers.get('user-agent') || null,
-              metadata: { device, browser, email: rbtTestUser.email, role: 'RBT', rbtTestBypass: true },
+              email,
+              name: 'Aaron Billing Test',
+              role: 'BILLING',
+              isActive: true,
             },
           })
-        } catch (_) {}
-        const response = NextResponse.json({ success: true, role: 'RBT', userId: rbtTestUser.id })
+          .catch(() => null)
+      }
+      if (billingUser?.role === 'BILLING' && billingUser.isActive) {
+        const userAgent = request.headers.get('user-agent') || ''
+        const ipAddress =
+          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+          request.headers.get('x-real-ip') ||
+          null
+        const { device, browser } = parseUserAgent(userAgent)
+        const sessionToken = await createSession(billingUser.id, { device, browser, ipAddress })
+        const response = NextResponse.json({ success: true, role: 'BILLING', userId: billingUser.id })
         response.cookies.set('session', sessionToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
         return response
       }
       return NextResponse.json(
-        { error: 'No RBT account found for this email. Create the RBT in Admin (Employees & Candidates), set status to HIRED, and use this email.' },
+        { error: 'No BILLING account found for this email. Run: npm run db:add-billing-user' },
         { status: 403 }
       )
     }
@@ -131,13 +132,9 @@ export async function POST(request: NextRequest) {
       return response
     } else if (isAdminFallback) {
       isValid = true
-    } else {
+    } else if (!isValid) {
       try {
-        if (isTestAccount) {
-          isValid = otp === '000000' || (await verifyOTPEmail(email, otp))
-        } else {
-          isValid = await verifyOTPEmail(email, otp)
-        }
+        isValid = await verifyOTPEmail(email, otp)
       } catch (verifyErr) {
         throw verifyErr
       }
@@ -173,6 +170,11 @@ export async function POST(request: NextRequest) {
       if (rbtProfile) {
         user = await findUserByEmailWithProfile(null, rbtProfile.userId)
       }
+    }
+
+    if (!user && isBillingPortalEmail(email)) {
+      await ensureBillingPortalUser(email)
+      user = await findUserByEmailWithProfile(email)
     }
 
     if (!user) {
@@ -270,7 +272,13 @@ export async function POST(request: NextRequest) {
     }
 
     const roleNormalized = (user.role ?? '').toUpperCase()
-    const role = roleNormalized === 'ADMIN' || roleNormalized === 'RBT' || roleNormalized === 'CANDIDATE' ? roleNormalized : null
+    const role =
+      roleNormalized === 'ADMIN' ||
+      roleNormalized === 'RBT' ||
+      roleNormalized === 'CANDIDATE' ||
+      roleNormalized === 'BILLING'
+        ? roleNormalized
+        : null
     const response = NextResponse.json({
       success: true,
       role: role ?? user.role,

@@ -1,12 +1,7 @@
 import { PrismaClient } from '@prisma/client'
+import { BILLING_PORTAL_USERS } from '@/lib/billing-portal-users'
 
 const prisma = new PrismaClient()
-
-/** Billing-only portal users (role BILLING — no admin access). */
-const BILLING_PORTAL_USERS: { email: string; name: string }[] = [
-  { email: 'rafique@riseandshineaba.com', name: 'Rafique' },
-  { email: 'afrin@riseandshineaba.com', name: 'Afrin' },
-]
 
 async function upsertBillingUser(email: string, name: string) {
   const normalized = email.trim().toLowerCase()
