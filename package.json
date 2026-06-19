@@ -18,6 +18,8 @@
     "db:backfill-onboarding": "tsx scripts/backfill-onboarding-tasks.ts",
     "fix:hired-rbts": "tsx scripts/fix-hired-rbts.ts",
     "db:add-admin": "tsx scripts/add-admin.ts",
+    "db:add-billing-user": "tsx scripts/add-billing-user.ts",
+    "db:sync-billing-logins": "tsx scripts/sync-billing-login-users.ts",
     "test:signature-hash": "tsx scripts/test-signature-certificate-hash.ts",
     "audit:retroactive-signatures": "tsx scripts/run-retroactive-signature-audit.ts",
     "audit:retroactive-signatures:dry": "tsx scripts/run-retroactive-signature-audit.ts --dry-run"
@@ -46,6 +48,8 @@
     "clsx": "^2.0.0",
     "dagre": "^0.8.5",
     "date-fns": "^3.0.6",
+    "exceljs": "^4.4.0",
+    "fastest-levenshtein": "^1.0.16",
     "framer-motion": "^12.25.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.303.0",

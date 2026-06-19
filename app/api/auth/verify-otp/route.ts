@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTPEmail } from '@/lib/email-otp'
 import { createSession, LOCAL_DEV_SESSION_TOKEN } from '@/lib/auth'
 import { getOtpTestCode, isOtpTestAccount } from '@/lib/constants'
-import { ensureBillingPortalUser, isBillingPortalEmail } from '@/lib/billing-portal-users'
+import { ensureBillingPortalUser, ensureBillingLoginUser, isBillingPortalEmail } from '@/lib/billing-portal-users'
 import { prisma } from '@/lib/prisma'
 
 
@@ -175,6 +175,19 @@ export async function POST(request: NextRequest) {
     if (!user && isBillingPortalEmail(email)) {
       await ensureBillingPortalUser(email)
       user = await findUserByEmailWithProfile(email)
+    }
+
+    if (!user) {
+      const billingProfile = await prisma.billingProfile
+        .findFirst({
+          where: { email: { equals: email, mode: 'insensitive' } },
+          select: { email: true, fullName: true },
+        })
+        .catch(() => null)
+      if (billingProfile?.email) {
+        await ensureBillingLoginUser(billingProfile.email, billingProfile.fullName)
+        user = await findUserByEmailWithProfile(email)
+      }
     }
 
     if (!user) {

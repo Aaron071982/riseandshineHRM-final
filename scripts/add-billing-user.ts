@@ -1,42 +1,12 @@
 import { PrismaClient } from '@prisma/client'
-import { BILLING_PORTAL_USERS } from '@/lib/billing-portal-users'
+import { BILLING_PORTAL_USERS, ensureBillingLoginUser } from '@/lib/billing-portal-users'
 
 const prisma = new PrismaClient()
 
 async function upsertBillingUser(email: string, name: string) {
-  const normalized = email.trim().toLowerCase()
-
-  const existing = await prisma.user.findFirst({
-    where: { email: { equals: normalized, mode: 'insensitive' } },
-  })
-
-  if (existing) {
-    const updated = await prisma.user.update({
-      where: { id: existing.id },
-      data: { role: 'BILLING', isActive: true, email: normalized, name: name.trim() },
-    })
-    console.log(`✅ Updated ${normalized} → BILLING (id: ${updated.id})`)
-    return updated
-  }
-
-  const created = await prisma.user.create({
-    data: {
-      email: normalized,
-      name: name.trim(),
-      role: 'BILLING',
-      isActive: true,
-      profile: {
-        create: {
-          fullName: name.trim(),
-          timezone: 'America/New_York',
-          skills: [],
-          languages: [],
-        },
-      },
-    },
-  })
-  console.log(`✅ Created ${normalized} → BILLING (id: ${created.id})`)
-  return created
+  const result = await ensureBillingLoginUser(email, name)
+  console.log(`✅ ${email.trim().toLowerCase()} → BILLING (id: ${result.id})`)
+  return result
 }
 
 async function main() {
