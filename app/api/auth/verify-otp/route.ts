@@ -3,6 +3,12 @@ import { verifyOTPEmail } from '@/lib/email-otp'
 import { createSession, LOCAL_DEV_SESSION_TOKEN } from '@/lib/auth'
 import { getOtpTestCode, isOtpTestAccount } from '@/lib/constants'
 import { provisionBillingLoginIfNeeded, shouldProvisionBillingLogin } from '@/lib/billing-portal-users'
+import {
+  getPostLoginPath,
+  isDirectLoginRole,
+  normalizeLoginRole,
+  roleAllowedInOtpResponse,
+} from '@/lib/auth/postLogin'
 import { prisma } from '@/lib/prisma'
 
 
@@ -221,33 +227,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check if user is a hired RBT or admin
-    if (user.role === 'CANDIDATE') {
-      // Candidates who aren't hired yet can't log in
+    const roleUpper = normalizeLoginRole(user.role)
+
+    // --- Role gate after OTP success ---
+    // Staff roles (BILLING, TRAINER, PAYROLL, ADMIN, BCBA, …) and RBT: allowed without CANDIDATE hire check.
+    // CANDIDATE: only if linked RBT profile is HIRED (promoted to RBT below).
+    if (roleUpper === 'CANDIDATE') {
       if (!user.rbtProfile || user.rbtProfile.status !== 'HIRED') {
         return NextResponse.json(
-          { error: 'Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.' },
+          {
+            error:
+              'Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.',
+          },
           { status: 403 }
         )
       }
-      
-      // If candidate is hired but role wasn't updated, fix it automatically
-      if (user.rbtProfile.status === 'HIRED') {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            role: 'RBT',
-            email: user.rbtProfile.email || user.email,
-            isActive: true,
-          },
-        })
-        // Update user object for session creation
-        user.role = 'RBT'
-      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          role: 'RBT',
+          email: user.rbtProfile.email || user.email,
+          isActive: true,
+        },
+      })
+      user.role = 'RBT'
+    } else if (!isDirectLoginRole(roleUpper)) {
+      return NextResponse.json(
+        {
+          error:
+            'Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.',
+        },
+        { status: 403 }
+      )
     }
-    
-    // RBT users should always be able to log in
-    if (user.role === 'RBT') {
+
+    // RBT users: keep email in sync with profile
+    if (normalizeLoginRole(user.role) === 'RBT') {
       // Ensure email matches RBTProfile email if available
       if (user.rbtProfile?.email && user.email !== user.rbtProfile.email) {
         await prisma.user.update({
@@ -300,17 +316,21 @@ export async function POST(request: NextRequest) {
       console.error('[auth][verify-otp] Failed to track login activity', error)
     }
 
-    const roleNormalized = (user.role ?? '').toUpperCase()
-    const role =
-      roleNormalized === 'ADMIN' ||
-      roleNormalized === 'RBT' ||
-      roleNormalized === 'CANDIDATE' ||
-      roleNormalized === 'BILLING'
-        ? roleNormalized
-        : null
+    const roleNormalized = normalizeLoginRole(user.role)
+    if (!roleAllowedInOtpResponse(roleNormalized)) {
+      return NextResponse.json(
+        {
+          error:
+            'Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.',
+        },
+        { status: 403 }
+      )
+    }
+
     const response = NextResponse.json({
       success: true,
-      role: role ?? user.role,
+      role: roleNormalized,
+      redirectTo: getPostLoginPath(roleNormalized),
       userId: user.id,
     })
     // Set cookie on the response we return so it is always sent (avoids redirect-to-home bug)

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
+import { getPostLoginPath } from '@/lib/auth/postLogin'
 import PublicCareersLandingPage from '@/components/public/PublicCareersLandingPage'
 
 export const dynamic = 'force-dynamic'
@@ -13,11 +14,8 @@ export default async function Home() {
     if (sessionToken) {
       const user = await validateSession(sessionToken)
       if (user) {
-        if (user.role === 'ADMIN') {
-          redirect('/admin/dashboard')
-        } else if (user.role === 'RBT') {
-          redirect('/rbt/dashboard')
-        }
+        const dest = getPostLoginPath(user.role)
+        if (dest) redirect(dest)
       }
     }
   } catch (e) {

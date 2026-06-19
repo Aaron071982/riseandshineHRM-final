@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
 import { OAUTH_RETURN_URL_KEY, isSafeOAuthReturnUrl } from '@/lib/oauth/returnUrl'
+import { getPostLoginPath } from '@/lib/auth/postLogin'
 
 export default function VerifyOTPPage() {
   const router = useRouter()
@@ -60,13 +61,12 @@ export default function VerifyOTPPage() {
       }
 
       // Full-page redirect so the browser sends the new session cookie (router.push can miss it)
-      const role = (data.role ?? '').toUpperCase()
-      if (role === 'ADMIN') {
-        window.location.href = '/admin/dashboard'
-        return
-      }
-      if (role === 'RBT') {
-        window.location.href = '/rbt/dashboard'
+      const redirectTo =
+        typeof data.redirectTo === 'string' && data.redirectTo.startsWith('/')
+          ? data.redirectTo
+          : getPostLoginPath(data.role)
+      if (redirectTo) {
+        window.location.href = redirectTo
         return
       }
       setError('Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.')
