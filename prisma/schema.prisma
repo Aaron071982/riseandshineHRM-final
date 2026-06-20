@@ -368,6 +368,7 @@ model User {
   trainingBookingsMarked     TrainingBooking[]           @relation("TrainingBookingMarkedBy")
   billingCyclesUploaded      BillingCycle[]              @relation("BillingCycleUploadedBy")
   billingCyclesFinalized     BillingCycle[]              @relation("BillingCycleFinalizedBy")
+  emailBlastsSent            EmailBlastCampaign[]        @relation("EmailBlastSentBy")
 
   @@map("users")
 }
@@ -642,6 +643,7 @@ model RBTProfile {
   payRateUpdatedBy            String?
   billingEntries              BillingEntry[]
   billingHoursConfirmations   BillingHoursConfirmation[]
+  emailBlastSendLogs          EmailBlastSendLog[]
 
   @@index([artemisTrainingCompleted])
   @@index([postHireStage])
@@ -1829,4 +1831,46 @@ model BillingHoursConfirmation {
 
   @@index([billingCycleId])
   @@map("billing_hours_confirmations")
+}
+
+enum EmailBlastSendStatus {
+  SENT
+  FAILED
+}
+
+model EmailBlastCampaign {
+  id             String    @id @default(cuid())
+  slug           String    @unique
+  title          String
+  subject        String
+  completedAt    DateTime?
+  sentByUserId   String?
+  recipientCount Int?
+  successCount   Int?
+  failureCount   Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sentBy   User?               @relation("EmailBlastSentBy", fields: [sentByUserId], references: [id], onDelete: SetNull)
+  sendLogs EmailBlastSendLog[]
+
+  @@map("email_blast_campaigns")
+}
+
+model EmailBlastSendLog {
+  id           String               @id @default(cuid())
+  campaignId   String
+  rbtProfileId String?
+  email        String
+  status       EmailBlastSendStatus
+  errorMessage String?
+  sentAt       DateTime             @default(now())
+
+  campaign   EmailBlastCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  rbtProfile RBTProfile?        @relation(fields: [rbtProfileId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, rbtProfileId])
+  @@index([campaignId])
+  @@index([email])
+  @@map("email_blast_send_logs")
 }

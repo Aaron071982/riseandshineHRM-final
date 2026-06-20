@@ -26,7 +26,9 @@ DECLARE
     'billing_entries',
     'billing_sessions',
     'payroll_only_people',
-    'billing_hours_confirmations'
+    'billing_hours_confirmations',
+    'email_blast_campaigns',
+    'email_blast_send_logs'
   ];
   pol_name text;
 BEGIN

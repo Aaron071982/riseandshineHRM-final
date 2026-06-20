@@ -1971,3 +1971,48 @@ export function generateArtemisSessionCancelledEmail(params: {
   )
   return { subject: `Cancelled: ${params.sessionTitle}`, html }
 }
+
+const BT_FEEDBACK_FORM_URL =
+  'https://docs.google.com/forms/d/e/1FAIpQLSdLsWRhhX92_-IwJgIGyo7HXzMcrwlCx0fVsx3EvJgfsHSb-Q/viewform'
+
+export function generateBtThankYouEmail(firstName: string): { subject: string; html: string } {
+  const name = firstName.trim() || 'there'
+  const subject = 'Thank you — and an opportunity to grow with us'
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;line-height:1.65;color:#333;margin:0;padding:0;background-color:#f5f5f5;">
+  <div style="max-width:600px;margin:0 auto;padding:16px;">
+    <div style="background:linear-gradient(135deg,#E4893D 0%,#FF9F5A 100%);color:#fff;padding:32px 20px;text-align:center;border-radius:12px 12px 0 0;">
+      <h1 style="margin:0;font-size:26px;font-weight:700;">Rise &amp; Shine ABA</h1>
+    </div>
+    <div style="padding:28px 24px;background:#ffffff;border-left:1px solid #eee;border-right:1px solid #eee;">
+      <p style="margin:0 0 16px;">Hi ${name},</p>
+      <p style="margin:0 0 16px;">Thank you for the work you do every day. As a Behavior Technician with Rise &amp; Shine, you are at the heart of what we do — showing up for children and families, building trust session by session, and turning treatment plans into real progress. The consistency and care you bring directly shapes the lives of the kids we serve, and we don&apos;t take that for granted.</p>
+      <p style="margin:0 0 16px;">We&apos;re always looking to support our team better, and we&apos;d genuinely like to hear from you. If you have a few minutes, please share your thoughts with us here:</p>
+      <p style="text-align:center;margin:28px 0;">
+        <a href="${BT_FEEDBACK_FORM_URL}" style="display:inline-block;background:#E4893D;color:#ffffff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:8px;font-size:16px;">Share Your Feedback</a>
+      </p>
+      <p style="margin:0 0 16px;">We&apos;d also like to share an opportunity. Many of you are already doing the work of a Registered Behavior Technician (RBT) — and earning your RBT certification can open real doors:</p>
+      <ul style="margin:0 0 16px;padding-left:22px;">
+        <li style="margin-bottom:8px;">Higher earning potential and access to more hours</li>
+        <li style="margin-bottom:8px;">Formal, nationally recognized credentials you carry throughout your career</li>
+        <li style="margin-bottom:8px;">A clear path toward becoming a BCBA down the road</li>
+        <li style="margin-bottom:8px;">Greater independence and a wider range of cases you can work</li>
+      </ul>
+      <p style="margin:0 0 16px;">Becoming an RBT builds directly on the experience you already have. It&apos;s a 40-hour training course plus a competency assessment and exam — and we&apos;re here to support you through the process. If you&apos;ve been thinking about taking that next step, we&apos;d love to help you get there.</p>
+      <p style="margin:0 0 16px;">If you&apos;re interested in pursuing your RBT certification, just reply to this email or reach out to our team and we&apos;ll walk you through it.</p>
+      <p style="margin:0 0 16px;">Thank you again for everything you do.</p>
+      <p style="margin:0;">Warm regards,<br><strong>The Rise &amp; Shine ABA Team</strong></p>
+    </div>
+    <div style="padding:20px;text-align:center;font-size:12px;color:#666;background:#f9f9f9;border-radius:0 0 12px 12px;border:1px solid #eee;border-top:none;">
+      <p style="margin:0;"><strong>Rise &amp; Shine ABA</strong></p>
+    </div>
+  </div>
+</body>
+</html>`
+  return { subject, html }
+}

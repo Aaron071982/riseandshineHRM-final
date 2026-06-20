@@ -23,6 +23,7 @@ import {
   Network,
   Plug,
   DollarSign,
+  Mail,
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
@@ -44,6 +45,7 @@ const mainNavItems = [
 
 const secondaryNavItems = [
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
+  { href: '/admin/email-blast', label: 'Email Blast', icon: Mail },
   { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
