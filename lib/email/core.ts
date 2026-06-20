@@ -47,7 +47,8 @@ export async function sendGenericEmail(
   to: string,
   subject: string,
   html: string,
-  attachments?: GenericEmailAttachment[]
+  attachments?: GenericEmailAttachment[],
+  replyTo?: string
 ): Promise<boolean> {
   if (!resend) {
     return true
@@ -66,7 +67,7 @@ export async function sendGenericEmail(
       subject,
       html,
       text: plainText,
-      reply_to: 'info@riseandshine.nyc',
+      reply_to: replyTo ?? 'info@riseandshine.nyc',
       ...(attachments?.length
         ? {
             attachments: attachments.map((a) => ({
