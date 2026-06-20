@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
 import { BT_THANK_YOU_CAMPAIGN } from '@/lib/email-blast/constants'
-import { getEmailBlastPreview, sendEmailBlastCampaign, sendEmailBlastTest } from '@/lib/email-blast/sendCampaign'
+import { getEmailBlastPreview, retryFailedEmailBlastCampaign, sendEmailBlastCampaign, sendEmailBlastTest } from '@/lib/email-blast/sendCampaign'
 
 export async function GET(
   _request: NextRequest,
@@ -51,6 +51,12 @@ export async function POST(
       }
       const result = await sendEmailBlastTest(slug, auth.user.email, auth.user.name)
       return NextResponse.json(result, { status: result.success ? 200 : 400 })
+    }
+
+    if (body?.retryFailed === true) {
+      const result = await retryFailedEmailBlastCampaign(slug, auth.user.id)
+      const status = result.failureCount === 0 && result.success ? 200 : result.successCount > 0 ? 200 : 400
+      return NextResponse.json(result, { status })
     }
 
     if (body?.confirm !== true) {

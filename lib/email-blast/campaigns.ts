@@ -10,6 +10,7 @@ export {
   BT_THANK_YOU_CAMPAIGN,
   EMAIL_BLAST_BATCH_DELAY_MS,
   EMAIL_BLAST_BATCH_SIZE,
+  EMAIL_BLAST_RETRY_DELAY_MS,
   type EmailBlastRecipient,
 } from '@/lib/email-blast/constants'
 

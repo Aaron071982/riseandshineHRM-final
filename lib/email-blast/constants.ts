@@ -20,3 +20,5 @@ export type EmailBlastRecipient = {
 /** Resend-friendly batching: 5 emails, then pause. */
 export const EMAIL_BLAST_BATCH_SIZE = 5
 export const EMAIL_BLAST_BATCH_DELAY_MS = 600
+/** Sequential delay when retrying failed sends (stay under ~2/sec). */
+export const EMAIL_BLAST_RETRY_DELAY_MS = 600

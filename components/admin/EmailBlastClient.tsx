@@ -12,7 +12,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { BT_THANK_YOU_CAMPAIGN } from '@/lib/email-blast/constants'
-import { Loader2, Mail, Send, Users } from 'lucide-react'
+import { Loader2, Mail, RefreshCw, Send, Users } from 'lucide-react'
+
+type FailedRecipient = {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  errorMessage: string | null
+}
 
 type Preview = {
   slug: string
@@ -21,6 +29,7 @@ type Preview = {
   description: string
   recipientCount: number
   recipientsSample: { id: string; firstName: string; lastName: string; email: string }[]
+  failedRecipients: FailedRecipient[]
   htmlPreview: string
   alreadySent: boolean
   completedAt: string | null
@@ -37,7 +46,9 @@ export default function EmailBlastClient() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [retryOpen, setRetryOpen] = useState(false)
   const [sending, setSending] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const [testing, setTesting] = useState(false)
   const [sendResult, setSendResult] = useState<string | null>(null)
 
@@ -76,6 +87,28 @@ export default function EmailBlastClient() {
       setSendResult(e instanceof Error ? e.message : 'Test send failed')
     } finally {
       setTesting(false)
+    }
+  }
+
+  async function handleRetryFailed() {
+    setRetrying(true)
+    setSendResult(null)
+    try {
+      const res = await fetch(`/api/admin/email-blast/${slug}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ retryFailed: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || data.message || 'Retry failed')
+      setSendResult(data.message)
+      setRetryOpen(false)
+      await loadPreview()
+    } catch (e) {
+      setSendResult(e instanceof Error ? e.message : 'Retry failed')
+      setRetryOpen(false)
+    } finally {
+      setRetrying(false)
     }
   }
 
@@ -186,6 +219,22 @@ export default function EmailBlastClient() {
             <div className="rounded-lg border p-4 text-sm bg-muted/40">{sendResult}</div>
           )}
 
+          {(preview.failedRecipients?.length ?? 0) > 0 && (
+            <div>
+              <p className="text-sm font-medium mb-2 text-destructive">
+                Failed deliveries ({preview.failedRecipients.length})
+              </p>
+              <ul className="text-sm space-y-1 max-h-48 overflow-y-auto rounded border border-red-200 p-3 dark:border-red-900">
+                {preview.failedRecipients.map((r) => (
+                  <li key={r.id}>
+                    {r.firstName} {r.lastName}{' '}
+                    <span className="text-muted-foreground">({r.email})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {preview.recipientsSample.length > 0 && (
             <div>
               <p className="text-sm font-medium mb-2">Recipient preview (first {preview.recipientsSample.length})</p>
@@ -206,10 +255,29 @@ export default function EmailBlastClient() {
           )}
 
           <div className="flex flex-wrap gap-3 pt-2">
+            {(preview.failedRecipients?.length ?? 0) > 0 && (
+              <Button
+                onClick={() => setRetryOpen(true)}
+                disabled={!preview.resendConfigured || retrying || sending}
+                className="bg-[#E4893D] hover:bg-[#d97a32] text-white"
+              >
+                {retrying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Retrying…
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry {preview.failedRecipients.length} failed
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={handleTestSend}
-              disabled={!preview.resendConfigured || !preview.adminEmail || testing || sending}
+              disabled={!preview.resendConfigured || !preview.adminEmail || testing || sending || retrying}
             >
               {testing ? (
                 <>
@@ -222,7 +290,7 @@ export default function EmailBlastClient() {
             </Button>
             <Button
               onClick={() => setConfirmOpen(true)}
-              disabled={preview.alreadySent || preview.recipientCount === 0 || sending}
+              disabled={preview.alreadySent || preview.recipientCount === 0 || sending || retrying}
               className="bg-[#E4893D] hover:bg-[#d97a32] text-white"
             >
               <Send className="h-4 w-4 mr-2" />
@@ -270,6 +338,38 @@ export default function EmailBlastClient() {
                 </>
               ) : (
                 `Send to ${preview.recipientCount} BT${preview.recipientCount === 1 ? '' : 's'}`
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={retryOpen} onOpenChange={setRetryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Retry failed deliveries</DialogTitle>
+            <DialogDescription>
+              Send again to <strong>{preview.failedRecipients.length}</strong> BT
+              {preview.failedRecipients.length === 1 ? '' : 's'} who did not receive the email? Sends are
+              throttled to avoid Resend rate limits.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRetryOpen(false)} disabled={retrying}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRetryFailed}
+              disabled={retrying}
+              className="bg-[#E4893D] hover:bg-[#d97a32] text-white"
+            >
+              {retrying ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Retrying…
+                </>
+              ) : (
+                `Retry ${preview.failedRecipients.length} failed`
               )}
             </Button>
           </DialogFooter>

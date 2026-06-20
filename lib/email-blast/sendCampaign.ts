@@ -5,12 +5,21 @@ import {
   BT_THANK_YOU_CAMPAIGN,
   EMAIL_BLAST_BATCH_DELAY_MS,
   EMAIL_BLAST_BATCH_SIZE,
+  EMAIL_BLAST_RETRY_DELAY_MS,
   ensureEmailBlastCampaign,
   listActiveDeliveryBlastRecipients,
   sleep,
   type EmailBlastRecipient,
 } from '@/lib/email-blast/campaigns'
 import { prisma } from '@/lib/prisma'
+
+export type FailedBlastRecipient = {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  errorMessage: string | null
+}
 
 export type EmailBlastPreview = {
   slug: string
@@ -19,6 +28,7 @@ export type EmailBlastPreview = {
   description: string
   recipientCount: number
   recipientsSample: EmailBlastRecipient[]
+  failedRecipients: FailedBlastRecipient[]
   htmlPreview: string
   alreadySent: boolean
   completedAt: string | null
@@ -27,6 +37,79 @@ export type EmailBlastPreview = {
   failureCount: number | null
   resendConfigured: boolean
   adminEmail: string | null
+}
+
+async function writeSendLog(
+  campaignId: string,
+  recipient: EmailBlastRecipient,
+  status: EmailBlastSendStatus,
+  errorMessage: string | null
+): Promise<void> {
+  await prisma.emailBlastSendLog.upsert({
+    where: {
+      campaignId_rbtProfileId: {
+        campaignId,
+        rbtProfileId: recipient.id,
+      },
+    },
+    create: {
+      campaignId,
+      rbtProfileId: recipient.id,
+      email: recipient.email,
+      status,
+      errorMessage,
+    },
+    update: {
+      email: recipient.email,
+      status,
+      errorMessage,
+      sentAt: new Date(),
+    },
+  })
+}
+
+async function deliverBlastEmail(recipient: EmailBlastRecipient): Promise<{ ok: boolean; error?: string }> {
+  const { subject, html } = generateBtThankYouEmail(recipient.firstName)
+  try {
+    const sent = await sendGenericEmail(recipient.email, subject, html)
+    if (!sent) return { ok: false, error: 'Email provider returned failure' }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'Send failed' }
+  }
+}
+
+async function syncCampaignCounts(campaignId: string): Promise<{ successCount: number; failureCount: number }> {
+  const grouped = await prisma.emailBlastSendLog.groupBy({
+    by: ['status'],
+    where: { campaignId },
+    _count: { id: true },
+  })
+  const successCount = grouped.find((g) => g.status === EmailBlastSendStatus.SENT)?._count.id ?? 0
+  const failureCount = grouped.find((g) => g.status === EmailBlastSendStatus.FAILED)?._count.id ?? 0
+  await prisma.emailBlastCampaign.update({
+    where: { id: campaignId },
+    data: { successCount, failureCount },
+  })
+  return { successCount, failureCount }
+}
+
+async function listFailedRecipients(campaignId: string): Promise<FailedBlastRecipient[]> {
+  const logs = await prisma.emailBlastSendLog.findMany({
+    where: { campaignId, status: EmailBlastSendStatus.FAILED },
+    include: {
+      rbtProfile: { select: { firstName: true, lastName: true } },
+    },
+    orderBy: { email: 'asc' },
+  })
+
+  return logs.map((log) => ({
+    id: log.rbtProfileId ?? log.id,
+    firstName: log.rbtProfile?.firstName ?? '',
+    lastName: log.rbtProfile?.lastName ?? '',
+    email: log.email,
+    errorMessage: log.errorMessage,
+  }))
 }
 
 export async function getEmailBlastPreview(slug: string): Promise<EmailBlastPreview> {
@@ -41,6 +124,7 @@ export async function getEmailBlastPreview(slug: string): Promise<EmailBlastPrev
 
   const sample = recipients[0]
   const { html } = generateBtThankYouEmail(sample?.firstName ?? 'Alex')
+  const failedRecipients = campaign.completedAt ? await listFailedRecipients(campaign.id) : []
 
   let sentByName: string | null = null
   if (campaign.sentByUserId) {
@@ -58,6 +142,7 @@ export async function getEmailBlastPreview(slug: string): Promise<EmailBlastPrev
     description: BT_THANK_YOU_CAMPAIGN.description,
     recipientCount: recipients.length,
     recipientsSample: recipients.slice(0, 15),
+    failedRecipients,
     htmlPreview: html,
     alreadySent: !!campaign.completedAt,
     completedAt: campaign.completedAt?.toISOString() ?? null,
@@ -137,63 +222,28 @@ export async function sendEmailBlastCampaign(
     }
   }
 
-  let successCount = alreadySent.length
-  let failureCount = campaign.failureCount ?? 0
   const failures: { email: string; error: string }[] = []
 
   for (let i = 0; i < pending.length; i += EMAIL_BLAST_BATCH_SIZE) {
     const batch = pending.slice(i, i + EMAIL_BLAST_BATCH_SIZE)
-    await Promise.all(
-      batch.map(async (recipient) => {
-        const { subject, html } = generateBtThankYouEmail(recipient.firstName)
-        let status: EmailBlastSendStatus = EmailBlastSendStatus.SENT
-        let errorMessage: string | null = null
-
-        try {
-          const sent = await sendGenericEmail(recipient.email, subject, html)
-          if (!sent) {
-            status = EmailBlastSendStatus.FAILED
-            errorMessage = 'Email provider returned failure'
-            failureCount += 1
-            failures.push({ email: recipient.email, error: errorMessage })
-          } else {
-            successCount += 1
-          }
-        } catch (err) {
-          status = EmailBlastSendStatus.FAILED
-          errorMessage = err instanceof Error ? err.message : 'Send failed'
-          failureCount += 1
-          failures.push({ email: recipient.email, error: errorMessage })
-        }
-
-        await prisma.emailBlastSendLog.upsert({
-          where: {
-            campaignId_rbtProfileId: {
-              campaignId: campaign.id,
-              rbtProfileId: recipient.id,
-            },
-          },
-          create: {
-            campaignId: campaign.id,
-            rbtProfileId: recipient.id,
-            email: recipient.email,
-            status,
-            errorMessage,
-          },
-          update: {
-            email: recipient.email,
-            status,
-            errorMessage,
-            sentAt: new Date(),
-          },
-        })
-      })
-    )
+    for (const recipient of batch) {
+      const result = await deliverBlastEmail(recipient)
+      if (result.ok) {
+        await writeSendLog(campaign.id, recipient, EmailBlastSendStatus.SENT, null)
+      } else {
+        const errorMessage = result.error ?? 'Send failed'
+        failures.push({ email: recipient.email, error: errorMessage })
+        await writeSendLog(campaign.id, recipient, EmailBlastSendStatus.FAILED, errorMessage)
+      }
+      await sleep(EMAIL_BLAST_RETRY_DELAY_MS)
+    }
 
     if (i + EMAIL_BLAST_BATCH_SIZE < pending.length) {
       await sleep(EMAIL_BLAST_BATCH_DELAY_MS)
     }
   }
+
+  const { successCount, failureCount } = await syncCampaignCounts(campaign.id)
 
   await prisma.emailBlastCampaign.update({
     where: { id: campaign.id },
@@ -210,6 +260,89 @@ export async function sendEmailBlastCampaign(
     success: true,
     message: `Sent to ${successCount} of ${recipients.length} actively working BT(s).`,
     recipientCount: recipients.length,
+    successCount,
+    failureCount,
+    failures: failures.slice(0, 20),
+  }
+}
+
+export async function retryFailedEmailBlastCampaign(
+  slug: string,
+  _sentByUserId: string
+): Promise<EmailBlastSendResult> {
+  if (slug !== BT_THANK_YOU_CAMPAIGN.slug) {
+    throw new Error('Unknown email blast campaign')
+  }
+
+  const campaign = await ensureEmailBlastCampaign(slug)
+  if (!campaign.completedAt) {
+    return {
+      success: false,
+      message: 'Campaign has not been sent yet. Use the main send button first.',
+      recipientCount: 0,
+      successCount: 0,
+      failureCount: 0,
+      failures: [],
+    }
+  }
+
+  const failedLogs = await prisma.emailBlastSendLog.findMany({
+    where: { campaignId: campaign.id, status: EmailBlastSendStatus.FAILED },
+    include: {
+      rbtProfile: { select: { id: true, firstName: true, lastName: true, email: true } },
+    },
+    orderBy: { email: 'asc' },
+  })
+
+  if (failedLogs.length === 0) {
+    return {
+      success: true,
+      message: 'No failed recipients to retry.',
+      recipientCount: campaign.recipientCount ?? 0,
+      successCount: campaign.successCount ?? 0,
+      failureCount: 0,
+      failures: [],
+    }
+  }
+
+  const failures: { email: string; error: string }[] = []
+  let retried = 0
+  let newlySent = 0
+
+  for (const log of failedLogs) {
+    const profile = log.rbtProfile
+    if (!profile?.id || !profile.email) continue
+
+    const recipient: EmailBlastRecipient = {
+      id: profile.id,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      email: log.email.trim().toLowerCase(),
+    }
+
+    retried += 1
+    const result = await deliverBlastEmail(recipient)
+    if (result.ok) {
+      newlySent += 1
+      await writeSendLog(campaign.id, recipient, EmailBlastSendStatus.SENT, null)
+    } else {
+      const errorMessage = result.error ?? 'Send failed'
+      failures.push({ email: recipient.email, error: errorMessage })
+      await writeSendLog(campaign.id, recipient, EmailBlastSendStatus.FAILED, errorMessage)
+    }
+
+    await sleep(EMAIL_BLAST_RETRY_DELAY_MS)
+  }
+
+  const { successCount, failureCount } = await syncCampaignCounts(campaign.id)
+
+  return {
+    success: failureCount === 0,
+    message:
+      failureCount === 0
+        ? `Retry complete — all ${successCount} recipients now delivered.`
+        : `Retry sent ${newlySent} of ${retried} failed recipient(s). ${failureCount} still failing.`,
+    recipientCount: campaign.recipientCount ?? retried,
     successCount,
     failureCount,
     failures: failures.slice(0, 20),
