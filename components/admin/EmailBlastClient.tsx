@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { BT_THANK_YOU_CAMPAIGN } from '@/lib/email-blast/campaigns'
+import { BT_THANK_YOU_CAMPAIGN } from '@/lib/email-blast/constants'
 import { Loader2, Mail, Send, Users } from 'lucide-react'
 
 type Preview = {

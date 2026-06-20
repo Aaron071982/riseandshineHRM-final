@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
-import { BT_THANK_YOU_CAMPAIGN } from '@/lib/email-blast/campaigns'
+import { BT_THANK_YOU_CAMPAIGN } from '@/lib/email-blast/constants'
 import { getEmailBlastPreview, sendEmailBlastCampaign } from '@/lib/email-blast/sendCampaign'
 
 export async function GET(

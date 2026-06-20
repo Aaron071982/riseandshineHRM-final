@@ -1,23 +1,17 @@
 import { PostHireStage } from '@prisma/client'
+import {
+  BT_THANK_YOU_CAMPAIGN,
+  type EmailBlastRecipient,
+} from '@/lib/email-blast/constants'
 import { prisma } from '@/lib/prisma'
 
-export const BT_FEEDBACK_FORM_URL =
-  'https://docs.google.com/forms/d/e/1FAIpQLSdLsWRhhX92_-IwJgIGyo7HXzMcrwlCx0fVsx3EvJgfsHSb-Q/viewform'
-
-export const BT_THANK_YOU_CAMPAIGN = {
-  slug: 'bt-active-delivery-thank-you',
-  title: 'Thank You — Actively Working BTs',
-  subject: 'Thank you — and an opportunity to grow with us',
-  description:
-    'One-time thank-you email to all actively working BTs (ACTIVE_DELIVERY), with feedback form link and RBT certification encouragement.',
-} as const
-
-export type EmailBlastRecipient = {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-}
+export {
+  BT_FEEDBACK_FORM_URL,
+  BT_THANK_YOU_CAMPAIGN,
+  EMAIL_BLAST_BATCH_DELAY_MS,
+  EMAIL_BLAST_BATCH_SIZE,
+  type EmailBlastRecipient,
+} from '@/lib/email-blast/constants'
 
 function isValidEmail(email: string | null | undefined): email is string {
   if (!email) return false
@@ -51,10 +45,7 @@ export async function listActiveDeliveryBlastRecipients(): Promise<EmailBlastRec
 }
 
 export async function ensureEmailBlastCampaign(slug: string) {
-  const def =
-    slug === BT_THANK_YOU_CAMPAIGN.slug
-      ? BT_THANK_YOU_CAMPAIGN
-      : null
+  const def = slug === BT_THANK_YOU_CAMPAIGN.slug ? BT_THANK_YOU_CAMPAIGN : null
   if (!def) throw new Error('Unknown email blast campaign')
 
   return prisma.emailBlastCampaign.upsert({
@@ -74,7 +65,3 @@ export async function ensureEmailBlastCampaign(slug: string) {
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
-
-/** Resend-friendly batching: 5 emails, then pause. */
-export const EMAIL_BLAST_BATCH_SIZE = 5
-export const EMAIL_BLAST_BATCH_DELAY_MS = 600
