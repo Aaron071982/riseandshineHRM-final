@@ -25,6 +25,8 @@ export type EmailBlastPreview = {
   sentByName: string | null
   successCount: number | null
   failureCount: number | null
+  resendConfigured: boolean
+  adminEmail: string | null
 }
 
 export async function getEmailBlastPreview(slug: string): Promise<EmailBlastPreview> {
@@ -62,6 +64,8 @@ export async function getEmailBlastPreview(slug: string): Promise<EmailBlastPrev
     sentByName,
     successCount: campaign.successCount,
     failureCount: campaign.failureCount,
+    resendConfigured: !!process.env.RESEND_API_KEY,
+    adminEmail: null,
   }
 }
 
@@ -209,5 +213,40 @@ export async function sendEmailBlastCampaign(
     successCount,
     failureCount,
     failures: failures.slice(0, 20),
+  }
+}
+
+/** Send a single preview email to the logged-in admin (does not mark campaign complete). */
+export async function sendEmailBlastTest(
+  slug: string,
+  adminEmail: string,
+  adminFirstName?: string | null
+): Promise<{ success: boolean; message: string }> {
+  if (slug !== BT_THANK_YOU_CAMPAIGN.slug) {
+    throw new Error('Unknown email blast campaign')
+  }
+  if (!process.env.RESEND_API_KEY) {
+    return {
+      success: false,
+      message: 'RESEND_API_KEY is not configured — emails cannot be sent from this environment.',
+    }
+  }
+
+  const email = adminEmail.trim().toLowerCase()
+  if (!email.includes('@')) {
+    return { success: false, message: 'Your admin account has no valid email address.' }
+  }
+
+  const firstName = adminFirstName?.trim() || email.split('@')[0] || 'there'
+  const { subject, html } = generateBtThankYouEmail(firstName)
+  const sent = await sendGenericEmail(email, `[TEST] ${subject}`, html)
+
+  if (!sent) {
+    return { success: false, message: 'Resend rejected the test email. Check Vercel logs.' }
+  }
+
+  return {
+    success: true,
+    message: `Test email sent to ${email}. Check your inbox and Resend dashboard.`,
   }
 }

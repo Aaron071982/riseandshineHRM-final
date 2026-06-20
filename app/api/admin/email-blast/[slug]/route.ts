@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
 import { BT_THANK_YOU_CAMPAIGN } from '@/lib/email-blast/constants'
-import { getEmailBlastPreview, sendEmailBlastCampaign } from '@/lib/email-blast/sendCampaign'
+import { getEmailBlastPreview, sendEmailBlastCampaign, sendEmailBlastTest } from '@/lib/email-blast/sendCampaign'
 
 export async function GET(
   _request: NextRequest,
@@ -17,7 +17,10 @@ export async function GET(
     }
 
     const preview = await getEmailBlastPreview(slug)
-    return NextResponse.json(preview)
+    return NextResponse.json({
+      ...preview,
+      adminEmail: auth.user.email ?? null,
+    })
   } catch (error: unknown) {
     console.error('[email-blast] preview failed', error)
     return NextResponse.json(
@@ -41,6 +44,15 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}))
+
+    if (body?.test === true) {
+      if (!auth.user.email) {
+        return NextResponse.json({ error: 'Admin account has no email for test send.' }, { status: 400 })
+      }
+      const result = await sendEmailBlastTest(slug, auth.user.email, auth.user.name)
+      return NextResponse.json(result, { status: result.success ? 200 : 400 })
+    }
+
     if (body?.confirm !== true) {
       return NextResponse.json(
         { error: 'Confirmation required. Set confirm: true to send.' },
