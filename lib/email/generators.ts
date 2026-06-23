@@ -1,5 +1,6 @@
 import { makePublicUrl } from '../baseUrl'
 import { formatPhoneNumber } from '../sms'
+import { FORTY_HOUR_RBT_COURSE_URL } from '../onboarding/catalog'
 
 export function generateApplicationReviewedEmail(firstName: string): { subject: string; html: string } {
   const subject = "We've reviewed your application - Rise and Shine"
@@ -600,7 +601,7 @@ export function generateManualHireOnboardingEmail(
   const loginUrl = makePublicUrl('/login')
   const subject = "Welcome to Rise and Shine – You're Hired!"
   const fortyHourParagraph = !fortyHourCourseCompleted
-    ? `<p><strong>40-Hour RBT Course:</strong> If you have not yet completed the 40-hour RBT course, you will have access to it in your onboarding dashboard. Log in, complete the course, and upload your certificate there.</p>`
+    ? `<p><strong>40-Hour RBT Course:</strong> If you have not yet completed the 40-hour RBT course, start the free training here: <a href="${FORTY_HOUR_RBT_COURSE_URL}" style="color:#E4893D;">Autism Partnership Foundation RBT Training</a>. When finished, log in to My Tasks and upload your certificate.</p>`
     : ''
   const html = `
     <!DOCTYPE html>

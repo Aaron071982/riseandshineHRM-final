@@ -12,6 +12,12 @@ export const TIER_A_LAST_STEP = 25
 export const TIER_B_FIRST_STEP = 26
 export const TIER_B_LAST_STEP = 30
 
+/** Free 40-hour RBT training (Autism Partnership Foundation). */
+export const FORTY_HOUR_RBT_COURSE_URL =
+  'https://courses.autismpartnershipfoundation.org/offers/it285gs6/checkout'
+
+export const FORTY_HOUR_RBT_CERTIFICATE_SLUG = 'forty-hour-rbt-certificate'
+
 export type CatalogEntry = {
   stepNumber: number
   title: string
@@ -56,7 +62,7 @@ export const ONBOARDING_CATALOG: CatalogEntry[] = [
   { stepNumber: 26, title: 'Sexual Harassment Prevention Training + Quiz', slug: 'sexual-harassment-training', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'TRAINING_QUIZ', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: 'RiseShine_SexualHarassmentPolicy_v1.pdf', isRequired: true },
   { stepNumber: 27, title: 'Mandated Reporter Training Certificate', slug: 'mandated-reporter-certificate', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
   { stepNumber: 28, title: 'CPR/First Aid Certificate', slug: 'cpr-first-aid-certificate', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
-  { stepNumber: 29, title: '40-Hour RBT Training Certificate', slug: 'forty-hour-rbt-certificate', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
+  { stepNumber: 29, title: '40-Hour RBT Training Certificate', slug: FORTY_HOUR_RBT_CERTIFICATE_SLUG, type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
   { stepNumber: 30, title: 'Artemis Training Booking & Completion', slug: 'artemis-training', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'BOOKING', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
   { stepNumber: 31, title: 'Background Check Cleared (Admin)', slug: 'background-check-cleared', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'ADMIN_ONLY', tier: 'ACTIVATION', unlockGroup: null, folder: 'ACKNOWLEDGMENT_FORMS', file: null, isRequired: true },
   { stepNumber: 32, title: 'Supervision Contract Countersigned (Admin)', slug: 'supervision-countersigned', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'ADMIN_ONLY', tier: 'ACTIVATION', unlockGroup: null, folder: 'ACKNOWLEDGMENT_FORMS', file: null, isRequired: true },

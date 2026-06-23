@@ -21,7 +21,7 @@ import HRInitiatedDocFlow from '@/components/onboarding/HRInitiatedDocFlow'
 import DocumentUploadFlow from '@/components/onboarding/DocumentUploadFlow'
 import SexualHarassmentQuizFlow from '@/components/onboarding/SexualHarassmentQuizFlow'
 import ArtemisBookingFlow from '@/components/onboarding/ArtemisBookingFlow'
-import { RBT_VISIBLE_STEPS, TOTAL_ONBOARDING_STEPS } from '@/lib/onboarding/catalog'
+import { RBT_VISIBLE_STEPS, TOTAL_ONBOARDING_STEPS, FORTY_HOUR_RBT_CERTIFICATE_SLUG, FORTY_HOUR_RBT_COURSE_URL } from '@/lib/onboarding/catalog'
 
 type StepRow = {
   documentId: string
@@ -381,10 +381,18 @@ function StepFlow({ current, onComplete }: { current: StepRow; onComplete: () =>
   }
 
   if (current.flowType === 'UPLOAD') {
+    const isFortyHour = current.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG
     return (
       <DocumentUploadFlow
         documentId={current.documentId}
         title={current.title}
+        description={
+          isFortyHour
+            ? 'Complete the 40-hour RBT training, then upload your certificate of completion.'
+            : undefined
+        }
+        externalCourseUrl={isFortyHour ? FORTY_HOUR_RBT_COURSE_URL : undefined}
+        externalCourseLabel="Start 40-Hour RBT Course (Free)"
         onComplete={onComplete}
       />
     )
