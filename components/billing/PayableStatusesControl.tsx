@@ -1,13 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
 import {
   PAYABLE_STATUS_OPTIONS,
   type ArtemisSessionStatusKey,
 } from '@/lib/billing/sessionStatus'
+import { mapApiEntriesToBreakdown } from '@/lib/billing/breakdownEntries'
+import type { BreakdownEntry } from '@/components/billing/PayrollStatusBreakdown'
+
+export type PayableStatusUpdateResult = {
+  payableStatuses: ArtemisSessionStatusKey[]
+  entries: BreakdownEntry[]
+}
 
 export default function PayableStatusesControl({
   cycleId,
@@ -18,13 +24,18 @@ export default function PayableStatusesControl({
   cycleId: string
   cycleLocked: boolean
   initialStatuses: ArtemisSessionStatusKey[]
-  onUpdated: () => void | Promise<void>
+  onUpdated: (result: PayableStatusUpdateResult) => void | Promise<void>
 }) {
   const [selected, setSelected] = useState<Set<ArtemisSessionStatusKey>>(new Set(initialStatuses))
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    setSelected(new Set(initialStatuses))
+  }, [initialStatuses])
+
   const toggle = async (key: ArtemisSessionStatusKey, checked: boolean) => {
     if (cycleLocked) return
+    const prev = new Set(selected)
     const next = new Set(selected)
     if (checked) next.add(key)
     else next.delete(key)
@@ -38,7 +49,20 @@ export default function PayableStatusesControl({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ payableStatuses: Array.from(next) }),
       })
-      if (res.ok) await onUpdated()
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        const entries = data.cycle?.entries
+          ? mapApiEntriesToBreakdown(data.cycle.entries)
+          : []
+        await onUpdated({
+          payableStatuses: data.payableStatuses ?? Array.from(next),
+          entries,
+        })
+      } else {
+        setSelected(prev)
+      }
+    } catch {
+      setSelected(prev)
     } finally {
       setLoading(false)
     }

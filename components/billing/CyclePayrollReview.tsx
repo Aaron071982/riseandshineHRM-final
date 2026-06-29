@@ -1,14 +1,18 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import PayableStatusesControl from '@/components/billing/PayableStatusesControl'
+import PayableStatusesControl, {
+  type PayableStatusUpdateResult,
+} from '@/components/billing/PayableStatusesControl'
 import PayrollStatusBreakdown, {
   type BreakdownEntry,
 } from '@/components/billing/PayrollStatusBreakdown'
 import {
   parsePayableStatusesJson,
   payableStatusLabels,
+  type ArtemisSessionStatusKey,
 } from '@/lib/billing/sessionStatus'
 
 export default function CyclePayrollReview({
@@ -16,16 +20,36 @@ export default function CyclePayrollReview({
   cycleLocked,
   payableStatusesJson,
   entries,
+  onRecalculated,
 }: {
   cycleId: string
   cycleLocked: boolean
   payableStatusesJson: unknown
   entries: BreakdownEntry[]
+  onRecalculated?: (result: PayableStatusUpdateResult) => void
 }) {
   const router = useRouter()
-  const payableStatuses = parsePayableStatusesJson(payableStatusesJson)
+  const [payableStatuses, setPayableStatuses] = useState<ArtemisSessionStatusKey[]>(() =>
+    parsePayableStatusesJson(payableStatusesJson)
+  )
+  const [localEntries, setLocalEntries] = useState<BreakdownEntry[]>(entries)
 
-  const refresh = () => router.refresh()
+  useEffect(() => {
+    setPayableStatuses(parsePayableStatusesJson(payableStatusesJson))
+  }, [payableStatusesJson])
+
+  useEffect(() => {
+    setLocalEntries(entries)
+  }, [entries])
+
+  const handleUpdated = async (result: PayableStatusUpdateResult) => {
+    setPayableStatuses(result.payableStatuses)
+    if (result.entries.length > 0) {
+      setLocalEntries(result.entries)
+    }
+    onRecalculated?.(result)
+    router.refresh()
+  }
 
   return (
     <div className="space-y-6">
@@ -33,7 +57,7 @@ export default function CyclePayrollReview({
         cycleId={cycleId}
         cycleLocked={cycleLocked}
         initialStatuses={payableStatuses}
-        onUpdated={refresh}
+        onUpdated={handleUpdated}
       />
 
       <p className="text-xs text-gray-500">
@@ -46,7 +70,7 @@ export default function CyclePayrollReview({
         </CardHeader>
         <CardContent>
           <PayrollStatusBreakdown
-            entries={entries}
+            entries={localEntries}
             payableStatuses={payableStatuses}
             cycleId={cycleId}
           />

@@ -372,6 +372,23 @@ export default function NewCycleWizardPage() {
                   clientName: s.clientName,
                 })) ?? [],
               }))}
+              onRecalculated={({ payableStatuses, entries: updated }) => {
+                setPayableStatusesJson(payableStatuses)
+                if (updated.length === 0) return
+                const byId = new Map(updated.map((e) => [e.id, e]))
+                setEntries((prev) =>
+                  prev.map((e) => {
+                    const patch = byId.get(e.id)
+                    if (!patch) return e
+                    return {
+                      ...e,
+                      totalHours: patch.totalHours,
+                      grossPay: patch.grossPay,
+                      finalPay: patch.finalPay,
+                    }
+                  })
+                )
+              }}
             />
           )}
 

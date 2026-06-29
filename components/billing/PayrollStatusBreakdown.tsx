@@ -30,6 +30,7 @@ export type BreakdownEntry = {
   isExcluded: boolean
   hourlyRate: number | null
   adjustment: number
+  grossPay: number
   finalPay: number
   totalHours: number
   rbtProfile: { firstName: string; lastName: string; email?: string | null } | null
