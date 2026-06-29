@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { formatDate } from '@/lib/utils'
-import { Search, UserPlus, TrendingUp, Users as UsersIcon, Code2, Headphones, Megaphone, Calculator, Users, GraduationCap } from 'lucide-react'
+import { Search, UserPlus, TrendingUp, Users as UsersIcon, Code2, Headphones, Megaphone, Calculator, Users } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -19,9 +19,6 @@ import {
 import type { EmployeeListType } from '@/app/admin/employees/page'
 import RBTKanbanBoard, { type RBTKanbanProfile } from '@/components/admin/RBTKanbanBoard'
 import EmployeeDeleteSection from '@/components/admin/EmployeeDeleteSection'
-import ArtemisStatusBadge from '@/components/training/ArtemisStatusBadge'
-import type { ArtemisStatus } from '@/lib/training/artemisStatus'
-import { isHiredForArtemis } from '@/lib/training/artemisStatus'
 
 interface RBTProfile {
   id: string
@@ -64,10 +61,7 @@ interface EmployeesListProps {
   initialRbts: RBTProfile[]
   assignmentCounts?: Record<string, number>
   activeWorkingStats?: { activelyWorking: number; idleHires: number }
-  artemisStats?: { awaiting: number }
-  artemisStatusByRbtId?: Record<string, ArtemisStatus>
   initialWorkFilter?: string
-  initialArtemisFilter?: string
   bcbaProfiles: GenericProfile[]
   billingProfiles: GenericProfile[]
   marketingProfiles: GenericProfile[]
@@ -104,10 +98,7 @@ export default function EmployeesList({
   initialRbts,
   assignmentCounts = {},
   activeWorkingStats = { activelyWorking: 0, idleHires: 0 },
-  artemisStats = { awaiting: 0 },
-  artemisStatusByRbtId = {},
   initialWorkFilter = '',
-  initialArtemisFilter = '',
   bcbaProfiles,
   billingProfiles,
   marketingProfiles,
@@ -120,7 +111,6 @@ export default function EmployeesList({
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const [status, setStatus] = useState(searchParams.get('status') || '')
   const [workFilter, setWorkFilter] = useState(initialWorkFilter || searchParams.get('workFilter') || '')
-  const [artemisFilter, setArtemisFilter] = useState(initialArtemisFilter || searchParams.get('artemisFilter') || '')
   const [type, setType] = useState(currentType)
   const [isPending, startTransition] = useTransition()
 
@@ -164,17 +154,6 @@ export default function EmployeesList({
       params.set('type', currentType)
       if (value) params.set('workFilter', value)
       else params.delete('workFilter')
-      router.push(`/admin/employees?${params.toString()}`)
-    })
-  }
-
-  const handleArtemisFilterChange = (value: string) => {
-    setArtemisFilter(value)
-    startTransition(() => {
-      const params = new URLSearchParams(searchParams.toString())
-      params.set('type', currentType)
-      if (value) params.set('artemisFilter', value)
-      else params.delete('artemisFilter')
       router.push(`/admin/employees?${params.toString()}`)
     })
   }
@@ -277,33 +256,6 @@ export default function EmployeesList({
                 </div>
               </CardContent>
             </Card>
-            <Link href="/admin/employees?type=RBT&artemisFilter=awaiting">
-              <Card
-                className={`dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)] transition-shadow hover:shadow-md cursor-pointer ${
-                  artemisStats.awaiting > 0 ? 'border-red-200 dark:border-red-900/50' : ''
-                }`}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-[var(--text-tertiary)]">Awaiting Artemis</p>
-                      <p
-                        className={`text-2xl font-bold mt-1 ${
-                          artemisStats.awaiting > 0
-                            ? 'text-red-600 dark:text-red-400'
-                            : 'text-gray-900 dark:text-[var(--text-primary)]'
-                        }`}
-                      >
-                        {artemisStats.awaiting}
-                      </p>
-                    </div>
-                    <GraduationCap
-                      className={`h-8 w-8 ${artemisStats.awaiting > 0 ? 'text-red-500' : 'text-gray-400'}`}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
           </>
         )}
         {currentType !== 'RBT' && <div className="md:col-span-3" aria-hidden />}
@@ -366,17 +318,6 @@ export default function EmployeesList({
                     <SelectItem value="all_hired">All Hired</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={artemisFilter || 'all'} onValueChange={(v) => handleArtemisFilterChange(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-full md:w-[220px]">
-                    <SelectValue placeholder="Artemis status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Artemis status</SelectItem>
-                    <SelectItem value="trained">Trained</SelectItem>
-                    <SelectItem value="booked">Booked</SelectItem>
-                    <SelectItem value="not_started">Not Started</SelectItem>
-                  </SelectContent>
-                </Select>
               </>
             )}
           </div>
@@ -398,7 +339,6 @@ export default function EmployeesList({
             statusFilter={status}
             searchFilter={search}
             assignmentCounts={assignmentCounts}
-            artemisStatusByRbtId={artemisStatusByRbtId}
           />
         ) : filteredRbts.length === 0 ? (
           <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
@@ -417,7 +357,6 @@ export default function EmployeesList({
               if (currentType === 'RBT' && status) q.set('status', status)
               if (currentType === 'RBT' && search) q.set('search', search)
               if (workFilter) q.set('workFilter', workFilter)
-              if (artemisFilter) q.set('artemisFilter', artemisFilter)
               const viewHref = `/admin/rbts/${rbt.id}${q.toString() ? `?${q.toString()}` : ''}`
               const redirectHref = `/admin/employees?type=RBT${status ? `&status=${encodeURIComponent(status)}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`
               return (
@@ -447,9 +386,6 @@ export default function EmployeesList({
                             <Badge variant="outline" className="dark:border-[var(--border-subtle)]">
                               {clientCount} client{clientCount === 1 ? '' : 's'}
                             </Badge>
-                          )}
-                          {isHiredForArtemis(rbt.status) && artemisStatusByRbtId[rbt.id] && (
-                            <ArtemisStatusBadge status={artemisStatusByRbtId[rbt.id]} />
                           )}
                           {rbt.source === 'PUBLIC_APPLICATION' && (
                             <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-[var(--orange-subtle)] dark:text-[var(--orange-primary)] dark:border-[var(--orange-border)]">

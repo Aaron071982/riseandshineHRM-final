@@ -15,7 +15,6 @@ import { CurrencyCell } from '@/components/billing/CurrencyCell'
 import { MatchStatusBadge } from '@/components/billing/MatchStatusBadge'
 import { formatHours } from '@/lib/billing/format'
 import {
-  ARTEMIS_STATUS,
   PAYABLE_STATUS_OPTIONS,
   computePayableHours,
   computeStatusBreakdown,
@@ -68,7 +67,6 @@ export default function PayrollStatusBreakdown({
   const [search, setSearch] = useState('')
   const [matchFilter, setMatchFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [incompleteOnly, setIncompleteOnly] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortAsc, setSortAsc] = useState(true)
 
@@ -82,16 +80,12 @@ export default function PayrollStatusBreakdown({
         const payableHours = computePayableHours(e.sessions, payableStatuses)
         const rate = e.hourlyRate ?? 0
         const pay = rate * payableHours + (e.adjustment ?? 0)
-        const incompleteCount = e.sessions.filter(
-          (s) => s.sessionStatus === ARTEMIS_STATUS.INCOMPLETE
-        ).length
         return {
           entry: e,
           name: employeeName(e),
           breakdown,
           payableHours,
           pay,
-          incompleteCount,
         }
       })
   }, [entries, payableStatuses])
@@ -109,10 +103,9 @@ export default function PayrollStatusBreakdown({
         const hrs = r.breakdown[statusFilter as ArtemisSessionStatusKey] ?? 0
         if (hrs <= 0) return false
       }
-      if (incompleteOnly && r.incompleteCount === 0) return false
       return true
     })
-  }, [rows, search, matchFilter, statusFilter, incompleteOnly])
+  }, [rows, search, matchFilter, statusFilter])
 
   const sorted = useMemo(() => {
     const list = [...filtered]
@@ -189,10 +182,9 @@ export default function PayrollStatusBreakdown({
     if (search.trim()) params.set('search', search.trim())
     if (matchFilter !== 'all') params.set('match', matchFilter)
     if (statusFilter !== 'all') params.set('status', statusFilter)
-    if (incompleteOnly) params.set('incomplete', '1')
     const q = params.toString()
     return q ? `?${q}` : ''
-  }, [search, matchFilter, statusFilter, incompleteOnly])
+  }, [search, matchFilter, statusFilter])
 
   const exportFilteredHref = cycleId
     ? `/api/billing/cycles/${cycleId}/export${filterQuery}`
@@ -242,14 +234,6 @@ export default function PayrollStatusBreakdown({
             </SelectContent>
           </Select>
         </div>
-        <label className="flex items-center gap-2 text-sm pb-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={incompleteOnly}
-            onChange={(e) => setIncompleteOnly(e.target.checked)}
-          />
-          Has incomplete
-        </label>
         {exportFilteredHref && exportAllHref && (
           <div className="flex gap-2 pb-1 ml-auto">
             <Link

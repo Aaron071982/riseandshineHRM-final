@@ -266,45 +266,6 @@ export async function requireAdminSession(): Promise<
   return { user, response: null }
 }
 
-/** Artemis training portal: admins and trainer-role users. */
-export function canAccessTrainingPortal(user: SessionUser | null): boolean {
-  if (!user) return false
-  const role = (user.role ?? '').toUpperCase()
-  return role === 'ADMIN' || role === 'TRAINER'
-}
-
-/** Can manage Artemis sessions, attendance, and trainee outreach. */
-export function isTrainingManager(user: SessionUser | null): boolean {
-  if (!user) return false
-  if ((user.role ?? '').toUpperCase() === 'TRAINER') return true
-  return isAdmin(user)
-}
-
-/** Super admins may mark Artemis complete without attending a session. */
-export function canOverrideTrainingRequirement(user: SessionUser | null): boolean {
-  if (!user) return false
-  return isSuperAdminEmail(user.email)
-}
-
-export async function requireTrainingPortalSession(): Promise<
-  | { user: SessionUser; response: null }
-  | { user: null; response: NextResponse }
-> {
-  const cookieStore = await cookies()
-  const sessionToken = cookieStore.get('session')?.value
-  if (!sessionToken) {
-    return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  }
-  const user = await validateSession(sessionToken)
-  if (!user) {
-    return { user: null, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  }
-  if (!canAccessTrainingPortal(user)) {
-    return { user: null, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
-  }
-  return { user, response: null }
-}
-
 /** Billing & Payroll portal: BILLING role, admins, or super-admin emails. */
 export function isBillingManager(user: SessionUser | null): boolean {
   if (!user) return false

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireBillingManagerSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { buildPayrollWorkbook, payrollExportFilename } from '@/lib/billing/excelExport'
-import { ARTEMIS_STATUS } from '@/lib/billing/sessionStatus'
 import type { BillingMatchStatus } from '@prisma/client'
 
 function entryDisplayName(entry: {
@@ -27,8 +26,7 @@ function matchesExportFilters(
   },
   search: string | null,
   match: string | null,
-  status: string | null,
-  incompleteOnly: boolean
+  status: string | null
 ): boolean {
   if (search) {
     const q = search.toLowerCase()
@@ -44,12 +42,6 @@ function matchesExportFilters(
       (s) => s.sessionStatus === status && s.actualMinutes > 0
     )
     if (!hasStatus) return false
-  }
-  if (incompleteOnly) {
-    const hasIncomplete = entry.sessions.some(
-      (s) => s.sessionStatus === ARTEMIS_STATUS.INCOMPLETE
-    )
-    if (!hasIncomplete) return false
   }
   return true
 }
@@ -70,8 +62,7 @@ export async function GET(
   const search = searchParams.get('search')
   const match = searchParams.get('match')
   const status = searchParams.get('status')
-  const incompleteOnly = searchParams.get('incomplete') === '1'
-  const hasFilters = !!(search || match || status || incompleteOnly)
+  const hasFilters = !!(search || match || status)
 
   let entries = await prisma.billingEntry.findMany({
     where: {
@@ -88,9 +79,7 @@ export async function GET(
   })
 
   if (hasFilters) {
-    entries = entries.filter((e) =>
-      matchesExportFilters(e, search, match, status, incompleteOnly)
-    )
+    entries = entries.filter((e) => matchesExportFilters(e, search, match, status))
   }
 
   const buffer = await buildPayrollWorkbook(

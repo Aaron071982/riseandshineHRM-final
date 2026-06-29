@@ -16,9 +16,6 @@ import {
 import { useToast } from '@/components/ui/toast'
 import { ChevronDown, ChevronRight, Calendar, UserX, UserCheck } from 'lucide-react'
 import EmployeeDeleteSection from '@/components/admin/EmployeeDeleteSection'
-import ArtemisStatusBadge from '@/components/training/ArtemisStatusBadge'
-import type { ArtemisStatus } from '@/lib/training/artemisStatus'
-import { isHiredForArtemis } from '@/lib/training/artemisStatus'
 
 const COLUMN_COLLAPSE_KEY = 'rbt-kanban-column-collapsed'
 
@@ -82,7 +79,6 @@ interface RBTKanbanBoardProps {
   statusFilter: string
   searchFilter?: string
   assignmentCounts?: Record<string, number>
-  artemisStatusByRbtId?: Record<string, ArtemisStatus>
   onRbtsChange?: (rbts: RBTKanbanProfile[]) => void
 }
 
@@ -91,7 +87,6 @@ export default function RBTKanbanBoard({
   statusFilter,
   searchFilter = '',
   assignmentCounts = {},
-  artemisStatusByRbtId = {},
   onRbtsChange,
 }: RBTKanbanBoardProps) {
   const { showToast } = useToast()
@@ -323,9 +318,6 @@ export default function RBTKanbanBoard({
                                         <Badge variant="outline" className="text-xs">
                                           {assignmentCounts[rbt.id]} client{(assignmentCounts[rbt.id] ?? 0) === 1 ? '' : 's'}
                                         </Badge>
-                                      )}
-                                      {isHiredForArtemis(rbt.status) && artemisStatusByRbtId[rbt.id] && (
-                                        <ArtemisStatusBadge status={artemisStatusByRbtId[rbt.id]} className="text-xs" />
                                       )}
                                     </div>
                                     <p className="text-xs text-gray-500 dark:text-[var(--text-disabled)] mt-2">

@@ -5,6 +5,7 @@ export const BILLING_PORTAL_USERS = [
   { email: 'rafique@riseandshineaba.com', name: 'Rafique' },
   { email: 'afrin@riseandshineaba.com', name: 'Afrin' },
   { email: 'jaden.j.brown2025@gmail.com', name: 'Jaden Brown' },
+  { email: 'fardeen@riseandshineaba.com', name: 'Fardeen' },
 ] as const
 
 export function getBillingPortalEmailSet(): Set<string> {

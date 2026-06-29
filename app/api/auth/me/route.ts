@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server'
-import {
-  getCurrentUser,
-  isTrainingManager,
-  canOverrideTrainingRequirement,
-  isAdmin,
-  canAccessTrainingPortal,
-} from '@/lib/auth'
+import { getCurrentUser, isAdmin } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +15,6 @@ export async function GET() {
     email: user.email,
     name: user.name,
     rbtProfileId: user.rbtProfileId,
-    trainingManager: isTrainingManager(user),
-    trainingPortal: canAccessTrainingPortal(user),
-    canOverrideArtemisTraining: canOverrideTrainingRequirement(user),
     isAdmin: isAdmin(user),
   })
 }

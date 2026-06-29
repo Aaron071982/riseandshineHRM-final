@@ -19,7 +19,6 @@ export async function getPipelineStats(): Promise<ToolResult> {
     statusCounts,
     hiredRBTs,
     inPipeline,
-    awaitingArtemis,
     onboardingComplete,
     activeStats,
     hiredWithTasks,
@@ -28,9 +27,6 @@ export async function getPipelineStats(): Promise<ToolResult> {
     prisma.rBTProfile.groupBy({ by: ['status'], _count: true }),
     prisma.rBTProfile.count({ where: { status: 'HIRED' } }),
     prisma.rBTProfile.count({ where: { status: { in: [...PIPELINE_STATUSES] } } }),
-    prisma.rBTProfile.count({
-      where: { status: 'HIRED', artemisTrainingCompleted: false },
-    }),
     prisma.rBTProfile.count({ where: { status: 'ONBOARDING_COMPLETED' } }),
     getActiveWorkingStats(),
     prisma.rBTProfile.findMany({
@@ -78,7 +74,6 @@ export async function getPipelineStats(): Promise<ToolResult> {
     `  In pipeline: ${inPipeline}`,
     `  Actively working: ${activeStats.activelyWorking}`,
     `  Idle hires: ${activeStats.idleHires}`,
-    `  Awaiting Artemis training: ${awaitingArtemis}`,
     `  Onboarding completed (status): ${onboardingComplete}`,
     `  Onboarding completion rate: ${onboardingCompletionRatePercent}%`,
     `  Upcoming interviews: ${upcomingInterviews}`,

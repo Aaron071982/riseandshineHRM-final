@@ -20,12 +20,9 @@ export async function GET() {
   if (auth.response) return auth.response
 
   try {
-    const [hiredCount, pipelineCount, awaitingArtemis, onboardingComplete, activeStats] = await Promise.all([
+    const [hiredCount, pipelineCount, onboardingComplete, activeStats] = await Promise.all([
       prisma.rBTProfile.count({ where: { status: 'HIRED' } }),
       prisma.rBTProfile.count({ where: { status: { in: [...PIPELINE_STATUSES] } } }),
-      prisma.rBTProfile.count({
-        where: { status: 'HIRED', artemisTrainingCompleted: false },
-      }),
       prisma.rBTProfile.count({ where: { status: 'ONBOARDING_COMPLETED' } }),
       getActiveWorkingStats(),
     ])
@@ -33,7 +30,6 @@ export async function GET() {
     return NextResponse.json({
       hiredRBTs: hiredCount,
       inPipeline: pipelineCount,
-      awaitingArtemis,
       onboardingComplete,
       activelyWorking: activeStats.activelyWorking,
       idleHires: activeStats.idleHires,

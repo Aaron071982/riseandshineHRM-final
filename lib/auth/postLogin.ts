@@ -43,7 +43,6 @@ export function getPostLoginPath(role: string | null | undefined): string | null
     case 'RBT':
       return '/rbt/dashboard'
     case 'TRAINER':
-      return '/training/dashboard'
     case 'BCBA':
     case 'MARKETING':
     case 'CALL_CENTER':

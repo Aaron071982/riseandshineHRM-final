@@ -6,11 +6,9 @@ import PayableStatusesControl from '@/components/billing/PayableStatusesControl'
 import PayrollStatusBreakdown, {
   type BreakdownEntry,
 } from '@/components/billing/PayrollStatusBreakdown'
-import IncompleteSessionsPanel from '@/components/billing/IncompleteSessionsPanel'
 import {
   parsePayableStatusesJson,
   payableStatusLabels,
-  type ArtemisSessionStatusKey,
 } from '@/lib/billing/sessionStatus'
 
 export default function CyclePayrollReview({
@@ -41,8 +39,6 @@ export default function CyclePayrollReview({
       <p className="text-xs text-gray-500">
         Payable this cycle: <strong>{payableStatusLabels(payableStatuses)}</strong>
       </p>
-
-      <IncompleteSessionsPanel cycleId={cycleId} cycleLocked={cycleLocked} entries={entries} />
 
       <Card className="shadow-sm">
         <CardHeader>

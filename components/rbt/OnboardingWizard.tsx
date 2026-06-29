@@ -20,7 +20,6 @@ import DownloadReuploadFlow from '@/components/onboarding/DownloadReuploadFlow'
 import HRInitiatedDocFlow from '@/components/onboarding/HRInitiatedDocFlow'
 import DocumentUploadFlow from '@/components/onboarding/DocumentUploadFlow'
 import SexualHarassmentQuizFlow from '@/components/onboarding/SexualHarassmentQuizFlow'
-import ArtemisBookingFlow from '@/components/onboarding/ArtemisBookingFlow'
 import { RBT_VISIBLE_STEPS, TOTAL_ONBOARDING_STEPS, FORTY_HOUR_RBT_CERTIFICATE_SLUG, FORTY_HOUR_RBT_COURSE_URL } from '@/lib/onboarding/catalog'
 
 type StepRow = {
@@ -409,7 +408,14 @@ function StepFlow({ current, onComplete }: { current: StepRow; onComplete: () =>
   }
 
   if (current.flowType === 'BOOKING') {
-    return <ArtemisBookingFlow />
+    return (
+      <div className="space-y-4 text-sm text-gray-600">
+        <p>
+          Artemis training is coordinated by your supervisor. This step will be marked complete once
+          training is verified in our system.
+        </p>
+      </div>
+    )
   }
 
   return <p className="text-gray-500">Unsupported step type.</p>

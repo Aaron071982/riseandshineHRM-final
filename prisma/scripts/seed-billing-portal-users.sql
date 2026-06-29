@@ -45,3 +45,18 @@ SELECT
   NOW(),
   NOW()
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email ILIKE 'jaden.j.brown2025@gmail.com');
+
+UPDATE users
+SET role = 'BILLING', "isActive" = true, "updatedAt" = NOW()
+WHERE email ILIKE 'fardeen@riseandshineaba.com';
+
+INSERT INTO users (id, email, name, role, "isActive", "createdAt", "updatedAt")
+SELECT
+  'cmqlbillingfardeen001',
+  'fardeen@riseandshineaba.com',
+  'Fardeen',
+  'BILLING',
+  true,
+  NOW(),
+  NOW()
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email ILIKE 'fardeen@riseandshineaba.com');

@@ -201,27 +201,6 @@ export async function buildPayrollWorkbook(
   })
   detail.getColumn(1).width = 22
 
-  const incomplete = workbook.addWorksheet('Incomplete Sessions')
-  const incHeaders = ['Employee', 'Client', 'Date', 'Actual Hours']
-  const incHeaderRow = incomplete.addRow(incHeaders)
-  incHeaderRow.eachCell((cell) => {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } }
-    cell.font = HEADER_FONT
-  })
-
-  for (const e of entries) {
-    const name = employeeName(e)
-    const incSessions = e.sessions.filter((s) => s.sessionStatus === 'incomplete')
-    for (const s of incSessions) {
-      const row = incomplete.addRow([name, s.clientName, s.dos, s.actualMinutes / 60])
-      row.getCell(3).numFmt = 'm/d/yyyy'
-      row.getCell(4).numFmt = '0.00'
-    }
-  }
-  incomplete.columns.forEach((col) => {
-    col.width = 18
-  })
-
   const buffer = await workbook.xlsx.writeBuffer()
   return Buffer.from(buffer)
 }
