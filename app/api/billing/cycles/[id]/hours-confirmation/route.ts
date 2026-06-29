@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireBillingManagerSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { format } from 'date-fns'
 import {
   generateHoursConfirmationEmail,
   sendHoursConfirmationEmail,
   getPayDeadline,
+  groupIncompleteSessionsByDate,
+  sumIncompleteHours,
 } from '@/lib/billing/hoursConfirmationEmail'
 import { isPayableMatchStatus } from '@/lib/billing/entryActions'
 
@@ -14,19 +15,6 @@ const BATCH_DELAY_MS = 600
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
-}
-
-function groupSessionsByDate(
-  sessions: { dos: Date; actualMinutes: number }[]
-): { date: Date; hours: number }[] {
-  const byDay = new Map<string, number>()
-  for (const s of sessions) {
-    const key = format(s.dos, 'yyyy-MM-dd')
-    byDay.set(key, (byDay.get(key) ?? 0) + s.actualMinutes / 60)
-  }
-  return [...byDay.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, hours]) => ({ date: new Date(key + 'T12:00:00'), hours }))
 }
 
 export async function GET(
@@ -40,11 +28,11 @@ export async function GET(
     where: { id: params.id },
     include: {
       entries: {
-        where: { isExcluded: false, totalHours: { gt: 0 } },
+        where: { isExcluded: false },
         include: {
           rbtProfile: { select: { id: true, firstName: true, lastName: true, email: true } },
           payrollOnly: { select: { id: true, fullName: true, email: true } },
-          sessions: { select: { dos: true, actualMinutes: true } },
+          sessions: { select: { dos: true, actualMinutes: true, sessionStatus: true } },
         },
       },
       hoursConfirmations: {
@@ -69,17 +57,19 @@ export async function GET(
         ? `${e.rbtProfile.firstName} ${e.rbtProfile.lastName}`
         : (e.payrollOnly?.fullName ?? e.providerNameRaw)
       const firstName = e.rbtProfile?.firstName ?? name.split(' ')[0] ?? name
-      const dailyHours = groupSessionsByDate(e.sessions)
+      const dailyHours = groupIncompleteSessionsByDate(e.sessions)
+      const totalHours = sumIncompleteHours(e.sessions)
       return {
         entryId: e.id,
         name,
         firstName,
         email,
-        totalHours: e.totalHours,
-        canEmail: !!email,
+        totalHours,
+        canEmail: !!email && totalHours > 0,
         dailyHours,
       }
     })
+    .filter((r) => r.totalHours > 0)
 
   const previewRecipient = recipients.find((r) => r.canEmail) ?? recipients[0]
   const previewHtml = previewRecipient
@@ -96,7 +86,7 @@ export async function GET(
   return NextResponse.json({
     recipientCount: recipients.filter((r) => r.canEmail).length,
     skippedCount: recipients.filter((r) => !r.canEmail).length,
-    totalWithHours: recipients.length,
+    totalWithIncompleteHours: recipients.length,
     payDeadline: getPayDeadline(cycle.periodEnd),
     previewHtml,
     previewRecipient: previewRecipient?.name ?? null,
@@ -115,11 +105,11 @@ export async function POST(
     where: { id: params.id },
     include: {
       entries: {
-        where: { isExcluded: false, totalHours: { gt: 0 } },
+        where: { isExcluded: false },
         include: {
           rbtProfile: { select: { id: true, firstName: true, lastName: true, email: true } },
           payrollOnly: { select: { id: true, fullName: true, email: true } },
-          sessions: { select: { dos: true, actualMinutes: true } },
+          sessions: { select: { dos: true, actualMinutes: true, sessionStatus: true } },
         },
       },
     },
@@ -133,11 +123,11 @@ export async function POST(
     return NextResponse.json({ error: 'Cycle must be in review or finalized to send confirmations' }, { status: 400 })
   }
 
-  const toSend = cycle.entries.filter(
-    (e) =>
-      isPayableMatchStatus(e.matchStatus) &&
-      (e.rbtProfile?.email || e.payrollOnly?.email)
-  )
+  const toSend = cycle.entries.filter((e) => {
+    if (!isPayableMatchStatus(e.matchStatus)) return false
+    if (!e.rbtProfile?.email && !e.payrollOnly?.email) return false
+    return sumIncompleteHours(e.sessions) > 0
+  })
 
   let sent = 0
   let failed = 0
@@ -151,7 +141,8 @@ export async function POST(
         const firstName =
           e.rbtProfile?.firstName ??
           (e.payrollOnly?.fullName ?? e.providerNameRaw).split(' ')[0]
-        const dailyHours = groupSessionsByDate(e.sessions)
+        const dailyHours = groupIncompleteSessionsByDate(e.sessions)
+        const totalHours = sumIncompleteHours(e.sessions)
 
         const ok = await sendHoursConfirmationEmail({
           to: email,
@@ -160,7 +151,7 @@ export async function POST(
           periodStart: cycle.periodStart,
           periodEnd: cycle.periodEnd,
           dailyHours,
-          totalHours: e.totalHours,
+          totalHours,
         })
 
         await prisma.billingHoursConfirmation.create({
@@ -181,10 +172,16 @@ export async function POST(
     if (i + BATCH_SIZE < toSend.length) await sleep(BATCH_DELAY_MS)
   }
 
-  const noEmail = cycle.entries.filter(
-    (e) => isPayableMatchStatus(e.matchStatus) && !e.rbtProfile?.email && !e.payrollOnly?.email
-  )
-  for (const e of noEmail) {
+  const noEmailOrNoIncomplete = cycle.entries.filter((e) => {
+    if (!isPayableMatchStatus(e.matchStatus)) return false
+    const hasIncomplete = sumIncompleteHours(e.sessions) > 0
+    const hasEmail = !!(e.rbtProfile?.email || e.payrollOnly?.email)
+    return !hasEmail || !hasIncomplete
+  })
+  for (const e of noEmailOrNoIncomplete) {
+    const hasEmail = !!(e.rbtProfile?.email || e.payrollOnly?.email)
+    const hasIncomplete = sumIncompleteHours(e.sessions) > 0
+    if (!hasIncomplete) continue
     await prisma.billingHoursConfirmation.create({
       data: {
         billingCycleId: cycle.id,

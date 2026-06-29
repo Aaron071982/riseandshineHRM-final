@@ -196,8 +196,12 @@ export default function MatchReviewTable({
               <th className="px-3 py-3 font-medium">Provider</th>
               <th className="px-3 py-3 font-medium">Status</th>
               <th className="px-3 py-3 font-medium">Match</th>
-              <th className="px-3 py-3 font-medium text-right">Sessions</th>
-              <th className="px-3 py-3 font-medium text-right">Hours</th>
+              <th className="px-3 py-3 font-medium text-right" title="Sessions in selected payable statuses">
+                Payable sessions
+              </th>
+              <th className="px-3 py-3 font-medium text-right" title="Hours in selected payable statuses">
+                Payable hrs
+              </th>
               <th className="px-3 py-3 font-medium">Rate</th>
               <th className="px-3 py-3 font-medium text-right">Gross</th>
               <th className="px-3 py-3 font-medium w-28">Actions</th>

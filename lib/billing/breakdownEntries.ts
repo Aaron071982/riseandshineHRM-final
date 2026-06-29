@@ -11,6 +11,7 @@ type ApiBreakdownEntry = {
   grossPay: number
   finalPay: number
   totalHours: number
+  totalSessions: number
   rbtProfile: { firstName: string; lastName: string; email?: string | null } | null
   payrollOnly: { fullName: string; email?: string | null } | null
   sessions: {

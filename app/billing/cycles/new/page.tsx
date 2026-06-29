@@ -383,6 +383,7 @@ export default function NewCycleWizardPage() {
                     return {
                       ...e,
                       totalHours: patch.totalHours,
+                      totalSessions: patch.totalSessions,
                       grossPay: patch.grossPay,
                       finalPay: patch.finalPay,
                     }

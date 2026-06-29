@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { formatHours } from '@/lib/billing/format'
+import SessionStatusBadge from '@/components/billing/SessionStatusBadge'
 
 type Session = {
   id: string
@@ -12,6 +13,7 @@ type Session = {
   actualMinutes: number
   procedureCode: string | null
   location: string | null
+  sessionStatus: string | null
 }
 
 export default function SessionDrilldown({ sessions }: { sessions: Session[] }) {
@@ -36,6 +38,7 @@ export default function SessionDrilldown({ sessions }: { sessions: Session[] }) 
               <tr>
                 <th className="px-2 py-1 text-left">Date</th>
                 <th className="px-2 py-1 text-left">Client</th>
+                <th className="px-2 py-1 text-left">Status</th>
                 <th className="px-2 py-1 text-right">Hours</th>
                 <th className="px-2 py-1 text-left">Code</th>
                 <th className="px-2 py-1 text-left">Location</th>
@@ -46,6 +49,9 @@ export default function SessionDrilldown({ sessions }: { sessions: Session[] }) 
                 <tr key={s.id} className="border-t border-gray-100 dark:border-[var(--border-subtle)]">
                   <td className="px-2 py-1">{format(new Date(s.dos), 'M/d/yyyy')}</td>
                   <td className="px-2 py-1">{s.clientName}</td>
+                  <td className="px-2 py-1">
+                    <SessionStatusBadge status={s.sessionStatus} />
+                  </td>
                   <td className="px-2 py-1 text-right">{formatHours(s.actualMinutes / 60)}</td>
                   <td className="px-2 py-1">{s.procedureCode ?? '—'}</td>
                   <td className="px-2 py-1">{s.location ?? '—'}</td>

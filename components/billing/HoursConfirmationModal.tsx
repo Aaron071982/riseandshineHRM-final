@@ -27,6 +27,7 @@ export default function HoursConfirmationModal({
   const [preview, setPreview] = useState<{
     recipientCount: number
     skippedCount: number
+    totalWithIncompleteHours: number
     previewHtml: string | null
     payDeadline: string
   } | null>(null)
@@ -56,13 +57,13 @@ export default function HoursConfirmationModal({
     <>
       <Button variant="outline" onClick={loadPreview} disabled={!canSend}>
         <Mail className="w-4 h-4 mr-2" />
-        Send Hours Confirmation to BTs
+        Send Incomplete Hours Reminder to BTs
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Hours confirmation — {cycleLabel}</DialogTitle>
+            <DialogTitle>Incomplete hours reminder — {cycleLabel}</DialogTitle>
           </DialogHeader>
 
           {loading && (
@@ -76,15 +77,20 @@ export default function HoursConfirmationModal({
             <div className="space-y-4">
               <p className="text-sm">
                 This will email{' '}
-                <strong>{preview.recipientCount} matched BT{preview.recipientCount !== 1 ? 's' : ''}</strong>{' '}
-                with hours in this cycle.
+                <strong>
+                  {preview.recipientCount} matched BT{preview.recipientCount !== 1 ? 's' : ''}
+                </strong>{' '}
+                who have <strong>incomplete</strong> hours in Artemis for this cycle.
                 {preview.skippedCount > 0 && (
                   <span className="text-gray-500">
                     {' '}
-                    ({preview.skippedCount} skipped — no email on file)
+                    ({preview.skippedCount} with incomplete hours skipped — no email on file)
                   </span>
                 )}
               </p>
+              {preview.totalWithIncompleteHours === 0 && (
+                <p className="text-sm text-amber-700">No providers have incomplete hours this cycle.</p>
+              )}
               <p className="text-xs text-gray-500">
                 Pay deadline referenced in email: {preview.payDeadline}
               </p>
