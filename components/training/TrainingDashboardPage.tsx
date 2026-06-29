@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
 import CreateSessionModal from '@/components/training/CreateSessionModal'
+import SessionRequestsPanel from '@/components/training/SessionRequestsPanel'
+import { TRAINING_ACCENT } from '@/lib/training/constants'
 
 type Summary = {
   stats: {
@@ -13,6 +15,7 @@ type Summary = {
     rbtsTrained: number
     awaitingTraining: number
     thisMonthSessions: number
+    openSessionRequests: number
   }
   upcomingSessions: Array<{
     id: string
@@ -74,7 +77,7 @@ export default function TrainingDashboardPage() {
   if (!data) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-[#e36f1e] dark:text-[var(--orange-primary)]" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: TRAINING_ACCENT }} />
       </div>
     )
   }
@@ -83,12 +86,14 @@ export default function TrainingDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-500 via-amber-400 to-orange-400 p-8 shadow-lg">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-purple-500 to-violet-500 p-8 shadow-lg">
         <h1 className="text-2xl md:text-3xl font-bold text-white">Training Dashboard</h1>
-        <p className="mt-2 text-orange-50 max-w-2xl">
+        <p className="mt-2 text-violet-50 max-w-2xl">
           Manage Artemis training sessions and track RBT progress.
         </p>
       </div>
+
+      <SessionRequestsPanel onChange={load} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
@@ -102,7 +107,7 @@ export default function TrainingDashboardPage() {
               <CardTitle className="text-sm font-medium text-gray-500">{label}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-[#e36f1e] dark:text-[var(--orange-primary)]">
+              <p className="text-3xl font-bold" style={{ color: TRAINING_ACCENT }}>
                 {val as number}
               </p>
             </CardContent>
@@ -116,7 +121,8 @@ export default function TrainingDashboardPage() {
             <CardTitle>Upcoming Sessions</CardTitle>
             <Button
               size="sm"
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              className="text-white hover:opacity-90"
+              style={{ backgroundColor: TRAINING_ACCENT }}
               onClick={() => setCreateOpen(true)}
             >
               + Create New Session
@@ -147,7 +153,8 @@ export default function TrainingDashboardPage() {
                       href={s.meetingUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-sm text-[#e36f1e] dark:text-[var(--orange-primary)] underline"
+                      className="text-sm underline"
+                      style={{ color: TRAINING_ACCENT }}
                     >
                       Meeting link
                     </a>
@@ -188,7 +195,8 @@ export default function TrainingDashboardPage() {
                     {p.email && (
                       <a
                         href={`mailto:${p.email}`}
-                        className="text-[#e36f1e] dark:text-[var(--orange-primary)]"
+                        className="underline"
+                        style={{ color: TRAINING_ACCENT }}
                       >
                         {p.email}
                       </a>

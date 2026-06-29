@@ -8,6 +8,7 @@ import {
   generateArtemisNewSessionEmail,
 } from '@/lib/email/generators'
 import { buildArtemisTrainingIcs } from '@/lib/training/ics'
+import { DANY_TRAINER_EMAIL } from '@/lib/training/constants'
 import type { TrainingSession } from '@prisma/client'
 
 export async function logTrainingEmail(input: {
@@ -185,4 +186,49 @@ export async function sendCompletionEmailToRbt(params: {
     rbtProfileId: params.rbtProfile.id,
     emailType: 'COMPLETION',
   })
+}
+
+export async function notifyArtemisSessionRequest(params: {
+  rbtProfile: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string | null
+    phoneNumber: string
+  }
+  message: string | null
+}): Promise<void> {
+  const name = `${params.rbtProfile.firstName} ${params.rbtProfile.lastName}`
+  const msgBlock = params.message?.trim()
+    ? `<p><strong>Message:</strong> ${params.message.trim().replace(/\n/g, '<br>')}</p>`
+    : '<p><em>No message provided.</em></p>'
+
+  await sendGenericEmail(
+    DANY_TRAINER_EMAIL,
+    `Artemis session request: ${name}`,
+    `<p><strong>${name}</strong> requested help booking Artemis Training.</p>
+     ${msgBlock}
+     <p><strong>Phone:</strong> ${params.rbtProfile.phoneNumber}</p>
+     <p><strong>Email:</strong> ${params.rbtProfile.email ?? '—'}</p>
+     <p><a href="${makePublicUrl('/training/dashboard')}">Open training dashboard</a></p>`
+  )
+
+  try {
+    const dany = await prisma.user.findFirst({
+      where: { email: { equals: DANY_TRAINER_EMAIL, mode: 'insensitive' }, isActive: true },
+      select: { id: true },
+    })
+    if (dany) {
+      await prisma.adminNotification.create({
+        data: {
+          userId: dany.id,
+          type: 'ARTEMIS_SESSION_REQUEST',
+          message: `${name} requested help with Artemis Training`,
+          linkUrl: '/training/dashboard',
+        },
+      })
+    }
+  } catch {
+    // ignore
+  }
 }

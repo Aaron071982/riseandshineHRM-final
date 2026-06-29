@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import MatchReviewTable from '@/components/billing/MatchReviewTable'
+import CyclePayrollReview from '@/components/billing/CyclePayrollReview'
 import PayRateInput from '@/components/billing/PayRateInput'
 import ExcludedProvidersSection from '@/components/billing/ExcludedProvidersSection'
 import HoursConfirmationModal from '@/components/billing/HoursConfirmationModal'
@@ -45,7 +46,13 @@ type Entry = {
   isExcluded: boolean
   role: string | null
   notes: string | null
-  rbtProfile: { firstName: string; lastName: string } | null
+  sessions: {
+    sessionStatus: string | null
+    actualMinutes: number
+    dos: string
+    clientName: string
+  }[]
+  rbtProfile: { firstName: string; lastName: string; email?: string | null } | null
   payrollOnly: { id: string; fullName: string; email: string | null } | null
 }
 
@@ -79,6 +86,7 @@ export default function NewCycleWizardPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
+  const [payableStatusesJson, setPayableStatusesJson] = useState<unknown>(['completed', 'ready_to_bill'])
   const [dragOver, setDragOver] = useState(false)
 
   useEffect(() => {
@@ -115,6 +123,7 @@ export default function NewCycleWizardPage() {
     if (res.ok) {
       setEntries(data.cycle.entries)
       setCandidates(data.candidates)
+      setPayableStatusesJson(data.cycle.payableStatuses)
     }
   }, [])
 
@@ -153,6 +162,9 @@ export default function NewCycleWizardPage() {
       if (!res.ok) throw new Error(data.error || 'Upload failed')
       setEntries(data.entries)
       setUploadPreview(data.preview)
+      if (data.hoursByStatus) {
+        console.log('[upload] Hours by status:', data.hoursByStatus)
+      }
       if (data.periodWarning?.mismatch) {
         setPeriodWarning(
           `File dates (${new Date(data.periodWarning.detectedMin).toLocaleDateString()} – ${new Date(data.periodWarning.detectedMax).toLocaleDateString()}) may not match cycle period.`
@@ -345,6 +357,23 @@ export default function NewCycleWizardPage() {
           />
 
           <ExcludedProvidersSection entries={excludedEntries} />
+
+          {cycleId && payrollEntries.length > 0 && (
+            <CyclePayrollReview
+              cycleId={cycleId}
+              cycleLocked={false}
+              payableStatusesJson={payableStatusesJson}
+              entries={payrollEntries.map((e) => ({
+                ...e,
+                sessions: e.sessions?.map((s) => ({
+                  sessionStatus: s.sessionStatus,
+                  actualMinutes: s.actualMinutes,
+                  dos: typeof s.dos === 'string' ? s.dos : new Date(s.dos).toISOString(),
+                  clientName: s.clientName,
+                })) ?? [],
+              }))}
+            />
+          )}
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setStep(3)}>

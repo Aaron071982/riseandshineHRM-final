@@ -3,7 +3,8 @@ import type { ArtemisParseResult, ProviderGroup } from './types'
 import { matchProviderToRbt, computeEntryPay } from './matcher'
 import { loadRbtMatchCandidates, suggestPayRatesForRbts } from './payRate'
 import { loadPayrollOnlyCandidates } from './payrollOnly'
-import { recomputeCycleTotals } from './totals'
+import { DEFAULT_PAYABLE_STATUSES } from './sessionStatus'
+import { recalculateCyclePayable } from './recalculatePayable'
 
 async function createEntryWithSessions(
   cycleId: string,
@@ -50,6 +51,7 @@ async function createEntryWithSessions(
           procedureCode: s.procedureCode,
           location: s.location,
           rawStatus: s.rawStatus,
+          sessionStatus: s.sessionStatus,
         })),
       },
     },
@@ -117,10 +119,11 @@ export async function persistArtemisParse(
     data: {
       status: 'REVIEW',
       sourceFileName,
+      payableStatuses: [...DEFAULT_PAYABLE_STATUSES],
     },
   })
 
-  await recomputeCycleTotals(cycleId, 'preview')
+  await recalculateCyclePayable(cycleId, [...DEFAULT_PAYABLE_STATUSES])
 
   return {
     payrollEntries,

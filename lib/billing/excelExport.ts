@@ -1,5 +1,13 @@
 import ExcelJS from 'exceljs'
 import { format } from 'date-fns'
+import {
+  computePayableHours,
+  computeStatusBreakdown,
+  parsePayableStatusesJson,
+  payableStatusLabels,
+  PAYABLE_STATUS_OPTIONS,
+  type ArtemisSessionStatusKey,
+} from './sessionStatus'
 
 type ExportEntry = {
   id: string
@@ -15,27 +23,26 @@ type ExportEntry = {
   role: string | null
   rbtProfile: { firstName: string; lastName: string } | null
   payrollOnly: { fullName: string } | null
-}
-
-type ExportSession = {
-  clientName: string
-  dos: Date
-  actualMinutes: number
-  procedureCode: string | null
-  location: string | null
-  billingEntry: {
-    providerNameRaw: string
-    rbtProfile: { firstName: string; lastName: string } | null
-  }
+  sessions: {
+    clientName: string
+    dos: Date
+    actualMinutes: number
+    procedureCode: string | null
+    location: string | null
+    sessionStatus: string | null
+    rawStatus: string | null
+  }[]
 }
 
 type ExportCycle = {
   label: string
   periodStart: Date
   periodEnd: Date
+  payableStatuses: unknown
+  filtered?: boolean
 }
 
-const ORANGE = 'FFE36F1E'
+const TEAL = 'FF0D9488'
 const HEADER_FONT = { bold: true, color: { argb: 'FFFFFFFF' } }
 
 function employeeName(entry: ExportEntry): string {
@@ -48,121 +55,172 @@ function employeeName(entry: ExportEntry): string {
 
 export async function buildPayrollWorkbook(
   cycle: ExportCycle,
-  entries: ExportEntry[],
-  sessions: ExportSession[]
+  entries: ExportEntry[]
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'Rise and Shine HRM'
+  const payableStatuses = parsePayableStatusesJson(cycle.payableStatuses)
+  const payableSet = new Set(payableStatuses)
 
   const summary = workbook.addWorksheet('Payroll Summary')
-  summary.mergeCells('A1:J1')
-  const titleCell = summary.getCell('A1')
-  titleCell.value = 'RISE AND SHINE ABA — PAYROLL'
-  titleCell.font = { bold: true, size: 16 }
+  summary.mergeCells('A1:L1')
+  summary.getCell('A1').value = 'RISE AND SHINE ABA — PAYROLL'
+  summary.getCell('A1').font = { bold: true, size: 16 }
 
-  summary.mergeCells('A2:J2')
-  const subCell = summary.getCell('A2')
-  subCell.value = `${cycle.label} (${format(cycle.periodStart, 'M/d/yyyy')} – ${format(cycle.periodEnd, 'M/d/yyyy')})`
-  subCell.font = { italic: true, size: 11 }
+  summary.mergeCells('A2:L2')
+  summary.getCell('A2').value = `${cycle.label} (${format(cycle.periodStart, 'M/d/yyyy')} – ${format(cycle.periodEnd, 'M/d/yyyy')})`
+  summary.getCell('A2').font = { italic: true, size: 11 }
 
+  summary.mergeCells('A3:L3')
+  summary.getCell('A3').value = `Payable statuses: ${payableStatusLabels(payableStatuses)}`
+  summary.getCell('A3').font = { size: 10, italic: true }
+
+  if (cycle.filtered) {
+    summary.mergeCells('A4:L4')
+    summary.getCell('A4').value = 'Note: export reflects active table filters'
+    summary.getCell('A4').font = { size: 10, italic: true, color: { argb: 'FF6B7280' } }
+  }
+
+  const headerStartRow = cycle.filtered ? 5 : 4
   const headers = [
-    'ID',
-    'Employee Name',
-    'Pay Type',
+    'Employee',
     'Rate',
-    'Total Sessions',
-    'Total Hours',
-    'Gross Pay',
+    ...PAYABLE_STATUS_OPTIONS.map((o) => `${o.label} Hrs`),
+    'PAYABLE Hrs',
     'Adjustment',
-    'Final Pay',
+    'FINAL PAY',
     'Notes',
   ]
-  const headerRow = summary.addRow(headers)
+  const headerRow = summary.getRow(headerStartRow)
+  headerRow.values = headers
   headerRow.eachCell((cell) => {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ORANGE } }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } }
     cell.font = HEADER_FONT
     cell.alignment = { vertical: 'middle', horizontal: 'center' }
   })
 
-  let sumHours = 0
-  let sumGross = 0
-  let sumFinal = 0
+  const totals = {
+    breakdown: computeStatusBreakdown([]),
+    payableHours: 0,
+    adjustment: 0,
+    finalPay: 0,
+  }
+  for (const key of PAYABLE_STATUS_OPTIONS.map((o) => o.key)) {
+    totals.breakdown[key] = 0
+  }
 
   for (const e of entries) {
+    const breakdown = computeStatusBreakdown(e.sessions)
+    const payableHours = computePayableHours(e.sessions, payableStatuses)
+    const rate = e.hourlyRate ?? 0
+    const finalPay = rate * payableHours + e.adjustment
     const noteParts = [e.adjustmentNote, e.notes].filter(Boolean)
+
     const row = summary.addRow([
-      e.id.slice(-8).toUpperCase(),
       employeeName(e),
-      e.role ?? 'RBT',
       e.hourlyRate,
-      e.totalSessions,
-      e.totalHours,
-      e.grossPay,
+      ...PAYABLE_STATUS_OPTIONS.map((o) => breakdown[o.key]),
+      payableHours,
       e.adjustment,
-      e.finalPay,
+      finalPay,
       noteParts.join(' | ') || '',
     ])
-    row.getCell(4).numFmt = '$#,##0.00'
-    row.getCell(7).numFmt = '$#,##0.00'
-    row.getCell(8).numFmt = '$#,##0.00'
-    row.getCell(9).numFmt = '$#,##0.00'
-    row.getCell(6).numFmt = '0.00'
-    sumHours += e.totalHours
-    sumGross += e.grossPay
-    sumFinal += e.finalPay
+    row.getCell(2).numFmt = '$#,##0.00'
+    PAYABLE_STATUS_OPTIONS.forEach((_, i) => {
+      row.getCell(3 + i).numFmt = '0.00'
+    })
+    row.getCell(3 + PAYABLE_STATUS_OPTIONS.length).numFmt = '0.00'
+    row.getCell(4 + PAYABLE_STATUS_OPTIONS.length).numFmt = '$#,##0.00'
+    row.getCell(5 + PAYABLE_STATUS_OPTIONS.length).numFmt = '$#,##0.00'
+
+    for (const key of PAYABLE_STATUS_OPTIONS.map((o) => o.key)) {
+      totals.breakdown[key] += breakdown[key]
+    }
+    totals.payableHours += payableHours
+    totals.adjustment += e.adjustment
+    totals.finalPay += finalPay
   }
 
   const totalsRow = summary.addRow([
-    '',
     'TOTALS',
     '',
-    '',
-    '',
-    sumHours,
-    sumGross,
-    '',
-    sumFinal,
+    ...PAYABLE_STATUS_OPTIONS.map((o) => totals.breakdown[o.key]),
+    totals.payableHours,
+    totals.adjustment,
+    totals.finalPay,
     '',
   ])
   totalsRow.font = { bold: true }
-  totalsRow.getCell(6).numFmt = '0.00'
-  totalsRow.getCell(7).numFmt = '$#,##0.00'
-  totalsRow.getCell(9).numFmt = '$#,##0.00'
+  PAYABLE_STATUS_OPTIONS.forEach((_, i) => {
+    totalsRow.getCell(3 + i).numFmt = '0.00'
+  })
+  totalsRow.getCell(3 + PAYABLE_STATUS_OPTIONS.length).numFmt = '0.00'
+  totalsRow.getCell(5 + PAYABLE_STATUS_OPTIONS.length).numFmt = '$#,##0.00'
 
   summary.columns.forEach((col) => {
-    col.width = 16
+    col.width = 14
   })
-  summary.getColumn(2).width = 24
+  summary.getColumn(1).width = 24
 
   const detail = workbook.addWorksheet('Session Detail')
-  const detailHeaders = ['Employee', 'Client', 'Date', 'Actual Hours', 'Procedure Code', 'Location']
+  const detailHeaders = [
+    'Employee',
+    'Client',
+    'Date',
+    'Status',
+    'Actual Hours',
+    'Procedure Code',
+    'Payable?',
+  ]
   const detailHeaderRow = detail.addRow(detailHeaders)
   detailHeaderRow.eachCell((cell) => {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ORANGE } }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } }
     cell.font = HEADER_FONT
   })
 
-  for (const s of sessions) {
-    const name = s.billingEntry.rbtProfile
-      ? `${s.billingEntry.rbtProfile.firstName} ${s.billingEntry.rbtProfile.lastName}`.trim()
-      : s.billingEntry.providerNameRaw
-    const row = detail.addRow([
-      name,
-      s.clientName,
-      s.dos,
-      s.actualMinutes / 60,
-      s.procedureCode ?? '',
-      s.location ?? '',
-    ])
-    row.getCell(3).numFmt = 'm/d/yyyy'
-    row.getCell(4).numFmt = '0.00'
+  for (const e of entries) {
+    const name = employeeName(e)
+    for (const s of e.sessions) {
+      const key = (s.sessionStatus ?? '') as ArtemisSessionStatusKey
+      const isPayable = payableSet.has(key)
+      const row = detail.addRow([
+        name,
+        s.clientName,
+        s.dos,
+        s.rawStatus ?? s.sessionStatus ?? '',
+        s.actualMinutes / 60,
+        s.procedureCode ?? '',
+        isPayable ? 'Yes' : 'No',
+      ])
+      row.getCell(3).numFmt = 'm/d/yyyy'
+      row.getCell(5).numFmt = '0.00'
+    }
   }
-
   detail.columns.forEach((col) => {
+    col.width = 16
+  })
+  detail.getColumn(1).width = 22
+
+  const incomplete = workbook.addWorksheet('Incomplete Sessions')
+  const incHeaders = ['Employee', 'Client', 'Date', 'Actual Hours']
+  const incHeaderRow = incomplete.addRow(incHeaders)
+  incHeaderRow.eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } }
+    cell.font = HEADER_FONT
+  })
+
+  for (const e of entries) {
+    const name = employeeName(e)
+    const incSessions = e.sessions.filter((s) => s.sessionStatus === 'incomplete')
+    for (const s of incSessions) {
+      const row = incomplete.addRow([name, s.clientName, s.dos, s.actualMinutes / 60])
+      row.getCell(3).numFmt = 'm/d/yyyy'
+      row.getCell(4).numFmt = '0.00'
+    }
+  }
+  incomplete.columns.forEach((col) => {
     col.width = 18
   })
-  detail.getColumn(1).width = 24
-  detail.getColumn(2).width = 24
 
   const buffer = await workbook.xlsx.writeBuffer()
   return Buffer.from(buffer)

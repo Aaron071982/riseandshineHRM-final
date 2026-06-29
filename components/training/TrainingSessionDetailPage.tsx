@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Loader2 } from 'lucide-react'
+import { TRAINING_ACCENT } from '@/lib/training/constants'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 import {
@@ -163,7 +164,7 @@ export default function TrainingSessionDetailPage({ sessionId }: { sessionId: st
   if (loading || !session) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-[#e36f1e]" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: TRAINING_ACCENT }} />
       </div>
     )
   }
@@ -173,7 +174,7 @@ export default function TrainingSessionDetailPage({ sessionId }: { sessionId: st
   return (
     <div className="grid lg:grid-cols-2 gap-8">
       <div className="space-y-4">
-        <Link href="/training/sessions" className="text-sm text-[#e36f1e]">
+        <Link href="/training/sessions" className="text-sm" style={{ color: TRAINING_ACCENT }}>
           ← Sessions
         </Link>
         <h1 className="text-2xl font-bold">{session.title}</h1>
@@ -194,7 +195,7 @@ export default function TrainingSessionDetailPage({ sessionId }: { sessionId: st
           })}{' '}
           ET
         </p>
-        <Button asChild className="bg-[#E4893D] hover:bg-[#d35f1a]">
+        <Button asChild className="text-white hover:opacity-90" style={{ backgroundColor: TRAINING_ACCENT }}>
           <a href={session.meetingUrl} target="_blank" rel="noreferrer">
             Open meeting
           </a>
@@ -219,12 +220,12 @@ export default function TrainingSessionDetailPage({ sessionId }: { sessionId: st
             <span>{pct.toFixed(0)}%</span>
           </div>
           <div className="h-3 rounded-full bg-gray-200 overflow-hidden">
-            <div className="h-full bg-[#E4893D]" style={{ width: `${pct}%` }} />
+            <div className="h-full" style={{ width: `${pct}%`, backgroundColor: TRAINING_ACCENT }} />
           </div>
         </div>
         {session.description && <p className="text-gray-700">{session.description}</p>}
         {session.notes && (
-          <p className="text-sm text-gray-500 border-l-2 border-[#e36f1e] pl-3">{session.notes}</p>
+          <p className="text-sm text-gray-500 border-l-2 pl-3" style={{ borderColor: TRAINING_ACCENT }}>{session.notes}</p>
         )}
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
@@ -247,7 +248,7 @@ export default function TrainingSessionDetailPage({ sessionId }: { sessionId: st
             Booked attendees ({bookings.length} / {session.maxAttendees})
           </CardTitle>
           {bookings.some((b) => selected[b.id]) && (
-            <Button size="sm" className="bg-[#e36f1e]" onClick={() => void bulkAttended()}>
+            <Button size="sm" className="text-white hover:opacity-90" style={{ backgroundColor: TRAINING_ACCENT }} onClick={() => void bulkAttended()}>
               Mark selected as attended
             </Button>
           )}
@@ -284,7 +285,7 @@ export default function TrainingSessionDetailPage({ sessionId }: { sessionId: st
                     </p>
                     <p className="text-sm">{b.rbtProfile.phoneNumber}</p>
                     {b.rbtProfile.email && (
-                      <a href={`mailto:${b.rbtProfile.email}`} className="text-sm text-[#e36f1e]">
+                      <a href={`mailto:${b.rbtProfile.email}`} className="text-sm" style={{ color: TRAINING_ACCENT }}>
                         {b.rbtProfile.email}
                       </a>
                     )}

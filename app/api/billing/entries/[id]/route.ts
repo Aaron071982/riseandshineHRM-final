@@ -3,6 +3,7 @@ import { requireBillingManagerSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { suggestPayRatesForRbts } from '@/lib/billing/payRate'
 import { recomputeCycleTotals } from '@/lib/billing/totals'
+import { recalculateCyclePayable } from '@/lib/billing/recalculatePayable'
 import {
   matchEntryToRbt,
   matchEntryToPayrollOnly,
@@ -108,7 +109,7 @@ export async function PATCH(
     suggestedHourlyRate = map.get(suggestId) ?? null
   }
 
-  await recomputeCycleTotals(entry.billingCycleId)
+  await recalculateCyclePayable(entry.billingCycleId)
 
   return NextResponse.json({ entry: { ...updated, suggestedHourlyRate } })
 }

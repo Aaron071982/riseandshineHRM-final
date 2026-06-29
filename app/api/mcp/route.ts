@@ -13,9 +13,8 @@
  *   - Bulk operations
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'
 import { assertMcpAuth } from '@/lib/mcp-auth'
-import { createMcpServer } from '@/lib/mcp/server'
+import { handleMcpProtocolRequest } from '@/lib/mcp/httpHandler'
 import { logMcpRequest, oauthOptionsResponse, withCors } from '@/lib/oauth/http'
 
 export const runtime = 'nodejs'
@@ -44,12 +43,8 @@ async function handleMcpRequest(request: NextRequest): Promise<Response> {
 
   logMcpRequest(request, 'authorized')
 
-  const transport = new WebStandardStreamableHTTPServerTransport()
-  const server = createMcpServer()
-
   try {
-    await server.connect(transport)
-    const response = await transport.handleRequest(request)
+    const response = await handleMcpProtocolRequest(request)
     return withCorsResponse(response)
   } catch (err) {
     console.error('[mcp] request failed:', err)
@@ -63,8 +58,6 @@ async function handleMcpRequest(request: NextRequest): Promise<Response> {
         { status: 500 }
       )
     )
-  } finally {
-    await server.close().catch(() => {})
   }
 }
 

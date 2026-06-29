@@ -5,16 +5,19 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Download, RotateCcw } from 'lucide-react'
 import HoursConfirmationModal from '@/components/billing/HoursConfirmationModal'
+import DeleteCycleButton from '@/components/billing/DeleteCycleButton'
 
 export default function CycleDetailActions({
   cycleId,
   cycleLabel,
+  cycleStatus,
   canReopen,
   canDownload,
   canSendHoursConfirmation,
 }: {
   cycleId: string
   cycleLabel: string
+  cycleStatus: string
   canReopen: boolean
   canDownload: boolean
   canSendHoursConfirmation: boolean
@@ -52,6 +55,13 @@ export default function CycleDetailActions({
           Re-open for editing
         </Button>
       )}
+      <DeleteCycleButton
+        cycleId={cycleId}
+        cycleLabel={cycleLabel}
+        status={cycleStatus}
+        variant="outline"
+        className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+      />
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
 import { Loader2, GraduationCap } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
+import RequestSessionForm from '@/components/rbt/RequestSessionForm'
 
 type SessionCard = {
   id: string
@@ -50,6 +51,7 @@ export default function RbtTrainingPage() {
     }
   } | null>(null)
   const [confirmSession, setConfirmSession] = useState<SessionCard | null>(null)
+  const [openSessionRequest, setOpenSessionRequest] = useState<{ id: string; createdAt: string } | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -63,6 +65,7 @@ export default function RbtTrainingPage() {
       if (mRes.ok) {
         setProfile(mJson.profile ?? null)
         setBooking(mJson.booking ?? null)
+        setOpenSessionRequest(mJson.openSessionRequest ?? null)
       }
     } finally {
       setLoading(false)
@@ -303,6 +306,32 @@ export default function RbtTrainingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Card className="border-dashed">
+        <CardContent className="p-6 space-y-3">
+          <h2 className="font-semibold text-gray-900">Need help getting trained?</h2>
+          {openSessionRequest ? (
+            <p className="text-sm text-gray-600">
+              Request submitted — training team will reach out.
+              {openSessionRequest.createdAt && (
+                <span className="block text-xs text-gray-500 mt-1">
+                  Submitted{' '}
+                  {new Date(openSessionRequest.createdAt).toLocaleDateString('en-US', {
+                    timeZone: 'America/New_York',
+                  })}
+                </span>
+              )}
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-gray-600">
+                Can&apos;t find a time that works? Ask the training team to help you book.
+              </p>
+              <RequestSessionForm onSubmitted={() => void refresh()} />
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

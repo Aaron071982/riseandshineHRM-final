@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -21,6 +22,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import ArtemisStatusBadge from '@/components/training/ArtemisStatusBadge'
+import { getArtemisStatus } from '@/lib/training/artemisStatus'
+import { TRAINING_ACCENT } from '@/lib/training/constants'
 import { cn } from '@/lib/utils'
 
 type Trainee = {
@@ -32,7 +36,12 @@ type Trainee = {
   artemisTrainingCompleted: boolean
   artemisTrainingCompletedAt: string | null
   updatedAt: string
-  activeBooking: { sessionId: string; sessionStart: string; sessionTitle: string } | null
+  activeBooking: {
+    sessionId: string
+    sessionStart: string
+    sessionEnd: string
+    sessionTitle: string
+  } | null
   lastEmailSentAt: string | null
   lastEmailType: string | null
 }
@@ -41,12 +50,15 @@ type SessionOpt = { id: string; title: string; startTime: string; seatsLeft: num
 
 export default function TrainingTraineesPage() {
   const { showToast } = useToast()
+  const searchParams = useSearchParams()
   const [filter, setFilter] = useState('all')
   const [q, setQ] = useState('')
   const [rows, setRows] = useState<Trainee[]>([])
   const [loading, setLoading] = useState(true)
   const [bookOpen, setBookOpen] = useState<Trainee | null>(null)
   const [sessions, setSessions] = useState<SessionOpt[]>([])
+  const [canOverride, setCanOverride] = useState(false)
+  const [markingId, setMarkingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -82,8 +94,18 @@ export default function TrainingTraineesPage() {
   }, [])
 
   useEffect(() => {
-    if (bookOpen) loadSessions()
-  }, [bookOpen, loadSessions])
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d) => setCanOverride(!!d.canOverrideArtemisTraining))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const bookId = searchParams.get('book')
+    if (!bookId || rows.length === 0) return
+    const trainee = rows.find((r) => r.id === bookId)
+    if (trainee) setBookOpen(trainee)
+  }, [searchParams, rows])
 
   const emailOne = async (id: string) => {
     const res = await fetch(`/api/training/trainees/${id}/email`, { method: 'POST', credentials: 'include' })
@@ -91,6 +113,29 @@ export default function TrainingTraineesPage() {
       showToast('Email sent', 'success')
       load()
     } else showToast('Failed', 'error')
+  }
+
+  useEffect(() => {
+    if (bookOpen) loadSessions()
+  }, [bookOpen, loadSessions])
+
+  const markTrained = async (rbtId: string) => {
+    setMarkingId(rbtId)
+    try {
+      const res = await fetch(`/api/training/trainees/${rbtId}/mark-trained`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || 'Failed', 'error')
+        return
+      }
+      showToast('Marked as trained', 'success')
+      load()
+    } finally {
+      setMarkingId(null)
+    }
   }
 
   const bookManual = async (rbtId: string, trainingSessionId: string) => {
@@ -136,7 +181,7 @@ export default function TrainingTraineesPage() {
       </div>
 
       {loading ? (
-        <Loader2 className="w-8 h-8 animate-spin text-[#e36f1e]" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: TRAINING_ACCENT }} />
       ) : (
         <Card>
           <CardContent className="p-0 overflow-x-auto">
@@ -156,26 +201,41 @@ export default function TrainingTraineesPage() {
                 {rows.map((r) => {
                   const days = Math.floor((Date.now() - new Date(r.updatedAt).getTime()) / dayMs)
                   const redWait = days > 30 && !r.artemisTrainingCompleted
-                  let badge = (
-                    <span className="text-red-600 font-medium">Not trained</span>
+                  const artemisStatus = getArtemisStatus(
+                    { status: 'HIRED', artemisTrainingCompleted: r.artemisTrainingCompleted },
+                    r.activeBooking
+                      ? {
+                          attendanceStatus: 'BOOKED',
+                          sessionEndTime: new Date(r.activeBooking.sessionEnd),
+                        }
+                      : null
                   )
-                  if (r.artemisTrainingCompleted) {
-                    badge = (
-                      <span className="text-green-700 font-medium">
-                        Trained {r.artemisTrainingCompletedAt ? new Date(r.artemisTrainingCompletedAt).toLocaleDateString() : ''}
-                      </span>
+                  const badge =
+                    artemisStatus === 'TRAINED' ? (
+                      <div className="space-y-1">
+                        <ArtemisStatusBadge status="TRAINED" />
+                        {r.artemisTrainingCompletedAt && (
+                          <p className="text-xs text-gray-500">
+                            {new Date(r.artemisTrainingCompletedAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    ) : artemisStatus === 'BOOKED' ? (
+                      <div className="space-y-1">
+                        <ArtemisStatusBadge status="BOOKED" />
+                        {r.activeBooking && (
+                          <p className="text-xs text-gray-500">
+                            {new Date(r.activeBooking.sessionStart).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <ArtemisStatusBadge status="NOT_STARTED" />
                     )
-                  } else if (r.activeBooking) {
-                    badge = (
-                      <span className="text-amber-700 font-medium">
-                        Booked {new Date(r.activeBooking.sessionStart).toLocaleDateString()}
-                      </span>
-                    )
-                  }
                   return (
                     <tr key={r.id} className="border-b">
                       <td className="p-3">
-                        <Link href={`/admin/rbts/${r.id}`} className="text-[#e36f1e] font-medium hover:underline">
+                        <Link href={`/admin/rbts/${r.id}`} className="font-medium hover:underline" style={{ color: TRAINING_ACCENT }}>
                           {r.firstName} {r.lastName}
                         </Link>
                       </td>
@@ -203,8 +263,23 @@ export default function TrainingTraineesPage() {
                           Email
                         </Button>
                         {!r.artemisTrainingCompleted && (
-                          <Button size="sm" className="bg-[#e36f1e]" onClick={() => setBookOpen(r)}>
+                          <Button
+                            size="sm"
+                            className="text-white hover:opacity-90"
+                            style={{ backgroundColor: TRAINING_ACCENT }}
+                            onClick={() => setBookOpen(r)}
+                          >
                             Book manually
+                          </Button>
+                        )}
+                        {canOverride && !r.artemisTrainingCompleted && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={markingId === r.id}
+                            onClick={() => void markTrained(r.id)}
+                          >
+                            {markingId === r.id ? 'Saving…' : 'Mark trained (override)'}
                           </Button>
                         )}
                       </td>

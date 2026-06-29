@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
             id: book.id,
             sessionId: book.trainingSessionId,
             sessionStart: book.trainingSession.startTime,
+            sessionEnd: book.trainingSession.endTime,
             sessionTitle: book.trainingSession.title,
           }
         : null,

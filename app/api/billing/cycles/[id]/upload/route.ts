@@ -39,6 +39,9 @@ export async function POST(
 
   const result = await persistArtemisParse(params.id, parseResult, fileName)
 
+  const hoursByStatus = parseResult.stats.hoursByStatus
+  console.log('[billing/upload] Hours by status:', JSON.stringify(hoursByStatus, null, 2))
+
   const periodWarning =
     parseResult.detectedDateRange.min && parseResult.detectedDateRange.max
       ? {
@@ -64,6 +67,7 @@ export async function POST(
     where: { billingCycleId: params.id },
     include: {
       rbtProfile: { select: { id: true, firstName: true, lastName: true } },
+      sessions: { orderBy: { dos: 'asc' } },
     },
   })
 
@@ -81,6 +85,7 @@ export async function POST(
     detectedDateRange: result.detectedDateRange,
     periodWarning,
     entries: entriesWithSuggestions,
-    preview: `Found ${parseResult.stats.totalRows} billable session rows across ${parseResult.stats.payrollProviderCount + parseResult.stats.excludedProviderCount} providers. ${parseResult.stats.payrollSessionCount} RBT/BT sessions (Completed / Ready to Bill only)${parseResult.stats.skippedSessionCount > 0 ? `, ${parseResult.stats.skippedSessionCount} non-billable skipped` : ''}${parseResult.stats.cancelledSessionCount > 0 ? ` (${parseResult.stats.cancelledSessionCount} cancelled)` : ''}.`,
+    preview: `Parsed ${parseResult.stats.payrollSessionCount} RBT/BT sessions across ${parseResult.stats.payrollProviderCount} providers. Status hours: ${Object.entries(parseResult.stats.hoursByStatus).map(([k, h]) => `${k} ${h.toFixed(1)}h`).join(', ')}. Payable defaults: Completed + Ready to Bill.`,
+    hoursByStatus: parseResult.stats.hoursByStatus,
   })
 }

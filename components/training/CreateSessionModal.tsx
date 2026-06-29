@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/components/ui/toast'
+import { DEFAULT_ARTEMIS_MEETING_URL, TRAINING_ACCENT } from '@/lib/training/constants'
 
 export default function CreateSessionModal({
   open,
@@ -30,7 +31,7 @@ export default function CreateSessionModal({
   const [startTime, setStartTime] = useState('10:00')
   const [endTime, setEndTime] = useState('11:30')
   const [maxAttendees, setMaxAttendees] = useState(10)
-  const [meetingUrl, setMeetingUrl] = useState('')
+  const [meetingUrl, setMeetingUrl] = useState(DEFAULT_ARTEMIS_MEETING_URL)
   const [notes, setNotes] = useState('')
   const [step, setStep] = useState<'form' | 'confirm'>('form')
   const [createdSessionId, setCreatedSessionId] = useState<string | null>(null)
@@ -162,7 +163,8 @@ export default function CreateSessionModal({
                 Cancel
               </Button>
               <Button
-                className="bg-[#E4893D]"
+                className="text-white hover:opacity-90"
+                style={{ backgroundColor: TRAINING_ACCENT }}
                 disabled={loading || !meetingUrl.trim()}
                 onClick={() => void createSessionOnly()}
               >
@@ -182,7 +184,7 @@ export default function CreateSessionModal({
               <Button variant="ghost" onClick={finishLater}>
                 I&apos;ll send later
               </Button>
-              <Button className="bg-[#E4893D]" disabled={loading} onClick={() => void notifyNow()}>
+              <Button className="text-white hover:opacity-90" style={{ backgroundColor: TRAINING_ACCENT }} disabled={loading} onClick={() => void notifyNow()}>
                 Send email now
               </Button>
             </DialogFooter>

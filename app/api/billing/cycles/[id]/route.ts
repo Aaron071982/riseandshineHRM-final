@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireBillingManagerSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { deleteBillingCycle } from '@/lib/billing/deleteCycle'
 
 export async function GET(
   _request: NextRequest,
@@ -51,4 +52,24 @@ export async function GET(
   })
 
   return NextResponse.json({ cycle, candidates, payrollOnlyPeople })
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const auth = await requireBillingManagerSession()
+  if (auth.response) return auth.response
+
+  try {
+    await deleteBillingCycle(params.id)
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Delete failed'
+    if (msg === 'Cycle not found') {
+      return NextResponse.json({ error: msg }, { status: 404 })
+    }
+    console.error('[billing/cycles/delete]', e)
+    return NextResponse.json({ error: 'Failed to delete cycle' }, { status: 500 })
+  }
 }

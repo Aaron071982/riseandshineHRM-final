@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CycleStatusBadge } from '@/components/billing/MatchStatusBadge'
 import { PayoutTrendChart, HoursDistributionChart } from '@/components/billing/BillingDashboardCharts'
+import RecentCyclesList from '@/components/billing/RecentCyclesList'
 import { formatUsd } from '@/lib/billing/format'
 import { getCycleDisplayStats } from '@/lib/billing/cycleStats'
 import { format } from 'date-fns'
@@ -267,37 +268,21 @@ export default async function BillingDashboardPage() {
           <CardTitle>Recent Cycles</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {cycles.length === 0 ? (
-            <p className="text-gray-500 text-sm p-6">No payroll cycles yet. Start your first cycle above.</p>
-          ) : (
-            <div className="divide-y dark:divide-[var(--border-subtle)]">
-              {cycles.map((c) => {
-                const stats = getCycleDisplayStats(c, c.entries)
-                return (
-                  <Link
-                    key={c.id}
-                    href={`/billing/cycles/${c.id}`}
-                    className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated)] transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-semibold truncate">{c.label}</p>
-                      <p className="text-xs text-gray-500">
-                        {format(c.periodStart, 'M/d')} – {format(c.periodEnd, 'M/d/yy')}
-                      </p>
-                    </div>
-                    <CycleStatusBadge status={c.status} />
-                    <p className="text-sm text-gray-600 tabular-nums">
-                      {stats.totalHours.toFixed(1)} hrs
-                    </p>
-                    <p className="text-sm font-semibold tabular-nums text-right min-w-[90px]">
-                      {formatUsd(stats.totalGrossPay)}
-                    </p>
-                    <span className="text-[#0D9488] text-sm font-medium">Open →</span>
-                  </Link>
-                )
-              })}
-            </div>
-          )}
+          <RecentCyclesList
+            cycles={cycles.map((c) => {
+              const stats = getCycleDisplayStats(c, c.entries)
+              return {
+                id: c.id,
+                label: c.label,
+                status: c.status,
+                periodStart: c.periodStart.toISOString(),
+                periodEnd: c.periodEnd.toISOString(),
+                totalHours: stats.totalHours,
+                totalGrossPay: stats.totalGrossPay,
+                rbtCount: stats.rbtCount,
+              }
+            })}
+          />
         </CardContent>
       </Card>
     </div>

@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
       periodEnd,
       uploadedById: auth.user.id,
       status: 'DRAFT',
+      payableStatuses: ['completed', 'ready_to_bill'],
     },
   })
 

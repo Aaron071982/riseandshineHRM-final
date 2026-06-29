@@ -5,6 +5,13 @@ import { Suspense } from 'react'
 import EmployeesList from '@/components/admin/EmployeesList'
 import EmployeesPageHero from '@/components/admin/EmployeesPageHero'
 import { getActiveWorkingStats, getAssignmentCountsByRbt } from '@/lib/rbt/activeWorking'
+import {
+  artemisStatusMatchesFilter,
+  countAwaitingArtemis,
+  getArtemisStatus,
+  type ArtemisStatus,
+} from '@/lib/training/artemisStatus'
+import { getActiveBookingsByRbtIds } from '@/lib/training/artemisStatus.server'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -17,6 +24,7 @@ interface SearchParams {
   status?: string
   view?: string
   workFilter?: string
+  artemisFilter?: string
 }
 
 export default async function EmployeesPage({
@@ -28,6 +36,7 @@ export default async function EmployeesPage({
   const search = searchParams.search || ''
   const statusFilter = searchParams.status || ''
   const workFilter = searchParams.workFilter || ''
+  const artemisFilter = searchParams.artemisFilter || ''
   const viewMode = searchParams.view === 'board' ? 'board' : 'list'
 
   const validTypes: EmployeeListType[] = ['RBT', 'BCBA', 'BILLING', 'MARKETING', 'CALL_CENTER', 'DEV_TEAM']
@@ -41,6 +50,8 @@ export default async function EmployeesPage({
   let devTeams: { id: string; name: string; description: string | null; _count: { members: number }; updatedAt: Date }[] = []
   let assignmentCounts: Record<string, number> = {}
   let activeWorkingStats = { activelyWorking: 0, idleHires: 0 }
+  let artemisStats = { awaiting: 0 }
+  let artemisStatusByRbtId: Record<string, ArtemisStatus> = {}
   let loadError = false
 
   try {
@@ -80,6 +91,32 @@ export default async function EmployeesPage({
       const countsMap = await getAssignmentCountsByRbt(rbts.map((r) => r.id))
       assignmentCounts = Object.fromEntries(countsMap)
       activeWorkingStats = await getActiveWorkingStats()
+
+      const hiredRbts = rbts.filter((r) => r.status === 'HIRED' || r.status === 'ONBOARDING_COMPLETED')
+      artemisStats = { awaiting: countAwaitingArtemis(hiredRbts) }
+
+      const bookingsMap = await getActiveBookingsByRbtIds(hiredRbts.map((r) => r.id))
+      for (const r of hiredRbts) {
+        const booking = bookingsMap.get(r.id)
+        const status = getArtemisStatus(
+          { status: r.status, artemisTrainingCompleted: r.artemisTrainingCompleted },
+          booking
+            ? {
+                attendanceStatus: booking.attendanceStatus,
+                sessionEndTime: booking.sessionEndTime,
+                sessionStatus: booking.sessionStatus,
+              }
+            : null
+        )
+        if (status) artemisStatusByRbtId[r.id] = status
+      }
+
+      if (artemisFilter) {
+        rbts = rbts.filter((r) => {
+          const status = artemisStatusByRbtId[r.id] ?? null
+          return artemisStatusMatchesFilter(status, artemisFilter)
+        })
+      }
     } else if (currentType === 'BCBA') {
       const where: any = {}
       if (search) {
@@ -165,7 +202,10 @@ export default async function EmployeesPage({
           initialRbts={currentType === 'RBT' ? rbts : []}
           assignmentCounts={assignmentCounts}
           activeWorkingStats={activeWorkingStats}
+          artemisStats={artemisStats}
+          artemisStatusByRbtId={artemisStatusByRbtId}
           initialWorkFilter={workFilter}
+          initialArtemisFilter={artemisFilter}
           bcbaProfiles={currentType === 'BCBA' ? bcbaProfiles : []}
           billingProfiles={currentType === 'BILLING' ? billingProfiles : []}
           marketingProfiles={currentType === 'MARKETING' ? marketingProfiles : []}

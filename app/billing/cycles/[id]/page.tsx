@@ -8,7 +8,9 @@ import { CurrencyCell } from '@/components/billing/CurrencyCell'
 import SessionDrilldown from '@/components/billing/SessionDrilldown'
 import ExcludedProvidersSection from '@/components/billing/ExcludedProvidersSection'
 import CycleDetailActions from '@/components/billing/CycleDetailActions'
+import CyclePayrollReview from '@/components/billing/CyclePayrollReview'
 import { HoursConfirmationLog } from '@/components/billing/HoursConfirmationModal'
+import { parsePayableStatusesJson } from '@/lib/billing/sessionStatus'
 import { formatUsd, formatHours } from '@/lib/billing/format'
 import { getCycleDisplayStats } from '@/lib/billing/cycleStats'
 import { format } from 'date-fns'
@@ -31,8 +33,8 @@ export default async function CycleDetailPage({ params }: { params: { id: string
       entries: {
         orderBy: [{ isExcluded: 'asc' }, { providerNameRaw: 'asc' }],
         include: {
-          rbtProfile: { select: { firstName: true, lastName: true } },
-          payrollOnly: { select: { fullName: true } },
+          rbtProfile: { select: { firstName: true, lastName: true, email: true } },
+          payrollOnly: { select: { fullName: true, email: true } },
           sessions: { orderBy: { dos: 'asc' } },
         },
       },
@@ -54,6 +56,17 @@ export default async function CycleDetailPage({ params }: { params: { id: string
 
   const canSendHours =
     cycle.status === 'REVIEW' || cycle.status === 'FINALIZED' || cycle.status === 'PAID'
+  const cycleLocked = cycle.status === 'FINALIZED' || cycle.status === 'PAID'
+
+  const breakdownEntries = payrollEntries.map((e) => ({
+    ...e,
+    sessions: e.sessions.map((s) => ({
+      sessionStatus: s.sessionStatus,
+      actualMinutes: s.actualMinutes,
+      dos: s.dos.toISOString(),
+      clientName: s.clientName,
+    })),
+  }))
 
   return (
     <div className="space-y-6">
@@ -73,6 +86,7 @@ export default async function CycleDetailPage({ params }: { params: { id: string
         <CycleDetailActions
           cycleId={cycle.id}
           cycleLabel={cycle.label}
+          cycleStatus={cycle.status}
           canReopen={!!canReopen}
           canDownload={cycle.status === 'FINALIZED' || cycle.status === 'PAID'}
           canSendHoursConfirmation={canSendHours && payable.length > 0}
@@ -104,9 +118,16 @@ export default async function CycleDetailPage({ params }: { params: { id: string
         <HoursConfirmationLog confirmations={cycle.hoursConfirmations} />
       </div>
 
+      <CyclePayrollReview
+        cycleId={cycle.id}
+        cycleLocked={cycleLocked}
+        payableStatusesJson={cycle.payableStatuses ?? parsePayableStatusesJson(null)}
+        entries={breakdownEntries}
+      />
+
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Payroll Entries</CardTitle>
+          <CardTitle>Session detail by provider</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">

@@ -42,6 +42,12 @@ enum TrainingEmailType {
   REMINDER
   SESSION_CANCELLED
   COMPLETION
+  SESSION_REQUEST
+}
+
+enum ArtemisSessionRequestStatus {
+  OPEN
+  RESOLVED
 }
 
 enum PreferredContactMethod {
@@ -369,6 +375,7 @@ model User {
   billingCyclesUploaded      BillingCycle[]              @relation("BillingCycleUploadedBy")
   billingCyclesFinalized     BillingCycle[]              @relation("BillingCycleFinalizedBy")
   emailBlastsSent            EmailBlastCampaign[]        @relation("EmailBlastSentBy")
+  artemisSessionRequestsResolved ArtemisSessionRequest[] @relation("ArtemisSessionRequestResolvedBy")
 
   @@map("users")
 }
@@ -621,6 +628,7 @@ model RBTProfile {
   artemisTrainingSession      TrainingSession?       @relation("ArtemisCompletionSession", fields: [artemisTrainingSessionId], references: [id], onDelete: SetNull)
   trainingBookings            TrainingBooking[]
   trainingEmailLogs           TrainingEmailLog[]
+  artemisSessionRequests      ArtemisSessionRequest[]
   hrDocumentTasks             HRDocumentTask[]
   employeeDocumentFolders     EmployeeDocumentFolder[]
   tierACompletedAt            DateTime?
@@ -715,6 +723,23 @@ model TrainingEmailLog {
   @@index([rbtProfileId])
   @@index([emailType, sentAt])
   @@map("training_email_log")
+}
+
+model ArtemisSessionRequest {
+  id               String                      @id @default(cuid())
+  rbtProfileId     String
+  message          String?                     @db.Text
+  status           ArtemisSessionRequestStatus @default(OPEN)
+  createdAt        DateTime                    @default(now())
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  resolvedBy User?      @relation("ArtemisSessionRequestResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([rbtProfileId])
+  @@map("artemis_session_requests")
 }
 
 model SchedulingExclusion {
@@ -1730,6 +1755,7 @@ model BillingCycle {
   uploadedById   String
   finalizedById  String?
   finalizedAt    DateTime?
+  payableStatuses Json?             @default("[\"completed\",\"ready_to_bill\"]")
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
@@ -1786,6 +1812,7 @@ model BillingSession {
   procedureCode    String?
   location         String?
   rawStatus        String?
+  sessionStatus    String?
   createdAt        DateTime @default(now())
 
   billingEntry BillingEntry @relation(fields: [billingEntryId], references: [id], onDelete: Cascade)

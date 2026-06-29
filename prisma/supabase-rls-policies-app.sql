@@ -22,6 +22,7 @@ DECLARE
     'training_sessions',
     'training_bookings',
     'training_email_log',
+    'artemis_session_requests',
     'billing_cycles',
     'billing_entries',
     'billing_sessions',

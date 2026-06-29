@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, LayoutList, Calendar as CalIcon } from 'lucide-react'
 import CreateSessionModal from '@/components/training/CreateSessionModal'
 import { cn } from '@/lib/utils'
+import { TRAINING_ACCENT } from '@/lib/training/constants'
 
 type SessionRow = {
   id: string
@@ -87,7 +88,8 @@ export default function TrainingSessionsPage() {
               type="button"
               size="sm"
               variant={view === 'list' ? 'default' : 'ghost'}
-              className={view === 'list' ? 'bg-[#e36f1e]' : ''}
+              className={view === 'list' ? 'text-white hover:opacity-90' : ''}
+              style={view === 'list' ? { backgroundColor: TRAINING_ACCENT } : undefined}
               onClick={() => setView('list')}
             >
               <LayoutList className="w-4 h-4 mr-1" />
@@ -97,14 +99,15 @@ export default function TrainingSessionsPage() {
               type="button"
               size="sm"
               variant={view === 'calendar' ? 'default' : 'ghost'}
-              className={view === 'calendar' ? 'bg-[#e36f1e]' : ''}
+              className={view === 'calendar' ? 'text-white hover:opacity-90' : ''}
+              style={view === 'calendar' ? { backgroundColor: TRAINING_ACCENT } : undefined}
               onClick={() => setView('calendar')}
             >
               <CalIcon className="w-4 h-4 mr-1" />
               Calendar
             </Button>
           </div>
-          <Button className="bg-[#E4893D] hover:bg-[#d35f1a]" onClick={() => setCreateOpen(true)}>
+          <Button className="text-white hover:opacity-90" style={{ backgroundColor: TRAINING_ACCENT }} onClick={() => setCreateOpen(true)}>
             + Create New Session
           </Button>
         </div>
@@ -125,7 +128,8 @@ export default function TrainingSessionsPage() {
               type="button"
               size="sm"
               variant={filter === k ? 'default' : 'outline'}
-              className={filter === k ? 'bg-[#e36f1e]' : ''}
+              className={filter === k ? 'text-white hover:opacity-90' : ''}
+              style={filter === k ? { backgroundColor: TRAINING_ACCENT } : undefined}
               onClick={() => setFilter(k)}
             >
               {label}
@@ -136,7 +140,7 @@ export default function TrainingSessionsPage() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-[#e36f1e]" />
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: TRAINING_ACCENT }} />
         </div>
       ) : view === 'list' ? (
         <div className="space-y-4">
@@ -170,7 +174,7 @@ export default function TrainingSessionsPage() {
                           <span>{pct.toFixed(0)}%</span>
                         </div>
                         <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
-                          <div className="h-full bg-[#E4893D]" style={{ width: `${pct}%` }} />
+                          <div className="h-full" style={{ width: `${pct}%`, backgroundColor: TRAINING_ACCENT }} />
                         </div>
                       </div>
                       <span
@@ -189,7 +193,8 @@ export default function TrainingSessionsPage() {
                         href={s.meetingUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-sm text-[#e36f1e] underline"
+                        className="text-sm underline"
+                        style={{ color: TRAINING_ACCENT }}
                       >
                         Meeting URL
                       </a>

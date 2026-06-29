@@ -5,7 +5,6 @@ import { validateSession } from '@/lib/auth'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import { PER_DOCUMENT_SIGNATURE_CONSENT_STATEMENT, SIGNATURE_METHOD } from '@/lib/esign-constants'
 import { sha256DocumentPdfSource, type AuditTrailEvent } from '@/lib/signature-certificate'
-import { sendEmail, EmailTemplateType, generateDocumentSignedReceiptEmail } from '@/lib/email'
 import { ESIGN_CONSENT_SLUG } from '@/lib/onboarding/catalog'
 import { syncTierMilestones, canUnlockStep, completedStepNumbers } from '@/lib/onboarding/progress'
 import {
@@ -245,26 +244,6 @@ export async function POST(request: NextRequest) {
       await syncTierMilestones(user.rbtProfileId!)
     } catch (milestoneErr) {
       console.error('[onboarding/acknowledge] syncTierMilestones failed (completion saved)', milestoneErr)
-    }
-
-    const toEmail = rbtProfile.email || user.email
-    if (toEmail) {
-      try {
-        const html = generateDocumentSignedReceiptEmail({
-          documentTitle: document.title,
-          signerName: trimmedName,
-          signedAtUtc: signedAt,
-        })
-        await sendEmail({
-          to: toEmail,
-          subject: `Document signed — ${document.title}`,
-          html,
-          templateType: EmailTemplateType.DOCUMENT_SIGNATURE_RECEIPT,
-          rbtProfileId: user.rbtProfileId!,
-        })
-      } catch (emailErr) {
-        console.error('[onboarding/acknowledge] receipt email failed', emailErr)
-      }
     }
 
     return NextResponse.json({

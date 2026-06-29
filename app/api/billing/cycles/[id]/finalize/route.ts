@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireBillingManagerSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { canFinalizeCycle, getCycleBlockers } from '@/lib/billing/validateCycle'
-import { recomputeCycleTotals } from '@/lib/billing/totals'
+import { recalculateCyclePayable } from '@/lib/billing/recalculatePayable'
 
 export async function POST(
   _request: NextRequest,
@@ -28,7 +28,7 @@ export async function POST(
     return NextResponse.json({ error: 'Cannot finalize cycle', blockers }, { status: 400 })
   }
 
-  await recomputeCycleTotals(params.id, 'finalized')
+  await recalculateCyclePayable(params.id)
 
   const updated = await prisma.billingCycle.update({
     where: { id: params.id },

@@ -18,6 +18,7 @@ export async function GET() {
     awaitingProfiles,
     monthSessions,
     recentBookings,
+    openSessionRequests,
   ] = await Promise.all([
     prisma.trainingSession.findMany({
       where: { status: { not: 'CANCELLED' }, endTime: { gte: now } },
@@ -58,6 +59,7 @@ export async function GET() {
         trainingSession: { select: { title: true, startTime: true } },
       },
     }),
+    prisma.artemisSessionRequest.count({ where: { status: 'OPEN' } }),
   ])
 
   const awaitingCount = await prisma.rBTProfile.count({
@@ -80,6 +82,7 @@ export async function GET() {
       rbtsTrained: trainedCount,
       awaitingTraining: awaitingCount,
       thisMonthSessions: monthSessions,
+      openSessionRequests,
     },
     upcomingSessions,
     awaitingProfiles,

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
+import { TRAINING_ACCENT } from '@/lib/training/constants'
 
 type SessionRow = {
   id: string
@@ -68,7 +69,7 @@ export default function TrainingHistoryPage() {
         </Button>
       </div>
       {loading ? (
-        <Loader2 className="w-8 h-8 animate-spin text-[#e36f1e]" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: TRAINING_ACCENT }} />
       ) : (
         <div className="space-y-3">
           {sessions.length === 0 ? (

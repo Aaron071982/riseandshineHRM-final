@@ -10,6 +10,7 @@ export type ParsedSessionRow = {
   location: string | null
   role: string
   rawStatus: string | null
+  sessionStatus: string | null
 }
 
 export type ProviderGroup = {
@@ -33,6 +34,8 @@ export type ArtemisParseResult = {
     payrollProviderCount: number
     excludedProviderCount: number
     byRole: Record<string, number>
+    /** Total hours per normalized status (includes cancelled/deleted for verification). */
+    hoursByStatus: Record<string, number>
   }
   detectedDateRange: { min: Date | null; max: Date | null }
 }

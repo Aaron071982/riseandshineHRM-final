@@ -36,6 +36,12 @@ export async function GET() {
     },
   })
 
+  const openSessionRequest = await prisma.artemisSessionRequest.findFirst({
+    where: { rbtProfileId: auth.user.rbtProfileId!, status: 'OPEN' },
+    select: { id: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  })
+
   return NextResponse.json({
     profile,
     booking: booking
@@ -45,5 +51,6 @@ export async function GET() {
           session: booking.trainingSession,
         }
       : null,
+    openSessionRequest,
   })
 }

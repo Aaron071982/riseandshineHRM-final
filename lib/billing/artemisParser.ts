@@ -1,5 +1,11 @@
 import ExcelJS from 'exceljs'
 import type { ArtemisParseResult, ParsedSessionRow, ProviderGroup } from './types'
+import {
+  isAlwaysExcludedStatus,
+  isSummaryArtemisStatus,
+  normalizeArtemisStatus,
+  type ArtemisSessionStatusKey,
+} from './sessionStatus'
 
 const PAYROLL_ROLES = new Set(['rbt', 'bt'])
 const EXCLUDED_ROLES = new Set(['bcba', 'clinical director'])
@@ -75,37 +81,6 @@ function normalizeHeaderKey(header: string): string {
     .trim()
 }
 
-/** Artemis pivot export: only delivered/billable sessions count toward payroll. */
-const BILLABLE_STATUSES = new Set(['completed', 'ready to bill'])
-
-const SUMMARY_STATUSES = new Set(['subtotal', 'total', 'sum', 'count'])
-
-function isSummaryStatus(status: string | null): boolean {
-  return SUMMARY_STATUSES.has((status ?? '').trim().toLowerCase())
-}
-
-function isBillableArtemisStatus(status: string | null): boolean {
-  return BILLABLE_STATUSES.has((status ?? '').trim().toLowerCase())
-}
-
-function isNonBillableArtemisStatus(status: string | null): boolean {
-  const s = (status ?? '').trim().toLowerCase()
-  if (!s) return true
-  return !BILLABLE_STATUSES.has(s)
-}
-
-function categorizeSkippedStatus(status: string | null): string {
-  const s = (status ?? '').trim().toLowerCase()
-  if (!s) return 'unknown'
-  if (/\bcancel/.test(s)) return 'cancelled'
-  if (/\bdeleted\b/.test(s)) return 'deleted'
-  if (/\bscheduled\b/.test(s)) return 'scheduled'
-  if (/\bincomplete\b/.test(s)) return 'incomplete'
-  if (/\bin progress\b/.test(s)) return 'in_progress'
-  if (/\bno show\b/.test(s)) return 'no_show'
-  return 'other'
-}
-
 function findStatusColumn(headers: Record<string, number>): {
   status?: number
   cancellationReason?: number
@@ -114,9 +89,7 @@ function findStatusColumn(headers: Record<string, number>): {
   for (const [k, col] of Object.entries(headers)) {
     if (
       k === 'status' ||
-      (k.startsWith('status') &&
-        !k.includes('claim') &&
-        !k.includes('case :'))
+      (k.startsWith('status') && !k.includes('claim') && !k.includes('case :'))
     ) {
       if (!result.status || k === 'status') result.status = col
     }
@@ -133,7 +106,6 @@ function findStatusColumn(headers: Record<string, number>): {
 }
 
 function findHeaderRow(sheet: ExcelJS.Worksheet): { rowNumber: number; colMap: Record<string, number> } | null {
-  const required = ['provider name', 'actual duration']
   for (let r = 1; r <= Math.min(sheet.rowCount, 50); r++) {
     const row = sheet.getRow(r)
     const headers: Record<string, number> = {}
@@ -186,12 +158,21 @@ function groupSessions(sessions: ParsedSessionRow[]): ProviderGroup[] {
   })
 }
 
+function addHoursByStatus(
+  hoursByStatus: Record<string, number>,
+  statusKey: ArtemisSessionStatusKey | null,
+  hours: number
+) {
+  if (!statusKey || hours <= 0) return
+  hoursByStatus[statusKey] = (hoursByStatus[statusKey] ?? 0) + hours
+}
+
 export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promise<ArtemisParseResult> {
   const workbook = new ExcelJS.Workbook()
   const data = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer)
   await workbook.xlsx.load(data as unknown as ExcelJS.Buffer)
 
-  let sheet =
+  const sheet =
     workbook.worksheets.find((w) =>
       w.name.toLowerCase().includes('session reconciliation report')
     ) ?? workbook.worksheets[0]
@@ -208,12 +189,12 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
   const payrollSessions: ParsedSessionRow[] = []
   const excludedSessions: ParsedSessionRow[] = []
   const byRole: Record<string, number> = {}
+  const hoursByStatus: Record<string, number> = {}
   let minDate: Date | null = null
   let maxDate: Date | null = null
   let totalRows = 0
   let cancelledSessionCount = 0
   let skippedSessionCount = 0
-  /** Artemis groups rows under a status header; blank cells inherit the group status. */
   let inheritedGroupStatus = ''
 
   for (let r = header.rowNumber + 1; r <= sheet.rowCount; r++) {
@@ -225,7 +206,7 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
       ? cellText(row.getCell(header.colMap.cancellationReason)) || null
       : null
 
-    if (explicitStatus && isSummaryStatus(explicitStatus)) {
+    if (explicitStatus && isSummaryArtemisStatus(explicitStatus)) {
       inheritedGroupStatus = ''
       skippedSessionCount++
       continue
@@ -235,19 +216,8 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
       inheritedGroupStatus = explicitStatus
     }
 
-    const effectiveStatus = explicitStatus || inheritedGroupStatus || null
-
-    if ((cancellationReason ?? '').trim().length > 0) {
-      skippedSessionCount++
-      if (effectiveStatus && /\bcancel/i.test(effectiveStatus)) cancelledSessionCount++
-      continue
-    }
-
-    if (isNonBillableArtemisStatus(effectiveStatus)) {
-      skippedSessionCount++
-      if (categorizeSkippedStatus(effectiveStatus) === 'cancelled') cancelledSessionCount++
-      continue
-    }
+    const effectiveStatusRaw = explicitStatus || inheritedGroupStatus || null
+    const statusKey = normalizeArtemisStatus(effectiveStatusRaw)
 
     const providerName = header.colMap.providerName
       ? cellText(row.getCell(header.colMap.providerName))
@@ -257,7 +227,32 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
       ? parseMinutes(row.getCell(header.colMap.actualDuration).value)
       : 0
 
+    const hasCancellation = (cancellationReason ?? '').trim().length > 0
+    const isCancelledOrDeleted =
+      hasCancellation ||
+      isAlwaysExcludedStatus(statusKey) ||
+      (effectiveStatusRaw != null && /\bcancel/i.test(effectiveStatusRaw))
+
+    if (isCancelledOrDeleted && actualMinutes > 0) {
+      const hours = actualMinutes / 60
+      if (statusKey === 'cancelled' || /\bcancel/i.test(effectiveStatusRaw ?? '')) {
+        addHoursByStatus(hoursByStatus, 'cancelled', hours)
+        cancelledSessionCount++
+      } else if (statusKey === 'deleted') {
+        addHoursByStatus(hoursByStatus, 'deleted', hours)
+      } else {
+        addHoursByStatus(hoursByStatus, 'cancelled', hours)
+        cancelledSessionCount++
+      }
+      skippedSessionCount++
+      continue
+    }
+
     if (!providerName || actualMinutes <= 0) continue
+
+    if (statusKey) {
+      addHoursByStatus(hoursByStatus, statusKey, actualMinutes / 60)
+    }
 
     totalRows++
     const roleCol = header.colMap.role
@@ -284,12 +279,13 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
         : null,
       location: header.colMap.location ? cellText(row.getCell(header.colMap.location)) || null : null,
       role: roleKey,
-      rawStatus: effectiveStatus,
+      rawStatus: effectiveStatusRaw,
+      sessionStatus: statusKey,
     }
 
     if (isPayrollRole(roleKey)) {
       payrollSessions.push(session)
-    } else {
+    } else if (isExcludedRole(roleKey)) {
       excludedSessions.push(session)
     }
   }
@@ -309,6 +305,7 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
       payrollProviderCount: payrollGroups.length,
       excludedProviderCount: excludedGroups.length,
       byRole,
+      hoursByStatus,
     },
     detectedDateRange: { min: minDate, max: maxDate },
   }

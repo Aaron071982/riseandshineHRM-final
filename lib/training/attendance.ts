@@ -109,3 +109,84 @@ export async function applyTrainingAttendanceEffects(params: {
   await syncTierMilestones(booking.rbtProfileId)
 }
 
+/** Super-admin override: mark Artemis complete without a booking/session. */
+export async function completeArtemisTrainingWithoutSession(params: {
+  rbtProfileId: string
+  actorUser: SessionUser
+}): Promise<void> {
+  const { rbtProfileId, actorUser } = params
+  const profile = await prisma.rBTProfile.findUnique({
+    where: { id: rbtProfileId },
+    select: { artemisTrainingCompleted: true },
+  })
+  if (!profile) throw new Error('RBT not found')
+  if (profile.artemisTrainingCompleted) return
+
+  const now = new Date()
+
+  await prisma.rBTProfile.update({
+    where: { id: rbtProfileId },
+    data: {
+      artemisTrainingCompleted: true,
+      artemisTrainingCompletedAt: now,
+    },
+  })
+
+  const metadata: Prisma.JsonObject = {
+    kind: 'ARTEMIS_TRAINING_COMPLETED',
+    override: true,
+    rbtProfileId,
+  }
+
+  try {
+    await prisma.activityLog.create({
+      data: {
+        userId: actorUser.id,
+        activityType: 'FORM_SUBMISSION',
+        action: 'Artemis training marked complete (override)',
+        resourceType: 'rbt_profile',
+        resourceId: rbtProfileId,
+        metadata,
+      },
+    })
+  } catch {
+    // non-fatal
+  }
+
+  try {
+    await prisma.rBTAuditLog.create({
+      data: {
+        rbtProfileId,
+        auditType: 'ARTEMIS_TRAINING',
+        dateTime: now,
+        notes: 'Completed Artemis Training (admin override)',
+        createdBy: actorUser.email || actorUser.name || 'Admin',
+      },
+    })
+  } catch {
+    // non-fatal
+  }
+
+  const artemisDoc = await prisma.onboardingDocument.findFirst({
+    where: { slug: 'artemis-training', isActive: true },
+  })
+  if (artemisDoc) {
+    await prisma.onboardingCompletion.upsert({
+      where: {
+        rbtProfileId_documentId: {
+          rbtProfileId,
+          documentId: artemisDoc.id,
+        },
+      },
+      create: {
+        rbtProfileId,
+        documentId: artemisDoc.id,
+        status: 'COMPLETED',
+        completedAt: now,
+      },
+      update: { status: 'COMPLETED', completedAt: now },
+    })
+  }
+  await syncTierMilestones(rbtProfileId)
+}
+

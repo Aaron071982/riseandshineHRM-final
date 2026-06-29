@@ -4,7 +4,7 @@ import { callMcpTool, MCP_TOOL_DEFINITIONS } from '@/lib/mcp/registry'
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
-    name: 'riseandshine-hrm',
+    name: 'Rise and Shine HRM',
     version: '1.0.0',
   })
 
