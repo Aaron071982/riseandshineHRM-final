@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireBillingManagerSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
-  buildPayrollConfirmation,
-  generateHoursConfirmationEmail,
-  sendHoursConfirmationEmail,
-} from '@/lib/billing/hoursConfirmationEmail'
+  buildEntryHoursConfirmation,
+  sendEntryHoursConfirmation,
+} from '@/lib/billing/entryHoursConfirmation'
+import { sendHoursConfirmationEmail } from '@/lib/billing/hoursConfirmationEmail'
 import { isPayableMatchStatus } from '@/lib/billing/entryActions'
-import { parsePayableStatusesJson } from '@/lib/billing/sessionStatus'
 
 const BATCH_SIZE = 5
 const BATCH_DELAY_MS = 600
@@ -16,62 +15,14 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
 }
 
-function mapEntryToConfirmation(
-  e: {
-    id: string
-    providerNameRaw: string
-    matchStatus: string
-    hourlyRate: number | null
-    adjustment: number
-    finalPay: number
-    totalHours: number
-    rbtProfileId: string | null
-    payrollOnlyId: string | null
-    rbtProfile: { id: string; firstName: string; lastName: string; email: string | null } | null
-    payrollOnly: { id: string; fullName: string; email: string | null } | null
-    sessions: { dos: Date; actualMinutes: number; sessionStatus: string | null }[]
-  },
-  cycle: {
-    label: string
-    periodStart: Date
-    periodEnd: Date
-    payableStatuses: unknown
-  }
-) {
-  const email = e.rbtProfile?.email ?? e.payrollOnly?.email ?? null
-  const name = e.rbtProfile
-    ? `${e.rbtProfile.firstName} ${e.rbtProfile.lastName}`
-    : (e.payrollOnly?.fullName ?? e.providerNameRaw)
-  const firstName = e.rbtProfile?.firstName ?? name.split(' ')[0] ?? name
-  const payableStatuses = parsePayableStatusesJson(cycle.payableStatuses)
-
-  const confirmation = buildPayrollConfirmation({
-    firstName,
-    cycleLabel: cycle.label,
-    periodStart: cycle.periodStart,
-    periodEnd: cycle.periodEnd,
-    sessions: e.sessions,
-    payableStatuses,
-  })
-
-  return {
-    entryId: e.id,
-    rbtProfileId: e.rbtProfileId,
-    payrollOnlyId: e.payrollOnlyId,
-    name,
-    email,
-    totalHours: e.totalHours,
-    canEmail: !!email?.trim() && e.totalHours > 0,
-    confirmation,
-  }
-}
-
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const auth = await requireBillingManagerSession()
   if (auth.response) return auth.response
+
+  const entryId = request.nextUrl.searchParams.get('entryId')
 
   const cycle = await prisma.billingCycle.findUnique({
     where: { id: params.id },
@@ -100,30 +51,48 @@ export async function GET(
 
   const recipients = cycle.entries
     .filter((e) => isPayableMatchStatus(e.matchStatus))
-    .map((e) => mapEntryToConfirmation(e, cycle))
+    .map((e) => buildEntryHoursConfirmation(e, cycle))
     .filter((r) => r.totalHours > 0)
 
-  const previewRecipient = recipients.find((r) => r.canEmail) ?? recipients[0]
-  const previewHtml = previewRecipient
-    ? generateHoursConfirmationEmail(previewRecipient.confirmation)
-    : null
+  const previewRecipient = entryId
+    ? recipients.find((r) => r.entryId === entryId)
+    : recipients.find((r) => r.canEmail) ?? recipients[0]
 
   return NextResponse.json({
     recipientCount: recipients.filter((r) => r.canEmail).length,
     skippedCount: recipients.filter((r) => !r.canEmail).length,
     withIncompleteHours: recipients.filter((r) => r.confirmation.incompleteHours > 0).length,
-    previewHtml,
+    previewHtml: previewRecipient?.previewHtml ?? null,
     previewRecipient: previewRecipient?.name ?? null,
+    previewEntryId: previewRecipient?.entryId ?? null,
+    recipients: recipients.map((r) => ({
+      entryId: r.entryId,
+      name: r.name,
+      email: r.email,
+      canEmail: r.canEmail,
+      totalHours: r.totalHours,
+    })),
     confirmations: cycle.hoursConfirmations,
   })
 }
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const auth = await requireBillingManagerSession()
   if (auth.response) return auth.response
+
+  const body = await request.json().catch(() => ({}))
+  const entryId = typeof body.entryId === 'string' ? body.entryId : null
+
+  if (entryId) {
+    const result = await sendEntryHoursConfirmation(entryId)
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
+    return NextResponse.json({ sent: result.sent ? 1 : 0, failed: result.sent ? 0 : 1, skipped: 0 })
+  }
 
   const cycle = await prisma.billingCycle.findUnique({
     where: { id: params.id },
@@ -152,7 +121,7 @@ export async function POST(
 
   const recipients = cycle.entries
     .filter((e) => isPayableMatchStatus(e.matchStatus))
-    .map((e) => mapEntryToConfirmation(e, cycle))
+    .map((e) => buildEntryHoursConfirmation(e, cycle))
     .filter((r) => r.totalHours > 0)
 
   const toSend = recipients.filter((r) => r.canEmail)

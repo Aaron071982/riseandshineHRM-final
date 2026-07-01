@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -9,8 +10,23 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { format } from 'date-fns'
-import { Mail, Loader2 } from 'lucide-react'
+import { Mail, Loader2, Eye } from 'lucide-react'
+
+type Recipient = {
+  entryId: string
+  name: string
+  email: string | null
+  canEmail: boolean
+  totalHours: number
+}
 
 export default function HoursConfirmationModal({
   cycleId,
@@ -21,41 +37,65 @@ export default function HoursConfirmationModal({
   cycleLabel: string
   canSend: boolean
 }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
-  const [preview, setPreview] = useState<{
-    recipientCount: number
-    skippedCount: number
-    withIncompleteHours: number
-    previewHtml: string | null
-    previewRecipient: string | null
-  } | null>(null)
+  const [recipients, setRecipients] = useState<Recipient[]>([])
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [previewRecipient, setPreviewRecipient] = useState<string | null>(null)
+  const [recipientCount, setRecipientCount] = useState(0)
+  const [skippedCount, setSkippedCount] = useState(0)
+  const [withIncompleteHours, setWithIncompleteHours] = useState(0)
   const [result, setResult] = useState<{ sent: number; failed: number; skipped: number } | null>(
     null
   )
 
-  const loadPreview = async () => {
+  const loadPreview = async (entryId?: string) => {
     setLoading(true)
-    setResult(null)
-    const res = await fetch(`/api/billing/cycles/${cycleId}/hours-confirmation`)
+    const q = entryId ? `?entryId=${encodeURIComponent(entryId)}` : ''
+    const res = await fetch(`/api/billing/cycles/${cycleId}/hours-confirmation${q}`)
     const data = await res.json()
-    if (res.ok) setPreview(data)
+    if (res.ok) {
+      setRecipients(data.recipients ?? [])
+      setSelectedEntryId(data.previewEntryId ?? null)
+      setPreviewHtml(data.previewHtml)
+      setPreviewRecipient(data.previewRecipient)
+      setRecipientCount(data.recipientCount)
+      setSkippedCount(data.skippedCount)
+      setWithIncompleteHours(data.withIncompleteHours)
+    }
     setLoading(false)
+  }
+
+  const openModal = async () => {
+    setResult(null)
     setOpen(true)
+    await loadPreview()
+  }
+
+  const onSelectRecipient = async (entryId: string) => {
+    setSelectedEntryId(entryId)
+    await loadPreview(entryId)
   }
 
   const sendAll = async () => {
     setSending(true)
     const res = await fetch(`/api/billing/cycles/${cycleId}/hours-confirmation`, { method: 'POST' })
     const data = await res.json()
-    if (res.ok) setResult(data)
+    if (res.ok) {
+      setResult(data)
+      router.refresh()
+    }
     setSending(false)
   }
 
+  const selected = recipients.find((r) => r.entryId === selectedEntryId)
+
   return (
     <>
-      <Button variant="outline" onClick={loadPreview} disabled={!canSend}>
+      <Button variant="outline" onClick={openModal} disabled={!canSend}>
         <Mail className="w-4 h-4 mr-2" />
         Send Hours Confirmation to BTs
       </Button>
@@ -66,51 +106,69 @@ export default function HoursConfirmationModal({
             <DialogTitle>Hours confirmation — {cycleLabel}</DialogTitle>
           </DialogHeader>
 
-          {loading && (
+          {loading && !previewHtml && (
             <p className="text-sm text-gray-500 flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading preview…
             </p>
           )}
 
-          {preview && !result && (
+          {!result && previewHtml && (
             <div className="space-y-4">
               <p className="text-sm">
-                This will email{' '}
+                Preview each email below, then send to all{' '}
                 <strong>
-                  {preview.recipientCount} matched BT{preview.recipientCount !== 1 ? 's' : ''}
+                  {recipientCount} BT{recipientCount !== 1 ? 's' : ''}
                 </strong>{' '}
-                their hours summary for this cycle (no pay rate or dollar amounts).
-                {preview.skippedCount > 0 && (
-                  <span className="text-gray-500">
-                    {' '}
-                    ({preview.skippedCount} skipped — no email on file)
-                  </span>
+                with hours and an email on file.
+                {skippedCount > 0 && (
+                  <span className="text-gray-500"> ({skippedCount} skipped — no email)</span>
                 )}
               </p>
-              {preview.withIncompleteHours > 0 && (
+              {withIncompleteHours > 0 && (
                 <p className="text-sm text-amber-800">
-                  {preview.withIncompleteHours} BT
-                  {preview.withIncompleteHours !== 1 ? 's' : ''} will also receive a reminder to
-                  complete incomplete sessions in Artemis.
+                  {withIncompleteHours} BT{withIncompleteHours !== 1 ? 's' : ''} have incomplete
+                  hours in this batch.
                 </p>
               )}
-              {preview.recipientCount === 0 && (
-                <p className="text-sm text-amber-700">
-                  No BTs with hours and an email on file to send.
-                </p>
+
+              {recipients.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-500">Preview for</label>
+                  <Select
+                    value={selectedEntryId ?? undefined}
+                    onValueChange={onSelectRecipient}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select BT…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {recipients.map((r) => (
+                        <SelectItem key={r.entryId} value={r.entryId}>
+                          {r.name}
+                          {!r.canEmail ? ' (no email)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
-              {preview.previewRecipient && (
+
+              {selected && (
                 <p className="text-xs text-gray-500">
-                  Preview for: <strong>{preview.previewRecipient}</strong>
+                  To: <strong>{selected.email ?? '—'}</strong> ·{' '}
+                  {selected.totalHours.toFixed(2)} payable hrs
                 </p>
               )}
-              {preview.previewHtml && (
-                <div
-                  className="border rounded-lg p-4 bg-gray-50 text-sm overflow-auto max-h-64"
-                  dangerouslySetInnerHTML={{ __html: preview.previewHtml }}
-                />
-              )}
+
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Eye className="w-3.5 h-3.5" />
+                Email preview{previewRecipient ? ` for ${previewRecipient}` : ''}
+              </div>
+              <div
+                className="border rounded-lg p-4 bg-gray-50 text-sm overflow-auto max-h-[45vh]"
+                dangerouslySetInnerHTML={{ __html: previewHtml }}
+              />
             </div>
           )}
 
@@ -127,11 +185,11 @@ export default function HoursConfirmationModal({
             <Button variant="outline" onClick={() => setOpen(false)}>
               {result ? 'Close' : 'Cancel'}
             </Button>
-            {!result && preview && (
+            {!result && previewHtml && (
               <Button
                 className="bg-[#0D9488] hover:bg-teal-700 text-white"
                 onClick={sendAll}
-                disabled={sending || preview.recipientCount === 0}
+                disabled={sending || recipientCount === 0}
               >
                 {sending ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />

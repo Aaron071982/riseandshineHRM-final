@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CycleStatusBadge, MatchStatusBadge } from '@/components/billing/MatchStatusBadge'
 import { CurrencyCell } from '@/components/billing/CurrencyCell'
 import SessionDrilldown from '@/components/billing/SessionDrilldown'
+import EntryHoursConfirmationButton from '@/components/billing/EntryHoursConfirmationButton'
 import ExcludedProvidersSection from '@/components/billing/ExcludedProvidersSection'
 import CycleDetailActions from '@/components/billing/CycleDetailActions'
 import CycleDetailEditor from '@/components/billing/CycleDetailEditor'
@@ -255,7 +256,7 @@ export default async function CycleDetailPage({ params }: { params: { id: string
                     <p className="text-xs text-gray-500">Artemis: {e.providerNameRaw}</p>
                     <MatchStatusBadge status={e.matchStatus} className="mt-1" />
                   </div>
-                  <div className="text-right text-sm">
+                  <div className="text-right text-sm space-y-2">
                     <p>
                       {e.totalSessions} sessions · {formatHours(e.totalHours)} hrs @{' '}
                       <CurrencyCell value={e.hourlyRate} />
@@ -263,6 +264,17 @@ export default async function CycleDetailPage({ params }: { params: { id: string
                     <p className="font-semibold">
                       Final: <CurrencyCell value={e.finalPay} />
                     </p>
+                    {canSendHours && (
+                      <EntryHoursConfirmationButton
+                        entryId={e.id}
+                        recipientName={
+                          e.rbtProfile
+                            ? `${e.rbtProfile.firstName} ${e.rbtProfile.lastName}`
+                            : e.payrollOnly?.fullName ?? e.providerNameRaw
+                        }
+                        disabled={e.totalHours <= 0}
+                      />
+                    )}
                   </div>
                 </div>
                 <SessionDrilldown
