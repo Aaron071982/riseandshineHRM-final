@@ -14,7 +14,8 @@ const needle = (process.argv[3] ?? 'asiyah').toLowerCase()
 async function main() {
   const buffer = readFileSync(path)
   const wb = new ExcelJS.Workbook()
-  await wb.xlsx.load(buffer)
+  const data = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer)
+  await wb.xlsx.load(data as unknown as ExcelJS.Buffer)
   const sheet =
     wb.worksheets.find((w) => w.name.toLowerCase().includes('session reconciliation')) ??
     wb.worksheets[0]
