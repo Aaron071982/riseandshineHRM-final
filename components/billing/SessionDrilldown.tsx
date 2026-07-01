@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { format } from 'date-fns'
 import { formatHours } from '@/lib/billing/format'
+import { formatCalendarDate } from '@/lib/billing/calendarDate'
 import SessionStatusBadge from '@/components/billing/SessionStatusBadge'
 
 type Session = {
@@ -47,7 +47,7 @@ export default function SessionDrilldown({ sessions }: { sessions: Session[] }) 
             <tbody>
               {sessions.map((s) => (
                 <tr key={s.id} className="border-t border-gray-100 dark:border-[var(--border-subtle)]">
-                  <td className="px-2 py-1">{format(new Date(s.dos), 'M/d/yyyy')}</td>
+                  <td className="px-2 py-1">{formatCalendarDate(s.dos)}</td>
                   <td className="px-2 py-1">{s.clientName}</td>
                   <td className="px-2 py-1">
                     <SessionStatusBadge status={s.sessionStatus} />

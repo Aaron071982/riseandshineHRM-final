@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { sendGenericEmail } from '@/lib/email/core'
+import { calendarDateKey, formatCalendarDate } from '@/lib/billing/calendarDate'
 import {
   ARTEMIS_STATUS,
   isAlwaysExcludedStatus,
@@ -17,17 +18,11 @@ export type HoursConfirmationSession = {
 }
 
 function dosKey(dos: Date): string {
-  const y = dos.getUTCFullYear()
-  const m = String(dos.getUTCMonth() + 1).padStart(2, '0')
-  const d = String(dos.getUTCDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
+  return calendarDateKey(dos)
 }
 
 function formatDos(dos: Date): string {
-  const y = dos.getUTCFullYear()
-  const m = String(dos.getUTCMonth() + 1).padStart(2, '0')
-  const d = String(dos.getUTCDate()).padStart(2, '0')
-  return `${m}/${d}/${y}`
+  return formatCalendarDate(dos)
 }
 
 /** Completed + Ready to Bill — grouped as "completed" in the BT-facing email. */

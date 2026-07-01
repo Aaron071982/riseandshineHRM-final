@@ -6,6 +6,7 @@ import {
   normalizeArtemisStatus,
   type ArtemisSessionStatusKey,
 } from './sessionStatus'
+import { parseCalendarDate } from './calendarDate'
 
 const PAYROLL_ROLES = new Set(['rbt', 'bt'])
 const EXCLUDED_ROLES = new Set(['bcba', 'clinical director'])
@@ -34,31 +35,7 @@ function parseMinutes(value: unknown): number {
 }
 
 function parseDos(value: unknown): Date | null {
-  if (value == null || value === '') return null
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const d = new Date(value)
-    d.setHours(0, 0, 0, 0)
-    return d
-  }
-  const s = String(value).trim()
-  if (!s) return null
-  const parts = s.split(/[/-]/)
-  if (parts.length >= 3) {
-    const month = parseInt(parts[0], 10)
-    const day = parseInt(parts[1], 10)
-    let year = parseInt(parts[2], 10)
-    if (year < 100) year += 2000
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      const d = new Date(year, month - 1, day)
-      if (!Number.isNaN(d.getTime())) return d
-    }
-  }
-  const parsed = new Date(s)
-  if (!Number.isNaN(parsed.getTime())) {
-    parsed.setHours(0, 0, 0, 0)
-    return parsed
-  }
-  return null
+  return parseCalendarDate(value)
 }
 
 function cellText(cell: ExcelJS.Cell): string {

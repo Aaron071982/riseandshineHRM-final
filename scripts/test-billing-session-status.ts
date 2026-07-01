@@ -9,6 +9,7 @@ import {
   normalizeArtemisStatus,
   sessionMatchesStatusFilter,
 } from '../lib/billing/sessionStatus'
+import { formatCalendarDate, parseCalendarDate } from '../lib/billing/calendarDate'
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -59,5 +60,12 @@ assert(
   sessionMatchesStatusFilter('Ready to Bill', ARTEMIS_STATUS.READY_TO_BILL),
   'filter matches Artemis label'
 )
+
+// ExcelJS returns DOS as UTC midnight — must not shift to previous calendar day
+const excelDos = new Date('2026-06-15T00:00:00.000Z')
+const parsedDos = parseCalendarDate(excelDos)
+assert(parsedDos?.toISOString() === '2026-06-15T00:00:00.000Z', 'Excel DOS stays on 15th')
+assert(formatCalendarDate(parsedDos!) === '6/15/2026', 'DOS displays as 6/15/2026')
+assert(parseCalendarDate('6/15/2026')?.toISOString() === '2026-06-15T00:00:00.000Z', 'M/D/Y string parses')
 
 console.log('\nAll billing session status checks passed.')

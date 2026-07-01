@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs'
 import { format } from 'date-fns'
+import { calendarDateForExcel } from './calendarDate'
 import {
   computePayableHours,
   computeStatusBreakdown,
@@ -187,7 +188,7 @@ export async function buildPayrollWorkbook(
       const row = detail.addRow([
         name,
         s.clientName,
-        s.dos,
+        calendarDateForExcel(s.dos),
         s.rawStatus ?? s.sessionStatus ?? '',
         s.actualMinutes / 60,
         s.procedureCode ?? '',
