@@ -1,6 +1,14 @@
 import { format } from 'date-fns'
 import { sendGenericEmail } from '@/lib/email/core'
-import { ARTEMIS_STATUS, normalizeArtemisStatus } from '@/lib/billing/sessionStatus'
+import {
+  ARTEMIS_STATUS,
+  isAlwaysExcludedStatus,
+  normalizeArtemisStatus,
+  payableStatusLabels,
+  computePayableHours,
+  type ArtemisSessionStatusKey,
+} from '@/lib/billing/sessionStatus'
+import { formatUsd } from '@/lib/billing/format'
 
 const BILLING_CONTACT = 'Irsal@riseandshineaba.com'
 
@@ -15,49 +23,188 @@ export type HoursConfirmationSession = {
   sessionStatus: string | null
 }
 
+function dosKey(dos: Date): string {
+  const y = dos.getUTCFullYear()
+  const m = String(dos.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(dos.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function formatDos(dos: Date): string {
+  const y = dos.getUTCFullYear()
+  const m = String(dos.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(dos.getUTCDate()).padStart(2, '0')
+  return `${m}/${d}/${y}`
+}
+
+/** Completed + Ready to Bill — shown as "Completed" in the email. */
+export function isEmailCompletedStatus(status: string | null | undefined): boolean {
+  const key = normalizeArtemisStatus(status)
+  return key === ARTEMIS_STATUS.COMPLETED || key === ARTEMIS_STATUS.READY_TO_BILL
+}
+
 export function filterIncompleteSessions(sessions: HoursConfirmationSession[]): HoursConfirmationSession[] {
   return sessions.filter(
     (s) => normalizeArtemisStatus(s.sessionStatus) === ARTEMIS_STATUS.INCOMPLETE
   )
 }
 
-export function groupIncompleteSessionsByDate(
-  sessions: HoursConfirmationSession[]
-): { date: Date; hours: number }[] {
-  const incomplete = filterIncompleteSessions(sessions)
-  const byDay = new Map<string, number>()
-  for (const s of incomplete) {
-    const key = format(s.dos, 'yyyy-MM-dd')
-    byDay.set(key, (byDay.get(key) ?? 0) + s.actualMinutes / 60)
+export function sumCompletedHours(sessions: HoursConfirmationSession[]): number {
+  let minutes = 0
+  for (const s of sessions) {
+    if (isEmailCompletedStatus(s.sessionStatus)) minutes += s.actualMinutes
   }
-  return [...byDay.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, hours]) => ({ date: new Date(key + 'T12:00:00'), hours }))
+  return minutes / 60
 }
 
 export function sumIncompleteHours(sessions: HoursConfirmationSession[]): number {
   return filterIncompleteSessions(sessions).reduce((sum, s) => sum + s.actualMinutes / 60, 0)
 }
 
-export function generateHoursConfirmationEmail(params: {
+export function countDaysWorked(sessions: HoursConfirmationSession[]): number {
+  const days = new Set<string>()
+  for (const s of sessions) {
+    const key = normalizeArtemisStatus(s.sessionStatus)
+    if (key && isAlwaysExcludedStatus(key)) continue
+    if (s.actualMinutes <= 0) continue
+    days.add(dosKey(s.dos))
+  }
+  return days.size
+}
+
+export function groupSessionsByDateForEmail(sessions: HoursConfirmationSession[]): {
+  date: Date
+  completedHours: number
+  incompleteHours: number
+}[] {
+  const byDay = new Map<string, { completedMinutes: number; incompleteMinutes: number }>()
+  for (const s of sessions) {
+    const key = normalizeArtemisStatus(s.sessionStatus)
+    if (key && isAlwaysExcludedStatus(key)) continue
+    if (s.actualMinutes <= 0) continue
+
+    const day = dosKey(s.dos)
+    if (!byDay.has(day)) byDay.set(day, { completedMinutes: 0, incompleteMinutes: 0 })
+    const row = byDay.get(day)!
+    if (isEmailCompletedStatus(s.sessionStatus)) {
+      row.completedMinutes += s.actualMinutes
+    } else if (key === ARTEMIS_STATUS.INCOMPLETE) {
+      row.incompleteMinutes += s.actualMinutes
+    }
+  }
+
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, row]) => ({
+      date: new Date(key + 'T12:00:00.000Z'),
+      completedHours: row.completedMinutes / 60,
+      incompleteHours: row.incompleteMinutes / 60,
+    }))
+    .filter((d) => d.completedHours > 0 || d.incompleteHours > 0)
+}
+
+export type PayrollConfirmationParams = {
   firstName: string
   cycleLabel: string
   periodStart: Date
   periodEnd: Date
-  dailyHours: { date: Date; hours: number }[]
-  totalHours: number
-}): string {
-  const { firstName, cycleLabel, periodStart, periodEnd, dailyHours, totalHours } = params
+  sessions: HoursConfirmationSession[]
+  payableStatuses: ArtemisSessionStatusKey[]
+  hourlyRate: number | null
+  adjustment: number
+  finalPay: number
+}
+
+export function buildPayrollConfirmation(params: PayrollConfirmationParams) {
+  const {
+    sessions,
+    payableStatuses,
+    hourlyRate,
+    adjustment,
+    finalPay,
+    ...rest
+  } = params
+
+  const completedHours = sumCompletedHours(sessions)
+  const incompleteHours = sumIncompleteHours(sessions)
+  const payableHours = computePayableHours(sessions, payableStatuses)
+  const grossPay = hourlyRate != null ? hourlyRate * payableHours : 0
+  const dailyBreakdown = groupSessionsByDateForEmail(sessions)
+  const daysWorked = countDaysWorked(sessions)
+
+  return {
+    ...rest,
+    sessions,
+    payableStatuses,
+    hourlyRate,
+    adjustment,
+    finalPay,
+    completedHours,
+    incompleteHours,
+    payableHours,
+    grossPay,
+    dailyBreakdown,
+    daysWorked,
+    payableStatusLabel: payableStatusLabels(payableStatuses),
+  }
+}
+
+export function generateHoursConfirmationEmail(
+  data: ReturnType<typeof buildPayrollConfirmation>
+): string {
+  const {
+    firstName,
+    cycleLabel,
+    periodStart,
+    periodEnd,
+    daysWorked,
+    completedHours,
+    incompleteHours,
+    payableHours,
+    hourlyRate,
+    adjustment,
+    grossPay,
+    finalPay,
+    dailyBreakdown,
+    payableStatusLabel,
+  } = data
+
   const periodStr = `${format(periodStart, 'MM/dd/yyyy')} to ${format(periodEnd, 'MM/dd/yyyy')}`
   const payDeadline = getPayDeadline(periodEnd)
+  const hasIncomplete = incompleteHours > 0
 
-  const rows = dailyHours
-    .map(
-      (d) =>
-        `<tr><td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${format(d.date, 'MM/dd')}</td>` +
-        `<td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${d.hours.toFixed(1)}</td></tr>`
-    )
+  const dailyRows = dailyBreakdown
+    .map((d) => {
+      const completed =
+        d.completedHours > 0 ? d.completedHours.toFixed(2) : '—'
+      const incomplete =
+        d.incompleteHours > 0 ? d.incompleteHours.toFixed(2) : '—'
+      return (
+        `<tr>` +
+        `<td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;">${formatDos(d.date)}</td>` +
+        `<td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${completed}</td>` +
+        `<td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;">${incomplete}</td>` +
+        `</tr>`
+      )
+    })
     .join('')
+
+  const incompleteSection = hasIncomplete
+    ? `<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:16px;margin:20px 0;">
+        <p style="margin:0 0 8px;font-weight:bold;color:#92400e;">Action required — incomplete sessions</p>
+        <p style="margin:0;font-size:14px;color:#78350f;">
+          You have <strong>${incompleteHours.toFixed(2)} hours</strong> still marked <strong>Incomplete</strong> in Artemis.
+          Please log in and complete those sessions on your end as soon as possible.
+          If a session cannot be completed, email <a href="mailto:${BILLING_CONTACT}" style="color:#0D9488;">${BILLING_CONTACT}</a> right away.
+          Continued incomplete sessions may result in further action.
+        </p>
+      </div>`
+    : ''
+
+  const adjustmentLine =
+    adjustment !== 0
+      ? `<tr><td style="padding:6px 0;color:#6b7280;">Adjustment</td><td style="padding:6px 0;text-align:right;">${formatUsd(adjustment)}</td></tr>`
+      : ''
 
   return `<!DOCTYPE html>
 <html>
@@ -65,43 +212,59 @@ export function generateHoursConfirmationEmail(params: {
 <body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937;max-width:600px;margin:0 auto;padding:24px;">
   <div style="border-left:4px solid #0D9488;padding-left:16px;margin-bottom:24px;">
     <h1 style="margin:0;font-size:20px;color:#0D9488;">Rise &amp; Shine ABA</h1>
-    <p style="margin:4px 0 0;font-size:13px;color:#6b7280;">Billing Team</p>
+    <p style="margin:4px 0 0;font-size:13px;color:#6b7280;">Payroll Confirmation</p>
   </div>
   <p>Hi ${firstName},</p>
-  <p>Our payroll review for the <strong>${periodStr}</strong> pay period (${cycleLabel}) found sessions still marked <strong>Incomplete</strong> in Artemis for you. Please review the incomplete hours below and complete or correct them in Artemis if needed.</p>
+  <p>Please review your hours and pay for the <strong>${periodStr}</strong> pay period (<strong>${cycleLabel}</strong>). Below is a summary of your sessions from our Artemis payroll review.</p>
+
+  <table style="width:100%;font-size:14px;margin:16px 0;background:#f0fdfa;border-radius:8px;border-collapse:collapse;">
+    <tr><td style="padding:12px 16px 4px;">Days worked</td><td style="padding:12px 16px 4px;text-align:right;font-weight:bold;">${daysWorked}</td></tr>
+    <tr><td style="padding:4px 16px;">Completed hours <span style="color:#6b7280;font-size:12px;">(Completed + Ready to Bill)</span></td><td style="padding:4px 16px;text-align:right;font-weight:bold;">${completedHours.toFixed(2)}</td></tr>
+    <tr><td style="padding:4px 16px;">Incomplete hours</td><td style="padding:4px 16px;text-align:right;font-weight:bold;${hasIncomplete ? 'color:#d97706;' : ''}">${incompleteHours.toFixed(2)}</td></tr>
+    <tr><td style="padding:4px 16px 12px;border-top:1px solid #99f6e4;">Payable hours <span style="color:#6b7280;font-size:12px;">(${payableStatusLabel})</span></td><td style="padding:4px 16px 12px;text-align:right;font-weight:bold;border-top:1px solid #99f6e4;">${payableHours.toFixed(2)}</td></tr>
+  </table>
+
   <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
     <thead>
-      <tr style="background:#fffbeb;">
-        <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #d97706;">Date</th>
-        <th style="padding:8px 12px;text-align:right;border-bottom:2px solid #d97706;">Incomplete hrs</th>
+      <tr style="background:#f9fafb;">
+        <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #e5e7eb;">Date</th>
+        <th style="padding:8px 12px;text-align:right;border-bottom:2px solid #e5e7eb;">Completed hrs</th>
+        <th style="padding:8px 12px;text-align:right;border-bottom:2px solid #e5e7eb;">Incomplete hrs</th>
       </tr>
     </thead>
     <tbody>
-      ${rows}
+      ${dailyRows || '<tr><td colspan="3" style="padding:12px;color:#6b7280;">No session detail available.</td></tr>'}
       <tr style="font-weight:bold;background:#f9fafb;">
-        <td style="padding:10px 12px;">Total incomplete</td>
-        <td style="padding:10px 12px;text-align:right;">${totalHours.toFixed(1)} hours</td>
+        <td style="padding:10px 12px;">Totals</td>
+        <td style="padding:10px 12px;text-align:right;">${completedHours.toFixed(2)}</td>
+        <td style="padding:10px 12px;text-align:right;">${incompleteHours.toFixed(2)}</td>
       </tr>
     </tbody>
   </table>
-  <p>Scheduled, completed, and other non-incomplete sessions are not included in this email.</p>
-  <p>If everything looks correct, no action is needed.</p>
-  <p>If you believe there is a discrepancy, please email <a href="mailto:${BILLING_CONTACT}" style="color:#0D9488;">${BILLING_CONTACT}</a> before the pay date (<strong>${payDeadline}</strong>). Unfortunately, we are unable to make adjustments to this pay period after that date, so please reach out promptly if something does not look right.</p>
+
+  <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:16px;margin:20px 0;">
+    <p style="margin:0 0 8px;font-weight:bold;color:#065f46;">Your pay this cycle</p>
+    <table style="width:100%;font-size:14px;">
+      <tr><td style="padding:6px 0;color:#6b7280;">Hourly rate</td><td style="padding:6px 0;text-align:right;">${hourlyRate != null ? formatUsd(hourlyRate) : '—'}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;">Gross pay</td><td style="padding:6px 0;text-align:right;">${formatUsd(grossPay)}</td></tr>
+      ${adjustmentLine}
+      <tr><td style="padding:8px 0 0;font-weight:bold;font-size:16px;border-top:1px solid #6ee7b7;">Total pay</td><td style="padding:8px 0 0;text-align:right;font-weight:bold;font-size:16px;border-top:1px solid #6ee7b7;">${formatUsd(finalPay)}</td></tr>
+    </table>
+  </div>
+
+  ${incompleteSection}
+
+  <p>If anything looks incorrect, please email <a href="mailto:${BILLING_CONTACT}" style="color:#0D9488;">${BILLING_CONTACT}</a> before the pay date (<strong>${payDeadline}</strong>). We are unable to make adjustments to this pay period after that date.</p>
   <p>Thank you,<br><strong>Rise &amp; Shine ABA Billing Team</strong></p>
 </body>
 </html>`
 }
 
-export async function sendHoursConfirmationEmail(params: {
-  to: string
-  firstName: string
-  cycleLabel: string
-  periodStart: Date
-  periodEnd: Date
-  dailyHours: { date: Date; hours: number }[]
-  totalHours: number
-}): Promise<boolean> {
-  const subject = `Please review your incomplete hours — ${params.cycleLabel}`
-  const html = generateHoursConfirmationEmail(params)
-  return sendGenericEmail(params.to, subject, html, undefined, BILLING_CONTACT)
+export async function sendHoursConfirmationEmail(
+  to: string,
+  data: ReturnType<typeof buildPayrollConfirmation>
+): Promise<boolean> {
+  const subject = `Your payroll confirmation — ${data.cycleLabel}`
+  const html = generateHoursConfirmationEmail(data)
+  return sendGenericEmail(to, subject, html, undefined, BILLING_CONTACT)
 }

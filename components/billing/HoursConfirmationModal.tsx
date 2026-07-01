@@ -27,9 +27,10 @@ export default function HoursConfirmationModal({
   const [preview, setPreview] = useState<{
     recipientCount: number
     skippedCount: number
-    totalWithIncompleteHours: number
+    withIncompleteHours: number
     previewHtml: string | null
     payDeadline: string
+    previewRecipient: string | null
   } | null>(null)
   const [result, setResult] = useState<{ sent: number; failed: number; skipped: number } | null>(
     null
@@ -57,13 +58,13 @@ export default function HoursConfirmationModal({
     <>
       <Button variant="outline" onClick={loadPreview} disabled={!canSend}>
         <Mail className="w-4 h-4 mr-2" />
-        Send Incomplete Hours Reminder to BTs
+        Send Payroll Confirmation to BTs
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Incomplete hours reminder — {cycleLabel}</DialogTitle>
+            <DialogTitle>Payroll confirmation — {cycleLabel}</DialogTitle>
           </DialogHeader>
 
           {loading && (
@@ -80,20 +81,33 @@ export default function HoursConfirmationModal({
                 <strong>
                   {preview.recipientCount} matched BT{preview.recipientCount !== 1 ? 's' : ''}
                 </strong>{' '}
-                who have <strong>incomplete</strong> hours in Artemis for this cycle.
+                their hours breakdown (completed vs incomplete), payable hours, and total pay for
+                this cycle.
                 {preview.skippedCount > 0 && (
                   <span className="text-gray-500">
                     {' '}
-                    ({preview.skippedCount} with incomplete hours skipped — no email on file)
+                    ({preview.skippedCount} skipped — no email on file)
                   </span>
                 )}
               </p>
-              {preview.totalWithIncompleteHours === 0 && (
-                <p className="text-sm text-amber-700">No providers have incomplete hours this cycle.</p>
+              {preview.withIncompleteHours > 0 && (
+                <p className="text-sm text-amber-800">
+                  {preview.withIncompleteHours} BT
+                  {preview.withIncompleteHours !== 1 ? 's' : ''} will also receive a reminder to
+                  complete incomplete sessions in Artemis.
+                </p>
               )}
-              <p className="text-xs text-gray-500">
-                Pay deadline referenced in email: {preview.payDeadline}
-              </p>
+              {preview.recipientCount === 0 && (
+                <p className="text-sm text-amber-700">
+                  No BTs with hours and an email on file to send.
+                </p>
+              )}
+              {preview.previewRecipient && (
+                <p className="text-xs text-gray-500">
+                  Preview for: <strong>{preview.previewRecipient}</strong> · Pay deadline in email:{' '}
+                  {preview.payDeadline}
+                </p>
+              )}
               {preview.previewHtml && (
                 <div
                   className="border rounded-lg p-4 bg-gray-50 text-sm overflow-auto max-h-64"
@@ -153,7 +167,7 @@ export function HoursConfirmationLog({
 
   return (
     <div className="mt-4 border-t pt-4">
-      <p className="text-xs font-medium text-gray-500 mb-2">Hours confirmations sent</p>
+      <p className="text-xs font-medium text-gray-500 mb-2">Payroll confirmations sent</p>
       <ul className="text-xs space-y-1 text-gray-600">
         {confirmations.map((c) => {
           const name = c.rbtProfile
