@@ -216,8 +216,9 @@ export default async function CycleDetailPage({ params }: { params: { id: string
         {cycle.sourceFileName && (
           <p className="text-teal-100 text-xs mt-4">Source: {cycle.sourceFileName}</p>
         )}
-        <HoursConfirmationLog confirmations={cycle.hoursConfirmations} />
       </div>
+
+      <HoursConfirmationLog confirmations={cycle.hoursConfirmations} />
 
       {cycleLocked ? (
         <CyclePayrollReview

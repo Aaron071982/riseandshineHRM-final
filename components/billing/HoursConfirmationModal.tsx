@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { format } from 'date-fns'
-import { Mail, Loader2, Eye } from 'lucide-react'
+import { Mail, Loader2, Eye, ChevronDown } from 'lucide-react'
 
 type Recipient = {
   entryId: string
@@ -218,24 +218,52 @@ export function HoursConfirmationLog({
     payrollOnly: { fullName: string } | null
   }>
 }) {
+  const [open, setOpen] = useState(false)
+
   if (confirmations.length === 0) return null
 
+  const sent = confirmations.filter((c) => c.status === 'SENT').length
+  const skipped = confirmations.filter((c) => c.status === 'SKIPPED').length
+  const failed = confirmations.filter((c) => c.status === 'FAILED').length
+
+  const summaryParts = [
+    sent > 0 ? `${sent} sent` : null,
+    skipped > 0 ? `${skipped} skipped` : null,
+    failed > 0 ? `${failed} failed` : null,
+  ].filter(Boolean)
+
   return (
-    <div className="mt-4 border-t pt-4">
-      <p className="text-xs font-medium text-gray-500 mb-2">Hours confirmations sent</p>
-      <ul className="text-xs space-y-1 text-gray-600">
-        {confirmations.map((c) => {
-          const name = c.rbtProfile
-            ? `${c.rbtProfile.firstName} ${c.rbtProfile.lastName}`
-            : (c.payrollOnly?.fullName ?? c.email)
-          return (
-            <li key={c.id}>
-              {name} — {c.status}
-              {c.sentAt ? ` · ${format(new Date(c.sentAt), 'MMM d, h:mm a')}` : ''}
-            </li>
-          )
-        })}
-      </ul>
+    <div className="rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--surface)] text-sm">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900/40 rounded-lg"
+      >
+        <span>
+          Hours confirmation emails
+          <span className="ml-2 text-xs text-gray-500">
+            ({summaryParts.join(' · ') || `${confirmations.length} total`})
+          </span>
+        </span>
+        <ChevronDown
+          className={`w-4 h-4 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <ul className="border-t border-gray-100 dark:border-[var(--border-subtle)] px-4 py-3 text-xs space-y-1 text-gray-600 dark:text-gray-400 max-h-48 overflow-y-auto">
+          {confirmations.map((c) => {
+            const name = c.rbtProfile
+              ? `${c.rbtProfile.firstName} ${c.rbtProfile.lastName}`
+              : (c.payrollOnly?.fullName ?? c.email)
+            return (
+              <li key={c.id}>
+                {name} — {c.status}
+                {c.sentAt ? ` · ${format(new Date(c.sentAt), 'MMM d, h:mm a')}` : ''}
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }
