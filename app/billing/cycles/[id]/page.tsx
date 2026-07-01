@@ -8,11 +8,14 @@ import { CurrencyCell } from '@/components/billing/CurrencyCell'
 import SessionDrilldown from '@/components/billing/SessionDrilldown'
 import ExcludedProvidersSection from '@/components/billing/ExcludedProvidersSection'
 import CycleDetailActions from '@/components/billing/CycleDetailActions'
+import CycleDetailEditor from '@/components/billing/CycleDetailEditor'
 import CyclePayrollReview from '@/components/billing/CyclePayrollReview'
 import { HoursConfirmationLog } from '@/components/billing/HoursConfirmationModal'
 import { parsePayableStatusesJson } from '@/lib/billing/sessionStatus'
 import { formatUsd, formatHours } from '@/lib/billing/format'
 import { getCycleDisplayStats } from '@/lib/billing/cycleStats'
+import { getCycleBlockers } from '@/lib/billing/validateCycle'
+import { suggestPayRatesForRbts } from '@/lib/billing/payRate'
 import { format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
@@ -33,8 +36,12 @@ export default async function CycleDetailPage({ params }: { params: { id: string
       entries: {
         orderBy: [{ isExcluded: 'asc' }, { providerNameRaw: 'asc' }],
         include: {
-          rbtProfile: { select: { firstName: true, lastName: true, email: true } },
-          payrollOnly: { select: { fullName: true, email: true } },
+          rbtProfile: {
+            select: { firstName: true, lastName: true, email: true, hourlyPayRate: true },
+          },
+          payrollOnly: {
+            select: { id: true, fullName: true, email: true, hourlyPayRate: true },
+          },
           sessions: { orderBy: { dos: 'asc' } },
         },
       },
@@ -68,6 +75,70 @@ export default async function CycleDetailPage({ params }: { params: { id: string
     })),
   }))
 
+  const blockers = getCycleBlockers(cycle.entries)
+
+  const candidates = cycleLocked
+    ? []
+    : await prisma.rBTProfile.findMany({
+        where: { status: { in: ['HIRED', 'ONBOARDING_COMPLETED'] } },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          artemisProviderName: true,
+          hourlyPayRate: true,
+        },
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      })
+
+  const rbtIds = cycle.entries
+    .map((e) => e.rbtProfileId ?? e.suggestedRbtProfileId)
+    .filter((id): id is string => !!id)
+  const suggestedRates =
+    !cycleLocked && rbtIds.length > 0 ? await suggestPayRatesForRbts(rbtIds) : new Map()
+
+  const editorEntries = cycle.entries.map((e) => {
+    const suggestId = e.rbtProfileId ?? e.suggestedRbtProfileId
+    const suggestedHourlyRate =
+      e.hourlyRate == null
+        ? (suggestId ? suggestedRates.get(suggestId) : null) ??
+          e.rbtProfile?.hourlyPayRate ??
+          e.payrollOnly?.hourlyPayRate ??
+          null
+        : undefined
+
+    return {
+      id: e.id,
+      providerNameRaw: e.providerNameRaw,
+      matchStatus: e.matchStatus,
+      matchConfidence: e.matchConfidence,
+      rbtProfileId: e.rbtProfileId,
+      payrollOnlyId: e.payrollOnlyId,
+      suggestedRbtProfileId: e.suggestedRbtProfileId,
+      totalSessions: e.totalSessions,
+      totalHours: e.totalHours,
+      hourlyRate: e.hourlyRate,
+      suggestedHourlyRate,
+      grossPay: e.grossPay,
+      adjustment: e.adjustment,
+      adjustmentNote: e.adjustmentNote,
+      finalPay: e.finalPay,
+      role: e.role,
+      notes: e.notes,
+      isExcluded: e.isExcluded,
+      rbtProfile: e.rbtProfile
+        ? { firstName: e.rbtProfile.firstName, lastName: e.rbtProfile.lastName }
+        : null,
+      payrollOnly: e.payrollOnly,
+      sessions: e.sessions.map((s) => ({
+        sessionStatus: s.sessionStatus,
+        actualMinutes: s.actualMinutes,
+        dos: s.dos.toISOString(),
+        clientName: s.clientName,
+      })),
+    }
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -90,8 +161,28 @@ export default async function CycleDetailPage({ params }: { params: { id: string
           canReopen={!!canReopen}
           canDownload={cycle.status === 'FINALIZED' || cycle.status === 'PAID'}
           canSendHoursConfirmation={canSendHours && payable.length > 0}
+          canFinalize={cycle.status === 'REVIEW'}
+          blockers={blockers}
         />
       </div>
+
+      {cycle.status === 'REVIEW' && blockers.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+          <p className="font-medium mb-2">Resolve before finalizing:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            {blockers.map((b) => (
+              <li key={b.entryId}>{b.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {cycle.status === 'REVIEW' && blockers.length === 0 && (
+        <div className="rounded-lg border border-teal-200 bg-teal-50/60 dark:bg-teal-950/20 px-4 py-3 text-sm text-teal-900 dark:text-teal-100">
+          Ready to finalize — all providers are matched with pay rates. Confirm payable statuses and
+          totals below, then click <strong>Finalize Cycle</strong> (top right).
+        </div>
+      )}
 
       <div className="rounded-xl bg-gradient-to-r from-[#0D9488] to-teal-600 text-white p-6 shadow-md">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
@@ -118,12 +209,21 @@ export default async function CycleDetailPage({ params }: { params: { id: string
         <HoursConfirmationLog confirmations={cycle.hoursConfirmations} />
       </div>
 
-      <CyclePayrollReview
-        cycleId={cycle.id}
-        cycleLocked={cycleLocked}
-        payableStatusesJson={cycle.payableStatuses ?? parsePayableStatusesJson(null)}
-        entries={breakdownEntries}
-      />
+      {cycleLocked ? (
+        <CyclePayrollReview
+          cycleId={cycle.id}
+          cycleLocked
+          payableStatusesJson={cycle.payableStatuses ?? parsePayableStatusesJson(null)}
+          entries={breakdownEntries}
+        />
+      ) : (
+        <CycleDetailEditor
+          cycleId={cycle.id}
+          initialEntries={editorEntries}
+          initialCandidates={candidates}
+          initialPayableStatusesJson={cycle.payableStatuses ?? parsePayableStatusesJson(null)}
+        />
+      )}
 
       <Card className="shadow-sm">
         <CardHeader>
@@ -168,7 +268,7 @@ export default async function CycleDetailPage({ params }: { params: { id: string
         </CardContent>
       </Card>
 
-      <ExcludedProvidersSection entries={excludedEntries} />
+      {cycleLocked && <ExcludedProvidersSection entries={excludedEntries} />}
 
       {cycle.finalizedAt && (
         <p className="text-xs text-gray-500">
