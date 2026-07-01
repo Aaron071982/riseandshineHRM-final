@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Download, Loader2, RotateCcw, CheckCircle2 } from 'lucide-react'
 import HoursConfirmationModal from '@/components/billing/HoursConfirmationModal'
+import TaxDisclaimerModal from '@/components/billing/TaxDisclaimerModal'
 import DeleteCycleButton from '@/components/billing/DeleteCycleButton'
 import type { CycleBlocker } from '@/lib/billing/types'
 
@@ -90,7 +91,10 @@ export default function CycleDetailActions({
           </Button>
         )}
         {canSendHoursConfirmation && (
-          <HoursConfirmationModal cycleId={cycleId} cycleLabel={cycleLabel} canSend />
+          <>
+            <HoursConfirmationModal cycleId={cycleId} cycleLabel={cycleLabel} canSend />
+            <TaxDisclaimerModal cycleId={cycleId} cycleLabel={cycleLabel} canSend />
+          </>
         )}
         {canDownload && (
           <Button asChild variant="outline">

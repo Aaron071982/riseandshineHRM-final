@@ -12,6 +12,7 @@ import CyclePayrollReview from '@/components/billing/CyclePayrollReview'
 import PayRateInput from '@/components/billing/PayRateInput'
 import ExcludedProvidersSection from '@/components/billing/ExcludedProvidersSection'
 import HoursConfirmationModal from '@/components/billing/HoursConfirmationModal'
+import TaxDisclaimerModal from '@/components/billing/TaxDisclaimerModal'
 import { CurrencyCell } from '@/components/billing/CurrencyCell'
 import { defaultBiweeklyPeriod, formatCycleLabel, formatHours, formatUsd } from '@/lib/billing/format'
 import { getCycleBlockers } from '@/lib/billing/validateCycle'
@@ -534,11 +535,18 @@ export default function NewCycleWizardPage() {
               </Button>
               <div className="flex flex-wrap gap-2">
                 {cycleId && (
-                  <HoursConfirmationModal
-                    cycleId={cycleId}
-                    cycleLabel={label}
-                    canSend={blockers.length === 0 && matchedEntries.length > 0}
-                  />
+                  <>
+                    <HoursConfirmationModal
+                      cycleId={cycleId}
+                      cycleLabel={label}
+                      canSend={blockers.length === 0 && matchedEntries.length > 0}
+                    />
+                    <TaxDisclaimerModal
+                      cycleId={cycleId}
+                      cycleLabel={label}
+                      canSend={blockers.length === 0 && matchedEntries.length > 0}
+                    />
+                  </>
                 )}
                 <Button
                   onClick={finalize}

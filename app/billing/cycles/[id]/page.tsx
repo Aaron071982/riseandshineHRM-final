@@ -15,12 +15,21 @@ import { parsePayableStatusesJson } from '@/lib/billing/sessionStatus'
 import { formatUsd, formatHours } from '@/lib/billing/format'
 import { getCycleDisplayStats } from '@/lib/billing/cycleStats'
 import { getCycleBlockers } from '@/lib/billing/validateCycle'
+import { recalculateCyclePayable } from '@/lib/billing/recalculatePayable'
 import { suggestPayRatesForRbts } from '@/lib/billing/payRate'
 import { format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CycleDetailPage({ params }: { params: { id: string } }) {
+  const exists = await prisma.billingCycle.findUnique({
+    where: { id: params.id },
+    select: { id: true },
+  })
+  if (!exists) notFound()
+
+  await recalculateCyclePayable(params.id)
+
   const cycle = await prisma.billingCycle.findUnique({
     where: { id: params.id },
     include: {

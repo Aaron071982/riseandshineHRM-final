@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import {
   computePayableHours,
   computeStatusBreakdown,
+  normalizeArtemisStatus,
   parsePayableStatusesJson,
   payableStatusLabels,
   PAYABLE_STATUS_OPTIONS,
@@ -181,8 +182,8 @@ export async function buildPayrollWorkbook(
   for (const e of entries) {
     const name = employeeName(e)
     for (const s of e.sessions) {
-      const key = (s.sessionStatus ?? '') as ArtemisSessionStatusKey
-      const isPayable = payableSet.has(key)
+      const key = normalizeArtemisStatus(s.sessionStatus)
+      const isPayable = key != null && payableSet.has(key)
       const row = detail.addRow([
         name,
         s.clientName,

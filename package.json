@@ -21,6 +21,7 @@
     "db:add-billing-user": "tsx scripts/add-billing-user.ts",
     "db:sync-billing-logins": "tsx scripts/sync-billing-login-users.ts",
     "test:signature-hash": "tsx scripts/test-signature-certificate-hash.ts",
+    "test:billing-session-status": "tsx scripts/test-billing-session-status.ts",
     "audit:retroactive-signatures": "tsx scripts/run-retroactive-signature-audit.ts",
     "audit:retroactive-signatures:dry": "tsx scripts/run-retroactive-signature-audit.ts --dry-run"
   },

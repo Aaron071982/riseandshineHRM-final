@@ -5,7 +5,6 @@ import {
   buildPayrollConfirmation,
   generateHoursConfirmationEmail,
   sendHoursConfirmationEmail,
-  getPayDeadline,
 } from '@/lib/billing/hoursConfirmationEmail'
 import { isPayableMatchStatus } from '@/lib/billing/entryActions'
 import { parsePayableStatusesJson } from '@/lib/billing/sessionStatus'
@@ -53,9 +52,6 @@ function mapEntryToConfirmation(
     periodEnd: cycle.periodEnd,
     sessions: e.sessions,
     payableStatuses,
-    hourlyRate: e.hourlyRate,
-    adjustment: e.adjustment,
-    finalPay: e.finalPay,
   })
 
   return {
@@ -116,7 +112,6 @@ export async function GET(
     recipientCount: recipients.filter((r) => r.canEmail).length,
     skippedCount: recipients.filter((r) => !r.canEmail).length,
     withIncompleteHours: recipients.filter((r) => r.confirmation.incompleteHours > 0).length,
-    payDeadline: getPayDeadline(cycle.periodEnd),
     previewHtml,
     previewRecipient: previewRecipient?.name ?? null,
     confirmations: cycle.hoursConfirmations,

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireBillingManagerSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { recalculateCyclePayable } from '@/lib/billing/recalculatePayable'
 import { buildPayrollWorkbook, payrollExportFilename } from '@/lib/billing/excelExport'
+import { sessionMatchesStatusFilter, type ArtemisSessionStatusKey } from '@/lib/billing/sessionStatus'
 import type { BillingMatchStatus } from '@prisma/client'
 
 function entryDisplayName(entry: {
@@ -38,8 +40,9 @@ function matchesExportFilters(
   if (match === 'unmatched' && entry.matchStatus !== 'UNMATCHED') return false
   if (match === 'needs_review' && entry.matchStatus !== 'NEEDS_REVIEW') return false
   if (status) {
+    const filterStatus = status as ArtemisSessionStatusKey
     const hasStatus = entry.sessions.some(
-      (s) => s.sessionStatus === status && s.actualMinutes > 0
+      (s) => sessionMatchesStatusFilter(s.sessionStatus, filterStatus) && s.actualMinutes > 0
     )
     if (!hasStatus) return false
   }
@@ -57,6 +60,8 @@ export async function GET(
   if (!cycle) {
     return NextResponse.json({ error: 'Cycle not found' }, { status: 404 })
   }
+
+  await recalculateCyclePayable(params.id)
 
   const { searchParams } = new URL(request.url)
   const search = searchParams.get('search')

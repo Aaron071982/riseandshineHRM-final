@@ -9,10 +9,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { format } from 'date-fns'
 import { Mail, Loader2 } from 'lucide-react'
 
-export default function HoursConfirmationModal({
+export default function TaxDisclaimerModal({
   cycleId,
   cycleLabel,
   canSend,
@@ -27,7 +26,6 @@ export default function HoursConfirmationModal({
   const [preview, setPreview] = useState<{
     recipientCount: number
     skippedCount: number
-    withIncompleteHours: number
     previewHtml: string | null
     previewRecipient: string | null
   } | null>(null)
@@ -38,7 +36,7 @@ export default function HoursConfirmationModal({
   const loadPreview = async () => {
     setLoading(true)
     setResult(null)
-    const res = await fetch(`/api/billing/cycles/${cycleId}/hours-confirmation`)
+    const res = await fetch(`/api/billing/cycles/${cycleId}/tax-disclaimer`)
     const data = await res.json()
     if (res.ok) setPreview(data)
     setLoading(false)
@@ -47,7 +45,7 @@ export default function HoursConfirmationModal({
 
   const sendAll = async () => {
     setSending(true)
-    const res = await fetch(`/api/billing/cycles/${cycleId}/hours-confirmation`, { method: 'POST' })
+    const res = await fetch(`/api/billing/cycles/${cycleId}/tax-disclaimer`, { method: 'POST' })
     const data = await res.json()
     if (res.ok) setResult(data)
     setSending(false)
@@ -57,13 +55,13 @@ export default function HoursConfirmationModal({
     <>
       <Button variant="outline" onClick={loadPreview} disabled={!canSend}>
         <Mail className="w-4 h-4 mr-2" />
-        Send Hours Confirmation to BTs
+        Send Tax Disclaimer to BTs
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Hours confirmation — {cycleLabel}</DialogTitle>
+            <DialogTitle>Tax disclaimer — {cycleLabel}</DialogTitle>
           </DialogHeader>
 
           {loading && (
@@ -80,7 +78,8 @@ export default function HoursConfirmationModal({
                 <strong>
                   {preview.recipientCount} matched BT{preview.recipientCount !== 1 ? 's' : ''}
                 </strong>{' '}
-                their hours summary for this cycle (no pay rate or dollar amounts).
+                a notice that federal and state taxes (and other payroll deductions) will be withheld
+                from their pay this cycle.
                 {preview.skippedCount > 0 && (
                   <span className="text-gray-500">
                     {' '}
@@ -88,13 +87,6 @@ export default function HoursConfirmationModal({
                   </span>
                 )}
               </p>
-              {preview.withIncompleteHours > 0 && (
-                <p className="text-sm text-amber-800">
-                  {preview.withIncompleteHours} BT
-                  {preview.withIncompleteHours !== 1 ? 's' : ''} will also receive a reminder to
-                  complete incomplete sessions in Artemis.
-                </p>
-              )}
               {preview.recipientCount === 0 && (
                 <p className="text-sm text-amber-700">
                   No BTs with hours and an email on file to send.
@@ -145,39 +137,5 @@ export default function HoursConfirmationModal({
         </DialogContent>
       </Dialog>
     </>
-  )
-}
-
-export function HoursConfirmationLog({
-  confirmations,
-}: {
-  confirmations: Array<{
-    id: string
-    email: string
-    status: string
-    sentAt: string | Date | null
-    rbtProfile: { firstName: string; lastName: string } | null
-    payrollOnly: { fullName: string } | null
-  }>
-}) {
-  if (confirmations.length === 0) return null
-
-  return (
-    <div className="mt-4 border-t pt-4">
-      <p className="text-xs font-medium text-gray-500 mb-2">Hours confirmations sent</p>
-      <ul className="text-xs space-y-1 text-gray-600">
-        {confirmations.map((c) => {
-          const name = c.rbtProfile
-            ? `${c.rbtProfile.firstName} ${c.rbtProfile.lastName}`
-            : (c.payrollOnly?.fullName ?? c.email)
-          return (
-            <li key={c.id}>
-              {name} — {c.status}
-              {c.sentAt ? ` · ${format(new Date(c.sentAt), 'MMM d, h:mm a')}` : ''}
-            </li>
-          )
-        })}
-      </ul>
-    </div>
   )
 }

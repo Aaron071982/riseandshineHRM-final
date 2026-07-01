@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireBillingManagerSession, isAdmin } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { recalculateCyclePayable } from '@/lib/billing/recalculatePayable'
 
 export async function POST(
   _request: NextRequest,
@@ -26,6 +27,8 @@ export async function POST(
       finalizedById: null,
     },
   })
+
+  await recalculateCyclePayable(params.id)
 
   return NextResponse.json({ cycle: updated })
 }

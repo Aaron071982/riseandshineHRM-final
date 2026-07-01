@@ -4,18 +4,11 @@ import {
   ARTEMIS_STATUS,
   isAlwaysExcludedStatus,
   normalizeArtemisStatus,
-  payableStatusLabels,
   computePayableHours,
   type ArtemisSessionStatusKey,
 } from '@/lib/billing/sessionStatus'
-import { formatUsd } from '@/lib/billing/format'
 
 const BILLING_CONTACT = 'Irsal@riseandshineaba.com'
-
-export function getPayDeadline(periodEnd: Date): string {
-  const day = periodEnd.getUTCDate()
-  return day <= 15 ? 'the 1st' : 'the 15th'
-}
 
 export type HoursConfirmationSession = {
   dos: Date
@@ -37,7 +30,7 @@ function formatDos(dos: Date): string {
   return `${m}/${d}/${y}`
 }
 
-/** Completed + Ready to Bill — shown as "Completed" in the email. */
+/** Completed + Ready to Bill — grouped as "completed" in the BT-facing email. */
 export function isEmailCompletedStatus(status: string | null | undefined): boolean {
   const key = normalizeArtemisStatus(status)
   return key === ARTEMIS_STATUS.COMPLETED || key === ARTEMIS_STATUS.READY_TO_BILL
@@ -110,25 +103,14 @@ export type PayrollConfirmationParams = {
   periodEnd: Date
   sessions: HoursConfirmationSession[]
   payableStatuses: ArtemisSessionStatusKey[]
-  hourlyRate: number | null
-  adjustment: number
-  finalPay: number
 }
 
 export function buildPayrollConfirmation(params: PayrollConfirmationParams) {
-  const {
-    sessions,
-    payableStatuses,
-    hourlyRate,
-    adjustment,
-    finalPay,
-    ...rest
-  } = params
+  const { sessions, payableStatuses, ...rest } = params
 
   const completedHours = sumCompletedHours(sessions)
   const incompleteHours = sumIncompleteHours(sessions)
   const payableHours = computePayableHours(sessions, payableStatuses)
-  const grossPay = hourlyRate != null ? hourlyRate * payableHours : 0
   const dailyBreakdown = groupSessionsByDateForEmail(sessions)
   const daysWorked = countDaysWorked(sessions)
 
@@ -136,16 +118,11 @@ export function buildPayrollConfirmation(params: PayrollConfirmationParams) {
     ...rest,
     sessions,
     payableStatuses,
-    hourlyRate,
-    adjustment,
-    finalPay,
     completedHours,
     incompleteHours,
     payableHours,
-    grossPay,
     dailyBreakdown,
     daysWorked,
-    payableStatusLabel: payableStatusLabels(payableStatuses),
   }
 }
 
@@ -161,16 +138,10 @@ export function generateHoursConfirmationEmail(
     completedHours,
     incompleteHours,
     payableHours,
-    hourlyRate,
-    adjustment,
-    grossPay,
-    finalPay,
     dailyBreakdown,
-    payableStatusLabel,
   } = data
 
   const periodStr = `${format(periodStart, 'MM/dd/yyyy')} to ${format(periodEnd, 'MM/dd/yyyy')}`
-  const payDeadline = getPayDeadline(periodEnd)
   const hasIncomplete = incompleteHours > 0
 
   const dailyRows = dailyBreakdown
@@ -201,27 +172,22 @@ export function generateHoursConfirmationEmail(
       </div>`
     : ''
 
-  const adjustmentLine =
-    adjustment !== 0
-      ? `<tr><td style="padding:6px 0;color:#6b7280;">Adjustment</td><td style="padding:6px 0;text-align:right;">${formatUsd(adjustment)}</td></tr>`
-      : ''
-
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937;max-width:600px;margin:0 auto;padding:24px;">
   <div style="border-left:4px solid #0D9488;padding-left:16px;margin-bottom:24px;">
     <h1 style="margin:0;font-size:20px;color:#0D9488;">Rise &amp; Shine ABA</h1>
-    <p style="margin:4px 0 0;font-size:13px;color:#6b7280;">Payroll Confirmation</p>
+    <p style="margin:4px 0 0;font-size:13px;color:#6b7280;">Hours Confirmation</p>
   </div>
   <p>Hi ${firstName},</p>
-  <p>Please review your hours and pay for the <strong>${periodStr}</strong> pay period (<strong>${cycleLabel}</strong>). Below is a summary of your sessions from our Artemis payroll review.</p>
+  <p>Please review your hours for the <strong>${periodStr}</strong> pay period (<strong>${cycleLabel}</strong>). Below is a summary of your sessions from our Artemis payroll review.</p>
 
   <table style="width:100%;font-size:14px;margin:16px 0;background:#f0fdfa;border-radius:8px;border-collapse:collapse;">
     <tr><td style="padding:12px 16px 4px;">Days worked</td><td style="padding:12px 16px 4px;text-align:right;font-weight:bold;">${daysWorked}</td></tr>
-    <tr><td style="padding:4px 16px;">Completed hours <span style="color:#6b7280;font-size:12px;">(Completed + Ready to Bill)</span></td><td style="padding:4px 16px;text-align:right;font-weight:bold;">${completedHours.toFixed(2)}</td></tr>
+    <tr><td style="padding:4px 16px;">Completed hours</td><td style="padding:4px 16px;text-align:right;font-weight:bold;">${completedHours.toFixed(2)}</td></tr>
     <tr><td style="padding:4px 16px;">Incomplete hours</td><td style="padding:4px 16px;text-align:right;font-weight:bold;${hasIncomplete ? 'color:#d97706;' : ''}">${incompleteHours.toFixed(2)}</td></tr>
-    <tr><td style="padding:4px 16px 12px;border-top:1px solid #99f6e4;">Payable hours <span style="color:#6b7280;font-size:12px;">(${payableStatusLabel})</span></td><td style="padding:4px 16px 12px;text-align:right;font-weight:bold;border-top:1px solid #99f6e4;">${payableHours.toFixed(2)}</td></tr>
+    <tr><td style="padding:4px 16px 12px;border-top:1px solid #99f6e4;">Total payable hours</td><td style="padding:4px 16px 12px;text-align:right;font-weight:bold;border-top:1px solid #99f6e4;">${payableHours.toFixed(2)}</td></tr>
   </table>
 
   <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
@@ -242,19 +208,8 @@ export function generateHoursConfirmationEmail(
     </tbody>
   </table>
 
-  <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:16px;margin:20px 0;">
-    <p style="margin:0 0 8px;font-weight:bold;color:#065f46;">Your pay this cycle</p>
-    <table style="width:100%;font-size:14px;">
-      <tr><td style="padding:6px 0;color:#6b7280;">Hourly rate</td><td style="padding:6px 0;text-align:right;">${hourlyRate != null ? formatUsd(hourlyRate) : '—'}</td></tr>
-      <tr><td style="padding:6px 0;color:#6b7280;">Gross pay</td><td style="padding:6px 0;text-align:right;">${formatUsd(grossPay)}</td></tr>
-      ${adjustmentLine}
-      <tr><td style="padding:8px 0 0;font-weight:bold;font-size:16px;border-top:1px solid #6ee7b7;">Total pay</td><td style="padding:8px 0 0;text-align:right;font-weight:bold;font-size:16px;border-top:1px solid #6ee7b7;">${formatUsd(finalPay)}</td></tr>
-    </table>
-  </div>
-
   ${incompleteSection}
 
-  <p>If anything looks incorrect, please email <a href="mailto:${BILLING_CONTACT}" style="color:#0D9488;">${BILLING_CONTACT}</a> before the pay date (<strong>${payDeadline}</strong>). We are unable to make adjustments to this pay period after that date.</p>
   <p>Thank you,<br><strong>Rise &amp; Shine ABA Billing Team</strong></p>
 </body>
 </html>`
@@ -264,7 +219,50 @@ export async function sendHoursConfirmationEmail(
   to: string,
   data: ReturnType<typeof buildPayrollConfirmation>
 ): Promise<boolean> {
-  const subject = `Your payroll confirmation — ${data.cycleLabel}`
+  const subject = `Your hours confirmation — ${data.cycleLabel}`
   const html = generateHoursConfirmationEmail(data)
+  return sendGenericEmail(to, subject, html, undefined, BILLING_CONTACT)
+}
+
+export type TaxDisclaimerParams = {
+  firstName: string
+  cycleLabel: string
+  periodStart: Date
+  periodEnd: Date
+}
+
+export function generateTaxDisclaimerEmail(params: TaxDisclaimerParams): string {
+  const { firstName, cycleLabel, periodStart, periodEnd } = params
+  const periodStr = `${format(periodStart, 'MM/dd/yyyy')} to ${format(periodEnd, 'MM/dd/yyyy')}`
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937;max-width:600px;margin:0 auto;padding:24px;">
+  <div style="border-left:4px solid #0D9488;padding-left:16px;margin-bottom:24px;">
+    <h1 style="margin:0;font-size:20px;color:#0D9488;">Rise &amp; Shine ABA</h1>
+    <p style="margin:4px 0 0;font-size:13px;color:#6b7280;">Payroll Notice</p>
+  </div>
+  <p>Hi ${firstName},</p>
+  <p>This is a payroll notice for the <strong>${periodStr}</strong> pay period (<strong>${cycleLabel}</strong>).</p>
+  <div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;padding:16px;margin:20px 0;">
+    <p style="margin:0;font-size:14px;color:#065f46;">
+      <strong>Please note:</strong> Federal and state taxes, along with any other applicable payroll deductions,
+      will be withheld from your pay for this period. Your take-home pay will reflect these withholdings.
+    </p>
+  </div>
+  <p>If you have any questions about your pay or deductions, please email
+    <a href="mailto:${BILLING_CONTACT}" style="color:#0D9488;">${BILLING_CONTACT}</a>.</p>
+  <p>Thank you,<br><strong>Rise &amp; Shine ABA Billing Team</strong></p>
+</body>
+</html>`
+}
+
+export async function sendTaxDisclaimerEmail(
+  to: string,
+  params: TaxDisclaimerParams
+): Promise<boolean> {
+  const subject = `Payroll tax notice — ${params.cycleLabel}`
+  const html = generateTaxDisclaimerEmail(params)
   return sendGenericEmail(to, subject, html, undefined, BILLING_CONTACT)
 }

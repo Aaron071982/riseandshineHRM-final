@@ -36,22 +36,41 @@ export const ALWAYS_EXCLUDED_STATUSES = new Set<ArtemisSessionStatusKey>([
 
 const SUMMARY_STATUSES = new Set(['subtotal', 'total', 'sum', 'count'])
 
+const ALLOWED_STATUS_KEYS = new Set<string>(Object.values(ARTEMIS_STATUS))
+
+/** Artemis export labels and stored DB keys → normalized key */
+const STATUS_ALIASES: Record<string, ArtemisSessionStatusKey> = {
+  completed: ARTEMIS_STATUS.COMPLETED,
+  'ready to bill': ARTEMIS_STATUS.READY_TO_BILL,
+  'in progress': ARTEMIS_STATUS.IN_PROGRESS,
+  incomplete: ARTEMIS_STATUS.INCOMPLETE,
+  scheduled: ARTEMIS_STATUS.SCHEDULED,
+  cancelled: ARTEMIS_STATUS.CANCELLED,
+  canceled: ARTEMIS_STATUS.CANCELLED,
+  deleted: ARTEMIS_STATUS.DELETED,
+}
+
 export function isSummaryArtemisStatus(status: string | null): boolean {
   return SUMMARY_STATUSES.has((status ?? '').trim().toLowerCase())
 }
 
-/** Map raw Artemis Status cell (after forward-fill) to a normalized key. */
+/**
+ * Map Artemis export labels, stored sessionStatus keys (snake_case), or mixed input
+ * to a single normalized key. All payroll hour math must use this — never compare raw strings.
+ */
 export function normalizeArtemisStatus(raw: string | null | undefined): ArtemisSessionStatusKey | null {
   const s = (raw ?? '').trim().toLowerCase()
   if (!s) return null
-  if (s === 'completed') return ARTEMIS_STATUS.COMPLETED
-  if (s === 'ready to bill') return ARTEMIS_STATUS.READY_TO_BILL
-  if (s === 'in progress') return ARTEMIS_STATUS.IN_PROGRESS
-  if (s === 'incomplete') return ARTEMIS_STATUS.INCOMPLETE
-  if (s === 'scheduled') return ARTEMIS_STATUS.SCHEDULED
-  if (s === 'cancelled' || s === 'canceled') return ARTEMIS_STATUS.CANCELLED
-  if (s === 'deleted') return ARTEMIS_STATUS.DELETED
-  return null
+  if (ALLOWED_STATUS_KEYS.has(s)) return s as ArtemisSessionStatusKey
+  const spaced = s.replace(/_/g, ' ')
+  return STATUS_ALIASES[spaced] ?? null
+}
+
+export function sessionMatchesStatusFilter(
+  sessionStatus: string | null | undefined,
+  filterStatus: ArtemisSessionStatusKey
+): boolean {
+  return normalizeArtemisStatus(sessionStatus) === filterStatus
 }
 
 export function isAlwaysExcludedStatus(
