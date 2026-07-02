@@ -15,7 +15,7 @@ import {
   EmailTemplateType,
 } from '@/lib/email'
 import { makePublicUrl } from '@/lib/baseUrl'
-import { assertCronOrResponse } from '@/lib/cron-auth'
+import { assertAutomaticCronEmailsOrResponse, assertCronOrResponse } from '@/lib/cron-auth'
 const REMINDER_MINUTES = parseInt(process.env.INTERVIEW_REMINDER_MINUTES ?? '15', 10)
 const RECIPIENTS_RAW = process.env.INTERVIEW_REMINDER_RECIPIENTS ?? 'aaronsiam21@gmail.com,kazi@siyam.nyc'
 const RECIPIENTS = RECIPIENTS_RAW.split(',').map((e) => e.trim()).filter(Boolean)
@@ -23,6 +23,8 @@ const RECIPIENTS = RECIPIENTS_RAW.split(',').map((e) => e.trim()).filter(Boolean
 export async function GET(request: NextRequest) {
   const auth = assertCronOrResponse(request)
   if (auth) return auth
+  const emailsOff = assertAutomaticCronEmailsOrResponse()
+  if (emailsOff) return emailsOff
 
   try {
     const now = new Date()

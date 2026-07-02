@@ -13,7 +13,7 @@ import { prisma } from '@/lib/prisma'
 import { getWorkflowSettings } from '@/lib/workflow-settings'
 import { sendGenericEmail } from '@/lib/email'
 import { makePublicUrl } from '@/lib/baseUrl'
-import { assertCronOrResponse } from '@/lib/cron-auth'
+import { automaticCronEmailsEnabled, assertCronOrResponse } from '@/lib/cron-auth'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
@@ -267,8 +267,10 @@ export async function GET(request: NextRequest) {
       ? `Rise and Shine HRM – Staleness digest (${sections.reduce((acc, s) => acc + s.rows.length, 0)} items)`
       : 'Rise and Shine HRM – Staleness digest (no items)'
 
-    for (const to of recipients) {
-      await sendGenericEmail(to, subject, html).catch((e) => console.error('Staleness digest send failed:', e))
+    if (automaticCronEmailsEnabled()) {
+      for (const to of recipients) {
+        await sendGenericEmail(to, subject, html).catch((e) => console.error('Staleness digest send failed:', e))
+      }
     }
 
     if (hasAny && recipients.length > 0) {
@@ -304,6 +306,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ——— RBT reminder emails (Part 7 / plan) ———
+    if (automaticCronEmailsEnabled()) {
     const tasksUrl = makePublicUrl('/rbt/tasks')
     const twoDaysAgo = new Date(now.getTime() - 2 * dayMs)
     const threeDaysAgo = new Date(now.getTime() - 3 * dayMs)
@@ -531,6 +534,7 @@ export async function GET(request: NextRequest) {
           rbtHtml
         ).catch((e) => console.error('RBT clock-out reminder send failed:', e))
       }
+    }
     }
 
     return NextResponse.json({

@@ -10,11 +10,13 @@ import {
   generateInterviewReminderEmail,
   EmailTemplateType,
 } from '@/lib/email'
-import { assertCronOrResponse } from '@/lib/cron-auth'
+import { assertAutomaticCronEmailsOrResponse, assertCronOrResponse } from '@/lib/cron-auth'
 
 export async function GET(request: NextRequest) {
   const auth = assertCronOrResponse(request)
   if (auth) return auth
+  const emailsOff = assertAutomaticCronEmailsOrResponse()
+  if (emailsOff) return emailsOff
 
   try {
     const now = new Date()

@@ -12,11 +12,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendGenericEmail } from '@/lib/email/core'
 import { makePublicUrl } from '@/lib/baseUrl'
-import { assertCronOrResponse } from '@/lib/cron-auth'
+import { assertAutomaticCronEmailsOrResponse, assertCronOrResponse } from '@/lib/cron-auth'
 
 export async function GET(request: NextRequest) {
   const auth = assertCronOrResponse(request)
   if (auth) return auth
+  const emailsOff = assertAutomaticCronEmailsOrResponse()
+  if (emailsOff) return emailsOff
 
   try {
     const now = new Date()

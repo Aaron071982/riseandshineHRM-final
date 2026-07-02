@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { assertCronOrResponse } from '@/lib/cron-auth'
+import { assertAutomaticCronEmailsOrResponse, assertCronOrResponse } from '@/lib/cron-auth'
 import { sendGenericEmail } from '@/lib/email'
 import { makePublicUrl } from '@/lib/baseUrl'
 import { getOnboardingProgress } from '@/lib/onboarding/progress'
@@ -13,6 +13,8 @@ const REMINDER_HOURS = [24, 72, 168] as const
 export async function GET(request: NextRequest) {
   const denied = assertCronOrResponse(request)
   if (denied) return denied
+  const emailsOff = assertAutomaticCronEmailsOrResponse()
+  if (emailsOff) return emailsOff
 
   try {
     const hired = await prisma.rBTProfile.findMany({

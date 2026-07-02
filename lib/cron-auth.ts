@@ -1,5 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+/** Cron email jobs are off unless AUTOMATIC_EMAILS_ENABLED=true in env. */
+export function automaticCronEmailsEnabled(): boolean {
+  return process.env.AUTOMATIC_EMAILS_ENABLED === 'true'
+}
+
+export function assertAutomaticCronEmailsOrResponse(): NextResponse | null {
+  if (!automaticCronEmailsEnabled()) {
+    return NextResponse.json({
+      success: true,
+      skipped: true,
+      reason: 'Automatic cron emails are disabled',
+    })
+  }
+  return null
+}
+
 /**
  * Cron route auth: Bearer token or `?secret=` must match CRON_SECRET when set.
  * Vercel Cron sends `Authorization: Bearer <CRON_SECRET>` automatically.
