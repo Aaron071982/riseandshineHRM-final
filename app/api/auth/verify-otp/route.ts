@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyOTPEmail } from '@/lib/email-otp'
+import { verifyOTPEmail, isActiveOtpLocked } from '@/lib/email-otp'
 import { createSession, LOCAL_DEV_SESSION_TOKEN } from '@/lib/auth'
 import { getOtpTestCode, isOtpTestAccount } from '@/lib/constants'
+import { isOtpBypassEnvironment } from '@/lib/auth/otpBypass'
+import {
+  assertVerifyOtpRateLimit,
+  recordVerifyOtpFailure,
+} from '@/lib/otp-rate-limit'
 import { provisionBillingLoginIfNeeded, shouldProvisionBillingLogin } from '@/lib/billing-portal-users'
 import {
   getPostLoginPath,
@@ -77,16 +82,40 @@ export async function POST(request: NextRequest) {
     // Treat any non-production build OR explicit localhost hostname as eligible for the bypass so
     // `next start` on localhost still works even if NODE_ENV is "production".
     const hostname = request.nextUrl.hostname
-    const isLocalhostHost = hostname === 'localhost' || hostname === '127.0.0.1'
-    const isNonProdEnv = process.env.NODE_ENV !== 'production'
+    const isOtpBypassEnv = isOtpBypassEnvironment(hostname)
     const isDevBypass =
-      (isNonProdEnv || isLocalhostHost) && otp === '123456' && !isOtpTestAccount(email)
-    const adminFallbackList = (process.env.ADMIN_FALLBACK_EMAIL ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
-    const isAdminFallback = adminFallbackList.length > 0 && adminFallbackList.includes(email) && otp === '123456'
-    const isFixedOtpTestLogin = isOtpTestAccount(email) && otp === getOtpTestCode()
+      isOtpBypassEnv && otp === '123456' && !isOtpTestAccount(email)
+    const adminFallbackList = (process.env.ADMIN_FALLBACK_EMAIL ?? '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+    const isAdminFallback =
+      isOtpBypassEnv &&
+      adminFallbackList.length > 0 &&
+      adminFallbackList.includes(email) &&
+      otp === '123456'
+    const isFixedOtpTestLogin =
+      isOtpBypassEnv && isOtpTestAccount(email) && otp === getOtpTestCode()
     const isBillingTestBypass =
-      (isNonProdEnv || isLocalhostHost) && email === 'aaronsiam23@gmail.com' && otp === '123456'
+      isOtpBypassEnv && email === 'aaronsiam23@gmail.com' && otp === '123456'
     let isValid = false
+
+    const usesRealOtpFlow =
+      !isFixedOtpTestLogin && !isBillingTestBypass && !isDevBypass && !isAdminFallback
+
+    if (usesRealOtpFlow) {
+      const rateLimited = await assertVerifyOtpRateLimit(email)
+      if (rateLimited) return rateLimited
+      if (await isActiveOtpLocked(email)) {
+        return NextResponse.json(
+          {
+            error:
+              'This verification code was locked after too many failed attempts. Request a new code.',
+          },
+          { status: 429 }
+        )
+      }
+    }
 
     if (isFixedOtpTestLogin) {
       isValid = true
@@ -155,6 +184,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (!isValid) {
+      if (usesRealOtpFlow) {
+        await recordVerifyOtpFailure(email)
+      }
       const recentCode = await prisma.otpCode.findFirst({
         where: { email },
         orderBy: { createdAt: 'desc' },

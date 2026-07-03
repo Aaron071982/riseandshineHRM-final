@@ -19,7 +19,7 @@ export function isSuperAdminEmail(email: string | null | undefined): boolean {
   return getSuperAdminEmails().includes(email.toLowerCase())
 }
 
-/** Fixed OTP `000000` on send + verify — works in development and production. */
+/** Fixed OTP for test accounts — only honored in non-production / localhost (see verify-otp). */
 export const OTP_TEST_ACCOUNT_CODE = '000000'
 
 const OTP_TEST_ACCOUNT_EMAILS = ['hrmtesting@gmail.com', 'aaronsiam22@gmail.com', 'aaronsiam24@gmail.com'] as const

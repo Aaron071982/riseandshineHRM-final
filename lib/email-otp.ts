@@ -107,6 +107,10 @@ export async function verifyOTPEmail(email: string, code: string): Promise<boole
       return false
     }
 
+    if (otp.failedAttempts >= 5) {
+      return false
+    }
+
     const now = new Date()
     if (otp.expiresAt < now) {
       return false
@@ -121,5 +125,20 @@ export async function verifyOTPEmail(email: string, code: string): Promise<boole
     console.error('[auth][email-otp] verifyOTPEmail error', (error as Error)?.message, error)
     return false
   }
+}
+
+/** Latest active OTP for an email — used to block verify after too many failures. */
+export async function isActiveOtpLocked(email: string): Promise<boolean> {
+  const cleanEmail = email.trim().toLowerCase()
+  const latest = await prisma.otpCode.findFirst({
+    where: {
+      email: cleanEmail,
+      used: false,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { failedAttempts: true },
+  })
+  return (latest?.failedAttempts ?? 0) >= 5
 }
 

@@ -1,90 +1,168 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readdir, stat, readFile } from 'fs/promises'
-import { join } from 'path'
 import archiver from 'archiver'
+import { requireRbtSession, validateSession, isAdmin } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
+import { getClientIpFromRequest } from '@/lib/client-ip'
+import { cookies } from 'next/headers'
 
-export async function GET(request: NextRequest) {
-  try {
-    const onboardingFolderPath = join(process.cwd(), 'onboarding documents')
-    
-    // Check if folder exists
-    try {
-      await stat(onboardingFolderPath)
-    } catch {
-      return NextResponse.json(
-        { error: 'Onboarding documents folder not found' },
-        { status: 404 }
-      )
-    }
+export const dynamic = 'force-dynamic'
 
-    // Get all files in the folder
-    const files = await readdir(onboardingFolderPath)
-    const validFiles = []
-    
-    // Check each file
-    for (const file of files) {
-      const filePath = join(onboardingFolderPath, file)
-      const fileStat = await stat(filePath)
-      if (fileStat.isFile()) {
-        validFiles.push({ name: file, path: filePath })
+async function buildOnboardingZip(rbtProfileId: string): Promise<{ zip: Buffer; folderName: string } | null> {
+  const rbt = await prisma.rBTProfile.findUnique({
+    where: { id: rbtProfileId },
+    select: { firstName: true, lastName: true },
+  })
+  if (!rbt) return null
+
+  const [completions, folders] = await Promise.all([
+    prisma.onboardingCompletion.findMany({
+      where: { rbtProfileId, status: 'COMPLETED' },
+      include: { document: true, signatureCertificate: true },
+    }),
+    prisma.employeeDocumentFolder.findMany({ where: { rbtProfileId } }),
+  ])
+
+  const chunks: Buffer[] = []
+  const archive = archiver('zip', { zlib: { level: 9 } })
+  archive.on('data', (c: Buffer) => chunks.push(c))
+
+  const done = new Promise<Buffer>((resolve, reject) => {
+    archive.on('end', () => resolve(Buffer.concat(chunks)))
+    archive.on('error', reject)
+  })
+
+  const folderName = `${rbt.firstName}_${rbt.lastName}`.replace(/\s+/g, '_')
+
+  for (const c of completions) {
+    const sub =
+      c.document.flowType === 'ESIGN' || c.document.flowType === 'NOTICE'
+        ? 'Acknowledgments'
+        : c.document.type === 'FILLABLE_PDF'
+          ? 'Tax_Forms'
+          : 'Documents'
+    const base = `${folderName}/${sub}/${c.document.slug}`
+    if (c.signedPdfUrl && supabaseAdmin) {
+      const { data } = await supabaseAdmin.storage
+        .from(c.storageBucket ?? STORAGE_BUCKET)
+        .download(c.signedPdfUrl)
+      if (data) {
+        const buf = Buffer.from(await data.arrayBuffer())
+        archive.append(buf, { name: `${base}.pdf` })
       }
     }
-
-    if (validFiles.length === 0) {
-      return NextResponse.json(
-        { error: 'No files found in onboarding documents folder' },
-        { status: 404 }
-      )
-    }
-
-    // Create a zip archive
-    const archive = archiver('zip', {
-      zlib: { level: 9 }
-    })
-
-    // Collect all data into a buffer
-    const chunks: Buffer[] = []
-    
-    archive.on('data', (chunk: Buffer) => {
-      chunks.push(chunk)
-    })
-
-    // Add all files to archive
-    for (const file of validFiles) {
-      const fileBuffer = await readFile(file.path)
-      archive.append(fileBuffer, { name: file.name })
-    }
-
-    // Wait for all data to be collected before finalizing
-    return new Promise<NextResponse>((resolve, reject) => {
-      archive.on('end', () => {
-        const buffer = Buffer.concat(chunks)
-        // Convert Buffer to Uint8Array for NextResponse compatibility
-        const uint8Array = new Uint8Array(buffer)
-        resolve(
-          new NextResponse(uint8Array, {
-            headers: {
-              'Content-Type': 'application/zip',
-              'Content-Disposition': 'attachment; filename="onboarding-documents.zip"',
-              'Content-Length': buffer.length.toString(),
-            },
-          })
-        )
+    if (c.signatureCertificate) {
+      archive.append(JSON.stringify(c.signatureCertificate.certificateJson, null, 2), {
+        name: `${base}_certificate.json`,
       })
+    }
+  }
 
-      archive.on('error', (err) => {
-        reject(err)
-      })
-      
-      // Finalize after setting up event handlers
-      archive.finalize()
+  for (const f of folders) {
+    if (f.fileUrl.startsWith('quiz-cert:')) continue
+    if (supabaseAdmin) {
+      const { data } = await supabaseAdmin.storage.from(STORAGE_BUCKET).download(f.fileUrl)
+      if (data) {
+        const buf = Buffer.from(await data.arrayBuffer())
+        archive.append(buf, { name: `${folderName}/Uploads/${f.fileName}` })
+      }
+    }
+  }
+
+  archive.finalize()
+  const zip = await done
+  return { zip, folderName }
+}
+
+async function logOnboardingDownload(params: {
+  userId: string
+  rbtProfileId: string
+  request: NextRequest
+  role: string
+}) {
+  try {
+    await prisma.activityLog.create({
+      data: {
+        userId: params.userId,
+        activityType: 'FORM_SUBMISSION',
+        action: 'Downloaded onboarding package',
+        resourceType: 'rbt_profile',
+        resourceId: params.rbtProfileId,
+        url: '/api/rbt/onboarding-package/download',
+        ipAddress: getClientIpFromRequest(params.request),
+        userAgent: params.request.headers.get('user-agent'),
+        metadata: {
+          rbtProfileId: params.rbtProfileId,
+          accessorRole: params.role,
+          phiAccess: true,
+        },
+      },
     })
-  } catch (error: any) {
-    console.error('Error creating zip:', error)
-    return NextResponse.json(
-      { error: 'Failed to create onboarding package' },
-      { status: 500 }
-    )
+  } catch (error) {
+    console.error('[onboarding-package/download] activity log failed', error)
   }
 }
 
+export async function GET(request: NextRequest) {
+  try {
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get('session')?.value
+    if (!sessionToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const user = await validateSession(sessionToken)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const requestedRbtProfileId = request.nextUrl.searchParams.get('rbtProfileId')
+    let rbtProfileId: string | null = null
+
+    if (requestedRbtProfileId) {
+      if (!isAdmin(user)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      rbtProfileId = requestedRbtProfileId
+    } else if ((user.role ?? '').toUpperCase() === 'RBT' || (user.role ?? '').toUpperCase() === 'CANDIDATE') {
+      const rbtAuth = await requireRbtSession()
+      if (rbtAuth.response) return rbtAuth.response
+      rbtProfileId = rbtAuth.user.rbtProfileId ?? null
+    } else if (isAdmin(user)) {
+      return NextResponse.json(
+        { error: 'Admin downloads require rbtProfileId query parameter' },
+        { status: 400 }
+      )
+    } else {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (!rbtProfileId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const result = await buildOnboardingZip(rbtProfileId)
+    if (!result) {
+      return NextResponse.json({ error: 'Onboarding package not found' }, { status: 404 })
+    }
+
+    await logOnboardingDownload({
+      userId: user.id,
+      rbtProfileId,
+      request,
+      role: user.role,
+    })
+
+    return new NextResponse(new Uint8Array(result.zip), {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${result.folderName}_onboarding.zip"`,
+        'Content-Length': result.zip.length.toString(),
+        'Cache-Control': 'no-store',
+      },
+    })
+  } catch (error) {
+    console.error('[onboarding-package/download]', error)
+    return NextResponse.json({ error: 'Failed to create onboarding package' }, { status: 500 })
+  }
+}

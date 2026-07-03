@@ -1,34 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateOTP } from '@/lib/otp'
 import { sendOTPEmail, storeOTPEmail } from '@/lib/email-otp'
 import { getOtpTestCode, isOtpTestAccount } from '@/lib/constants'
 import { provisionBillingLoginIfNeeded } from '@/lib/billing-portal-users'
-
+import { isOtpBypassEnvironment } from '@/lib/auth/otpBypass'
+import { getClientIpFromRequest } from '@/lib/client-ip'
+import {
+  assertSendOtpRateLimit,
+  recordSendOtpAttempt,
+} from '@/lib/otp-rate-limit'
 
 export async function POST(request: NextRequest) {
-  const logId = `req_${Date.now().toString(36)}`
   try {
     const body = await request.json().catch(() => ({}))
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
-
+    const hostname = request.nextUrl.hostname
+    const ip = getClientIpFromRequest(request)
 
     if (!email || !email.includes('@')) {
-      return NextResponse.json(
-        { error: 'Invalid email address' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid email address' }, { status: 400 })
     }
 
-    // Ensure billing portal users exist before OTP (fixes login when only billing_profiles row exists).
+    const rateLimited = await assertSendOtpRateLimit(email, ip)
+    if (rateLimited) return rateLimited
+
     await provisionBillingLoginIfNeeded(email)
 
-    if (isOtpTestAccount(email)) {
+    if (isOtpTestAccount(email) && isOtpBypassEnvironment(hostname)) {
       const code = getOtpTestCode()
       try {
         await storeOTPEmail(email, code)
       } catch {
         // still allow login with fixed code if store fails
       }
+      await recordSendOtpAttempt(email, ip)
       return NextResponse.json({
         success: true,
         isTestAccount: true,
@@ -36,14 +40,15 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Localhost / development bypass: no email, no OTP table required. Use fixed code 123456.
-    const isDevBypass = process.env.NODE_ENV === 'development'
+    const isDevBypass = isOtpBypassEnvironment(hostname)
     const devBypassCode = '123456'
     if (isDevBypass) {
       try {
         await storeOTPEmail(email, devBypassCode)
-      } catch (storeErr) {
+      } catch {
+        // ignore
       }
+      await recordSendOtpAttempt(email, ip)
       return NextResponse.json({
         success: true,
         isDevBypass: true,
@@ -52,37 +57,42 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      const { generateOTP } = await import('@/lib/otp')
       const code = generateOTP()
       await storeOTPEmail(email, code)
+      await recordSendOtpAttempt(email, ip)
 
       const sent = await sendOTPEmail(email, code)
       if (!sent) {
+        console.warn('[auth][send-otp] OTP stored but email send returned false', { email })
       }
 
-      const isDevMode = !process.env.RESEND_API_KEY
-      return NextResponse.json({
-        success: true,
-        ...(isDevMode && { devOTP: code }),
-      })
+      return NextResponse.json({ success: true })
     } catch (productionErr: unknown) {
       const err = productionErr as Error
       console.error('[auth][send-otp] Production send/store failed', {
         message: err?.message,
         stack: err?.stack?.split('\n').slice(0, 4),
       })
-      // Allow any declared admin/fallback email to get code 123456 when DB or email fails (e.g. missing otp_codes table)
-      const fallbackList = (process.env.ADMIN_FALLBACK_EMAIL ?? '')
-        .split(',')
-        .map((e) => e.trim().toLowerCase())
-        .filter(Boolean)
-      if (fallbackList.length > 0 && fallbackList.includes(email)) {
-        return NextResponse.json({
-          success: true,
-          devOTP: '123456',
-        })
+
+      if (isOtpBypassEnvironment(hostname)) {
+        const fallbackList = (process.env.ADMIN_FALLBACK_EMAIL ?? '')
+          .split(',')
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean)
+        if (fallbackList.length > 0 && fallbackList.includes(email)) {
+          await recordSendOtpAttempt(email, ip)
+          return NextResponse.json({
+            success: true,
+            devOTP: '123456',
+          })
+        }
       }
-      const message = 'Unable to send verification code. Please try again or contact support.'
-      return NextResponse.json({ success: false, error: message }, { status: 503 })
+
+      return NextResponse.json(
+        { success: false, error: 'Unable to send verification code. Please try again or contact support.' },
+        { status: 503 }
+      )
     }
   } catch (error: unknown) {
     const err = error as Error
@@ -99,4 +109,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
