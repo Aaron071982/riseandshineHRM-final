@@ -35,13 +35,12 @@ export default async function RBTLayoutWrapper({
     }
 
     let rbtFirstName: string | null = profile.firstName ?? null
-    let canAccessSessions = false
+    // Sessions & Pay (and time clock) for hired / onboarding-complete RBTs.
+    // Do not gate on Tier A — pay statements must be visible after payroll finalize.
+    let canAccessSessions =
+      profile.status === 'HIRED' || profile.status === 'ONBOARDING_COMPLETED'
     let hasActiveSession = false
     try {
-      if (profile.status === 'HIRED') {
-        canAccessSessions = !!profile.tierACompletedAt
-      }
-
       if (canAccessSessions) {
         const active = await prisma.timeEntry.findFirst({
           where: { rbtProfileId: user.rbtProfileId, clockOutTime: null },

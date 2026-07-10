@@ -23,7 +23,8 @@ export async function POST(
   try {
     const updated = await prisma.$transaction(async (tx) => {
       // Remove employee-visible snapshots before marking unfinalized
-      await deletePayStatementsForCycle(params.id, tx)
+      const deleted = await deletePayStatementsForCycle(params.id, tx)
+      console.log(`[billing/reopen] deleted ${deleted} pay statements for cycle ${params.id}`)
       return tx.billingCycle.update({
         where: { id: params.id },
         data: {
@@ -36,6 +37,7 @@ export async function POST(
 
     await recalculateCyclePayable(params.id)
 
+    console.log(`[billing/reopen] success cycleId=${params.id} status=REVIEW`)
     return NextResponse.json({ cycle: updated })
   } catch (error) {
     console.error('[billing/reopen]', error)

@@ -47,6 +47,7 @@ const mainNavItems = [
 ]
 
 const secondaryNavItems = [
+  { href: '/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
   { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
@@ -60,13 +61,12 @@ const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system
 
 const billingNavItem = { href: '/billing/dashboard', label: 'Billing', icon: DollarSign }
 const operationsNavItem = { href: '/operations', label: 'Operations', icon: LineChart }
-const scheduleNavItem = { href: '/schedule', label: 'Schedule', icon: CalendarDays }
 
 export default function AdminLayout({
   children,
   showBillingNav,
   showOperationsNav,
-  showScheduleNav,
+  showScheduleNav: _showScheduleNav = true,
 }: AdminLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -94,9 +94,8 @@ export default function AdminLayout({
     () => [
       ...(showBillingNav ? [billingNavItem] : []),
       ...(showOperationsNav ? [operationsNavItem] : []),
-      ...(showScheduleNav ? [scheduleNavItem] : []),
     ],
-    [showBillingNav, showOperationsNav, showScheduleNav]
+    [showBillingNav, showOperationsNav]
   )
 
   const moreMenuHasActive = useMemo(() => {
@@ -198,9 +197,13 @@ export default function AdminLayout({
                               ? pathname.startsWith('/billing')
                               : item.href === '/operations'
                                 ? pathname.startsWith('/operations')
-                                : pathname === item.href
+                                : item.href === '/schedule'
+                                  ? pathname.startsWith('/schedule')
+                                  : pathname === item.href
                         const isTealPortal =
-                          item.href === '/billing/dashboard' || item.href === '/operations'
+                          item.href === '/billing/dashboard' ||
+                          item.href === '/operations' ||
+                          item.href === '/schedule'
                         return (
                           <Link
                             key={item.href}
@@ -271,9 +274,13 @@ export default function AdminLayout({
                     ? pathname.startsWith('/billing')
                     : item.href === '/operations'
                       ? pathname.startsWith('/operations')
-                      : pathname === item.href
+                      : item.href === '/schedule'
+                        ? pathname.startsWith('/schedule')
+                        : pathname === item.href
               const isTealPortal =
-                item.href === '/billing/dashboard' || item.href === '/operations'
+                item.href === '/billing/dashboard' ||
+                item.href === '/operations' ||
+                item.href === '/schedule'
               const Icon = item.icon
               return (
                 <Link

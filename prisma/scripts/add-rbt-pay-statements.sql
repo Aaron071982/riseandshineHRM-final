@@ -95,5 +95,11 @@ REVOKE ALL ON TABLE "rbt_pay_statements" FROM anon;
 REVOKE ALL ON TABLE "rbt_pay_statements" FROM authenticated;
 REVOKE ALL ON TABLE "rbt_pay_statement_sessions" FROM anon;
 REVOKE ALL ON TABLE "rbt_pay_statement_sessions" FROM authenticated;
-GRANT ALL ON TABLE "rbt_pay_statements" TO postgres, service_role;
-GRANT ALL ON TABLE "rbt_pay_statement_sessions" TO postgres, service_role;
+-- Optional: DB-side default if app omits id (safe if extension already present)
+DO $$ BEGIN
+  ALTER TABLE "rbt_pay_statement_sessions"
+    ALTER COLUMN "id" SET DEFAULT encode(gen_random_bytes(12), 'hex');
+EXCEPTION WHEN others THEN
+  NULL;
+END $$;
+
