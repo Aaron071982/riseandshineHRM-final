@@ -537,6 +537,52 @@ export async function GET(request: NextRequest) {
     }
     }
 
+    // ——— §195(6) termination notice deadline alerts ———
+    const twoDaysFromNow = new Date(now.getTime() + 2 * dayMs)
+    const pendingTerminationNotices = await prisma.termination.findMany({
+      where: {
+        noticeIssuedAt: null,
+        status: { in: ['PENDING_TASKS', 'INITIATED'] },
+        noticeDeadline: { lte: twoDaysFromNow },
+      },
+      include: {
+        rbtProfile: { select: { id: true, firstName: true, lastName: true } },
+      },
+    })
+    if (pendingTerminationNotices.length > 0) {
+      const termAdmins = await prisma.user.findMany({
+        where: { role: 'ADMIN', isActive: true },
+        select: { id: true, email: true },
+      })
+      for (const term of pendingTerminationNotices) {
+        const name = `${term.rbtProfile.firstName} ${term.rbtProfile.lastName}`
+        const profileUrl = makePublicUrl(`/admin/rbts/${term.rbtProfileId}`)
+        const overdue = term.noticeDeadline < now
+        const msg = overdue
+          ? `§195(6) notice OVERDUE for ${name}`
+          : `§195(6) notice due within 2 days for ${name}`
+        const subject = overdue
+          ? `OVERDUE: §195(6) notice for ${name}`
+          : `Reminder: §195(6) notice deadline for ${name}`
+        const html = `<p>${msg}</p><p>Deadline: <strong>${term.noticeDeadline.toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</strong></p><p><a href="${profileUrl}">Open profile &amp; offboarding</a></p>`
+        for (const admin of termAdmins) {
+          if (admin.email) {
+            sendGenericEmail(admin.email, subject, `<div style="font-family:sans-serif">${html}</div>`).catch(() => {})
+          }
+          await prisma.adminNotification
+            .create({
+              data: {
+                userId: admin.id,
+                type: 'TERMINATION_NOTICE_DUE',
+                message: msg,
+                linkUrl: profileUrl,
+              },
+            })
+            .catch(() => {})
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       sections: sections.map((s) => ({ title: s.title, count: s.rows.length })),

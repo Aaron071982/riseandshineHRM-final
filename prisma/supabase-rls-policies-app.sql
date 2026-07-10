@@ -29,7 +29,13 @@ DECLARE
     'payroll_only_people',
     'billing_hours_confirmations',
     'email_blast_campaigns',
-    'email_blast_send_logs'
+    'email_blast_send_logs',
+    'terminations',
+    'offboarding_tasks',
+    'termination_documents',
+    'rbt_schedule_assignments',
+    'rbt_pay_statements',
+    'rbt_pay_statement_sessions'
   ];
   pol_name text;
 BEGIN

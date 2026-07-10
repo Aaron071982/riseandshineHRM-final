@@ -5,7 +5,7 @@ import { requireAdminSession } from '@/lib/auth'
 import { sendEmail, generateManualHireOnboardingEmail, EmailTemplateType } from '@/lib/email'
 import { geocodeAddress } from '@/lib/mapbox-geocode'
 
-const RBT_STATUSES = ['NEW', 'REACH_OUT', 'REACH_OUT_EMAIL_SENT', 'TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'HIRED', 'ONBOARDING_COMPLETED', 'STALLED', 'REJECTED'] as const
+const RBT_STATUSES = ['NEW', 'REACH_OUT', 'REACH_OUT_EMAIL_SENT', 'TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'HIRED', 'ONBOARDING_COMPLETED', 'STALLED', 'REJECTED', 'FIRED'] as const
 
 export async function GET(request: NextRequest) {
   try {

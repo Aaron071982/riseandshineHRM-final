@@ -1,0 +1,8 @@
+[
+  ["Report Title", "", ""],
+  ["Case Number", "Status", "Case : Claim : Status", "Client", "Client ID", "Provider Name", "Case : Provider Role", "Insurance", "Practice Procedure Code", "DOS", "Unit", "Actual Unit", "Billed Amount", "Practice Fee", "Claim", "Case : Claim : Claim Total Paid Amount"],
+  ["C001", "Completed", "Paid", "Client A", "A1", "Provider One", "RBT", "NY Medicaid", "97153", "6/1/2026", 4, 4, 100, 57.8, "CLM-100", 50],
+  ["C001", "", "", "Client A", "A1", "Provider One", "RBT", "NY Medicaid", "97153", "6/2/2026", 4, 4, 100, 57.8, "CLM-100", 50],
+  ["C002", "Ready to Bill", "Submitted", "Client B", "B1", "Provider Two", "RBT", "Aetna", "97153", "6/3/2026", 4, 4, 80, 72.16, "", ""],
+  ["C002", "", "Submitted", "Client B", "B1", "Provider Two", "RBT", "Aetna", "97153", "6/4/2026", 4, 4, 80, 72.16, "CLM-200", 0]
+]

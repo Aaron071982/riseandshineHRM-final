@@ -294,6 +294,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // RBT users: block terminated profiles
+    if (normalizeLoginRole(user.role) === 'RBT' && user.rbtProfile?.status === 'FIRED') {
+      return NextResponse.json(
+        {
+          error:
+            'Your email is not yet associated with an active Rise and Shine account. Please contact an administrator.',
+        },
+        { status: 403 }
+      )
+    }
+
     // RBT users: keep email in sync with profile
     if (normalizeLoginRole(user.role) === 'RBT') {
       // Ensure email matches RBTProfile email if available

@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Circle, MinusCircle } from 'lucide-react'
 
-type RBTStatus = 'NEW' | 'REACH_OUT' | 'REACH_OUT_EMAIL_SENT' | 'TO_INTERVIEW' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_COMPLETED' | 'HIRED' | 'ONBOARDING_COMPLETED' | 'STALLED' | 'REJECTED'
+type RBTStatus = 'NEW' | 'REACH_OUT' | 'REACH_OUT_EMAIL_SENT' | 'TO_INTERVIEW' | 'INTERVIEW_SCHEDULED' | 'INTERVIEW_COMPLETED' | 'HIRED' | 'ONBOARDING_COMPLETED' | 'STALLED' | 'REJECTED' | 'FIRED' | 'FIRED'
 
 interface StatusManagerProps {
   rbtId: string
@@ -19,6 +19,7 @@ const TIMELINE_STEPS: Array<{ status: RBTStatus; label: string }> = [
   { status: 'ONBOARDING_COMPLETED', label: 'Onboarding Completed' },
   { status: 'STALLED', label: 'Stalled' },
   { status: 'REJECTED', label: 'Rejected' },
+  { status: 'FIRED', label: 'Fired' },
 ]
 
 const ORDER: Record<RBTStatus, number> = {
@@ -32,11 +33,12 @@ const ORDER: Record<RBTStatus, number> = {
   ONBOARDING_COMPLETED: 5,
   STALLED: 4,
   REJECTED: 4,
+  FIRED: 5,
 }
 
 export default function StatusManager({ initialStatus }: StatusManagerProps) {
   const currentOrder = ORDER[initialStatus] ?? -1
-  const isOutcome = initialStatus === 'HIRED' || initialStatus === 'ONBOARDING_COMPLETED' || initialStatus === 'STALLED' || initialStatus === 'REJECTED'
+  const isOutcome = initialStatus === 'HIRED' || initialStatus === 'ONBOARDING_COMPLETED' || initialStatus === 'STALLED' || initialStatus === 'REJECTED' || initialStatus === 'FIRED'
 
   return (
     <div className="space-y-4">
@@ -46,7 +48,7 @@ export default function StatusManager({ initialStatus }: StatusManagerProps) {
           const stepOrder = ORDER[step.status]
           const isCompleted = currentOrder > stepOrder || (currentOrder === stepOrder && step.status === initialStatus)
           const isCurrent = step.status === initialStatus
-          const isOutcomeStep = step.status === 'HIRED' || step.status === 'ONBOARDING_COMPLETED' || step.status === 'STALLED' || step.status === 'REJECTED'
+          const isOutcomeStep = step.status === 'HIRED' || step.status === 'ONBOARDING_COMPLETED' || step.status === 'STALLED' || step.status === 'REJECTED' || step.status === 'FIRED'
           const showOutcome = isOutcome && isOutcomeStep && step.status === initialStatus
 
           if (isOutcomeStep && !showOutcome && !isCurrent) {

@@ -44,6 +44,7 @@ const KANBAN_COLUMNS: { id: string; label: string; statuses: string[] }[] = [
   { id: 'HIRED', label: 'Hired', statuses: ['HIRED'] },
   { id: 'ONBOARDING_COMPLETED', label: 'Onboarding Completed', statuses: ['ONBOARDING_COMPLETED'] },
   { id: 'REJECTED', label: 'Rejected', statuses: ['REJECTED'] },
+  { id: 'FIRED', label: 'Fired', statuses: ['FIRED'] },
   { id: 'STALLED', label: 'Stalled', statuses: ['STALLED'] },
 ]
 

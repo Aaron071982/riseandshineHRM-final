@@ -117,6 +117,9 @@ export interface RBTProfile {
   postHireStage?: string | null
   activeWorkingSince?: Date | string | null
   activeWorkingManualOverride?: boolean
+  terminationReason?: string | null
+  terminatedAt?: Date | string | null
+  terminatedBy?: string | null
   createdAt: Date
   updatedAt: Date
   user: {

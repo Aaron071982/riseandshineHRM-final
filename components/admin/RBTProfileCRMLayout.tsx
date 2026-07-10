@@ -23,6 +23,7 @@ import {
   FolderOpen,
   Grid3x3,
   List,
+  CalendarClock,
 } from 'lucide-react'
 import {
   Dialog,
@@ -57,6 +58,9 @@ import AuditLog from '@/components/admin/AuditLog'
 import AvailabilityGridPreview from '@/components/admin/rbt-profile/AvailabilityGridPreview'
 import AdminRbtAvailabilityDialog from '@/components/admin/rbt-profile/AdminRbtAvailabilityDialog'
 import EditProfileForm from '@/components/admin/rbt-profile/EditProfileForm'
+import TerminateRbtButton, { canTerminateRbt } from '@/components/admin/TerminateRbtButton'
+import TerminationOffboardingPanel from '@/components/admin/TerminationOffboardingPanel'
+import AdminRbtSchedulePanel from '@/components/admin/AdminRbtSchedulePanel'
 import type { RBTProfile } from './rbt-profile/types'
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {
@@ -70,19 +74,25 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; darkBg: string; 
   ONBOARDING_COMPLETED: { bg: 'bg-emerald-50', text: 'text-emerald-700', darkBg: 'dark:bg-[var(--status-hired-bg)]', darkText: 'dark:text-[var(--status-hired-text)]' },
   STALLED: { bg: 'bg-gray-100', text: 'text-gray-600', darkBg: 'dark:bg-[var(--bg-elevated)]', darkText: 'dark:text-[var(--text-tertiary)]' },
   REJECTED: { bg: 'bg-red-50', text: 'text-red-700', darkBg: 'dark:bg-[var(--status-rejected-bg)]', darkText: 'dark:text-[var(--status-rejected-text)]' },
+  FIRED: { bg: 'bg-red-100', text: 'text-red-800', darkBg: 'dark:bg-[var(--status-rejected-bg)]', darkText: 'dark:text-[var(--status-rejected-text)]' },
 }
 
-const RBT_STATUSES = ['NEW', 'REACH_OUT', 'REACH_OUT_EMAIL_SENT', 'TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'HIRED', 'ONBOARDING_COMPLETED', 'STALLED', 'REJECTED'] as const
+const RBT_STATUSES = ['NEW', 'REACH_OUT', 'REACH_OUT_EMAIL_SENT', 'TO_INTERVIEW', 'INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'HIRED', 'ONBOARDING_COMPLETED', 'STALLED', 'REJECTED', 'FIRED'] as const
 type RBTStatus = (typeof RBT_STATUSES)[number]
 
-const TABS = [
+const BASE_TABS = [
   { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'availability', label: 'Availability', icon: Grid3x3 },
+  { id: 'scheduling', label: 'Scheduling', icon: CalendarClock },
   { id: 'interviews', label: 'Interviews', icon: Calendar },
   { id: 'onboarding', label: 'Onboarding', icon: CheckCircle2 },
   { id: 'documents', label: 'Documents', icon: FolderOpen },
   { id: 'audit', label: 'Audit Log', icon: List },
 ] as const
+
+const REASON_TAB = { id: 'reason', label: 'Reason', icon: FileText } as const
+
+type ProfileTabId = (typeof BASE_TABS)[number]['id'] | typeof REASON_TAB.id
 
 interface RBTProfileCRMLayoutProps {
   rbtProfile: RBTProfile
@@ -99,7 +109,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
   const [rbtProfile, setRbtProfile] = useState(initialRbtProfile)
   const [loading, setLoading] = useState(false)
   const [ids, setIds] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]['id']>('activity')
+  const [activeTab, setActiveTab] = useState<ProfileTabId>(initialRbtProfile.status === 'FIRED' ? 'reason' : 'activity')
   const [auditLogs, setAuditLogs] = useState<Array<{ id: string; auditType: string; dateTime: string; notes: string | null; createdBy: string | null }>>([])
   const [emailLogs, setEmailLogs] = useState<Array<{ id: string; templateType: string; sentAt: string; toEmail: string; subject: string }>>([])
   const [documents, setDocuments] = useState<Array<{ id: string; fileName: string; fileType: string; documentType: string | null; uploadedAt: Date }>>(initialRbtProfile.documents || [])
@@ -677,8 +687,9 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
   const canScheduleInterview = ['TO_INTERVIEW', 'REACH_OUT', 'REACH_OUT_EMAIL_SENT'].includes(rbtProfile.status)
   const canHire = rbtProfile.status === 'INTERVIEW_COMPLETED'
   const canStall = rbtProfile.status === 'INTERVIEW_COMPLETED'
-  const canReject = rbtProfile.status !== 'HIRED' && rbtProfile.status !== 'REJECTED'
+  const canReject = rbtProfile.status !== 'HIRED' && rbtProfile.status !== 'REJECTED' && rbtProfile.status !== 'FIRED'
   const isHired = rbtProfile.status === 'HIRED'
+  const canTerminate = canTerminateRbt(rbtProfile.status)
   const incompleteTasks = rbtProfile.onboardingTasks.filter((t) => !t.isCompleted)
   const ssnOnboardingTask = rbtProfile.onboardingTasks.find((t) => t.taskType === 'SOCIAL_SECURITY_DOCUMENT')
   const catalogSsnComplete = rbtProfile.onboardingCompletions?.some(
@@ -698,6 +709,11 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
 
   const isActivelyWorking = rbtProfile.postHireStage === 'ACTIVE_DELIVERY'
   const clientAssignmentCount = clientAssignments.length
+  const isFired = rbtProfile.status === 'FIRED'
+  const profileTabs = useMemo(
+    () => (isFired ? [BASE_TABS[0], REASON_TAB, ...BASE_TABS.slice(1)] : [...BASE_TABS]),
+    [isFired]
+  )
 
   const handleMarkActivelyWorking = async () => {
     setActiveWorkingLoading(true)
@@ -1113,6 +1129,26 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                 {canHire && <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleHire} disabled={loading}>Hire</Button>}
                 {canStall && <Button size="sm" variant="outline" onClick={handleStall} disabled={loading}>Stall</Button>}
                 {canReject && <Button size="sm" variant="destructive" onClick={handleReject} disabled={loading || !rbtProfile.email}>Reject</Button>}
+                {canTerminate && (
+                  <TerminateRbtButton
+                    rbtId={rbtProfile.id}
+                    displayName={`${rbtProfile.firstName} ${rbtProfile.lastName}`}
+                    status={rbtProfile.status}
+                    email={rbtProfile.email}
+                    onTerminated={({ reason, terminatedAt }) => {
+                      setRbtProfile({
+                        ...rbtProfile,
+                        status: 'FIRED',
+                        postHireStage: 'MATCHING',
+                        activeWorkingSince: null,
+                        terminationReason: reason,
+                        terminatedAt,
+                      })
+                      setActiveTab('reason')
+                      fetchAuditLogs()
+                    }}
+                  />
+                )}
                 <Button size="sm" variant="outline" onClick={() => setSendEmailDialogOpen(true)} disabled={loading}><Mail className="h-4 w-4 mr-1" />Send Email</Button>
                 {rbtProfile.resumeUrl && (
                   <Button
@@ -1300,7 +1336,7 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
         {/* Right panel - 2/3 tabs */}
         <main className="flex-1 min-w-0 order-2 lg:order-2">
           <div className="flex border-b border-gray-200 dark:border-[var(--border-subtle)] mb-4 overflow-x-auto">
-            {TABS.map((tab) => (
+            {profileTabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -1318,6 +1354,33 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
           </div>
 
           <div className="transition-opacity duration-200">
+            {activeTab === 'reason' && (
+              <div className="space-y-4">
+                <Card className="border border-red-200 dark:border-[var(--status-rejected-border)] bg-white dark:bg-[var(--bg-elevated)]">
+                  <CardHeader className="py-3">
+                    <CardTitle className="text-lg font-semibold text-red-700 dark:text-[var(--status-rejected-text)]">
+                      Termination reason
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0 space-y-4">
+                    {rbtProfile.terminationReason ? (
+                      <p className="text-sm text-gray-800 dark:text-[var(--text-primary)] whitespace-pre-wrap">
+                        {rbtProfile.terminationReason}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)]">No reason recorded.</p>
+                    )}
+                    <div className="text-xs text-gray-500 dark:text-[var(--text-disabled)] space-y-1 border-t border-gray-200 dark:border-[var(--border-subtle)] pt-4">
+                      {rbtProfile.terminatedAt && (
+                        <p>Terminated on {formatDateTime(rbtProfile.terminatedAt)}</p>
+                      )}
+                      {rbtProfile.terminatedBy && <p>Recorded by {rbtProfile.terminatedBy}</p>}
+                    </div>
+                  </CardContent>
+                </Card>
+                <TerminationOffboardingPanel rbtProfileId={rbtProfile.id} />
+              </div>
+            )}
             {activeTab === 'activity' && (
               <ActivityTab
                 rbtProfile={rbtProfile}
@@ -1449,6 +1512,12 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                   </div>
                 </CardContent>
               </Card>
+            )}
+            {activeTab === 'scheduling' && (
+              <AdminRbtSchedulePanel
+                rbtProfileId={rbtProfile.id}
+                rbtName={`${rbtProfile.firstName} ${rbtProfile.lastName}`}
+              />
             )}
             {activeTab === 'interviews' && (
               <div className="space-y-4">

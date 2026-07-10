@@ -67,7 +67,7 @@ function durationLabelFromHours(totalHours: number | null): string {
   return formatDurationHM(Math.round(totalHours * 3600))
 }
 
-export default function RBTSessionsPage() {
+export default function RBTSessionsPage({ title = 'Sessions' }: { title?: string }) {
   const { showToast } = useToast()
   const [now, setNow] = useState(new Date())
   const [clockInEpochMs, setClockInEpochMs] = useState<number | null>(null)
@@ -168,7 +168,7 @@ export default function RBTSessionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)]">Sessions</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)]">{title}</h1>
         <p className="text-gray-600 dark:text-[var(--text-tertiary)]">Clock in/out and review your recent session history.</p>
       </div>
 

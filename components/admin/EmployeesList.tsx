@@ -81,6 +81,7 @@ const statusColors: Record<string, { bg: string; text: string; darkBg: string; d
   ONBOARDING_COMPLETED: { bg: 'bg-emerald-50', text: 'text-emerald-700', darkBg: 'dark:bg-[var(--status-hired-bg)]', darkText: 'dark:text-[var(--status-hired-text)]' },
   STALLED: { bg: 'bg-gray-100', text: 'text-gray-600', darkBg: 'dark:bg-[var(--bg-elevated)]', darkText: 'dark:text-[var(--text-tertiary)]' },
   REJECTED: { bg: 'bg-red-50', text: 'text-red-700', darkBg: 'dark:bg-[var(--status-rejected-bg)]', darkText: 'dark:text-[var(--status-rejected-text)]' },
+  FIRED: { bg: 'bg-red-100', text: 'text-red-800', darkBg: 'dark:bg-[var(--status-rejected-bg)]', darkText: 'dark:text-[var(--status-rejected-text)]' },
 }
 
 const TYPE_OPTIONS: { value: EmployeeListType; label: string }[] = [
@@ -305,6 +306,7 @@ export default function EmployeesList({
                     <SelectItem value="ONBOARDING_COMPLETED">Onboarding Completed</SelectItem>
                     <SelectItem value="STALLED">Stalled</SelectItem>
                     <SelectItem value="REJECTED">Rejected</SelectItem>
+                    <SelectItem value="FIRED">Fired</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={workFilter || 'all'} onValueChange={(v) => handleWorkFilterChange(v === 'all' ? '' : v)}>

@@ -67,11 +67,45 @@ enum RBTStatus {
   ONBOARDING_COMPLETED
   STALLED
   REJECTED
+  FIRED
 }
 
 enum PostHireStage {
   MATCHING
   ACTIVE_DELIVERY
+}
+
+enum TerminationReason {
+  PERFORMANCE
+  CONDUCT
+  ATTENDANCE
+  POLICY_VIOLATION
+  RESTRUCTURING
+  END_OF_ASSIGNMENT
+  VOLUNTARY
+  OTHER
+}
+
+enum TerminationStatus {
+  INITIATED
+  PENDING_TASKS
+  COMPLETED
+}
+
+enum OffboardingTaskType {
+  DISABLE_HRM_ACCESS
+  REVOKE_PHI_EHR_ACCESS
+  DISABLE_EMAIL_SSO
+  COLLECT_PROPERTY
+  REASSIGN_CLIENTS
+  NOTIFY_SUPERVISOR
+  REMOVE_FROM_ROSTER
+  CONFIRM_OPEN_NOTES
+  ISSUE_195_6_NOTICE
+  ISSUE_IA_12_3
+  TRIGGER_COBRA
+  PROCESS_FINAL_PAY
+  FILE_DOCUMENTS
 }
 
 enum InterviewStatus {
@@ -376,6 +410,8 @@ model User {
   billingCyclesFinalized     BillingCycle[]              @relation("BillingCycleFinalizedBy")
   emailBlastsSent            EmailBlastCampaign[]        @relation("EmailBlastSentBy")
   artemisSessionRequestsResolved ArtemisSessionRequest[] @relation("ArtemisSessionRequestResolvedBy")
+  terminationsDecided          Termination[]             @relation("TerminationDecisionMaker")
+  rbtScheduleAssignmentsCreated RbtScheduleAssignment[]  @relation("RbtScheduleAssignmentCreatedBy")
 
   @@map("users")
 }
@@ -655,6 +691,9 @@ model RBTProfile {
   postHireStage               PostHireStage?
   activeWorkingSince          DateTime?
   activeWorkingManualOverride Boolean                    @default(false)
+  terminationReason           String?                    @db.Text
+  terminatedAt                DateTime?
+  terminatedBy                String?
   quizAttempts                OnboardingQuizAttempt[]
   quizCertificates            OnboardingQuizCertificate[]
   oigScreeningLogs            OigScreeningLog[]
@@ -665,6 +704,9 @@ model RBTProfile {
   billingEntries              BillingEntry[]
   billingHoursConfirmations   BillingHoursConfirmation[]
   emailBlastSendLogs          EmailBlastSendLog[]
+  termination                 Termination?
+  scheduleAssignments         RbtScheduleAssignment[]
+  payStatements               RbtPayStatement[]
 
   @@index([artemisTrainingCompleted])
   @@index([postHireStage])
@@ -1346,6 +1388,101 @@ model RBTAuditLog {
   @@map("rbt_audit_logs")
 }
 
+/// Admin-entered weekly planning schedule for an RBT (standalone — not Artemis/payroll).
+model RbtScheduleAssignment {
+  id           String   @id @default(cuid())
+  rbtProfileId String
+  clientName   String
+  dayOfWeek    Int
+  startTime    String
+  endTime      String
+  location     String?
+  notes        String?  @db.Text
+  isActive     Boolean  @default(true)
+  createdBy    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  rbtProfile  RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  createdByUser User     @relation("RbtScheduleAssignmentCreatedBy", fields: [createdBy], references: [id])
+
+  @@index([rbtProfileId, isActive])
+  @@index([rbtProfileId, dayOfWeek])
+  @@map("rbt_schedule_assignments")
+}
+
+model Termination {
+  id                  String            @id @default(cuid())
+  rbtProfileId        String            @unique
+  status              TerminationStatus @default(PENDING_TASKS)
+  reason              TerminationReason
+  reasonNarrative     String?           @db.Text
+  decisionMakerId     String
+  decisionDate        DateTime          @default(now())
+  terminationDate     DateTime
+  lastDayWorked       DateTime
+  benefitsEndDate     DateTime
+  finalPayDate        DateTime
+  noticeDeadline      DateTime
+  noticeIssuedAt      DateTime?
+  counselConsulted    Boolean           @default(false)
+  reasonDocumented    Boolean           @default(false)
+  consistencyChecked  Boolean           @default(false)
+  redFlagPresent      Boolean           @default(false)
+  contractChecked     Boolean           @default(false)
+  regularWages        String?
+  overtimeOwed        String?
+  commissionsOwed     String?
+  ptoPayout           String?
+  deductions          String?
+  netFinalPay         String?
+  otherBenefitName    String?
+  otherBenefitEndDate DateTime?
+  ehrSystemName       String?
+  propertyList        String?           @db.Text
+  coveragePlan        String?           @db.Text
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  rbtProfile    RBTProfile            @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  decisionMaker User                  @relation("TerminationDecisionMaker", fields: [decisionMakerId], references: [id])
+  tasks         OffboardingTask[]
+  documents     TerminationDocument[]
+
+  @@index([status, noticeDeadline])
+  @@map("terminations")
+}
+
+model OffboardingTask {
+  id            String              @id @default(cuid())
+  terminationId String
+  type          OffboardingTaskType
+  completed     Boolean             @default(false)
+  completedById String?
+  completedAt   DateTime?
+  notes         String?             @db.Text
+
+  termination Termination @relation(fields: [terminationId], references: [id], onDelete: Cascade)
+
+  @@index([terminationId, completed])
+  @@map("offboarding_tasks")
+}
+
+model TerminationDocument {
+  id            String   @id @default(cuid())
+  terminationId String
+  docType       String
+  storagePath   String
+  contentHtml   String?  @db.Text
+  fileName      String?
+  generatedAt   DateTime @default(now())
+
+  termination Termination @relation(fields: [terminationId], references: [id], onDelete: Cascade)
+
+  @@index([terminationId, docType])
+  @@map("termination_documents")
+}
+
 model ActivityLog {
   id           String       @id @default(cuid())
   userId       String
@@ -1776,6 +1913,7 @@ model BillingCycle {
   finalizedBy User?          @relation("BillingCycleFinalizedBy", fields: [finalizedById], references: [id])
   entries     BillingEntry[]
   hoursConfirmations BillingHoursConfirmation[]
+  payStatements RbtPayStatement[]
 
   @@index([status])
   @@map("billing_cycles")
@@ -1873,6 +2011,54 @@ model BillingHoursConfirmation {
   @@map("billing_hours_confirmations")
 }
 
+/// Snapshot of an RBT's pay for a finalized billing cycle (immutable after finalize; updated only on re-finalize).
+model RbtPayStatement {
+  id                 String   @id @default(cuid())
+  rbtProfileId       String
+  billingCycleId     String
+  periodStart        DateTime @db.Date
+  periodEnd          DateTime @db.Date
+  payableStatuses     String[]
+  completedHours     Float    @default(0)
+  readyToBillHours   Float    @default(0)
+  incompleteHours    Float    @default(0)
+  inProgressHours    Float    @default(0)
+  scheduledHours     Float    @default(0)
+  payableHours       Float    @default(0)
+  hourlyRate         Float
+  grossPay           Float    @default(0)
+  adjustment         Float    @default(0)
+  finalPay           Float    @default(0)
+  status             String   @default("FINALIZED")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  rbtProfile   RBTProfile               @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  billingCycle BillingCycle             @relation(fields: [billingCycleId], references: [id], onDelete: Cascade)
+  sessions     RbtPayStatementSession[]
+
+  @@unique([rbtProfileId, billingCycleId])
+  @@index([rbtProfileId, status])
+  @@index([billingCycleId])
+  @@map("rbt_pay_statements")
+}
+
+model RbtPayStatementSession {
+  id             String   @id @default(cuid())
+  payStatementId String
+  clientName     String
+  dos            DateTime @db.Date
+  status         String
+  hours          Float
+  procedureCode  String?
+  isPayable      Boolean  @default(false)
+
+  payStatement RbtPayStatement @relation(fields: [payStatementId], references: [id], onDelete: Cascade)
+
+  @@index([payStatementId])
+  @@map("rbt_pay_statement_sessions")
+}
+
 enum EmailBlastSendStatus {
   SENT
   FAILED
@@ -1914,3 +2100,95 @@ model EmailBlastSendLog {
   @@index([email])
   @@map("email_blast_send_logs")
 }
+
+// ─── Weekly scheduling module (recurring session slots) ─────────────────────
+
+enum ScheduleDayOfWeek {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
+enum ScheduleSlotStatus {
+  CONFIRMED
+  TENTATIVE
+  NEEDS_REVIEW
+  CANCELLED
+}
+
+enum ScheduleTherapistRole {
+  RBT
+  BT
+  BCBA
+  BCaBA
+  CLINICAL_DIRECTOR
+}
+
+model ScheduleAllowedUser {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("schedule_allowed_user")
+}
+
+model ScheduleTherapist {
+  id        String                @id @default(cuid())
+  name      String
+  email     String?               @unique
+  role      ScheduleTherapistRole @default(RBT)
+  colorKey  Int?
+  active    Boolean               @default(true)
+  slots     ScheduleSessionSlot[]
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@index([active])
+  @@map("therapist")
+}
+
+model ScheduleWeeklyClient {
+  id                     String                @id @default(cuid())
+  code                   String?               @unique
+  name                   String
+  insurance              String?
+  bcba                   String?
+  authorizedHoursPerWeek Decimal?              @db.Decimal(5, 2)
+  active                 Boolean               @default(true)
+  slots                  ScheduleSessionSlot[]
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  @@index([active])
+  @@map("schedule_client")
+}
+
+model ScheduleSessionSlot {
+  id             String               @id @default(cuid())
+  therapistId    String
+  clientId       String
+  day            ScheduleDayOfWeek
+  startMin       Int
+  endMin         Int
+  status         ScheduleSlotStatus   @default(CONFIRMED)
+  procedureCode  String               @default("97153")
+  placeOfService String               @default("12-Home")
+  note           String?
+  createdBy      String?
+  updatedBy      String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  therapist      ScheduleTherapist     @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  client         ScheduleWeeklyClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([therapistId, clientId, day, startMin])
+  @@index([therapistId])
+  @@index([clientId])
+  @@index([day])
+  @@map("session_slot")
+}
+

@@ -71,7 +71,7 @@ export default function RBTLayout({
 
   const messageContextValue = { openMessageModal: () => setMessageModalOpen(true) }
   const navItems = canAccessSessions
-    ? [...baseNavItems.slice(0, 3), { href: '/rbt/sessions', label: 'Sessions', icon: Timer }, ...baseNavItems.slice(3)]
+    ? [...baseNavItems.slice(0, 3), { href: '/rbt/sessions', label: 'Sessions & Pay', icon: Timer }, ...baseNavItems.slice(3)]
     : baseNavItems
 
   return (

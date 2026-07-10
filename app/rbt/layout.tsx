@@ -25,22 +25,21 @@ export default async function RBTLayoutWrapper({
       redirect('/')
     }
 
-    let rbtFirstName: string | null = null
+    const profile = await prisma.rBTProfile.findUnique({
+      where: { id: user.rbtProfileId },
+      select: { id: true, firstName: true, status: true, tierACompletedAt: true },
+    })
+
+    if (!profile || profile.status === 'FIRED') {
+      redirect('/')
+    }
+
+    let rbtFirstName: string | null = profile.firstName ?? null
     let canAccessSessions = false
     let hasActiveSession = false
     try {
-      const profile = await prisma.rBTProfile.findUnique({
-        where: { id: user.rbtProfileId },
-        select: { id: true, firstName: true, status: true },
-      })
-      rbtFirstName = profile?.firstName ?? null
-
-      if (profile?.status === 'HIRED') {
-        const rbt = await prisma.rBTProfile.findUnique({
-          where: { id: profile.id },
-          select: { tierACompletedAt: true },
-        })
-        canAccessSessions = !!rbt?.tierACompletedAt
+      if (profile.status === 'HIRED') {
+        canAccessSessions = !!profile.tierACompletedAt
       }
 
       if (canAccessSessions) {

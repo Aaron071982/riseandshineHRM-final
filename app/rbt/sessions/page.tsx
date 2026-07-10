@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
+import RbtSessionsPayPage from '@/components/rbt/RbtSessionsPayPage'
 import RBTSessionsPage from '@/components/rbt/RBTSessionsPage'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +15,7 @@ export default async function SessionsPage() {
   if (!sessionToken) redirect('/')
 
   const user = await validateSession(sessionToken)
-  if (!user || user.role !== 'RBT' || !user.rbtProfileId) {
+  if (!user || (user.role !== 'RBT' && user.role !== 'CANDIDATE') || !user.rbtProfileId) {
     redirect('/')
   }
 
@@ -22,26 +23,16 @@ export default async function SessionsPage() {
     where: { id: user.rbtProfileId },
     select: { id: true, status: true },
   })
-  if (!profile || profile.status !== 'HIRED') {
+  if (!profile || (profile.status !== 'HIRED' && profile.status !== 'ONBOARDING_COMPLETED')) {
     redirect('/rbt/dashboard')
   }
 
-  const [tasks, completedDocs, totalDocs] = await Promise.all([
-    prisma.onboardingTask.findMany({
-      where: { rbtProfileId: profile.id },
-      select: { isCompleted: true },
-    }),
-    prisma.onboardingCompletion.count({
-      where: { rbtProfileId: profile.id, status: 'COMPLETED' },
-    }),
-    prisma.onboardingDocument.count({ where: { isActive: true } }),
-  ])
-  const completedTasks = tasks.filter((t) => t.isCompleted).length
-  const totalSteps = tasks.length + totalDocs
-  const completedSteps = completedTasks + completedDocs
-  if (!(totalSteps > 0 && completedSteps >= totalSteps)) {
-    redirect('/rbt/dashboard')
-  }
-
-  return <RBTSessionsPage />
+  return (
+    <div className="space-y-10">
+      <RbtSessionsPayPage />
+      <div className="border-t border-gray-200 pt-8">
+        <RBTSessionsPage title="Time clock" />
+      </div>
+    </div>
+  )
 }

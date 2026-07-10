@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Bell, UserPlus, CalendarCheck, PartyPopper, AlertCircle, Loader2, Calendar, Hand, Clock } from 'lucide-react'
+import { Bell, UserPlus, CalendarCheck, PartyPopper, AlertCircle, Loader2, Calendar, Hand, Clock, UserX } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 interface NotificationItem {
@@ -77,6 +77,10 @@ export default function AdminNotificationBell() {
         return <CalendarCheck className="h-4 w-4 text-amber-600 flex-shrink-0" />
       case 'CANDIDATE_HIRED':
         return <PartyPopper className="h-4 w-4 text-green-600 flex-shrink-0" />
+      case 'RBT_TERMINATED':
+        return <UserX className="h-4 w-4 text-red-600 flex-shrink-0" />
+      case 'TERMINATION_NOTICE_DUE':
+        return <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
       case 'STALENESS_ALERT':
         return <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
       case 'INTERVIEW_SCHEDULED':

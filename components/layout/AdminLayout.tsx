@@ -17,12 +17,14 @@ import {
   Moon,
   Monitor,
   CalendarClock,
+  CalendarDays,
   Settings,
   MessageCircle,
   LayoutGrid,
   Network,
   Plug,
   DollarSign,
+  LineChart,
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
@@ -33,6 +35,8 @@ import AdminNotificationBell from '@/components/admin/AdminNotificationBell'
 interface AdminLayoutProps {
   children: React.ReactNode
   showBillingNav?: boolean
+  showOperationsNav?: boolean
+  showScheduleNav?: boolean
 }
 
 const mainNavItems = [
@@ -55,8 +59,15 @@ const secondaryNavItems = [
 const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
 
 const billingNavItem = { href: '/billing/dashboard', label: 'Billing', icon: DollarSign }
+const operationsNavItem = { href: '/operations', label: 'Operations', icon: LineChart }
+const scheduleNavItem = { href: '/schedule', label: 'Schedule', icon: CalendarDays }
 
-export default function AdminLayout({ children, showBillingNav }: AdminLayoutProps) {
+export default function AdminLayout({
+  children,
+  showBillingNav,
+  showOperationsNav,
+  showScheduleNav,
+}: AdminLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -79,22 +90,33 @@ export default function AdminLayout({ children, showBillingNav }: AdminLayoutPro
     }
   }, [pathname])
 
+  const portalNavItems = useMemo(
+    () => [
+      ...(showBillingNav ? [billingNavItem] : []),
+      ...(showOperationsNav ? [operationsNavItem] : []),
+      ...(showScheduleNav ? [scheduleNavItem] : []),
+    ],
+    [showBillingNav, showOperationsNav, showScheduleNav]
+  )
+
   const moreMenuHasActive = useMemo(() => {
-    const items = showBillingNav
-      ? [billingNavItem, ...secondaryNavItems]
-      : secondaryNavItems
+    const items = [...portalNavItems, ...secondaryNavItems]
     return items.some((i) =>
       i.href === '/admin/org-chart'
         ? pathname.startsWith('/admin/org-chart')
         : i.href === '/billing/dashboard'
           ? pathname.startsWith('/billing')
-          : pathname === i.href
+          : i.href === '/operations'
+            ? pathname.startsWith('/operations')
+            : i.href === '/schedule'
+              ? pathname.startsWith('/schedule')
+              : pathname === i.href
     )
-  }, [pathname, showBillingNav])
+  }, [pathname, portalNavItems])
 
   const secondaryItems = useMemo(
-    () => (showBillingNav ? [billingNavItem, ...secondaryNavItems] : secondaryNavItems),
-    [showBillingNav]
+    () => [...portalNavItems, ...secondaryNavItems],
+    [portalNavItems]
   )
 
   const handleLogout = async () => {
@@ -174,7 +196,11 @@ export default function AdminLayout({ children, showBillingNav }: AdminLayoutPro
                             ? pathname.startsWith('/admin/org-chart')
                             : item.href === '/billing/dashboard'
                               ? pathname.startsWith('/billing')
-                              : pathname === item.href
+                              : item.href === '/operations'
+                                ? pathname.startsWith('/operations')
+                                : pathname === item.href
+                        const isTealPortal =
+                          item.href === '/billing/dashboard' || item.href === '/operations'
                         return (
                           <Link
                             key={item.href}
@@ -183,13 +209,11 @@ export default function AdminLayout({ children, showBillingNav }: AdminLayoutPro
                             className={cn(
                               'flex items-center px-3 py-2 text-sm',
                               isActive
-                                ? item.href === '/billing/dashboard'
+                                ? isTealPortal
                                   ? 'bg-[#0D9488] text-white'
                                   : 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
                                 : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-primary)]',
-                              item.href === '/billing/dashboard' &&
-                                !isActive &&
-                                'hover:bg-teal-50 dark:hover:bg-teal-950/30'
+                              isTealPortal && !isActive && 'hover:bg-teal-50 dark:hover:bg-teal-950/30'
                             )}
                           >
                             {Icon ? <Icon className="w-4 h-4 mr-2 shrink-0" /> : null}
@@ -245,7 +269,11 @@ export default function AdminLayout({ children, showBillingNav }: AdminLayoutPro
                   ? pathname.startsWith('/admin/org-chart')
                   : item.href === '/billing/dashboard'
                     ? pathname.startsWith('/billing')
-                    : pathname === item.href
+                    : item.href === '/operations'
+                      ? pathname.startsWith('/operations')
+                      : pathname === item.href
+              const isTealPortal =
+                item.href === '/billing/dashboard' || item.href === '/operations'
               const Icon = item.icon
               return (
                 <Link
@@ -255,7 +283,7 @@ export default function AdminLayout({ children, showBillingNav }: AdminLayoutPro
                   className={cn(
                     'flex items-center px-3 py-2 rounded-md text-base font-medium',
                     isActive
-                      ? item.href === '/billing/dashboard'
+                      ? isTealPortal
                         ? 'bg-[#0D9488] text-white'
                         : 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
                       : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-primary)]'

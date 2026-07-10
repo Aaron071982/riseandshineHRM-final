@@ -49,6 +49,7 @@ const statusColors: Record<string, { bg: string; text: string; darkBg: string; d
   INTERVIEW_COMPLETED: { bg: 'bg-indigo-50', text: 'text-indigo-700', darkBg: 'dark:bg-[var(--status-scheduled-bg)]', darkText: 'dark:text-[var(--status-scheduled-text)]' },
   HIRED: { bg: 'bg-green-50', text: 'text-green-700', darkBg: 'dark:bg-[var(--status-hired-bg)]', darkText: 'dark:text-[var(--status-hired-text)]' },
   REJECTED: { bg: 'bg-red-50', text: 'text-red-700', darkBg: 'dark:bg-[var(--status-rejected-bg)]', darkText: 'dark:text-[var(--status-rejected-text)]' },
+  FIRED: { bg: 'bg-red-100', text: 'text-red-800', darkBg: 'dark:bg-[var(--status-rejected-bg)]', darkText: 'dark:text-[var(--status-rejected-text)]' },
 }
 
 export default function RBTList({ initialRbts, loadError }: RBTListProps) {

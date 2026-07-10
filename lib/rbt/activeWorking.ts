@@ -75,6 +75,14 @@ export async function markActivelyWorkingManual(
     throw new Error('RBT must be hired to mark as actively working')
   }
 
+  const terminated = await prisma.termination.findUnique({
+    where: { rbtProfileId },
+    select: { id: true },
+  })
+  if (terminated) {
+    throw new Error('Cannot activate a terminated employee')
+  }
+
   const now = new Date()
   await prisma.rBTProfile.update({
     where: { id: rbtProfileId },
