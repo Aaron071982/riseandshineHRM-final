@@ -27,33 +27,18 @@ export default async function RBTLayoutWrapper({
 
     const profile = await prisma.rBTProfile.findUnique({
       where: { id: user.rbtProfileId },
-      select: { id: true, firstName: true, status: true, tierACompletedAt: true },
+      select: { id: true, firstName: true, status: true },
     })
 
     if (!profile || profile.status === 'FIRED') {
       redirect('/')
     }
 
-    let rbtFirstName: string | null = profile.firstName ?? null
-    // Sessions & Pay (and time clock) for hired / onboarding-complete RBTs.
-    // Do not gate on Tier A — pay statements must be visible after payroll finalize.
-    let canAccessSessions =
+    const canAccessSessions =
       profile.status === 'HIRED' || profile.status === 'ONBOARDING_COMPLETED'
-    let hasActiveSession = false
-    try {
-      if (canAccessSessions) {
-        const active = await prisma.timeEntry.findFirst({
-          where: { rbtProfileId: user.rbtProfileId, clockOutTime: null },
-          select: { id: true },
-        })
-        hasActiveSession = !!active
-      }
-    } catch {
-      // non-fatal
-    }
 
     return (
-      <RBTLayout rbtFirstName={rbtFirstName} canAccessSessions={canAccessSessions} hasActiveSession={hasActiveSession}>
+      <RBTLayout rbtFirstName={profile.firstName ?? null} canAccessSessions={canAccessSessions}>
         {children}
       </RBTLayout>
     )
@@ -62,4 +47,3 @@ export default async function RBTLayoutWrapper({
     redirect('/')
   }
 }
-

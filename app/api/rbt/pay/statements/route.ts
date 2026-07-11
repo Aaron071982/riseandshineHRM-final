@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { requireRbtSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { EMPLOYEE_STUB_SELECT } from '@/lib/payroll/types'
 
 export const dynamic = 'force-dynamic'
 
+/** @deprecated Prefer /api/rbt/pay/stubs — kept as alias for older clients */
 export async function GET() {
   try {
     const auth = await requireRbtSession()
@@ -13,39 +15,19 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const statements = await prisma.rbtPayStatement.findMany({
+    const stubs = await prisma.payrollRunEntry.findMany({
       where: {
         rbtProfileId,
-        status: 'FINALIZED',
+        payrollRun: { status: 'PUBLISHED' },
       },
-      orderBy: { periodEnd: 'desc' },
-      select: {
-        id: true,
-        rbtProfileId: true,
-        billingCycleId: true,
-        periodStart: true,
-        periodEnd: true,
-        payableStatuses: true,
-        completedHours: true,
-        readyToBillHours: true,
-        incompleteHours: true,
-        inProgressHours: true,
-        scheduledHours: true,
-        payableHours: true,
-        hourlyRate: true,
-        grossPay: true,
-        adjustment: true,
-        finalPay: true,
-        status: true,
-        createdAt: true,
-      },
+      select: EMPLOYEE_STUB_SELECT,
+      orderBy: { payrollRun: { payDate: 'desc' } },
     })
 
-    const scoped = statements.filter((s) => s.rbtProfileId === rbtProfileId)
-
-    return NextResponse.json({ statements: scoped })
+    const mine = stubs.filter((s) => s.rbtProfileId === rbtProfileId)
+    return NextResponse.json({ statements: mine, stubs: mine })
   } catch (error) {
     console.error('[rbt/pay/statements]', error)
-    return NextResponse.json({ error: 'Failed to load pay statements' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to load pay stubs' }, { status: 500 })
   }
 }

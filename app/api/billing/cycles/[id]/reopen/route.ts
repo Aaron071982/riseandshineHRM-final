@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireBillingManagerSession, isAdmin } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recalculateCyclePayable } from '@/lib/billing/recalculatePayable'
-import { deletePayStatementsForCycle } from '@/lib/billing/generatePayStatements'
 
 export async function POST(
   _request: NextRequest,
@@ -21,23 +20,17 @@ export async function POST(
   }
 
   try {
-    const updated = await prisma.$transaction(async (tx) => {
-      // Remove employee-visible snapshots before marking unfinalized
-      const deleted = await deletePayStatementsForCycle(params.id, tx)
-      console.log(`[billing/reopen] deleted ${deleted} pay statements for cycle ${params.id}`)
-      return tx.billingCycle.update({
-        where: { id: params.id },
-        data: {
-          status: 'REVIEW',
-          finalizedAt: null,
-          finalizedById: null,
-        },
-      })
+    const updated = await prisma.billingCycle.update({
+      where: { id: params.id },
+      data: {
+        status: 'REVIEW',
+        finalizedAt: null,
+        finalizedById: null,
+      },
     })
 
     await recalculateCyclePayable(params.id)
 
-    console.log(`[billing/reopen] success cycleId=${params.id} status=REVIEW`)
     return NextResponse.json({ cycle: updated })
   } catch (error) {
     console.error('[billing/reopen]', error)

@@ -11,6 +11,7 @@ import Image from 'next/image'
 const nav = [
   { href: '/billing/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/billing/rates', label: 'Pay Rates', icon: DollarSign },
+  { href: '/billing/payroll', label: 'Payroll', icon: DollarSign },
 ]
 
 export default function BillingLayout({

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Loader2, ChevronDown, ChevronRight, Download, DollarSign, Clock, TrendingUp } from 'lucide-react'
-import { statusLabel, type ArtemisSessionStatusKey } from '@/lib/billing/sessionStatus'
+import { usd, fmtUtcDate } from '@/lib/payroll/format'
 
 type PaySummary = {
   thisMonthPay: number
@@ -14,381 +14,256 @@ type PaySummary = {
   statementCount: number
 }
 
-type PayStatement = {
+type PayStub = {
   id: string
-  periodStart: string
-  periodEnd: string
-  payableStatuses: string[]
-  completedHours: number
-  readyToBillHours: number
-  incompleteHours: number
-  inProgressHours: number
-  scheduledHours: number
-  payableHours: number
-  hourlyRate: number
+  rbtProfileId: string | null
+  payrollName: string
+  totalHours: number
   grossPay: number
-  adjustment: number
-  finalPay: number
-  status: string
+  adjustedGross: number
+  empTaxTotal: number
+  empTaxFIT: number
+  empTaxSS: number
+  empTaxMed: number
+  empTaxNYIT: number
+  netPay: number
+  payrollRun: {
+    id: string
+    label: string
+    payDate: string
+    periodStart: string
+    periodEnd: string
+    status: string
+  }
 }
 
-type PaySession = {
-  id: string
-  clientName: string
-  dos: string
-  status: string
-  hours: number
-  procedureCode: string | null
-  isPayable: boolean
-}
-
-type StatementDetail = PayStatement & {
-  sessions: PaySession[]
-  billingCycle?: { label: string; status: string }
-}
-
-function usd(n: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
-}
-
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-US', {
-    timeZone: 'UTC',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
-function StatusBreakdown({ s }: { s: PayStatement }) {
-  const payable = new Set(s.payableStatuses)
-  const rows: { key: ArtemisSessionStatusKey; hours: number }[] = [
-    { key: 'completed', hours: s.completedHours },
-    { key: 'ready_to_bill', hours: s.readyToBillHours },
-    { key: 'incomplete', hours: s.incompleteHours },
-    { key: 'in_progress', hours: s.inProgressHours },
-    { key: 'scheduled', hours: s.scheduledHours },
+function StubBreakdown({ stub }: { stub: PayStub }) {
+  const deductions = [
+    { label: 'Federal Income Tax', amount: stub.empTaxFIT },
+    { label: 'Social Security', amount: stub.empTaxSS },
+    { label: 'Medicare', amount: stub.empTaxMed },
+    { label: 'NY Income Tax', amount: stub.empTaxNYIT },
   ]
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
-      {rows.map((r) => {
-        const isPay = payable.has(r.key)
-        return (
-          <div
-            key={r.key}
-            className={`rounded-lg border px-3 py-2 text-sm ${
-              isPay
-                ? 'border-green-200 bg-green-50 text-green-900'
-                : 'border-gray-100 bg-gray-50 text-gray-400'
-            }`}
-          >
-            <div className="text-xs font-medium opacity-80">{statusLabel(r.key)}</div>
-            <div className="font-semibold">{r.hours.toFixed(2)}h</div>
-            {!isPay && <div className="text-[10px] uppercase tracking-wide">Not payable</div>}
+    <div className="mt-4 space-y-3 text-sm">
+      <div className="flex justify-between">
+        <span className="text-gray-600">Hours</span>
+        <span className="font-medium">{stub.totalHours.toFixed(2)}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-gray-600">Gross Pay</span>
+        <span className="font-medium">{usd(stub.grossPay)}</span>
+      </div>
+      <div className="border-t pt-3">
+        <p className="font-medium text-gray-800 mb-2">Deductions</p>
+        <div className="space-y-1.5">
+          {deductions.map((d) => (
+            <div key={d.label} className="flex justify-between text-gray-600">
+              <span>{d.label}</span>
+              <span>−{usd(d.amount)}</span>
+            </div>
+          ))}
+          <div className="flex justify-between font-medium text-gray-800 pt-1 border-t">
+            <span>Total Deductions</span>
+            <span>−{usd(stub.empTaxTotal)}</span>
           </div>
-        )
-      })}
+        </div>
+      </div>
+      <div className="flex justify-between items-baseline bg-[#0E4D52]/5 rounded-lg px-3 py-3 mt-2">
+        <span className="font-semibold text-[#0E4D52]">Net Pay</span>
+        <span className="text-2xl font-bold text-[#0E4D52]">{usd(stub.netPay)}</span>
+      </div>
     </div>
   )
 }
 
-function downloadStatementHtml(detail: StatementDetail) {
-  const rows = detail.sessions
-    .map(
-      (s) =>
-        `<tr><td>${fmtDate(s.dos)}</td><td>${s.clientName}</td><td>${statusLabel(s.status as ArtemisSessionStatusKey)}</td><td>${s.hours.toFixed(2)}</td><td>${s.isPayable ? 'Yes' : 'No'}</td></tr>`
-    )
-    .join('')
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pay Statement</title>
-<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;color:#111}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f5f5f5}</style></head><body>
-<h1>Pay Statement</h1>
-<p><strong>Period:</strong> ${fmtDate(detail.periodStart)} – ${fmtDate(detail.periodEnd)}</p>
-<p><strong>Payable hours:</strong> ${detail.payableHours.toFixed(2)} × ${usd(detail.hourlyRate)} = ${usd(detail.grossPay)}</p>
-${detail.adjustment ? `<p><strong>Adjustment:</strong> ${usd(detail.adjustment)}</p>` : ''}
-<p><strong>Expected pay:</strong> ${usd(detail.finalPay)}</p>
-<table><thead><tr><th>Date</th><th>Client</th><th>Status</th><th>Hours</th><th>Payable</th></tr></thead><tbody>${rows}</tbody></table>
+function downloadStubHtml(stub: PayStub) {
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pay Stub</title>
+<style>body{font-family:system-ui,sans-serif;max-width:560px;margin:40px auto;color:#111}
+.row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}
+.net{font-size:1.5rem;font-weight:700;margin-top:16px}</style></head><body>
+<h1>Pay Stub</h1>
+<p><strong>Period:</strong> ${fmtUtcDate(stub.payrollRun.periodStart)} – ${fmtUtcDate(stub.payrollRun.periodEnd)}</p>
+<p><strong>Pay date:</strong> ${fmtUtcDate(stub.payrollRun.payDate)}</p>
+<div class="row"><span>Hours</span><span>${stub.totalHours.toFixed(2)}</span></div>
+<div class="row"><span>Gross Pay</span><span>${usd(stub.grossPay)}</span></div>
+<div class="row"><span>Federal Income Tax</span><span>-${usd(stub.empTaxFIT)}</span></div>
+<div class="row"><span>Social Security</span><span>-${usd(stub.empTaxSS)}</span></div>
+<div class="row"><span>Medicare</span><span>-${usd(stub.empTaxMed)}</span></div>
+<div class="row"><span>NY Income Tax</span><span>-${usd(stub.empTaxNYIT)}</span></div>
+<div class="row"><span>Total Deductions</span><span>-${usd(stub.empTaxTotal)}</span></div>
+<p class="net">Net Pay: ${usd(stub.netPay)}</p>
 </body></html>`
   const blob = new Blob([html], { type: 'text/html' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `pay-statement-${fmtDate(detail.periodStart).replace(/\s/g, '-')}.html`
+  a.download = `pay-stub-${fmtUtcDate(stub.payrollRun.payDate).replace(/\s/g, '-')}.html`
   a.click()
   URL.revokeObjectURL(url)
 }
 
 export default function RbtSessionsPayPage() {
   const [summary, setSummary] = useState<PaySummary | null>(null)
-  const [statements, setStatements] = useState<PayStatement[]>([])
+  const [stubs, setStubs] = useState<PayStub[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [details, setDetails] = useState<Record<string, StatementDetail>>({})
-  const [detailLoading, setDetailLoading] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const [sumRes, listRes] = await Promise.all([
-          fetch('/api/rbt/pay/summary', { credentials: 'include' }),
-          fetch('/api/rbt/pay/statements', { credentials: 'include' }),
-        ])
-        const sumData = await sumRes.json().catch(() => ({}))
-        const listData = await listRes.json().catch(() => ({}))
-        if (!sumRes.ok || !listRes.ok) {
-          if (!cancelled) setError(sumData.error || listData.error || 'Failed to load pay data')
-          return
-        }
-        if (!cancelled) {
-          setSummary(sumData)
-          setStatements(listData.statements ?? [])
-          if ((listData.statements ?? []).length > 0) {
-            setExpandedId(listData.statements[0].id)
-          }
-        }
-      } catch {
-        if (!cancelled) setError('Failed to load pay data')
-      } finally {
-        if (!cancelled) setLoading(false)
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [sumRes, listRes] = await Promise.all([
+        fetch('/api/rbt/pay/summary', { credentials: 'include' }),
+        fetch('/api/rbt/pay/stubs', { credentials: 'include' }),
+      ])
+      const sumData = await sumRes.json().catch(() => ({}))
+      const listData = await listRes.json().catch(() => ({}))
+      if (!sumRes.ok || !listRes.ok) {
+        setError(sumData.error || listData.error || 'Failed to load pay data')
+        return
       }
-    })()
-    return () => {
-      cancelled = true
+      setSummary(sumData)
+      const list = (listData.stubs ?? []) as PayStub[]
+      setStubs(list)
+      if (list.length > 0) setExpandedId(list[0].id)
+    } catch {
+      setError('Failed to load pay data')
+    } finally {
+      setLoading(false)
     }
   }, [])
 
-  const loadDetail = useCallback(
-    async (id: string) => {
-      if (details[id]) return
-      setDetailLoading(id)
-      try {
-        const res = await fetch(`/api/rbt/pay/statements/${id}`, { credentials: 'include' })
-        const data = await res.json().catch(() => ({}))
-        if (res.ok && data.statement) {
-          setDetails((prev) => ({ ...prev, [id]: data.statement }))
-        }
-      } finally {
-        setDetailLoading(null)
-      }
-    },
-    [details]
-  )
-
   useEffect(() => {
-    if (expandedId) loadDetail(expandedId)
-  }, [expandedId, loadDetail])
-
-  const latest = statements[0] ?? null
-  const latestDetail = latest ? details[latest.id] : null
+    void load()
+  }, [load])
 
   if (loading) {
     return (
       <div className="flex justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#0E4D52]" />
       </div>
     )
   }
 
   if (error) {
     return (
-      <Card className="border-2 border-red-100">
+      <Card className="border-red-100">
         <CardContent className="py-12 text-center text-red-600">{error}</CardContent>
       </Card>
     )
   }
 
+  const latest = stubs[0] ?? null
+
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 p-8 shadow-lg">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16" />
-        <div className="relative">
-          <h1 className="text-4xl font-bold text-white mb-2">Sessions &amp; Pay</h1>
-          <p className="text-emerald-50 text-lg">Finalized pay periods from billing</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Pay</h1>
+        <p className="text-sm text-gray-500 mt-1">Your published pay stubs from payroll.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-2 border-emerald-200 bg-gradient-to-br from-white to-emerald-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">This Month&apos;s Pay</p>
-                <p className="text-3xl font-bold text-emerald-600 mt-2">{usd(summary?.thisMonthPay ?? 0)}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-emerald-500 flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-white" />
-              </div>
-            </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium text-gray-600">This Month Net Pay</CardTitle>
+            <DollarSign className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{usd(summary?.thisMonthPay ?? 0)}</div>
           </CardContent>
         </Card>
-        <Card className="border-2 border-blue-200 bg-gradient-to-br from-white to-blue-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Earned</p>
-                <p className="text-3xl font-bold text-blue-600 mt-2">{usd(summary?.totalEarned ?? 0)}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-blue-500 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-white" />
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium text-gray-600">Total Net Earned</CardTitle>
+            <TrendingUp className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{usd(summary?.totalEarned ?? 0)}</div>
           </CardContent>
         </Card>
-        <Card className="border-2 border-purple-200 bg-gradient-to-br from-white to-purple-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Payable Hours</p>
-                <p className="text-3xl font-bold text-purple-600 mt-2">
-                  {(summary?.totalPayableHours ?? 0).toFixed(1)}h
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-purple-500 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-white" />
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-medium text-gray-600">Total Hours</CardTitle>
+            <Clock className="h-4 w-4 text-gray-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{(summary?.totalPayableHours ?? 0).toFixed(1)}h</div>
           </CardContent>
         </Card>
       </div>
 
       {latest ? (
-        <Card className="border-2 border-emerald-200 shadow-sm">
-          <CardHeader className="pb-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-xl">Latest pay period</CardTitle>
-              <Badge className="bg-emerald-100 text-emerald-800 border-0">Finalized</Badge>
-            </div>
-            <p className="text-sm text-gray-500">
-              {fmtDate(latest.periodStart)} – {fmtDate(latest.periodEnd)}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4">
-              <p className="text-sm text-emerald-800">
-                {latest.payableHours.toFixed(2)} hrs × {usd(latest.hourlyRate)}
-                {latest.adjustment !== 0 ? ` ${latest.adjustment >= 0 ? '+' : ''}${usd(latest.adjustment)} adj` : ''}
-              </p>
-              <p className="text-3xl font-bold text-emerald-700 mt-1">
-                Expected pay: {usd(latest.finalPay)}
-              </p>
-            </div>
-            <StatusBreakdown s={latest} />
-            {detailLoading === latest.id && !latestDetail ? (
-              <div className="flex justify-center py-4">
-                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+        <Card className="border-[#0E4D52]/20">
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-lg">Latest pay stub</CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  {fmtUtcDate(latest.payrollRun.periodStart)} – {fmtUtcDate(latest.payrollRun.periodEnd)}
+                  {' · '}Pay date {fmtUtcDate(latest.payrollRun.payDate)}
+                </p>
               </div>
-            ) : latestDetail ? (
-              <SessionTable sessions={latestDetail.sessions} />
-            ) : null}
-            {latestDetail && (
-              <Button variant="outline" size="sm" onClick={() => downloadStatementHtml(latestDetail)}>
-                <Download className="h-4 w-4 mr-1" /> Download statement
+              <Button variant="outline" size="sm" onClick={() => downloadStubHtml(latest)}>
+                <Download className="w-4 h-4 mr-1" />
+                Download
               </Button>
-            )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <StubBreakdown stub={latest} />
           </CardContent>
         </Card>
       ) : (
-        <Card className="border-2 border-gray-100">
-          <CardContent className="py-12 text-center">
-            <p className="text-xl font-semibold text-gray-700 mb-2">No finalized pay yet</p>
-            <p className="text-gray-500">
-              Your pay statements appear here after payroll finalizes a billing cycle.
-            </p>
+        <Card>
+          <CardContent className="py-12 text-center text-gray-500">
+            No published pay stubs yet. Your pay will appear here after payroll is published.
           </CardContent>
         </Card>
       )}
 
-      {statements.length > 0 && (
-        <Card className="border border-gray-200">
-          <CardHeader>
-            <CardTitle className="text-lg">Pay history</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 pt-0">
-            {statements.map((s) => {
-              const open = expandedId === s.id
-              const detail = details[s.id]
-              return (
-                <div key={s.id} className="rounded-lg border border-gray-200 overflow-hidden">
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-gray-50"
-                    onClick={() => setExpandedId(open ? null : s.id)}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      {open ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {fmtDate(s.periodStart)} – {fmtDate(s.periodEnd)}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {s.payableHours.toFixed(2)}h · {usd(s.hourlyRate)}/hr
-                        </p>
-                      </div>
+      {stubs.length > 1 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Pay history</h2>
+          {stubs.map((stub) => {
+            const open = expandedId === stub.id
+            return (
+              <Card key={stub.id}>
+                <button
+                  type="button"
+                  className="w-full text-left px-6 py-4 flex items-center justify-between gap-3"
+                  onClick={() => setExpandedId(open ? null : stub.id)}
+                >
+                  <div>
+                    <div className="font-medium">
+                      {fmtUtcDate(stub.payrollRun.periodStart)} – {fmtUtcDate(stub.payrollRun.periodEnd)}
                     </div>
-                    <p className="font-semibold text-emerald-700 shrink-0">{usd(s.finalPay)}</p>
-                  </button>
-                  {open && (
-                    <div className="border-t border-gray-100 bg-gray-50/50 p-4 space-y-3">
-                      <StatusBreakdown s={s} />
-                      {detailLoading === s.id && !detail ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-gray-400 mx-auto" />
-                      ) : detail ? (
-                        <>
-                          <SessionTable sessions={detail.sessions} />
-                          <Button variant="outline" size="sm" onClick={() => downloadStatementHtml(detail)}>
-                            <Download className="h-4 w-4 mr-1" /> Download
-                          </Button>
-                        </>
-                      ) : null}
+                    <div className="text-sm text-gray-500">
+                      Pay date {fmtUtcDate(stub.payrollRun.payDate)} · {stub.totalHours.toFixed(1)}h
                     </div>
-                  )}
-                </div>
-              )
-            })}
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  )
-}
-
-function SessionTable({ sessions }: { sessions: PaySession[] }) {
-  if (sessions.length === 0) {
-    return <p className="text-sm text-gray-500">No session details.</p>
-  }
-  return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-gray-50 text-left text-gray-600">
-            <th className="px-3 py-2 font-medium">Date</th>
-            <th className="px-3 py-2 font-medium">Client</th>
-            <th className="px-3 py-2 font-medium">Status</th>
-            <th className="px-3 py-2 font-medium">Hours</th>
-            <th className="px-3 py-2 font-medium">Payable</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sessions.map((s) => (
-            <tr key={s.id} className="border-t border-gray-100">
-              <td className="px-3 py-2 whitespace-nowrap">{fmtDate(s.dos)}</td>
-              <td className="px-3 py-2">{s.clientName}</td>
-              <td className="px-3 py-2">{statusLabel(s.status as ArtemisSessionStatusKey)}</td>
-              <td className="px-3 py-2">{s.hours.toFixed(2)}</td>
-              <td className="px-3 py-2">
-                {s.isPayable ? (
-                  <Badge className="bg-green-100 text-green-800 border-0">Yes</Badge>
-                ) : (
-                  <Badge variant="outline" className="text-gray-400">
-                    No
-                  </Badge>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary">{usd(stub.netPay)}</Badge>
+                    {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </div>
+                </button>
+                {open && (
+                  <CardContent className="pt-0 border-t">
+                    <div className="flex justify-end pt-3">
+                      <Button variant="outline" size="sm" onClick={() => downloadStubHtml(stub)}>
+                        <Download className="w-4 h-4 mr-1" />
+                        Download
+                      </Button>
+                    </div>
+                    <StubBreakdown stub={stub} />
+                  </CardContent>
                 )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

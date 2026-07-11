@@ -5,7 +5,6 @@ import { EMPLOYEE_STUB_SELECT } from '@/lib/payroll/types'
 
 export const dynamic = 'force-dynamic'
 
-/** @deprecated Prefer /api/rbt/pay/stubs/[id] */
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
@@ -30,9 +29,9 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    return NextResponse.json({ statement: stub, stub })
+    return NextResponse.json({ stub })
   } catch (error) {
-    console.error('[rbt/pay/statements/id]', error)
+    console.error('[rbt/pay/stubs/id]', error)
     return NextResponse.json({ error: 'Failed to load pay stub' }, { status: 500 })
   }
 }

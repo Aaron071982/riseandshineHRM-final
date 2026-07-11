@@ -3,7 +3,6 @@ import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import RbtSessionsPayPage from '@/components/rbt/RbtSessionsPayPage'
-import RBTSessionsPage from '@/components/rbt/RBTSessionsPage'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -27,12 +26,5 @@ export default async function SessionsPage() {
     redirect('/rbt/dashboard')
   }
 
-  return (
-    <div className="space-y-10">
-      <RbtSessionsPayPage />
-      <div className="border-t border-gray-200 pt-8">
-        <RBTSessionsPage title="Time clock" />
-      </div>
-    </div>
-  )
+  return <RbtSessionsPayPage />
 }

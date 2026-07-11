@@ -276,11 +276,9 @@ async function RBTDashboardPageInner() {
   let completions: Awaited<ReturnType<typeof prisma.onboardingCompletion.findMany>> = []
   let todayShifts: Awaited<ReturnType<typeof prisma.shift.findMany>> = []
   let upcomingShifts: Awaited<ReturnType<typeof prisma.shift.findMany>> = []
-  let timeEntries: Awaited<ReturnType<typeof prisma.timeEntry.findMany>> = []
-  let activeSessionClockIn: Date | null = null
 
   try {
-    const [profileResult, docsResult, completionsResult, todayResult, upcomingResult, timeResult] = await Promise.all([
+    const [profileResult, docsResult, completionsResult, todayResult, upcomingResult] = await Promise.all([
       prisma.rBTProfile.findUnique({
         where: { id: user.rbtProfileId },
         select: { firstName: true, scheduleCompleted: true },
@@ -312,21 +310,12 @@ async function RBTDashboardPageInner() {
         },
         orderBy: { startTime: 'asc' },
       }),
-      prisma.timeEntry.findMany({
-        where: {
-          rbtProfileId: user.rbtProfileId,
-          clockInTime: { gte: new Date(new Date().setDate(new Date().getDate() - 31)) },
-        },
-        orderBy: { clockInTime: 'desc' },
-      }),
     ])
     rbtProfile = profileResult
     onboardingDocuments = docsResult
     completions = completionsResult
     todayShifts = todayResult
     upcomingShifts = upcomingResult
-    timeEntries = timeResult
-    activeSessionClockIn = timeResult.find((t) => t.clockOutTime == null)?.clockInTime ?? null
   } catch (err) {
     logError('Failed to load dashboard data', err)
     return (
@@ -390,18 +379,6 @@ async function RBTDashboardPageInner() {
     )
     .map((c) => (c as any).document?.title ?? '')
 
-  const now = new Date()
-  const weekStart = new Date(now)
-  weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-  weekStart.setHours(0, 0, 0, 0)
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const hoursThisWeek = timeEntries
-    .filter((e) => e.clockInTime >= weekStart && e.totalHours)
-    .reduce((sum, e) => sum + (e.totalHours ?? 0), 0)
-  const hoursThisMonth = timeEntries
-    .filter((e) => e.clockInTime >= monthStart && e.totalHours)
-    .reduce((sum, e) => sum + (e.totalHours ?? 0), 0)
-
   try {
     return (
       <RBTDashboardHome
@@ -413,11 +390,8 @@ async function RBTDashboardPageInner() {
         completedTasks={completedTasks}
         todayShifts={todayShifts}
         upcomingShifts={upcomingShifts}
-        hoursThisWeek={hoursThisWeek}
-        hoursThisMonth={hoursThisMonth}
         upcomingShiftsCount={upcomingShifts.length}
         pendingUploadTitles={pendingUploadTitles}
-        activeSessionClockIn={activeSessionClockIn}
       />
     )
   } catch (error) {

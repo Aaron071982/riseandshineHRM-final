@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatDateTime } from '@/lib/utils'
-import { Calendar, Clock, CheckCircle2, Circle, ClipboardList } from 'lucide-react'
+import { Calendar, CheckCircle2, Circle, ClipboardList, DollarSign } from 'lucide-react'
 
 function getTimeBasedGreeting(): string {
   const h = new Date().getHours()
@@ -44,12 +44,9 @@ interface RBTDashboardHomeProps {
   completedTasks: TaskItem[]
   todayShifts: Shift[]
   upcomingShifts: Shift[]
-  hoursThisWeek: number
-  hoursThisMonth: number
   upcomingShiftsCount: number
   /** Fillable PDFs that were downloaded but not yet uploaded (for reminder banner) */
   pendingUploadTitles?: string[]
-  activeSessionClockIn?: Date | null
 }
 
 export default function RBTDashboardHome({
@@ -61,11 +58,8 @@ export default function RBTDashboardHome({
   completedTasks,
   todayShifts,
   upcomingShifts,
-  hoursThisWeek,
-  hoursThisMonth,
   upcomingShiftsCount,
   pendingUploadTitles = [],
-  activeSessionClockIn = null,
 }: RBTDashboardHomeProps) {
   const greeting = getTimeBasedGreeting()
   const showOnboarding = onboardingPercent < 100
@@ -192,25 +186,7 @@ export default function RBTDashboardHome({
       )}
 
       {/* Quick stats row */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hours this week</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{hoursThisWeek.toFixed(1)}h</div>
-          </CardContent>
-        </Card>
-        <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hours this month</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{hoursThisMonth.toFixed(1)}h</div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Upcoming shifts</CardTitle>
@@ -222,22 +198,13 @@ export default function RBTDashboardHome({
         </Card>
         <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Session</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Pay</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {activeSessionClockIn ? (
-              <Link href="/rbt/sessions" className="inline-flex items-center gap-2 text-green-700 dark:text-green-300">
-                <span className="inline-block h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
-                <span className="font-semibold">
-                  Session Active — {((Date.now() - new Date(activeSessionClockIn).getTime()) / 3600000).toFixed(1)}h
-                </span>
-              </Link>
-            ) : (
-              <Link href="/rbt/sessions" className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] hover:underline">
-                No active session
-              </Link>
-            )}
+            <Link href="/rbt/sessions" className="text-sm text-[#e36f1e] hover:underline font-medium">
+              View pay statements
+            </Link>
           </CardContent>
         </Card>
       </div>

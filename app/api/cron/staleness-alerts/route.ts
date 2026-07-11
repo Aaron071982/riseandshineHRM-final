@@ -511,29 +511,7 @@ export async function GET(request: NextRequest) {
           })
           .catch(() => {})
       }
-
-      for (const entry of forgotClockOutEntries) {
-        if (!entry.rbtProfile.email) continue
-        const rbtHtml = `
-          <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
-          <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;line-height:1.5;color:#333;padding:24px;">
-            <div style="max-width:620px;margin:0 auto;">
-              <h2 style="margin:0 0 8px 0;color:#E4893D;">Clock-out reminder</h2>
-              <p>Hi <strong>${entry.rbtProfile.firstName}</strong>, it looks like you may have forgotten to clock out from your session that started at ${entry.clockInTime.toLocaleString(
-                'en-US',
-                { timeZone: 'America/New_York' }
-              )}.</p>
-              <p>Please log in and clock out, or contact your admin if you need help.</p>
-              <p><a href="${makePublicUrl('/rbt/sessions')}" style="color:#E4893D;">Open Sessions</a></p>
-            </div>
-          </body></html>
-        `
-        await sendGenericEmail(
-          entry.rbtProfile.email,
-          'Reminder: you may have forgotten to clock out',
-          rbtHtml
-        ).catch((e) => console.error('RBT clock-out reminder send failed:', e))
-      }
+      // RBT clock-in/out removed — no employee clock-out reminder emails
     }
     }
 

@@ -41,14 +41,12 @@ interface RBTLayoutProps {
   /** RBT first name for greeting and sidebar (from server layout) */
   rbtFirstName?: string | null
   canAccessSessions?: boolean
-  hasActiveSession?: boolean
 }
 
 export default function RBTLayout({
   children,
   rbtFirstName,
   canAccessSessions = false,
-  hasActiveSession = false,
 }: RBTLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -71,7 +69,7 @@ export default function RBTLayout({
 
   const messageContextValue = { openMessageModal: () => setMessageModalOpen(true) }
   const navItems = canAccessSessions
-    ? [...baseNavItems.slice(0, 3), { href: '/rbt/sessions', label: 'Sessions & Pay', icon: Timer }, ...baseNavItems.slice(3)]
+    ? [...baseNavItems.slice(0, 3), { href: '/rbt/sessions', label: 'Pay', icon: Timer }, ...baseNavItems.slice(3)]
     : baseNavItems
 
   return (
@@ -118,9 +116,6 @@ export default function RBTLayout({
               >
                 <div className="relative shrink-0">
                   <Icon className="w-5 h-5" />
-                  {item.href === '/rbt/sessions' && hasActiveSession && (
-                    <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  )}
                 </div>
                 {item.label}
               </Link>
@@ -205,9 +200,6 @@ export default function RBTLayout({
                 >
                   <div className="relative">
                     <Icon className="w-5 h-5" />
-                    {item.href === '/rbt/sessions' && hasActiveSession && (
-                      <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                    )}
                   </div>
                   <span>{item.label}</span>
                 </Link>

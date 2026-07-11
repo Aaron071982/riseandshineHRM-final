@@ -60,6 +60,7 @@ const secondaryNavItems = [
 const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
 
 const billingNavItem = { href: '/billing/dashboard', label: 'Billing', icon: DollarSign }
+const payrollNavItem = { href: '/admin/payroll', label: 'Payroll', icon: DollarSign }
 const operationsNavItem = { href: '/operations', label: 'Operations', icon: LineChart }
 
 export default function AdminLayout({
@@ -92,7 +93,7 @@ export default function AdminLayout({
 
   const portalNavItems = useMemo(
     () => [
-      ...(showBillingNav ? [billingNavItem] : []),
+      ...(showBillingNav ? [billingNavItem, payrollNavItem] : []),
       ...(showOperationsNav ? [operationsNavItem] : []),
     ],
     [showBillingNav, showOperationsNav]
@@ -105,11 +106,13 @@ export default function AdminLayout({
         ? pathname.startsWith('/admin/org-chart')
         : i.href === '/billing/dashboard'
           ? pathname.startsWith('/billing')
-          : i.href === '/operations'
-            ? pathname.startsWith('/operations')
-            : i.href === '/schedule'
-              ? pathname.startsWith('/schedule')
-              : pathname === i.href
+          : i.href === '/admin/payroll'
+            ? pathname.startsWith('/admin/payroll') || pathname.startsWith('/billing/payroll')
+            : i.href === '/operations'
+              ? pathname.startsWith('/operations')
+              : i.href === '/schedule'
+                ? pathname.startsWith('/schedule')
+                : pathname === i.href
     )
   }, [pathname, portalNavItems])
 
@@ -194,14 +197,18 @@ export default function AdminLayout({
                           item.href === '/admin/org-chart'
                             ? pathname.startsWith('/admin/org-chart')
                             : item.href === '/billing/dashboard'
-                              ? pathname.startsWith('/billing')
-                              : item.href === '/operations'
-                                ? pathname.startsWith('/operations')
-                                : item.href === '/schedule'
-                                  ? pathname.startsWith('/schedule')
-                                  : pathname === item.href
+                              ? pathname.startsWith('/billing') && !pathname.startsWith('/billing/payroll')
+                              : item.href === '/admin/payroll'
+                                ? pathname.startsWith('/admin/payroll') ||
+                                  pathname.startsWith('/billing/payroll')
+                                : item.href === '/operations'
+                                  ? pathname.startsWith('/operations')
+                                  : item.href === '/schedule'
+                                    ? pathname.startsWith('/schedule')
+                                    : pathname === item.href
                         const isTealPortal =
                           item.href === '/billing/dashboard' ||
+                          item.href === '/admin/payroll' ||
                           item.href === '/operations' ||
                           item.href === '/schedule'
                         return (
@@ -271,14 +278,18 @@ export default function AdminLayout({
                 item.href === '/admin/org-chart'
                   ? pathname.startsWith('/admin/org-chart')
                   : item.href === '/billing/dashboard'
-                    ? pathname.startsWith('/billing')
-                    : item.href === '/operations'
-                      ? pathname.startsWith('/operations')
-                      : item.href === '/schedule'
-                        ? pathname.startsWith('/schedule')
-                        : pathname === item.href
+                    ? pathname.startsWith('/billing') && !pathname.startsWith('/billing/payroll')
+                    : item.href === '/admin/payroll'
+                      ? pathname.startsWith('/admin/payroll') ||
+                        pathname.startsWith('/billing/payroll')
+                      : item.href === '/operations'
+                        ? pathname.startsWith('/operations')
+                        : item.href === '/schedule'
+                          ? pathname.startsWith('/schedule')
+                          : pathname === item.href
               const isTealPortal =
                 item.href === '/billing/dashboard' ||
+                item.href === '/admin/payroll' ||
                 item.href === '/operations' ||
                 item.href === '/schedule'
               const Icon = item.icon

@@ -412,6 +412,7 @@ model User {
   artemisSessionRequestsResolved ArtemisSessionRequest[] @relation("ArtemisSessionRequestResolvedBy")
   terminationsDecided          Termination[]             @relation("TerminationDecisionMaker")
   rbtScheduleAssignmentsCreated RbtScheduleAssignment[]  @relation("RbtScheduleAssignmentCreatedBy")
+  payrollRunsUploaded           PayrollRun[]             @relation("PayrollRunUploadedBy")
 
   @@map("users")
 }
@@ -699,6 +700,8 @@ model RBTProfile {
   oigScreeningLogs            OigScreeningLog[]
   hourlyPayRate               Float?
   artemisProviderName         String?
+  /// Remembered "Last, First" from payroll register uploads (like artemisProviderName)
+  payrollName                 String?
   payRateUpdatedAt            DateTime?
   payRateUpdatedBy            String?
   billingEntries              BillingEntry[]
@@ -707,6 +710,7 @@ model RBTProfile {
   termination                 Termination?
   scheduleAssignments         RbtScheduleAssignment[]
   payStatements               RbtPayStatement[]
+  payrollRunEntries           PayrollRunEntry[]
 
   @@index([artemisTrainingCompleted])
   @@index([postHireStage])
@@ -2190,5 +2194,74 @@ model ScheduleSessionSlot {
   @@index([clientId])
   @@index([day])
   @@map("session_slot")
+}
+
+// ─── Payroll register uploads (employee pay stubs) ───────────────────────────
+
+enum PayrollRunStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum PayrollMatchStatus {
+  MATCHED
+  NEEDS_REVIEW
+  UNMATCHED
+}
+
+model PayrollRun {
+  id             String           @id @default(cuid())
+  label          String
+  payDate        DateTime         @db.Date
+  periodStart    DateTime         @db.Date
+  periodEnd      DateTime         @db.Date
+  sourceFileName String?
+  uploadedById   String
+  employeeCount  Int              @default(0)
+  totalNetPay    Float            @default(0)
+  totalGrossPay  Float            @default(0)
+  status         PayrollRunStatus @default(DRAFT)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  uploadedBy User              @relation("PayrollRunUploadedBy", fields: [uploadedById], references: [id])
+  entries    PayrollRunEntry[]
+
+  @@index([status])
+  @@index([payDate])
+  @@map("payroll_runs")
+}
+
+model PayrollRunEntry {
+  id               String             @id @default(cuid())
+  payrollRunId     String
+  rbtProfileId     String?
+  payrollName      String
+  matchStatus      PayrollMatchStatus @default(UNMATCHED)
+  matchConfidence  Float              @default(0)
+  totalHours       Float              @default(0)
+  grossPay         Float              @default(0)
+  adjustedGross    Float              @default(0)
+  empTaxTotal      Float              @default(0)
+  empTaxFIT        Float              @default(0)
+  empTaxSS         Float              @default(0)
+  empTaxMed        Float              @default(0)
+  empTaxNYIT       Float              @default(0)
+  netPay           Float              @default(0)
+  /// Admin-only — never expose on employee APIs
+  employerTaxTotal Float              @default(0)
+  /// Admin-only — never expose on employee APIs
+  totalPayrollCost Float              @default(0)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  payrollRun PayrollRun  @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  rbtProfile RBTProfile? @relation(fields: [rbtProfileId], references: [id], onDelete: SetNull)
+
+  @@unique([payrollRunId, rbtProfileId])
+  @@index([payrollRunId])
+  @@index([rbtProfileId])
+  @@index([matchStatus])
+  @@map("payroll_run_entries")
 }
 

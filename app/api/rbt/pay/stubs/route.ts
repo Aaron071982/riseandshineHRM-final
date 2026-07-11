@@ -14,9 +14,6 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const now = new Date()
-    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-
     const stubs = await prisma.payrollRunEntry.findMany({
       where: {
         rbtProfileId,
@@ -26,23 +23,10 @@ export async function GET() {
       orderBy: { payrollRun: { payDate: 'desc' } },
     })
 
-    // Ownership double-check
     const mine = stubs.filter((s) => s.rbtProfileId === rbtProfileId)
-
-    const thisMonthNet = mine
-      .filter((s) => new Date(s.payrollRun.payDate) >= monthStart)
-      .reduce((sum, s) => sum + s.netPay, 0)
-    const totalNetEarned = mine.reduce((sum, s) => sum + s.netPay, 0)
-    const totalHours = mine.reduce((sum, s) => sum + s.totalHours, 0)
-
-    return NextResponse.json({
-      thisMonthPay: thisMonthNet,
-      totalEarned: totalNetEarned,
-      totalPayableHours: totalHours,
-      statementCount: mine.length,
-    })
+    return NextResponse.json({ stubs: mine })
   } catch (error) {
-    console.error('[rbt/pay/summary]', error)
-    return NextResponse.json({ error: 'Failed to load pay summary' }, { status: 500 })
+    console.error('[rbt/pay/stubs]', error)
+    return NextResponse.json({ error: 'Failed to load pay stubs' }, { status: 500 })
   }
 }
