@@ -224,6 +224,44 @@ export async function setAuthorizedHours(clientId: string, hours: number | null)
   return serializeClient(row)
 }
 
+/** Partial update for Client hours tab (bcba / insurance / authorized hours). */
+export async function updateClientMeta(
+  clientId: string,
+  patch: {
+    bcba?: string | null
+    insurance?: string | null
+    authorizedHoursPerWeek?: number | null
+  }
+) {
+  await assertScheduleAccess()
+  const data: {
+    bcba?: string | null
+    insurance?: string | null
+    authorizedHoursPerWeek?: number | null
+  } = {}
+  if ('bcba' in patch) {
+    const v = patch.bcba
+    data.bcba = v == null || String(v).trim() === '' ? null : String(v).trim()
+  }
+  if ('insurance' in patch) {
+    const v = patch.insurance
+    data.insurance = v == null || String(v).trim() === '' ? null : String(v).trim()
+  }
+  if ('authorizedHoursPerWeek' in patch) {
+    const h = patch.authorizedHoursPerWeek
+    if (h != null && (typeof h !== 'number' || isNaN(h) || h < 0 || h > 168)) {
+      throw new Error('Authorized hours must be between 0 and 168')
+    }
+    data.authorizedHoursPerWeek = h ?? null
+  }
+  const row = await prisma.scheduleWeeklyClient.update({
+    where: { id: clientId },
+    data,
+  })
+  revalidate()
+  return serializeClient(row)
+}
+
 export async function addAllowedUser(email: string) {
   await assertScheduleAccess()
   const normalized = email.trim().toLowerCase()

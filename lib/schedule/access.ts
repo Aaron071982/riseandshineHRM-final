@@ -9,6 +9,8 @@ const DEFAULT_SCHEDULE_EMAILS = [
   'aaronsiam21@gmail.com',
   'fardeen@riseandshineaba.com',
   'hashir@riseandshineaba.com',
+  'azkarim05@gmail.com',
+  'jaden.j.brown2025@gmail.com',
 ]
 
 export async function getCurrentUserEmail(): Promise<string | null> {
