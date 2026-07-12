@@ -19,6 +19,28 @@ export function isSuperAdminEmail(email: string | null | undefined): boolean {
   return getSuperAdminEmails().includes(email.toLowerCase())
 }
 
+/**
+ * Admins who get full HRM access but must not see billing or payroll.
+ * Override via ADMIN_WITHOUT_BILLING_EMAILS (comma-separated).
+ */
+const DEFAULT_ADMIN_WITHOUT_BILLING_EMAILS = ['jaden.j.brown2025@gmail.com'] as const
+
+export function getAdminWithoutBillingEmails(): string[] {
+  const fromEnv = process.env.ADMIN_WITHOUT_BILLING_EMAILS?.trim()
+  if (fromEnv) {
+    return fromEnv
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+  }
+  return [...DEFAULT_ADMIN_WITHOUT_BILLING_EMAILS]
+}
+
+export function isAdminWithoutBilling(email: string | null | undefined): boolean {
+  if (!email) return false
+  return getAdminWithoutBillingEmails().includes(email.trim().toLowerCase())
+}
+
 /** Fixed OTP for test accounts — only honored in non-production / localhost (see verify-otp). */
 export const OTP_TEST_ACCOUNT_CODE = '000000'
 
