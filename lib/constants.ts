@@ -20,25 +20,39 @@ export function isSuperAdminEmail(email: string | null | undefined): boolean {
 }
 
 /**
- * Admins who get full HRM access but must not see billing or payroll.
- * Override via ADMIN_WITHOUT_BILLING_EMAILS (comma-separated).
+ * Only these emails may access Billing and Payroll (nav + APIs + layouts).
+ * Role alone is not enough. Override via BILLING_MANAGER_EMAILS (comma-separated).
  */
-const DEFAULT_ADMIN_WITHOUT_BILLING_EMAILS = ['jaden.j.brown2025@gmail.com'] as const
+const DEFAULT_BILLING_MANAGER_EMAILS = [
+  // Aaron
+  'aaronsiam21@gmail.com',
+  // Kazi / Jamal
+  'kazi@siyam.nyc',
+  'kazi@riseandshineaba.com',
+  'kazi@riseandshine.nyc',
+  'kazi@jamal.nyc',
+  // Fardeen
+  'fardeenhassansardar12@gmail.com',
+  'fardeen@riseandshineaba.com',
+  'fardeen@riseandshine.nyc',
+  // Shazia
+  'shaziakhaliq37@gmail.com',
+] as const
 
-export function getAdminWithoutBillingEmails(): string[] {
-  const fromEnv = process.env.ADMIN_WITHOUT_BILLING_EMAILS?.trim()
+export function getBillingManagerEmails(): string[] {
+  const fromEnv = process.env.BILLING_MANAGER_EMAILS?.trim()
   if (fromEnv) {
     return fromEnv
       .split(',')
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean)
   }
-  return [...DEFAULT_ADMIN_WITHOUT_BILLING_EMAILS]
+  return [...DEFAULT_BILLING_MANAGER_EMAILS]
 }
 
-export function isAdminWithoutBilling(email: string | null | undefined): boolean {
+export function isBillingManagerEmail(email: string | null | undefined): boolean {
   if (!email) return false
-  return getAdminWithoutBillingEmails().includes(email.trim().toLowerCase())
+  return getBillingManagerEmails().includes(email.trim().toLowerCase())
 }
 
 /** Fixed OTP for test accounts — only honored in non-production / localhost (see verify-otp). */

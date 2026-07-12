@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { prisma } from './prisma'
 import crypto from 'crypto'
-import { isSuperAdminEmail, isAdminWithoutBilling } from './constants'
+import { isBillingManagerEmail } from './constants'
 
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
 
@@ -266,13 +266,10 @@ export async function requireAdminSession(): Promise<
   return { user, response: null }
 }
 
-/** Billing & Payroll portal: BILLING role, admins (except billing-denied), or super-admin emails. */
+/** Billing & Payroll: email allowlist only (Aaron, Kazi/Jamal, Fardeen, Shazia). */
 export function isBillingManager(user: SessionUser | null): boolean {
   if (!user) return false
-  if (isAdminWithoutBilling(user.email)) return false
-  const role = (user.role ?? '').toUpperCase()
-  if (role === 'ADMIN' || role === 'BILLING') return true
-  return isSuperAdminEmail(user.email)
+  return isBillingManagerEmail(user.email)
 }
 
 export async function requireBillingManagerSession(): Promise<
