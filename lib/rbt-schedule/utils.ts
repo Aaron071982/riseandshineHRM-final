@@ -21,6 +21,11 @@ export type ScheduleAssignmentDTO = {
   updatedAt?: string
 }
 
+/** Synthetic id for sessions mirrored from the weekly Schedule roster. */
+export function isRosterAssignmentId(id: string): boolean {
+  return id.startsWith('roster:')
+}
+
 const TIME_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/
 
 export function parseTimeToMinutes(time: string): number | null {

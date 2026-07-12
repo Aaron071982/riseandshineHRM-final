@@ -18,13 +18,13 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Pencil, Plus, Trash2, MapPin, Clock } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
 import WeeklyScheduleCalendar from '@/components/schedule/WeeklyScheduleCalendar'
-import { isRosterAssignmentId } from '@/lib/rbt-schedule/from-roster'
 import {
   CALENDAR_DAY_ORDER,
   DAY_LABELS,
   DAY_SHORT,
   formatTime12h,
   hoursBetween,
+  isRosterAssignmentId,
   weeklyHours,
   type ScheduleAssignmentDTO,
 } from '@/lib/rbt-schedule/utils'

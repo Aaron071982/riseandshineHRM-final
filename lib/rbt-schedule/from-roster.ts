@@ -12,10 +12,6 @@ const DAY_TO_JS: Record<ScheduleDayOfWeek, number> = {
   SAT: 6,
 }
 
-export function isRosterAssignmentId(id: string): boolean {
-  return id.startsWith('roster:')
-}
-
 function normalizeName(name: string): string {
   return name
     .trim()
