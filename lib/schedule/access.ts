@@ -6,6 +6,9 @@ import { prisma } from '@/lib/prisma'
 /** Default allowlist when table is empty / env not set */
 const DEFAULT_SCHEDULE_EMAILS = [
   'kazi@siyam.nyc',
+  'kazi@riseandshineaba.com',
+  'kazi@riseandshine.nyc',
+  'shaziakhaliq37@gmail.com',
   'aaronsiam21@gmail.com',
   'fardeen@riseandshineaba.com',
   'hashir@riseandshineaba.com',
