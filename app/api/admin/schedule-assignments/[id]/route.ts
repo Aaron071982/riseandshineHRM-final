@@ -14,6 +14,12 @@ export async function PATCH(
     if (auth.response) return auth.response
 
     const { id } = await params
+    if (id.startsWith('roster:')) {
+      return NextResponse.json(
+        { error: 'Weekly roster sessions must be edited in the Schedule tab' },
+        { status: 400 }
+      )
+    }
     const existing = await prisma.rbtScheduleAssignment.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
@@ -77,6 +83,12 @@ export async function DELETE(
     if (auth.response) return auth.response
 
     const { id } = await params
+    if (id.startsWith('roster:')) {
+      return NextResponse.json(
+        { error: 'Weekly roster sessions must be removed in the Schedule tab' },
+        { status: 400 }
+      )
+    }
     const existing = await prisma.rbtScheduleAssignment.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })

@@ -248,7 +248,7 @@ export default function PublicCareersLandingPage() {
               </button>
             </div>
             <div className="mt-8 grid sm:grid-cols-2 gap-3 text-sm text-slate-700">
-              {['No experience required', 'Free 40-hour training support', 'Flexible scheduling', 'Weekly pay'].map((item) => (
+              {['No experience required', 'Free 40-hour training support', 'Flexible scheduling', 'Bi-weekly pay'].map((item) => (
                 <div key={item} className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-[#F97316]" />
                   <span>{item}</span>
@@ -339,7 +339,7 @@ export default function PublicCareersLandingPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {(
               [
-                { Icon: Users, title: 'Competitive Pay', text: 'Fair weekly compensation that reflects your dedication.' },
+                { Icon: Users, title: 'Competitive Pay', text: 'Fair bi-weekly compensation that reflects your dedication.' },
                 { Icon: CalendarDays, title: 'Flexible Hours', text: 'Most sessions after 2PM and on weekends - built around your life.' },
                 { Icon: Sparkles, title: 'Free Training Support', text: 'We guide you through the 40-hour course and certification process.' },
                 { Icon: HeartHandshake, title: 'BCBA Supervision', text: 'Learn directly from certified clinicians on every case.' },

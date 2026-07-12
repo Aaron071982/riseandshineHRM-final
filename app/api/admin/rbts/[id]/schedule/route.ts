@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/auth'
-import { validateAssignmentTimes } from '@/lib/rbt-schedule/utils'
+import { mergeAssignments, rosterAssignmentsForRbt } from '@/lib/rbt-schedule/from-roster'
+import { validateAssignmentTimes, type ScheduleAssignmentDTO } from '@/lib/rbt-schedule/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,17 +14,47 @@ export async function GET(
   if (auth.response) return auth.response
 
   const { id } = await params
-  const profile = await prisma.rBTProfile.findUnique({ where: { id }, select: { id: true } })
+  const profile = await prisma.rBTProfile.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      user: { select: { email: true } },
+    },
+  })
   if (!profile) {
     return NextResponse.json({ error: 'RBT profile not found' }, { status: 404 })
   }
 
-  const assignments = await prisma.rbtScheduleAssignment.findMany({
-    where: { rbtProfileId: id, isActive: true },
-    orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
-  })
+  const [nativeRows, roster] = await Promise.all([
+    prisma.rbtScheduleAssignment.findMany({
+      where: { rbtProfileId: id, isActive: true },
+      orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+    }),
+    rosterAssignmentsForRbt({
+      id: profile.id,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      email: profile.email,
+      userEmail: profile.user?.email,
+    }),
+  ])
 
-  return NextResponse.json({ assignments })
+  const native: ScheduleAssignmentDTO[] = nativeRows.map((a) => ({
+    id: a.id,
+    rbtProfileId: a.rbtProfileId,
+    clientName: a.clientName,
+    dayOfWeek: a.dayOfWeek,
+    startTime: a.startTime,
+    endTime: a.endTime,
+    location: a.location,
+    notes: a.notes,
+    isActive: a.isActive,
+  }))
+
+  return NextResponse.json({ assignments: mergeAssignments(native, roster) })
 }
 
 export async function POST(

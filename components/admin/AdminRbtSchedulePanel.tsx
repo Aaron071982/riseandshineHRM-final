@@ -18,6 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Pencil, Plus, Trash2, MapPin, Clock } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
 import WeeklyScheduleCalendar from '@/components/schedule/WeeklyScheduleCalendar'
+import { isRosterAssignmentId } from '@/lib/rbt-schedule/from-roster'
 import {
   CALENDAR_DAY_ORDER,
   DAY_LABELS,
@@ -100,6 +101,10 @@ export default function AdminRbtSchedulePanel({ rbtProfileId, rbtName }: AdminRb
   }
 
   const openEdit = (a: ScheduleAssignmentDTO) => {
+    if (isRosterAssignmentId(a.id)) {
+      showToast('Edit this session in the weekly Schedule tab', 'info')
+      return
+    }
     setEditingId(a.id)
     setForm({
       id: a.id,
@@ -193,6 +198,10 @@ export default function AdminRbtSchedulePanel({ rbtProfileId, rbtName }: AdminRb
   }
 
   const handleDelete = async (id: string) => {
+    if (isRosterAssignmentId(id)) {
+      showToast('Remove this session in the weekly Schedule tab', 'info')
+      return
+    }
     if (!confirm('Remove this assignment from the schedule?')) return
     try {
       const res = await fetch(`/api/admin/schedule-assignments/${id}`, {
@@ -222,7 +231,7 @@ export default function AdminRbtSchedulePanel({ rbtProfileId, rbtName }: AdminRb
             Weekly schedule — {rbtName}
           </h2>
           <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)] mt-0.5">
-            Planning tool only — not linked to Artemis sessions or payroll.
+            Includes sessions from the weekly Schedule tab (read-only here). Extra assignments can still be added below.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -254,7 +263,7 @@ export default function AdminRbtSchedulePanel({ rbtProfileId, rbtName }: AdminRb
             <CardContent className="pt-0 space-y-2">
               {assignments.length === 0 ? (
                 <p className="text-sm text-gray-500 py-4 text-center">
-                  No assignments yet. Add one or click an empty slot on the calendar.
+                  No assignments yet. Add one, click an empty calendar slot, or schedule this RBT in the weekly Schedule tab.
                 </p>
               ) : (
                 assignments
@@ -264,7 +273,9 @@ export default function AdminRbtSchedulePanel({ rbtProfileId, rbtName }: AdminRb
                     const bo = CALENDAR_DAY_ORDER.indexOf(b.dayOfWeek as (typeof CALENDAR_DAY_ORDER)[number])
                     return ao - bo || a.startTime.localeCompare(b.startTime)
                   })
-                  .map((a) => (
+                  .map((a) => {
+                    const fromRoster = isRosterAssignmentId(a.id)
+                    return (
                     <div
                       key={a.id}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)] p-3"
@@ -272,6 +283,9 @@ export default function AdminRbtSchedulePanel({ rbtProfileId, rbtName }: AdminRb
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-gray-900 dark:text-[var(--text-primary)] truncate">
                           {a.clientName}
+                          {fromRoster && (
+                            <span className="ml-2 text-xs font-normal text-gray-400">Weekly roster</span>
+                          )}
                         </p>
                         <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)] flex flex-wrap items-center gap-x-3 gap-y-1 mt-0.5">
                           <span>{DAY_LABELS[a.dayOfWeek]}s</span>
@@ -293,21 +307,24 @@ export default function AdminRbtSchedulePanel({ rbtProfileId, rbtName }: AdminRb
                           <p className="text-xs text-gray-500 mt-1 line-clamp-2">{a.notes}</p>
                         )}
                       </div>
-                      <div className="flex gap-1 shrink-0">
-                        <Button size="sm" variant="outline" onClick={() => openEdit(a)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={() => handleDelete(a.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                      {!fromRoster && (
+                        <div className="flex gap-1 shrink-0">
+                          <Button size="sm" variant="outline" onClick={() => openEdit(a)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => handleDelete(a.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  ))
+                    )
+                  })
               )}
             </CardContent>
           </Card>
