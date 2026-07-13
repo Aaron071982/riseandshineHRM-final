@@ -39,11 +39,27 @@ const actionLabel: Record<string, string> = {
   VIEW_ONLY: 'View document',
 }
 
+/**
+ * Site sends X-Frame-Options: DENY, so iframes of /api/... never work.
+ * Fetch with credentials → blob: URL for preview / download instead.
+ */
+async function fetchAsObjectUrl(path: string): Promise<string> {
+  const res = await fetch(path, { credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(typeof err.error === 'string' ? err.error : 'Failed to load document')
+  }
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
+}
+
 export default function RbtCompanyDistDocs({ search }: { search: string }) {
   const { showToast } = useToast()
   const [items, setItems] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [active, setActive] = useState<Assignment | null>(null)
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [signedName, setSignedName] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -66,23 +82,64 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
     void load()
   }, [load])
 
+  useEffect(() => {
+    return () => {
+      if (previewSrc) URL.revokeObjectURL(previewSrc)
+    }
+  }, [previewSrc])
+
   const filtered = items.filter((d) => {
     if (!search.trim()) return true
     return d.title.toLowerCase().includes(search.trim().toLowerCase())
   })
 
+  const closeDialog = () => {
+    if (saving) return
+    setActive(null)
+    setSignedName('')
+    setUploadFile(null)
+    if (previewSrc) {
+      URL.revokeObjectURL(previewSrc)
+      setPreviewSrc(null)
+    }
+  }
+
   const openDoc = async (a: Assignment) => {
     setActive(a)
     setSignedName('')
     setUploadFile(null)
+    setPreviewLoading(true)
+    if (previewSrc) {
+      URL.revokeObjectURL(previewSrc)
+      setPreviewSrc(null)
+    }
     try {
       await fetch(`/api/rbt/documents/company/${a.documentId}/view`, {
         method: 'POST',
         credentials: 'include',
       })
+      const url = await fetchAsObjectUrl(a.previewUrl)
+      setPreviewSrc(url)
       await load()
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not load preview', 'error')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const handleDownload = async () => {
+    if (!active) return
+    try {
+      const url = previewSrc ?? (await fetchAsObjectUrl(active.previewUrl))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${active.title}.${active.fileType}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
     } catch {
-      /* ignore */
+      showToast('Download failed', 'error')
     }
   }
 
@@ -102,7 +159,7 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
         return
       }
       showToast('Document signed', 'success')
-      setActive(null)
+      closeDialog()
       await load()
     } catch {
       showToast('Sign failed', 'error')
@@ -131,7 +188,7 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
         return
       }
       showToast('Completed file submitted', 'success')
-      setActive(null)
+      closeDialog()
       await load()
     } catch {
       showToast('Upload failed', 'error')
@@ -165,17 +222,11 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
             className="flex flex-wrap items-center justify-between gap-4 p-3 rounded-lg border dark:border-[var(--border-subtle)] hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)]"
           >
             <div className="flex items-start gap-3 min-w-0 flex-1">
-              <div className="w-14 h-16 rounded border bg-white overflow-hidden shrink-0 flex items-center justify-center">
-                {doc.fileType === 'png' ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={doc.previewUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <iframe src={doc.previewUrl} title="" className="w-[200%] h-[200%] scale-50 origin-top-left pointer-events-none" />
-                )}
+              <div className="w-14 h-16 rounded border bg-orange-50 dark:bg-orange-950/20 flex items-center justify-center shrink-0">
+                <FileText className="w-6 h-6 text-[#e36f1e]" />
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#e36f1e] shrink-0" />
                   <p className="font-medium truncate">{doc.title}</p>
                   {doc.isTest && (
                     <Badge variant="outline" className="border-amber-400 text-amber-700 text-[10px]">
@@ -206,7 +257,7 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
         ))}
       </ul>
 
-      <Dialog open={!!active} onOpenChange={(o) => !saving && !o && setActive(null)}>
+      <Dialog open={!!active} onOpenChange={(o) => !o && closeDialog()}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{active?.title}</DialogTitle>
@@ -216,16 +267,24 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
           </DialogHeader>
           {active && (
             <div className="space-y-4">
-              {active.fileType === 'png' ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={active.previewUrl} alt={active.title} className="w-full rounded border" />
-              ) : (
-                <iframe
-                  src={active.previewUrl}
-                  title={active.title}
-                  className="w-full min-h-[50vh] rounded border"
-                />
-              )}
+              <div className="w-full min-h-[50vh] rounded border bg-gray-50 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
+                {previewLoading ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                ) : previewSrc ? (
+                  active.fileType === 'png' ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={previewSrc} alt={active.title} className="w-full h-auto max-h-[70vh] object-contain" />
+                  ) : (
+                    <iframe
+                      src={previewSrc}
+                      title={active.title}
+                      className="w-full min-h-[50vh] h-[70vh] border-0"
+                    />
+                  )
+                ) : (
+                  <p className="text-sm text-gray-500">Preview unavailable</p>
+                )}
+              </div>
 
               {active.documentType === 'ACKNOWLEDGMENT' && active.status !== 'SIGNED' && (
                 <div className="space-y-2 border-t pt-4">
@@ -236,7 +295,11 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
                     onChange={(e) => setSignedName(e.target.value)}
                     placeholder="First Last"
                   />
-                  <Button disabled={saving} onClick={() => void handleSign()} className="bg-orange-500 hover:bg-orange-600 text-white">
+                  <Button
+                    disabled={saving}
+                    onClick={() => void handleSign()}
+                    className="bg-orange-500 hover:bg-orange-600 text-white"
+                  >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     Sign & acknowledge
                   </Button>
@@ -245,10 +308,8 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
 
               {active.documentType === 'DOWNLOAD_UPLOAD' && active.status !== 'SUBMITTED' && (
                 <div className="space-y-2 border-t pt-4">
-                  <Button variant="outline" asChild>
-                    <a href={active.previewUrl} download={`${active.title}.${active.fileType}`}>
-                      Download original
-                    </a>
+                  <Button variant="outline" type="button" onClick={() => void handleDownload()}>
+                    Download original
                   </Button>
                   <div className="space-y-2">
                     <Label htmlFor="submit-file">Upload completed file</Label>
@@ -258,7 +319,11 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
                       onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
                     />
                   </div>
-                  <Button disabled={saving} onClick={() => void handleUpload()} className="bg-orange-500 hover:bg-orange-600 text-white">
+                  <Button
+                    disabled={saving}
+                    onClick={() => void handleUpload()}
+                    className="bg-orange-500 hover:bg-orange-600 text-white"
+                  >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                     Submit completed file
                   </Button>
@@ -272,7 +337,7 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" disabled={saving} onClick={() => setActive(null)}>
+            <Button variant="outline" disabled={saving} onClick={closeDialog}>
               Close
             </Button>
           </DialogFooter>

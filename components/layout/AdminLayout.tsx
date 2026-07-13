@@ -26,8 +26,6 @@ import {
   DollarSign,
   LineChart,
   FileText,
-  Zap,
-  UsersRound,
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
@@ -57,8 +55,6 @@ const secondaryBase: NavItem[] = [
   { href: '/admin/documents', label: 'Documents', icon: FileText },
   { href: '/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
-  { href: '/admin/action-center', label: 'Action Center', icon: Zap },
-  { href: '/admin/team', label: 'Team', icon: UsersRound },
   { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
@@ -84,8 +80,6 @@ function pathIsActive(pathname: string, href: string): boolean {
   if (href === '/schedule') return pathname.startsWith('/schedule')
   if (href === '/admin/documents') return pathname.startsWith('/admin/documents')
   if (href === '/admin/employees') return pathname.startsWith('/admin/employees') || pathname.startsWith('/admin/rbts')
-  if (href === '/admin/action-center') return pathname.startsWith('/admin/action-center')
-  if (href === '/admin/team') return pathname.startsWith('/admin/team')
   return pathname === href
 }
 
@@ -146,8 +140,6 @@ export default function AdminLayout({
         { href: '/admin/employees', label: 'Employees and Candidates', icon: Users },
         { href: '/admin/interviews', label: 'Interviews', icon: Calendar },
         { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
-        { href: '/admin/team', label: 'Team', icon: UsersRound },
-        { href: '/admin/action-center', label: 'Action Center', icon: Zap },
         { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
         { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
         { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
@@ -156,7 +148,7 @@ export default function AdminLayout({
         { href: '/admin/mcp-activity', label: 'MCP Activity', icon: Plug },
         { href: '/admin/mcp-connections', label: 'MCP Connections', icon: Plug },
       ]
-      if (showOperationsNav) items.splice(5, 0, operationsNavItem)
+      if (showOperationsNav) items.splice(4, 0, operationsNavItem)
       return items
     }
     return [
