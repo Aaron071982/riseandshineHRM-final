@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
+import RbtCompanyDistDocs from '@/components/rbt/RbtCompanyDistDocs'
 
 type MyDoc = {
   id: string
@@ -220,7 +221,19 @@ export default function RBTDocumentsPage() {
         <TabsContent value="company" className="space-y-4">
           <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
             <CardHeader>
-              <CardTitle className="text-lg">Company Documents</CardTitle>
+              <CardTitle className="text-lg">Distributed company documents</CardTitle>
+              <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
+                New documents from Rise &amp; Shine — review, sign, or upload as required.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <RbtCompanyDistDocs search={search} />
+            </CardContent>
+          </Card>
+
+          <Card className="dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
+            <CardHeader>
+              <CardTitle className="text-lg">Onboarding completions</CardTitle>
               <p className="text-sm text-gray-600 dark:text-[var(--text-tertiary)]">
                 Completed onboarding documents.
               </p>
@@ -228,7 +241,7 @@ export default function RBTDocumentsPage() {
             <CardContent>
               {companyFiltered.length === 0 ? (
                 <p className="text-center py-8 text-gray-500 dark:text-[var(--text-tertiary)]">
-                  No company documents yet.
+                  No onboarding company documents yet.
                 </p>
               ) : (
                 <ul className="space-y-3">

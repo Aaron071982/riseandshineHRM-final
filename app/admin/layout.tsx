@@ -1,6 +1,6 @@
 import AdminLayout from '@/components/layout/AdminLayout'
 import { cookies } from 'next/headers'
-import { validateSession, isAdmin, isBillingManager } from '@/lib/auth'
+import { validateSession, isAdmin, isBillingManager, isExecutiveAdmin } from '@/lib/auth'
 import { isOperationsViewer } from '@/lib/auth/operationsAccess'
 import { redirect } from 'next/navigation'
 
@@ -39,9 +39,9 @@ export default async function AdminLayoutWrapper({
       showBillingNav={isBillingManager(user)}
       showOperationsNav={isOperationsViewer(user)}
       showScheduleNav
+      isExecutive={isExecutiveAdmin(user)}
     >
       {children}
     </AdminLayout>
   )
 }
-

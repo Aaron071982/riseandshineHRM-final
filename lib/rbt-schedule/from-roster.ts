@@ -1,3 +1,4 @@
+import { distance } from 'fastest-levenshtein'
 import { prisma } from '@/lib/prisma'
 import type { ScheduleDayOfWeek } from '@prisma/client'
 import { formatMinutes, type ScheduleAssignmentDTO } from '@/lib/rbt-schedule/utils'
@@ -12,28 +13,75 @@ const DAY_TO_JS: Record<ScheduleDayOfWeek, number> = {
   SAT: 6,
 }
 
-function normalizeName(name: string): string {
+/** Normalize for comparison: lowercase, strip punctuation/hyphens, collapse spaces. */
+export function normalizeName(name: string): string {
   return name
     .trim()
     .toLowerCase()
-    .replace(/[.,]/g, ' ')
+    .replace(/[.,']/g, ' ')
+    .replace(/[-_/]/g, ' ')
     .replace(/\s+/g, ' ')
+    .trim()
 }
 
-function namesMatch(a: string, b: string): boolean {
+function tokens(name: string): string[] {
+  return normalizeName(name).split(' ').filter(Boolean)
+}
+
+function similarity(a: string, b: string): number {
   const na = normalizeName(a)
   const nb = normalizeName(b)
+  if (!na || !nb) return 0
+  if (na === nb) return 1
+  const maxLen = Math.max(na.length, nb.length)
+  if (maxLen === 0) return 1
+  return 1 - distance(na, nb) / maxLen
+}
+
+/**
+ * Therapist roster name ↔ RBT profile name.
+ * Supports: exact, Last/First flip, middle names, hyphenated vs spaced names,
+ * and near-typo last names when first name matches (e.g. Logunle → Logunleko).
+ */
+export function namesMatch(therapistName: string, rbtFullName: string): boolean {
+  const na = normalizeName(therapistName)
+  const nb = normalizeName(rbtFullName)
   if (!na || !nb) return false
   if (na === nb) return true
+
   // "Last, First" ↔ "First Last"
   const flipComma = (s: string) => {
     const parts = s.split(',').map((p) => p.trim()).filter(Boolean)
-    return parts.length === 2 ? `${parts[1]} ${parts[0]}` : null
+    return parts.length === 2 ? normalizeName(`${parts[1]} ${parts[0]}`) : null
   }
-  const fa = flipComma(na)
-  const fb = flipComma(nb)
+  const fa = flipComma(therapistName)
+  const fb = flipComma(rbtFullName)
   if (fa && fa === nb) return true
   if (fb && fb === na) return true
+
+  const ta = tokens(therapistName)
+  const tb = tokens(rbtFullName)
+  if (ta.length === 0 || tb.length === 0) return false
+
+  // Compact form equal (Stacy Ann Williams ↔ StacyAnnWilliams after hyphen split)
+  if (ta.join('') === tb.join('')) return true
+
+  // Same first + last token; ignore middlename differences
+  // e.g. "Ahmed Abdelkhalek" ↔ "Ahmed noah Abdelkhalek"
+  // e.g. "Stacy Ann-Williams" ↔ "Stacy-Ann Williams" → tokens stacy,ann,williams both ways
+  if (ta.length >= 2 && tb.length >= 2) {
+    if (ta[0] === tb[0] && ta[ta.length - 1] === tb[tb.length - 1]) return true
+  }
+
+  // Same first name + close last name (typos / truncated)
+  if (ta.length >= 2 && tb.length >= 2 && ta[0] === tb[0]) {
+    const lastSim = similarity(ta[ta.length - 1], tb[tb.length - 1])
+    if (lastSim >= 0.75) return true
+  }
+
+  // Strong full-string similarity (conservative)
+  if (similarity(na, nb) >= 0.9) return true
+
   return false
 }
 
@@ -47,7 +95,7 @@ export type RbtIdentity = {
 
 /**
  * Load weekly-roster session slots for an RBT and map them to assignment DTOs.
- * Matching: therapist email → exact normalized full name (no aggressive fuzzy).
+ * Matching: therapist email → robust name match (middle names / hyphens / near-typos).
  */
 export async function rosterAssignmentsForRbt(rbt: RbtIdentity): Promise<ScheduleAssignmentDTO[]> {
   const fullName = `${rbt.firstName} ${rbt.lastName}`.trim()

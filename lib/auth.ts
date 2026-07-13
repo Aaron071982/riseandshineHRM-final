@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { prisma } from './prisma'
 import crypto from 'crypto'
-import { isBillingManagerEmail } from './constants'
+import { isBillingManagerEmail, isExecutiveAdminEmail } from './constants'
 
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
 
@@ -228,10 +228,17 @@ export async function cleanupExpiredSessions(): Promise<void> {
 }
 
 export { isSuperAdminEmail as isSuperAdmin } from '@/lib/constants'
+export { isExecutiveAdminEmail } from '@/lib/constants'
 
 /** Use for route guards so role casing or edge cases never cause false 403. */
 export function isAdmin(user: SessionUser | null): user is SessionUser {
   return !!user && (user.role ?? '').toUpperCase() === 'ADMIN'
+}
+
+/** Kazi executive portal accounts (indigo themed). Aaron remains standard orange admin. */
+export function isExecutiveAdmin(user: SessionUser | null): boolean {
+  if (!user || !isAdmin(user)) return false
+  return isExecutiveAdminEmail(user.email)
 }
 
 /** Get current session user from cookies (for use in server/API context). */

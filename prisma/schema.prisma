@@ -413,6 +413,7 @@ model User {
   terminationsDecided          Termination[]             @relation("TerminationDecisionMaker")
   rbtScheduleAssignmentsCreated RbtScheduleAssignment[]  @relation("RbtScheduleAssignmentCreatedBy")
   payrollRunsUploaded           PayrollRun[]             @relation("PayrollRunUploadedBy")
+  companyDocumentsUploaded      CompanyDocument[]        @relation("CompanyDocumentUploadedBy")
 
   @@map("users")
 }
@@ -711,6 +712,7 @@ model RBTProfile {
   scheduleAssignments         RbtScheduleAssignment[]
   payStatements               RbtPayStatement[]
   payrollRunEntries           PayrollRunEntry[]
+  companyDocumentRecipients   CompanyDocumentRecipient[]
 
   @@index([artemisTrainingCompleted])
   @@index([postHireStage])
@@ -2264,4 +2266,65 @@ model PayrollRunEntry {
   @@index([matchStatus])
   @@map("payroll_run_entries")
 }
+
+// ─── Company-wide document distribution ──────────────────────────────────────
+
+enum CompanyDocumentType {
+  ACKNOWLEDGMENT
+  DOWNLOAD_UPLOAD
+  VIEW_ONLY
+}
+
+enum CompanyDocumentRecipientStatus {
+  PENDING
+  VIEWED
+  SIGNED
+  SUBMITTED
+}
+
+model CompanyDocument {
+  id           String              @id @default(cuid())
+  title        String
+  description  String?             @db.Text
+  fileUrl      String
+  fileType     String
+  documentType CompanyDocumentType
+  uploadedById String
+  isActive     Boolean             @default(true)
+  isTest       Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  uploadedBy User                       @relation("CompanyDocumentUploadedBy", fields: [uploadedById], references: [id])
+  recipients CompanyDocumentRecipient[]
+
+  @@index([isActive, isTest])
+  @@index([createdAt])
+  @@map("company_documents")
+}
+
+model CompanyDocumentRecipient {
+  id                String                         @id @default(cuid())
+  companyDocumentId String
+  rbtProfileId      String
+  status            CompanyDocumentRecipientStatus @default(PENDING)
+  signedName        String?
+  signedAt          DateTime?
+  signatureIp       String?
+  uploadedFileUrl   String?
+  viewedAt          DateTime?
+  submittedAt       DateTime?
+  emailSentAt       DateTime?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+
+  companyDocument CompanyDocument @relation(fields: [companyDocumentId], references: [id], onDelete: Cascade)
+  rbtProfile      RBTProfile      @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([companyDocumentId, rbtProfileId])
+  @@index([rbtProfileId, status])
+  @@index([companyDocumentId, status])
+  @@map("company_document_recipients")
+}
+
 

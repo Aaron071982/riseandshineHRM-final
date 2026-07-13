@@ -25,6 +25,9 @@ import {
   Plug,
   DollarSign,
   LineChart,
+  FileText,
+  Zap,
+  UsersRound,
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
@@ -37,18 +40,25 @@ interface AdminLayoutProps {
   showBillingNav?: boolean
   showOperationsNav?: boolean
   showScheduleNav?: boolean
+  /** Kazi executive portal — indigo accent + reorganized nav */
+  isExecutive?: boolean
 }
 
-const mainNavItems = [
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard }
+
+const standardMainNav: NavItem[] = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/employees', label: 'Employees and Candidates', icon: Users },
   { href: '/admin/interviews', label: 'Interviews', icon: Calendar },
   { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
 ]
 
-const secondaryNavItems = [
+const secondaryBase: NavItem[] = [
+  { href: '/admin/documents', label: 'Documents', icon: FileText },
   { href: '/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
+  { href: '/admin/action-center', label: 'Action Center', icon: Zap },
+  { href: '/admin/team', label: 'Team', icon: UsersRound },
   { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
@@ -59,15 +69,42 @@ const secondaryNavItems = [
 
 const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
 
-const billingNavItem = { href: '/billing/dashboard', label: 'Billing', icon: DollarSign }
-const payrollNavItem = { href: '/admin/payroll', label: 'Payroll', icon: DollarSign }
-const operationsNavItem = { href: '/operations', label: 'Operations', icon: LineChart }
+const billingNavItem: NavItem = { href: '/billing/dashboard', label: 'Billing', icon: DollarSign }
+const payrollNavItem: NavItem = { href: '/admin/payroll', label: 'Payroll', icon: DollarSign }
+const operationsNavItem: NavItem = { href: '/operations', label: 'Operations', icon: LineChart }
+
+const EXEC_ACCENT = '#4F46E5'
+
+function pathIsActive(pathname: string, href: string): boolean {
+  if (href === '/admin/org-chart') return pathname.startsWith('/admin/org-chart')
+  if (href === '/billing/dashboard') return pathname.startsWith('/billing') && !pathname.startsWith('/billing/payroll')
+  if (href === '/admin/payroll')
+    return pathname.startsWith('/admin/payroll') || pathname.startsWith('/billing/payroll')
+  if (href === '/operations') return pathname.startsWith('/operations')
+  if (href === '/schedule') return pathname.startsWith('/schedule')
+  if (href === '/admin/documents') return pathname.startsWith('/admin/documents')
+  if (href === '/admin/employees') return pathname.startsWith('/admin/employees') || pathname.startsWith('/admin/rbts')
+  if (href === '/admin/action-center') return pathname.startsWith('/admin/action-center')
+  if (href === '/admin/team') return pathname.startsWith('/admin/team')
+  return pathname === href
+}
+
+function isPortalHref(href: string): boolean {
+  return (
+    href === '/billing/dashboard' ||
+    href === '/admin/payroll' ||
+    href === '/operations' ||
+    href === '/schedule' ||
+    href === '/admin/documents'
+  )
+}
 
 export default function AdminLayout({
   children,
   showBillingNav,
   showOperationsNav,
   showScheduleNav: _showScheduleNav = true,
+  isExecutive = false,
 }: AdminLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -91,34 +128,47 @@ export default function AdminLayout({
     }
   }, [pathname])
 
-  const portalNavItems = useMemo(
-    () => [
+  const mainNavItems = useMemo((): NavItem[] => {
+    if (!isExecutive) return standardMainNav
+    const top: NavItem[] = [{ href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }]
+    if (showBillingNav) {
+      top.push(payrollNavItem)
+      top.push(billingNavItem)
+    }
+    top.push({ href: '/schedule', label: 'Schedule', icon: CalendarDays })
+    top.push({ href: '/admin/documents', label: 'Documents', icon: FileText })
+    return top
+  }, [isExecutive, showBillingNav])
+
+  const moreItems = useMemo((): NavItem[] => {
+    if (isExecutive) {
+      const items: NavItem[] = [
+        { href: '/admin/employees', label: 'Employees and Candidates', icon: Users },
+        { href: '/admin/interviews', label: 'Interviews', icon: Calendar },
+        { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
+        { href: '/admin/team', label: 'Team', icon: UsersRound },
+        { href: '/admin/action-center', label: 'Action Center', icon: Zap },
+        { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
+        { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
+        { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
+        { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
+        { href: '/admin/org-chart', label: 'Company hierarchy', icon: Network },
+        { href: '/admin/mcp-activity', label: 'MCP Activity', icon: Plug },
+        { href: '/admin/mcp-connections', label: 'MCP Connections', icon: Plug },
+      ]
+      if (showOperationsNav) items.splice(5, 0, operationsNavItem)
+      return items
+    }
+    return [
       ...(showBillingNav ? [billingNavItem, payrollNavItem] : []),
       ...(showOperationsNav ? [operationsNavItem] : []),
-    ],
-    [showBillingNav, showOperationsNav]
-  )
+      ...secondaryBase,
+    ]
+  }, [isExecutive, showBillingNav, showOperationsNav])
 
-  const moreMenuHasActive = useMemo(() => {
-    const items = [...portalNavItems, ...secondaryNavItems]
-    return items.some((i) =>
-      i.href === '/admin/org-chart'
-        ? pathname.startsWith('/admin/org-chart')
-        : i.href === '/billing/dashboard'
-          ? pathname.startsWith('/billing')
-          : i.href === '/admin/payroll'
-            ? pathname.startsWith('/admin/payroll') || pathname.startsWith('/billing/payroll')
-            : i.href === '/operations'
-              ? pathname.startsWith('/operations')
-              : i.href === '/schedule'
-                ? pathname.startsWith('/schedule')
-                : pathname === i.href
-    )
-  }, [pathname, portalNavItems])
-
-  const secondaryItems = useMemo(
-    () => [...portalNavItems, ...secondaryNavItems],
-    [portalNavItems]
+  const moreMenuHasActive = useMemo(
+    () => moreItems.some((i) => pathIsActive(pathname, i.href)),
+    [pathname, moreItems]
   )
 
   const handleLogout = async () => {
@@ -130,13 +180,33 @@ export default function AdminLayout({
     cn(
       'inline-flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors',
       isActive
-        ? 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
+        ? isExecutive
+          ? 'text-white'
+          : 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
         : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-primary)]'
     )
 
+  const activeStyle = isExecutive
+    ? { backgroundColor: EXEC_ACCENT, color: '#fff' }
+    : undefined
+
+  const brandColor = isExecutive ? EXEC_ACCENT : '#e36f1e'
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[var(--bg-primary)]">
-      <nav className="nav-header relative z-50 overflow-visible bg-white border-b border-gray-200 dark:bg-[var(--bg-elevated)] dark:border-[var(--border-subtle)]">
+    <div
+      className={cn(
+        'min-h-screen bg-gray-50 dark:bg-[var(--bg-primary)]',
+        isExecutive && 'executive-admin-portal'
+      )}
+    >
+      <nav
+        className={cn(
+          'nav-header relative z-50 overflow-visible bg-white border-b dark:bg-[var(--bg-elevated)]',
+          isExecutive
+            ? 'border-indigo-100 dark:border-indigo-900/40'
+            : 'border-gray-200 dark:border-[var(--border-subtle)]'
+        )}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-visible">
           <div className="relative flex h-16 items-center justify-between overflow-visible">
             <Link href="/admin/dashboard" className="flex items-center shrink-0 z-10">
@@ -148,26 +218,39 @@ export default function AdminLayout({
                   height={48}
                   className="object-contain"
                 />
-                <span
-                  className="text-lg font-bold tracking-normal text-[#e36f1e] dark:text-[var(--text-primary)] whitespace-nowrap"
-                  style={{
-                    fontFamily:
-                      'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    letterSpacing: '0.01em',
-                    fontWeight: 700,
-                  }}
-                >
-                  Rise and shine
-                </span>
+                <div className="flex flex-col">
+                  <span
+                    className="text-lg font-bold tracking-normal whitespace-nowrap dark:text-[var(--text-primary)]"
+                    style={{
+                      color: brandColor,
+                      fontFamily:
+                        'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      letterSpacing: '0.01em',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Rise and shine
+                  </span>
+                  {isExecutive && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-500/80">
+                      Executive
+                    </span>
+                  )}
+                </div>
               </div>
             </Link>
 
             <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 items-center gap-0.5 overflow-visible">
               {mainNavItems.map((item) => {
-                const isActive = pathname === item.href
+                const isActive = pathIsActive(pathname, item.href)
                 const Icon = item.icon
                 return (
-                  <Link key={item.href} href={item.href} className={navLinkClass(isActive)}>
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={navLinkClass(isActive)}
+                    style={isActive ? activeStyle : undefined}
+                  >
                     {Icon ? <Icon className="w-4 h-4 mr-1" /> : null}
                     {item.label}
                   </Link>
@@ -181,6 +264,7 @@ export default function AdminLayout({
                     setMoreOpen((v) => !v)
                   }}
                   className={navLinkClass(moreMenuHasActive)}
+                  style={moreMenuHasActive ? activeStyle : undefined}
                 >
                   More
                   <span className="ml-1 text-xs">▾</span>
@@ -191,26 +275,10 @@ export default function AdminLayout({
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="py-1">
-                      {secondaryItems.map((item) => {
+                      {moreItems.map((item) => {
                         const Icon = item.icon
-                        const isActive =
-                          item.href === '/admin/org-chart'
-                            ? pathname.startsWith('/admin/org-chart')
-                            : item.href === '/billing/dashboard'
-                              ? pathname.startsWith('/billing') && !pathname.startsWith('/billing/payroll')
-                              : item.href === '/admin/payroll'
-                                ? pathname.startsWith('/admin/payroll') ||
-                                  pathname.startsWith('/billing/payroll')
-                                : item.href === '/operations'
-                                  ? pathname.startsWith('/operations')
-                                  : item.href === '/schedule'
-                                    ? pathname.startsWith('/schedule')
-                                    : pathname === item.href
-                        const isTealPortal =
-                          item.href === '/billing/dashboard' ||
-                          item.href === '/admin/payroll' ||
-                          item.href === '/operations' ||
-                          item.href === '/schedule'
+                        const isActive = pathIsActive(pathname, item.href)
+                        const portal = isPortalHref(item.href)
                         return (
                           <Link
                             key={item.href}
@@ -219,12 +287,19 @@ export default function AdminLayout({
                             className={cn(
                               'flex items-center px-3 py-2 text-sm',
                               isActive
-                                ? isTealPortal
+                                ? portal && !isExecutive
                                   ? 'bg-[#0D9488] text-white'
-                                  : 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
+                                  : isExecutive
+                                    ? 'text-white'
+                                    : 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
                                 : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-primary)]',
-                              isTealPortal && !isActive && 'hover:bg-teal-50 dark:hover:bg-teal-950/30'
+                              portal && !isActive && !isExecutive && 'hover:bg-teal-50 dark:hover:bg-teal-950/30'
                             )}
+                            style={
+                              isActive && isExecutive
+                                ? { backgroundColor: EXEC_ACCENT }
+                                : undefined
+                            }
                           >
                             {Icon ? <Icon className="w-4 h-4 mr-2 shrink-0" /> : null}
                             {item.label}
@@ -273,25 +348,9 @@ export default function AdminLayout({
       {mobileMenuOpen && (
         <div className="md:hidden relative z-40 bg-white dark:bg-[var(--bg-elevated)] border-b border-gray-200 dark:border-[var(--border-subtle)]">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            {mainNavItems.concat(secondaryItems).map((item) => {
-              const isActive =
-                item.href === '/admin/org-chart'
-                  ? pathname.startsWith('/admin/org-chart')
-                  : item.href === '/billing/dashboard'
-                    ? pathname.startsWith('/billing') && !pathname.startsWith('/billing/payroll')
-                    : item.href === '/admin/payroll'
-                      ? pathname.startsWith('/admin/payroll') ||
-                        pathname.startsWith('/billing/payroll')
-                      : item.href === '/operations'
-                        ? pathname.startsWith('/operations')
-                        : item.href === '/schedule'
-                          ? pathname.startsWith('/schedule')
-                          : pathname === item.href
-              const isTealPortal =
-                item.href === '/billing/dashboard' ||
-                item.href === '/admin/payroll' ||
-                item.href === '/operations' ||
-                item.href === '/schedule'
+            {mainNavItems.concat(moreItems).map((item) => {
+              const isActive = pathIsActive(pathname, item.href)
+              const portal = isPortalHref(item.href)
               const Icon = item.icon
               return (
                 <Link
@@ -301,11 +360,14 @@ export default function AdminLayout({
                   className={cn(
                     'flex items-center px-3 py-2 rounded-md text-base font-medium',
                     isActive
-                      ? isTealPortal
+                      ? portal && !isExecutive
                         ? 'bg-[#0D9488] text-white'
-                        : 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
+                        : isExecutive
+                          ? 'text-white'
+                          : 'bg-primary text-primary-foreground dark:bg-[var(--orange-primary)] dark:text-[var(--text-on-orange)]'
                       : 'text-gray-700 hover:bg-gray-100 dark:text-[var(--text-secondary)] dark:hover:bg-[var(--bg-elevated-hover)] dark:hover:text-[var(--text-primary)]'
                   )}
+                  style={isActive && isExecutive ? { backgroundColor: EXEC_ACCENT } : undefined}
                 >
                   {Icon ? <Icon className="w-4 h-4 mr-3" /> : null}
                   {item.label}

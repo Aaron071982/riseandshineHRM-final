@@ -55,10 +55,43 @@ export function isBillingManagerEmail(email: string | null | undefined): boolean
   return getBillingManagerEmails().includes(email.trim().toLowerCase())
 }
 
-/** Fixed OTP for test accounts — only honored in non-production / localhost (see verify-otp). */
+/**
+ * Executive admin portal (indigo themed nav/dashboard).
+ * Aaron keeps the standard orange admin view.
+ */
+const DEFAULT_EXECUTIVE_ADMIN_EMAILS = [
+  'kazi@jamal.nyc',
+  'kazi@riseandshineaba.com',
+] as const
+
+export function getExecutiveAdminEmails(): string[] {
+  const fromEnv = process.env.EXECUTIVE_ADMIN_EMAILS?.trim()
+  if (fromEnv) {
+    return fromEnv
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+  }
+  return [...DEFAULT_EXECUTIVE_ADMIN_EMAILS]
+}
+
+export function isExecutiveAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  return getExecutiveAdminEmails().includes(email.trim().toLowerCase())
+}
+
+/** Company-document TEST distribution goes only to this RBT account. */
+export const COMPANY_DOC_TEST_EMAIL = 'aaronsiam22@gmail.com'
+
+export function isCompanyDocTestEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  return email.trim().toLowerCase() === COMPANY_DOC_TEST_EMAIL
+}
+
+/** Fixed OTP for local/bypass envs only — never for aaronsiam22 (uses real emailed OTP). */
 export const OTP_TEST_ACCOUNT_CODE = '000000'
 
-const OTP_TEST_ACCOUNT_EMAILS = ['hrmtesting@gmail.com', 'aaronsiam22@gmail.com', 'aaronsiam24@gmail.com'] as const
+const OTP_TEST_ACCOUNT_EMAILS = ['hrmtesting@gmail.com', 'aaronsiam24@gmail.com'] as const
 
 export function isOtpTestAccount(email: string | null | undefined): boolean {
   if (!email) return false
