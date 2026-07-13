@@ -6,7 +6,7 @@ import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ completionId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const cookieStore = await cookies()
@@ -19,7 +19,7 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { completionId } = await params
+    const { id: completionId } = await params
     const completion = await prisma.onboardingCompletion.findUnique({
       where: { id: completionId },
       include: { document: true },
