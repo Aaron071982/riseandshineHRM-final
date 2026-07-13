@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { FileText, Loader2 } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import OnboardingPdfViewer from '@/components/onboarding/OnboardingPdfViewer'
 
 type Assignment = {
   recipientId: string
@@ -39,18 +40,23 @@ const actionLabel: Record<string, string> = {
   VIEW_ONLY: 'View document',
 }
 
-/**
- * Site sends X-Frame-Options: DENY, so iframes of /api/... never work.
- * Fetch with credentials → blob: URL for preview / download instead.
- */
-async function fetchAsObjectUrl(path: string): Promise<string> {
+/** Fetch file bytes with session cookies; never use the API URL inside an iframe. */
+async function fetchAsTypedBlob(path: string, fallbackType: string): Promise<Blob> {
   const res = await fetch(path, { credentials: 'include' })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(typeof err.error === 'string' ? err.error : 'Failed to load document')
   }
-  const blob = await res.blob()
-  return URL.createObjectURL(blob)
+  const ct = res.headers.get('content-type') || ''
+  if (ct.includes('text/html')) {
+    throw new Error('Document endpoint returned HTML instead of a file')
+  }
+  const buf = await res.arrayBuffer()
+  const type =
+    ct.startsWith('application/pdf') || ct.startsWith('image/')
+      ? ct.split(';')[0].trim()
+      : fallbackType
+  return new Blob([buf], { type })
 }
 
 export default function RbtCompanyDistDocs({ search }: { search: string }) {
@@ -58,8 +64,8 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
   const [items, setItems] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [active, setActive] = useState<Assignment | null>(null)
-  const [previewSrc, setPreviewSrc] = useState<string | null>(null)
-  const [previewLoading, setPreviewLoading] = useState(false)
+  const [pngSrc, setPngSrc] = useState<string | null>(null)
+  const [pngLoading, setPngLoading] = useState(false)
   const [signedName, setSignedName] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -84,9 +90,9 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
 
   useEffect(() => {
     return () => {
-      if (previewSrc) URL.revokeObjectURL(previewSrc)
+      if (pngSrc) URL.revokeObjectURL(pngSrc)
     }
-  }, [previewSrc])
+  }, [pngSrc])
 
   const filtered = items.filter((d) => {
     if (!search.trim()) return true
@@ -98,9 +104,9 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
     setActive(null)
     setSignedName('')
     setUploadFile(null)
-    if (previewSrc) {
-      URL.revokeObjectURL(previewSrc)
-      setPreviewSrc(null)
+    if (pngSrc) {
+      URL.revokeObjectURL(pngSrc)
+      setPngSrc(null)
     }
   }
 
@@ -108,36 +114,44 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
     setActive(a)
     setSignedName('')
     setUploadFile(null)
-    setPreviewLoading(true)
-    if (previewSrc) {
-      URL.revokeObjectURL(previewSrc)
-      setPreviewSrc(null)
+    if (pngSrc) {
+      URL.revokeObjectURL(pngSrc)
+      setPngSrc(null)
     }
-    try {
-      await fetch(`/api/rbt/documents/company/${a.documentId}/view`, {
-        method: 'POST',
-        credentials: 'include',
-      })
-      const url = await fetchAsObjectUrl(a.previewUrl)
-      setPreviewSrc(url)
-      await load()
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Could not load preview', 'error')
-    } finally {
-      setPreviewLoading(false)
+
+    // Mark viewed (non-blocking for preview)
+    void fetch(`/api/rbt/documents/company/${a.documentId}/view`, {
+      method: 'POST',
+      credentials: 'include',
+    }).then(() => load())
+
+    // PNGs: blob → <img>. PDFs: OnboardingPdfViewer (PDF.js / canvas) — same as onboarding.
+    if (a.fileType === 'png') {
+      setPngLoading(true)
+      try {
+        const blob = await fetchAsTypedBlob(a.previewUrl, 'image/png')
+        setPngSrc(URL.createObjectURL(blob))
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Could not load preview', 'error')
+      } finally {
+        setPngLoading(false)
+      }
     }
   }
 
   const handleDownload = async () => {
     if (!active) return
     try {
-      const url = previewSrc ?? (await fetchAsObjectUrl(active.previewUrl))
+      const mime = active.fileType === 'png' ? 'image/png' : 'application/pdf'
+      const blob = await fetchAsTypedBlob(active.previewUrl, mime)
+      const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       a.download = `${active.title}.${active.fileType}`
       document.body.appendChild(a)
       a.click()
       a.remove()
+      URL.revokeObjectURL(url)
     } catch {
       showToast('Download failed', 'error')
     }
@@ -267,24 +281,33 @@ export default function RbtCompanyDistDocs({ search }: { search: string }) {
           </DialogHeader>
           {active && (
             <div className="space-y-4">
-              <div className="w-full min-h-[50vh] rounded border bg-gray-50 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
-                {previewLoading ? (
-                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                ) : previewSrc ? (
-                  active.fileType === 'png' ? (
+              {/*
+                PDFs: same OnboardingPdfViewer as onboarding (fetch + PDF.js canvas).
+                Never iframe a same-origin /api URL (X-Frame-Options: DENY).
+              */}
+              {active.fileType === 'png' ? (
+                <div className="w-full min-h-[40vh] rounded border bg-gray-50 dark:bg-gray-900 flex items-center justify-center overflow-auto p-2">
+                  {pngLoading ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  ) : pngSrc ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={previewSrc} alt={active.title} className="w-full h-auto max-h-[70vh] object-contain" />
-                  ) : (
-                    <iframe
-                      src={previewSrc}
-                      title={active.title}
-                      className="w-full min-h-[50vh] h-[70vh] border-0"
+                    <img
+                      src={pngSrc}
+                      alt={active.title}
+                      className="w-full h-auto max-h-[70vh] object-contain"
                     />
-                  )
-                ) : (
-                  <p className="text-sm text-gray-500">Preview unavailable</p>
-                )}
-              </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">Preview unavailable</p>
+                  )}
+                </div>
+              ) : (
+                <OnboardingPdfViewer
+                  key={active.documentId}
+                  documentId={active.documentId}
+                  pdfUrl={active.previewUrl}
+                  title={active.title}
+                />
+              )}
 
               {active.documentType === 'ACKNOWLEDGMENT' && active.status !== 'SIGNED' && (
                 <div className="space-y-2 border-t pt-4">

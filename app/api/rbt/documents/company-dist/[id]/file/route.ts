@@ -43,13 +43,26 @@ export async function GET(
   }
 
   const buf = Buffer.from(await data.arrayBuffer())
-  const contentType = row.companyDocument.fileType === 'png' ? 'image/png' : 'application/pdf'
+  const contentType =
+    row.companyDocument.fileType === 'png'
+      ? 'image/png'
+      : // Detect PDF magic if mis-tagged
+        buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46
+          ? 'application/pdf'
+          : row.companyDocument.fileType === 'pdf'
+            ? 'application/pdf'
+            : 'application/octet-stream'
+  const ext = contentType === 'image/png' ? 'png' : contentType === 'application/pdf' ? 'pdf' : 'bin'
   const safeName = row.companyDocument.title.replace(/[^a-zA-Z0-9._-]/g, '_')
   return new NextResponse(buf, {
+    status: 200,
     headers: {
       'Content-Type': contentType,
-      'Content-Disposition': `inline; filename="${safeName}.${row.companyDocument.fileType}"`,
-      'Cache-Control': 'private, max-age=60',
+      'Content-Length': String(buf.length),
+      'Content-Disposition': `inline; filename="${safeName}.${ext}"`,
+      'Cache-Control': 'private, no-store',
+      // Do not inherit framing issues if anything tries to embed this response directly
+      'X-Content-Type-Options': 'nosniff',
     },
   })
 }
