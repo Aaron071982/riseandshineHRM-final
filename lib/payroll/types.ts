@@ -41,7 +41,11 @@ export type PayrollMatchResult = {
   suggestedRbtProfileId: string | null
 }
 
-/** Employee-safe stub fields — never include employer taxes / total cost */
+/**
+ * Employee-safe stub fields.
+ * NEVER include: employerTaxTotal, totalPayrollCost, earningsLines,
+ * employerTaxLines, employerDeductionLines, empTaxLines (admin detail only).
+ */
 export const EMPLOYEE_STUB_SELECT = {
   id: true,
   payrollRunId: true,
@@ -55,6 +59,7 @@ export const EMPLOYEE_STUB_SELECT = {
   empTaxSS: true,
   empTaxMed: true,
   empTaxNYIT: true,
+  empDeductionTotal: true,
   netPay: true,
   payrollRun: {
     select: {
@@ -64,6 +69,23 @@ export const EMPLOYEE_STUB_SELECT = {
       periodStart: true,
       periodEnd: true,
       status: true,
+      sourceFormat: true,
+      isDerived: true,
     },
   },
 } as const
+
+/** Zero / noise threshold for hiding non-pay delta stubs from employees */
+export const EMPLOYEE_PAY_EPS = 0.02
+
+export function stubHasEmployeePay(stub: {
+  grossPay: number
+  netPay: number
+  totalHours: number
+}): boolean {
+  return (
+    stub.grossPay > EMPLOYEE_PAY_EPS ||
+    stub.netPay > EMPLOYEE_PAY_EPS ||
+    stub.totalHours > EMPLOYEE_PAY_EPS
+  )
+}

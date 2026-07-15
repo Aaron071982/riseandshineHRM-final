@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireRbtSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { EMPLOYEE_STUB_SELECT } from '@/lib/payroll/types'
+import { EMPLOYEE_STUB_SELECT, stubHasEmployeePay } from '@/lib/payroll/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +23,9 @@ export async function GET() {
       orderBy: { payrollRun: { payDate: 'desc' } },
     })
 
-    const mine = stubs.filter((s) => s.rbtProfileId === rbtProfileId)
+    const mine = stubs
+      .filter((s) => s.rbtProfileId === rbtProfileId)
+      .filter(stubHasEmployeePay)
     return NextResponse.json({ stubs: mine })
   } catch (error) {
     console.error('[rbt/pay/stubs]', error)

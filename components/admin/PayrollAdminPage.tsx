@@ -1,6 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,6 +11,9 @@ import { useToast } from '@/components/ui/toast'
 import { Loader2, Upload, ArrowLeft, Pencil, Trash2 } from 'lucide-react'
 import { usd, fmtUtcDate } from '@/lib/payroll/format'
 import { cn } from '@/lib/utils'
+
+type LineAmount = { rawType: string; amount: number }
+type EarningLine = { rawType: string; units: number; gross: number }
 
 type RunListItem = {
   id: string
@@ -19,6 +24,11 @@ type RunListItem = {
   totalGrossPay: number
   status: 'DRAFT' | 'PUBLISHED'
   sourceFileName: string | null
+  sourceFormat?: 'REGISTER' | 'YTD_SNAPSHOT'
+  isDerived?: boolean
+  snapshotFileName?: string | null
+  checksumOk?: boolean
+  totalEmployerTax?: number | null
 }
 
 type Entry = {
@@ -28,10 +38,16 @@ type Entry = {
   matchConfidence: number
   totalHours: number
   grossPay: number
+  adjustedGross?: number | null
   netPay: number
   empTaxTotal: number
   employerTaxTotal: number
   totalPayrollCost: number
+  isContractor?: boolean
+  empTaxLines?: LineAmount[] | null
+  empDeductionLines?: LineAmount[] | null
+  employerTaxLines?: LineAmount[] | null
+  earningsLines?: EarningLine[] | null
   rbtProfileId: string | null
   rbtProfile: { id: string; firstName: string; lastName: string; email: string | null } | null
 }
@@ -44,6 +60,29 @@ type RunDetail = RunListItem & {
   entries: Entry[]
 }
 
+function asLines(v: unknown): LineAmount[] {
+  if (!Array.isArray(v)) return []
+  return v.filter(
+    (x): x is LineAmount =>
+      !!x &&
+      typeof x === 'object' &&
+      typeof (x as LineAmount).rawType === 'string' &&
+      typeof (x as LineAmount).amount === 'number'
+  )
+}
+
+function asEarnings(v: unknown): EarningLine[] {
+  if (!Array.isArray(v)) return []
+  return v.filter(
+    (x): x is EarningLine =>
+      !!x &&
+      typeof x === 'object' &&
+      typeof (x as EarningLine).rawType === 'string' &&
+      typeof (x as EarningLine).units === 'number' &&
+      typeof (x as EarningLine).gross === 'number'
+  )
+}
+
 function statusBadge(status: string) {
   if (status === 'PUBLISHED') return <Badge className="bg-green-600">Published</Badge>
   if (status === 'MATCHED') return <Badge className="bg-green-600">Matched</Badge>
@@ -54,6 +93,10 @@ function statusBadge(status: string) {
 
 export default function PayrollAdminPage() {
   const { showToast } = useToast()
+  const pathname = usePathname()
+  const ytdImportHref = pathname?.startsWith('/billing')
+    ? '/billing/payroll/import-ytd'
+    : '/admin/payroll/import-ytd'
   const [runs, setRuns] = useState<RunListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -249,7 +292,14 @@ export default function PayrollAdminPage() {
             >
               <ArrowLeft className="w-4 h-4" /> All payroll runs
             </button>
-            <h1 className="text-2xl font-bold text-gray-900">{run.label}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 flex flex-wrap items-center gap-2">
+              {run.label}
+              {run.sourceFormat === 'YTD_SNAPSHOT' && (
+                <Badge variant="secondary" className="font-normal text-gray-600">
+                  YTD back-fill
+                </Badge>
+              )}
+            </h1>
             <div className="text-sm text-gray-500 mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
               <span>Pay date {fmtUtcDate(run.payDate)} · {run.employeeCount} employees ·</span>
               {statusBadge(run.status)}
@@ -287,6 +337,17 @@ export default function PayrollAdminPage() {
           </div>
         </div>
 
+        {run.sourceFormat === 'YTD_SNAPSHOT' && (
+          <div className="rounded-md border border-slate-200 bg-slate-50 text-sm text-slate-700 px-3 py-2">
+            Derived from YTD snapshot{' '}
+            <span className="font-medium">{run.snapshotFileName || run.sourceFileName || '—'}</span>
+            . Amounts are period deltas (cumulative snapshot subtraction), not a register export.
+            {run.checksumOk === false && (
+              <span className="text-red-700 font-medium"> Checksum flagged.</span>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
             <CardContent className="pt-4">
@@ -304,7 +365,10 @@ export default function PayrollAdminPage() {
             <CardContent className="pt-4">
               <div className="text-xs text-gray-500">Employer taxes (admin)</div>
               <div className="text-lg font-semibold">
-                {usd(run.entries.reduce((s, e) => s + e.employerTaxTotal, 0))}
+                {usd(
+                  run.totalEmployerTax ??
+                    run.entries.reduce((s, e) => s + e.employerTaxTotal, 0)
+                )}
               </div>
             </CardContent>
           </Card>
@@ -333,48 +397,124 @@ export default function PayrollAdminPage() {
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">HRM profile</th>
                 <th className="px-3 py-2 text-right">Gross</th>
+                <th className="px-3 py-2 text-right">Adj. gross</th>
                 <th className="px-3 py-2 text-right">Net</th>
                 <th className="px-3 py-2 text-right">Employer tax</th>
                 <th className="px-3 py-2 text-right">Payroll cost</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((e) => (
-                <tr key={e.id} className="border-t">
-                  <td className="px-3 py-2 font-medium">{e.payrollName}</td>
-                  <td className="px-3 py-2">{statusBadge(e.matchStatus)}</td>
-                  <td className="px-3 py-2 min-w-[14rem]">
-                    {run.status === 'DRAFT' ? (
-                      <select
-                        className="w-full border rounded-md px-2 py-1.5 text-sm"
-                        value={e.rbtProfileId ?? ''}
-                        onChange={(ev) =>
-                          void confirmMatch(e.id, ev.target.value ? ev.target.value : null)
-                        }
-                      >
-                        <option value="">— Unmatched —</option>
-                        {candidates.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : e.rbtProfile ? (
-                      `${e.rbtProfile.firstName} ${e.rbtProfile.lastName}`
-                    ) : (
-                      '—'
+              {filtered.map((e) => {
+                const taxLines = asLines(e.empTaxLines)
+                const dedLines = asLines(e.empDeductionLines)
+                const erLines = asLines(e.employerTaxLines)
+                const earnLines = asEarnings(e.earningsLines)
+                const hasBreakdown =
+                  taxLines.length > 0 ||
+                  dedLines.length > 0 ||
+                  erLines.length > 0 ||
+                  earnLines.length > 0
+                return (
+                  <Fragment key={e.id}>
+                    <tr className="border-t">
+                      <td className="px-3 py-2 font-medium">
+                        {e.payrollName}
+                        {e.isContractor ? (
+                          <span className="ml-1 text-xs text-gray-400">1099</span>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2">{statusBadge(e.matchStatus)}</td>
+                      <td className="px-3 py-2 min-w-[14rem]">
+                        {run.status === 'DRAFT' ? (
+                          <select
+                            className="w-full border rounded-md px-2 py-1.5 text-sm"
+                            value={e.rbtProfileId ?? ''}
+                            onChange={(ev) =>
+                              void confirmMatch(e.id, ev.target.value ? ev.target.value : null)
+                            }
+                          >
+                            <option value="">— Unmatched —</option>
+                            {candidates.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : e.rbtProfile ? (
+                          `${e.rbtProfile.firstName} ${e.rbtProfile.lastName}`
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">{usd(e.grossPay)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-500">
+                        {e.adjustedGross == null ? '—' : usd(e.adjustedGross)}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums font-medium">{usd(e.netPay)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-500">
+                        {usd(e.employerTaxTotal)}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-500">
+                        {usd(e.totalPayrollCost)}
+                      </td>
+                    </tr>
+                    {hasBreakdown && (
+                      <tr className="border-t bg-gray-50/80">
+                        <td colSpan={8} className="px-3 py-2 text-xs text-gray-600">
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            {earnLines.length > 0 && (
+                              <div>
+                                <p className="font-medium text-gray-700 mb-1">Earnings</p>
+                                {earnLines.map((l) => (
+                                  <div key={l.rawType} className="flex justify-between gap-2">
+                                    <span>
+                                      {l.rawType} ({l.units})
+                                    </span>
+                                    <span className="tabular-nums">{usd(l.gross)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {taxLines.length > 0 && (
+                              <div>
+                                <p className="font-medium text-gray-700 mb-1">Employee taxes</p>
+                                {taxLines.map((l) => (
+                                  <div key={l.rawType} className="flex justify-between gap-2">
+                                    <span>{l.rawType}</span>
+                                    <span className="tabular-nums">{usd(l.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {dedLines.length > 0 && (
+                              <div>
+                                <p className="font-medium text-gray-700 mb-1">Employee deductions</p>
+                                {dedLines.map((l) => (
+                                  <div key={l.rawType} className="flex justify-between gap-2">
+                                    <span>{l.rawType}</span>
+                                    <span className="tabular-nums">{usd(l.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {erLines.length > 0 && (
+                              <div>
+                                <p className="font-medium text-gray-700 mb-1">Employer taxes</p>
+                                {erLines.map((l) => (
+                                  <div key={l.rawType} className="flex justify-between gap-2">
+                                    <span>{l.rawType}</span>
+                                    <span className="tabular-nums">{usd(l.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">{usd(e.grossPay)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-medium">{usd(e.netPay)}</td>
-                  <td className="px-3 py-2 text-right tabular-nums text-gray-500">
-                    {usd(e.employerTaxTotal)}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums text-gray-500">
-                    {usd(e.totalPayrollCost)}
-                  </td>
-                </tr>
-              ))}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -391,25 +531,30 @@ export default function PayrollAdminPage() {
             Upload finished payroll registers and publish employee pay stubs.
           </p>
         </div>
-        <label
-          className={cn(
-            'inline-flex items-center gap-2 rounded-md bg-[#0E4D52] text-white px-4 py-2 text-sm font-medium cursor-pointer hover:bg-[#0A3A3E]',
-            uploading && 'opacity-60 pointer-events-none'
-          )}
-        >
-          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-          Upload payroll register
-          <input
-            type="file"
-            accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) void onUpload(f)
-              e.target.value = ''
-            }}
-          />
-        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href={ytdImportHref}>Upload YTD reports</Link>
+          </Button>
+          <label
+            className={cn(
+              'inline-flex items-center gap-2 rounded-md bg-[#0E4D52] text-white px-4 py-2 text-sm font-medium cursor-pointer hover:bg-[#0A3A3E]',
+              uploading && 'opacity-60 pointer-events-none'
+            )}
+          >
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Upload payroll register
+            <input
+              type="file"
+              accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) void onUpload(f)
+                e.target.value = ''
+              }}
+            />
+          </label>
+        </div>
       </div>
 
       {runs.length === 0 ? (
@@ -434,7 +579,16 @@ export default function PayrollAdminPage() {
             <tbody>
               {runs.map((r) => (
                 <tr key={r.id} className="border-t">
-                  <td className="px-3 py-2 font-medium">{r.label}</td>
+                  <td className="px-3 py-2 font-medium">
+                    <span className="inline-flex flex-wrap items-center gap-2">
+                      {r.label}
+                      {r.sourceFormat === 'YTD_SNAPSHOT' && (
+                        <Badge variant="secondary" className="font-normal text-[10px] text-gray-600">
+                          YTD back-fill
+                        </Badge>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-3 py-2">{fmtUtcDate(r.payDate)}</td>
                   <td className="px-3 py-2">{r.employeeCount}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{usd(r.totalNetPay)}</td>

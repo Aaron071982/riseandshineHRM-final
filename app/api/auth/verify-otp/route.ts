@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTPEmail, isActiveOtpLocked } from '@/lib/email-otp'
-import { createSession, LOCAL_DEV_SESSION_TOKEN } from '@/lib/auth'
+import { createSession } from '@/lib/auth'
 import { getOtpTestCode, isOtpTestAccount } from '@/lib/constants'
 import { isOtpBypassEnvironment } from '@/lib/auth/otpBypass'
 import {
@@ -157,22 +157,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // For quick localhost / non-production testing, accept a fixed OTP (123456) and
-    // short‑circuit before any database calls. This does NOT apply on production hosts.
+    // Localhost / non-production: accept fixed OTP 123456, then continue with the
+    // normal lookup so the session is for the *entered email* (e.g. aaronsiam21),
+    // not a synthetic local-dev-admin identity. This does NOT apply on production hosts.
     if (isDevBypass) {
-      const response = NextResponse.json({
-        success: true,
-        role: 'ADMIN',
-        userId: 'local-dev-admin',
-      })
-      response.cookies.set('session', LOCAL_DEV_SESSION_TOKEN, {
-        httpOnly: false,
-        secure: false,
-        sameSite: 'lax',
-        maxAge: 30 * 24 * 60 * 60,
-        path: '/',
-      })
-      return response
+      isValid = true
     } else if (isAdminFallback) {
       isValid = true
     } else if (!isValid) {

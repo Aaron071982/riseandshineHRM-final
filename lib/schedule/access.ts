@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { validateSession, isAdmin, type SessionUser } from '@/lib/auth'
+import { validateSession, isAdmin, isSuperAdmin, type SessionUser } from '@/lib/auth'
+import { PLATFORM_OWNER_EMAIL } from '@/lib/constants'
 import { prisma } from '@/lib/prisma'
 
 /** Default allowlist when table is empty / env not set */
@@ -9,7 +10,7 @@ const DEFAULT_SCHEDULE_EMAILS = [
   'kazi@riseandshineaba.com',
   'kazi@riseandshine.nyc',
   'shaziakhaliq37@gmail.com',
-  'aaronsiam21@gmail.com',
+  PLATFORM_OWNER_EMAIL,
   'fardeen@riseandshineaba.com',
   'hashir@riseandshineaba.com',
   'azkarim05@gmail.com',
@@ -51,6 +52,8 @@ export async function isScheduleUser(email: string | null): Promise<boolean> {
     }
   }
 
+  if (normalized === PLATFORM_OWNER_EMAIL || isSuperAdmin(normalized)) return true
+
   // Fallback to env list (comma-separated) for bootstrap before seed runs
   const env = process.env.SCHEDULE_ACCESS_EMAILS?.trim()
   if (env) {
@@ -68,6 +71,7 @@ export async function isScheduleUser(email: string | null): Promise<boolean> {
 export async function canAccessSchedule(user: SessionUser | null): Promise<boolean> {
   if (!user) return false
   const email = user.email?.trim().toLowerCase() ?? null
+  if (email && isSuperAdmin(email)) return true
   if (isAdmin(user)) return true
   return isScheduleUser(email)
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireRbtSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { EMPLOYEE_STUB_SELECT } from '@/lib/payroll/types'
+import { EMPLOYEE_STUB_SELECT, stubHasEmployeePay } from '@/lib/payroll/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,8 +26,10 @@ export async function GET() {
       orderBy: { payrollRun: { payDate: 'desc' } },
     })
 
-    // Ownership double-check
-    const mine = stubs.filter((s) => s.rbtProfileId === rbtProfileId)
+    // Ownership double-check; hide zero-delta / empty pay stubs
+    const mine = stubs
+      .filter((s) => s.rbtProfileId === rbtProfileId)
+      .filter(stubHasEmployeePay)
 
     const thisMonthNet = mine
       .filter((s) => new Date(s.payrollRun.payDate) >= monthStart)

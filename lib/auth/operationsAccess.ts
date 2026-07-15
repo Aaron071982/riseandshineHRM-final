@@ -1,28 +1,30 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { validateSession, type SessionUser } from '@/lib/auth'
+import { isSuperAdmin, validateSession, type SessionUser } from '@/lib/auth'
+import { PLATFORM_OWNER_EMAIL } from '@/lib/constants'
 
-/** Revenue-cycle dashboard: strict email allowlist only (no blanket admin access). */
+/** Revenue-cycle dashboard: email allowlist (+ super-admins / platform owner). */
 const DEFAULT_OPERATIONS_EMAILS = [
   'kazi@siyam.nyc',
-  'aaronsiam21@gmail.com',
+  PLATFORM_OWNER_EMAIL,
   'aaronsiam25@gmail.com',
   'fardeen@riseandshineaba.com',
 ]
 
 export function getOperationsAccessEmails(): string[] {
   const env = process.env.OPERATIONS_ACCESS_EMAILS?.trim()
-  if (env) {
-    return env
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean)
-  }
-  return DEFAULT_OPERATIONS_EMAILS.map((e) => e.toLowerCase())
+  const base = env
+    ? env
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean)
+    : DEFAULT_OPERATIONS_EMAILS.map((e) => e.toLowerCase())
+  return [...new Set([...base, PLATFORM_OWNER_EMAIL])]
 }
 
 export function isOperationsViewer(user: SessionUser | null): boolean {
   if (!user?.email) return false
+  if (isSuperAdmin(user.email)) return true
   const allowed = getOperationsAccessEmails()
   return allowed.includes(user.email.trim().toLowerCase())
 }

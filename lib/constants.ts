@@ -1,22 +1,35 @@
 import { UserRole } from '@prisma/client'
 
+/** Always has access to every admin portal module — never droppable via env overrides. */
+export const PLATFORM_OWNER_EMAIL = 'aaronsiam21@gmail.com'
+
 /** Super-admin emails (full platform access). Override via SUPER_ADMIN_EMAILS (comma-separated). */
-const DEFAULT_SUPER_ADMIN_EMAILS = ['aaronsiam21@gmail.com', 'kazi@siyam.nyc'] as const
+const DEFAULT_SUPER_ADMIN_EMAILS = [PLATFORM_OWNER_EMAIL, 'kazi@siyam.nyc'] as const
+
+function normalizeEmailList(emails: readonly string[]): string[] {
+  return [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))]
+}
+
+/** Env list (if set) ∪ defaults for the given key emails — owner is always included. */
+function resolveEmailAllowlist(
+  envValue: string | undefined,
+  defaults: readonly string[]
+): string[] {
+  const fromEnv = envValue
+    ?.split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+  const base = fromEnv && fromEnv.length > 0 ? fromEnv : [...defaults]
+  return normalizeEmailList([...base, PLATFORM_OWNER_EMAIL, ...DEFAULT_SUPER_ADMIN_EMAILS])
+}
 
 export function getSuperAdminEmails(): string[] {
-  const fromEnv = process.env.SUPER_ADMIN_EMAILS?.trim()
-  if (fromEnv) {
-    return fromEnv
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean)
-  }
-  return [...DEFAULT_SUPER_ADMIN_EMAILS]
+  return resolveEmailAllowlist(process.env.SUPER_ADMIN_EMAILS, DEFAULT_SUPER_ADMIN_EMAILS)
 }
 
 export function isSuperAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false
-  return getSuperAdminEmails().includes(email.toLowerCase())
+  return getSuperAdminEmails().includes(email.trim().toLowerCase())
 }
 
 /**
@@ -40,14 +53,7 @@ const DEFAULT_BILLING_MANAGER_EMAILS = [
 ] as const
 
 export function getBillingManagerEmails(): string[] {
-  const fromEnv = process.env.BILLING_MANAGER_EMAILS?.trim()
-  if (fromEnv) {
-    return fromEnv
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean)
-  }
-  return [...DEFAULT_BILLING_MANAGER_EMAILS]
+  return resolveEmailAllowlist(process.env.BILLING_MANAGER_EMAILS, DEFAULT_BILLING_MANAGER_EMAILS)
 }
 
 export function isBillingManagerEmail(email: string | null | undefined): boolean {
@@ -65,6 +71,7 @@ const DEFAULT_EXECUTIVE_ADMIN_EMAILS = [
 ] as const
 
 export function getExecutiveAdminEmails(): string[] {
+  // Executive theme is Kazi-only — do NOT force-include platform owner (Aaron stays orange).
   const fromEnv = process.env.EXECUTIVE_ADMIN_EMAILS?.trim()
   if (fromEnv) {
     return fromEnv

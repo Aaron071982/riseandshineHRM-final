@@ -2211,51 +2211,91 @@ enum PayrollMatchStatus {
   UNMATCHED
 }
 
+/// REGISTER = flat payroll register import; YTD_SNAPSHOT = derived from cumulative YTD exports
+enum PayrollSourceFormat {
+  REGISTER
+  YTD_SNAPSHOT
+}
+
 model PayrollRun {
-  id             String           @id @default(cuid())
-  label          String
-  payDate        DateTime         @db.Date
-  periodStart    DateTime         @db.Date
-  periodEnd      DateTime         @db.Date
-  sourceFileName String?
-  uploadedById   String
-  employeeCount  Int              @default(0)
-  totalNetPay    Float            @default(0)
-  totalGrossPay  Float            @default(0)
-  status         PayrollRunStatus @default(DRAFT)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id                        String              @id @default(cuid())
+  label                     String
+  payDate                   DateTime            @db.Date
+  periodStart               DateTime            @db.Date
+  periodEnd                 DateTime            @db.Date
+  sourceFileName            String?
+  uploadedById              String
+  employeeCount             Int                 @default(0)
+  totalNetPay               Float               @default(0)
+  totalGrossPay             Float               @default(0)
+  status                    PayrollRunStatus    @default(DRAFT)
+  sourceFormat              PayrollSourceFormat @default(REGISTER)
+  /// true when amounts were derived by diffing cumulative YTD snapshots
+  isDerived                 Boolean             @default(false)
+  snapshotFileName          String?
+  snapshotReportedAt        DateTime?
+  checksumOk                Boolean             @default(true)
+  importWarnings            Json?
+  totalEmployeeTax          Float?
+  totalEmployeeDeductions   Float?
+  totalEmployerTax          Float?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
 
   uploadedBy User              @relation("PayrollRunUploadedBy", fields: [uploadedById], references: [id])
   entries    PayrollRunEntry[]
 
+  @@unique([payDate, sourceFormat])
   @@index([status])
   @@index([payDate])
   @@map("payroll_runs")
 }
 
 model PayrollRunEntry {
-  id               String             @id @default(cuid())
-  payrollRunId     String
-  rbtProfileId     String?
-  payrollName      String
-  matchStatus      PayrollMatchStatus @default(UNMATCHED)
-  matchConfidence  Float              @default(0)
-  totalHours       Float              @default(0)
-  grossPay         Float              @default(0)
-  adjustedGross    Float              @default(0)
-  empTaxTotal      Float              @default(0)
-  empTaxFIT        Float              @default(0)
-  empTaxSS         Float              @default(0)
-  empTaxMed        Float              @default(0)
-  empTaxNYIT       Float              @default(0)
-  netPay           Float              @default(0)
+  id                     String             @id @default(cuid())
+  payrollRunId           String
+  rbtProfileId           String?
+  payrollName            String
+  matchStatus            PayrollMatchStatus @default(UNMATCHED)
+  matchConfidence        Float              @default(0)
+  totalHours             Float              @default(0)
+  grossPay               Float              @default(0)
+  /// Register format only; null for YTD-derived rows (UI shows —)
+  adjustedGross          Float?
+  empTaxTotal            Float              @default(0)
+  empTaxFIT              Float              @default(0)
+  empTaxSS               Float              @default(0)
+  empTaxMed              Float              @default(0)
+  empTaxNYIT             Float              @default(0)
+  netPay                 Float              @default(0)
   /// Admin-only — never expose on employee APIs
-  employerTaxTotal Float              @default(0)
+  employerTaxTotal       Float              @default(0)
   /// Admin-only — never expose on employee APIs
-  totalPayrollCost Float              @default(0)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  totalPayrollCost       Float              @default(0)
+  isContractor           Boolean            @default(false)
+  /// [{ rawType, units, gross }]
+  earningsLines          Json               @default("[]")
+  /// [{ rawType, amount }]
+  empTaxLines            Json               @default("[]")
+  empDeductionLines      Json               @default("[]")
+  /// Admin-only — never expose on employee APIs
+  employerTaxLines       Json               @default("[]")
+  /// Admin-only — never expose on employee APIs
+  employerDeductionLines Json               @default("[]")
+  empDeductionTotal      Float              @default(0)
+  /// NEW YOR + YONKER
+  empTaxLocal            Float              @default(0)
+  /// STATE-NJ and other non-NY state withholding
+  empTaxStateOther       Float              @default(0)
+  /// Vendor TOTAL: values cell (hours + 1099 units) — checksum only
+  reportedTotalValues    Float?
+  /// Cumulative YTD figure this period delta was derived from
+  ytdGross               Float?
+  ytdNetPay              Float?
+  /// Optional vendor "ID: 20251201" line
+  payrollEmployeeId      String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   payrollRun PayrollRun  @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   rbtProfile RBTProfile? @relation(fields: [rbtProfileId], references: [id], onDelete: SetNull)

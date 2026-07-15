@@ -2,7 +2,12 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { prisma } from './prisma'
 import crypto from 'crypto'
-import { isBillingManagerEmail, isExecutiveAdminEmail } from './constants'
+import {
+  isBillingManagerEmail,
+  isExecutiveAdminEmail,
+  isSuperAdminEmail,
+  PLATFORM_OWNER_EMAIL,
+} from './constants'
 
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
 
@@ -129,26 +134,57 @@ async function validateSessionRawSql(token: string): Promise<SessionUser | null>
   }
 }
 
-/** Magic token set by verify-otp dev bypass (localhost + OTP 123456). Not in DB; validateSession accepts it so redirect to dashboard works. */
+/**
+ * Legacy magic token from an older localhost OTP bypass.
+ * Resolved to the platform-owner admin (aaronsiam21) so leftover cookies still
+ * unlock payroll / ops / schedule. New logins use real DB sessions instead.
+ */
 export const LOCAL_DEV_SESSION_TOKEN = 'local-dev-session'
 
 export async function validateSession(token: string): Promise<SessionUser | null> {
-  // Localhost / non-production dev bypass only — never honor this cookie in production (forged cookie risk).
+  // Localhost / non-production only — never honor this cookie in production.
   if (
     token === LOCAL_DEV_SESSION_TOKEN &&
     process.env.NODE_ENV !== 'production'
   ) {
-    await prisma.user.upsert({
-      where: { id: 'local-dev-admin' },
-      update: {},
-      create: { id: 'local-dev-admin', name: 'Local Dev Admin', email: 'dev@riseandshine.local', role: 'ADMIN', isActive: true },
-    }).catch(() => {})
+    const owner = await prisma.user
+      .findFirst({
+        where: { email: { equals: PLATFORM_OWNER_EMAIL, mode: 'insensitive' } },
+        include: { rbtProfile: true },
+      })
+      .catch(() => null)
+    if (owner) {
+      const role = normalizeRole(owner.role)
+      if (role) {
+        return attachRbtProfileIdIfNeeded({
+          id: owner.id,
+          phoneNumber: owner.phoneNumber,
+          role,
+          name: owner.name,
+          email: owner.email,
+          rbtProfileId: owner.rbtProfile?.id ?? null,
+        })
+      }
+    }
+    await prisma.user
+      .upsert({
+        where: { id: 'local-dev-admin' },
+        update: { email: PLATFORM_OWNER_EMAIL, name: 'Aaron', role: 'ADMIN', isActive: true },
+        create: {
+          id: 'local-dev-admin',
+          name: 'Aaron',
+          email: PLATFORM_OWNER_EMAIL,
+          role: 'ADMIN',
+          isActive: true,
+        },
+      })
+      .catch(() => {})
     return {
       id: 'local-dev-admin',
       phoneNumber: null,
       role: 'ADMIN',
-      name: 'Local Dev Admin',
-      email: 'dev@riseandshine.local',
+      name: 'Aaron',
+      email: PLATFORM_OWNER_EMAIL,
       rbtProfileId: null,
     }
   }
@@ -273,9 +309,10 @@ export async function requireAdminSession(): Promise<
   return { user, response: null }
 }
 
-/** Billing & Payroll: email allowlist only (Aaron, Kazi/Jamal, Fardeen, Shazia). */
+/** Billing & Payroll: email allowlist (Aaron, Kazi/Jamal, Fardeen, Shazia) + super-admins. */
 export function isBillingManager(user: SessionUser | null): boolean {
-  if (!user) return false
+  if (!user?.email) return false
+  if (isSuperAdminEmail(user.email)) return true
   return isBillingManagerEmail(user.email)
 }
 

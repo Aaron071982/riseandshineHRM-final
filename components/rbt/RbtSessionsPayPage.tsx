@@ -20,7 +20,7 @@ type PayStub = {
   payrollName: string
   totalHours: number
   grossPay: number
-  adjustedGross: number
+  adjustedGross: number | null
   empTaxTotal: number
   empTaxFIT: number
   empTaxSS: number

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRbtSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { EMPLOYEE_STUB_SELECT } from '@/lib/payroll/types'
+import { EMPLOYEE_STUB_SELECT, stubHasEmployeePay } from '@/lib/payroll/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +27,9 @@ export async function GET(
     }
     if (stub.rbtProfileId !== rbtProfileId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    if (!stubHasEmployeePay(stub)) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
     return NextResponse.json({ stub })
