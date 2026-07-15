@@ -262,6 +262,31 @@ export default function PayrollAdminPage() {
     }
   }
 
+  const reopen = async () => {
+    if (!activeRunId || !run) return
+    const ok = window.confirm(
+      `Reopen “${run.label}” for editing? Employees will temporarily lose access to this pay stub until you publish again.`
+    )
+    if (!ok) return
+    setPublishing(true)
+    try {
+      const res = await fetch(`/api/admin/payroll/runs/${activeRunId}/reopen`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || 'Could not reopen run', 'error')
+        return
+      }
+      showToast('Run reopened as draft — edit matches, then publish again', 'success')
+      await loadRuns()
+      await loadRun(activeRunId)
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-24">
@@ -332,6 +357,18 @@ export default function PayrollAdminPage() {
               >
                 {publishing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Publish payroll run
+              </Button>
+            )}
+            {run.status === 'PUBLISHED' && (
+              <Button
+                variant="outline"
+                className="border-[#0E4D52] text-[#0E4D52] hover:bg-[#0E4D52]/5"
+                disabled={publishing}
+                onClick={() => void reopen()}
+              >
+                {publishing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                <Pencil className="w-4 h-4 mr-1" />
+                Reopen for editing
               </Button>
             )}
           </div>
