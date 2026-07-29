@@ -42,9 +42,9 @@ async function main() {
     },
   })
 
-  // Admin 3: Tisha
+  // Admin 3: Tisha (riseandshineaba.com) — limited admin (no billing/payroll/ops/documents)
   const admin3 = await prisma.user.upsert({
-    where: { email: 'tisha@riseandshine.nyc' },
+    where: { email: 'tisha@riseandshineaba.com' },
     update: {
       role: 'ADMIN',
       isActive: true,
@@ -53,7 +53,30 @@ async function main() {
     create: {
       phoneNumber: null,
       name: 'Tisha',
-      email: 'tisha@riseandshine.nyc',
+      email: 'tisha@riseandshineaba.com',
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
+
+  // Remove legacy Tisha nyc admin login
+  await prisma.user.updateMany({
+    where: { email: { equals: 'tisha@riseandshine.nyc', mode: 'insensitive' } },
+    data: { isActive: false, role: 'CANDIDATE' },
+  })
+
+  // Admin 3b: Afsana — limited admin (no billing/payroll/ops/documents)
+  const admin3b = await prisma.user.upsert({
+    where: { email: 'afsana@riseandshineaba.com' },
+    update: {
+      role: 'ADMIN',
+      isActive: true,
+      name: 'Afsana',
+    },
+    create: {
+      phoneNumber: null,
+      name: 'Afsana',
+      email: 'afsana@riseandshineaba.com',
       role: 'ADMIN',
       isActive: true,
     },
@@ -199,6 +222,7 @@ async function main() {
     admin1: admin1.email,
     admin2: admin2.email,
     admin3: admin3.email,
+    admin3b: admin3b.email,
     admin4: admin4.email,
     admin5: admin5.email,
     admin6: admin6.email,
@@ -213,7 +237,8 @@ async function main() {
   console.log('📧 Admin emails configured:')
   console.log('   - aaronsiam21@gmail.com')
   console.log('   - kazi@siyam.nyc')
-  console.log('   - tisha@riseandshine.nyc')
+  console.log('   - tisha@riseandshineaba.com (limited)')
+  console.log('   - afsana@riseandshineaba.com (limited)')
   console.log('   - fardeen@riseandshine.nyc')
   console.log('   - fardeenhassansardar12@gmail.com')
   console.log('   - shazia@riseandshine.nyc')

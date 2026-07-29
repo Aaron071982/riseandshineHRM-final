@@ -7,7 +7,9 @@ import { updateClientMeta } from '@/lib/schedule/actions'
 import { useToast } from '@/components/ui/toast'
 import { Input } from '@/components/ui/input'
 
-type EditField = 'bcba' | 'insurance' | 'authorized'
+type EditField = 'borough' | 'bcba' | 'insurance' | 'authorized'
+
+const BOROUGH_OPTIONS = ['Bronx', 'Brooklyn', 'Manhattan', 'Queens', 'Staten Island'] as const
 
 export default function ClientHoursPanel({
   clients,
@@ -34,9 +36,9 @@ export default function ClientHoursPanel({
         return { ...c, scheduled, authorized, gap }
       })
       .sort((a, b) => {
-        const ga = a.gap ?? -999
-        const gb = b.gap ?? -999
-        return gb - ga
+        const ba = (a.borough ?? 'zzz').localeCompare(b.borough ?? 'zzz')
+        if (ba !== 0) return ba
+        return a.name.localeCompare(b.name)
       })
   }, [clients, slots])
 
@@ -60,6 +62,13 @@ export default function ClientHoursPanel({
           return
         }
         await updateClientMeta(clientId, { authorizedHoursPerWeek: hours })
+      } else if (field === 'borough') {
+        const next = trimmed === '' ? null : trimmed
+        if (next === (current.borough ?? null)) {
+          setEditing(null)
+          return
+        }
+        await updateClientMeta(clientId, { borough: next })
       } else if (field === 'bcba') {
         const next = trimmed === '' ? null : trimmed
         if (next === (current.bcba ?? null)) {
@@ -102,6 +111,25 @@ export default function ClientHoursPanel({
     inputType: 'text' | 'number' = 'text'
   ) => {
     const isEditing = editing?.id === r.id && editing.field === field
+    if (isEditing && field === 'borough') {
+      return (
+        <select
+          className="h-8 w-full text-sm border rounded-md px-2"
+          defaultValue={r.borough ?? ''}
+          autoFocus
+          disabled={saving}
+          onBlur={(e) => void save(r.id, field, e.target.value, r)}
+          onChange={(e) => void save(r.id, field, e.target.value, r)}
+        >
+          <option value="">— Unassigned —</option>
+          {BOROUGH_OPTIONS.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
+      )
+    }
     if (isEditing) {
       return (
         <Input
@@ -138,6 +166,7 @@ export default function ClientHoursPanel({
         <thead className="bg-[#F4F6F6]">
           <tr>
             <th className="text-left p-3">Client</th>
+            <th className="text-left p-3">Borough</th>
             <th className="text-left p-3">BCBA</th>
             <th className="text-left p-3">Insurance</th>
             <th className="text-right p-3">Scheduled</th>
@@ -151,6 +180,9 @@ export default function ClientHoursPanel({
               <td className="p-3">
                 <div className="font-medium">{r.name}</div>
                 {r.code && <span className="text-xs text-gray-400">{r.code}</span>}
+              </td>
+              <td className="p-3 text-gray-700 min-w-[8rem]">
+                {editableCell(r, 'borough', r.borough?.trim() || '—', 'h-8 w-full text-sm')}
               </td>
               <td className="p-3 text-gray-700 min-w-[9rem]">
                 {editableCell(r, 'bcba', r.bcba?.trim() || '—', 'h-8 w-full text-sm')}
@@ -177,7 +209,8 @@ export default function ClientHoursPanel({
         <p className="text-center text-gray-500 py-12">No clients — add them in Manage.</p>
       )}
       <p className="text-xs text-gray-400 px-3 py-2 border-t border-[#E4E8E9]">
-        Click BCBA, Insurance, or Authorized/wk to edit. Enter to save, Esc to cancel.
+        Click Borough, BCBA, Insurance, or Authorized/wk to edit. Set boroughs so Export groups by
+        borough → client. Enter to save, Esc to cancel.
       </p>
     </div>
   )

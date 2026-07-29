@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminSession } from '@/lib/auth'
+import { requireDocumentsAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { emailCompanyDocRecipients } from '@/lib/company-documents/distribute'
 
@@ -10,7 +10,7 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireAdminSession()
+  const auth = await requireDocumentsAdminSession()
   if (auth.response) return auth.response
 
   const { id } = await params

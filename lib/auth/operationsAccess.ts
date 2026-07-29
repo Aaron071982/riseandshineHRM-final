@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { isSuperAdmin, validateSession, type SessionUser } from '@/lib/auth'
-import { PLATFORM_OWNER_EMAIL } from '@/lib/constants'
+import { isLimitedAdminEmail, PLATFORM_OWNER_EMAIL } from '@/lib/constants'
 
 /** Revenue-cycle dashboard: email allowlist (+ super-admins / platform owner). */
 const DEFAULT_OPERATIONS_EMAILS = [
@@ -25,6 +25,7 @@ export function getOperationsAccessEmails(): string[] {
 export function isOperationsViewer(user: SessionUser | null): boolean {
   if (!user?.email) return false
   if (isSuperAdmin(user.email)) return true
+  if (isLimitedAdminEmail(user.email)) return false
   const allowed = getOperationsAccessEmails()
   return allowed.includes(user.email.trim().toLowerCase())
 }

@@ -37,6 +37,7 @@ interface AdminLayoutProps {
   children: React.ReactNode
   showBillingNav?: boolean
   showOperationsNav?: boolean
+  showDocumentsNav?: boolean
   showScheduleNav?: boolean
   /** Kazi executive portal — indigo accent + reorganized nav */
   isExecutive?: boolean
@@ -51,8 +52,9 @@ const standardMainNav: NavItem[] = [
   { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
 ]
 
-const secondaryBase: NavItem[] = [
-  { href: '/admin/documents', label: 'Documents', icon: FileText },
+const documentsNavItem: NavItem = { href: '/admin/documents', label: 'Documents', icon: FileText }
+
+const secondaryBaseWithoutDocs: NavItem[] = [
   { href: '/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
   { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
@@ -97,6 +99,7 @@ export default function AdminLayout({
   children,
   showBillingNav,
   showOperationsNav,
+  showDocumentsNav = true,
   showScheduleNav: _showScheduleNav = true,
   isExecutive = false,
 }: AdminLayoutProps) {
@@ -130,9 +133,11 @@ export default function AdminLayout({
       top.push(billingNavItem)
     }
     top.push({ href: '/schedule', label: 'Schedule', icon: CalendarDays })
-    top.push({ href: '/admin/documents', label: 'Documents', icon: FileText })
+    if (showDocumentsNav) {
+      top.push(documentsNavItem)
+    }
     return top
-  }, [isExecutive, showBillingNav])
+  }, [isExecutive, showBillingNav, showDocumentsNav])
 
   const moreItems = useMemo((): NavItem[] => {
     if (isExecutive) {
@@ -154,9 +159,10 @@ export default function AdminLayout({
     return [
       ...(showBillingNav ? [billingNavItem, payrollNavItem] : []),
       ...(showOperationsNav ? [operationsNavItem] : []),
-      ...secondaryBase,
+      ...(showDocumentsNav ? [documentsNavItem] : []),
+      ...secondaryBaseWithoutDocs,
     ]
-  }, [isExecutive, showBillingNav, showOperationsNav])
+  }, [isExecutive, showBillingNav, showOperationsNav, showDocumentsNav])
 
   const moreMenuHasActive = useMemo(
     () => moreItems.some((i) => pathIsActive(pathname, i.href)),

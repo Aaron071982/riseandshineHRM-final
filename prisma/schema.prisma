@@ -2161,6 +2161,8 @@ model ScheduleWeeklyClient {
   id                     String                @id @default(cuid())
   code                   String?               @unique
   name                   String
+  /// NYC borough (or other region) for schedule export grouping
+  borough                String?
   insurance              String?
   bcba                   String?
   authorizedHoursPerWeek Decimal?              @db.Decimal(5, 2)
@@ -2170,6 +2172,7 @@ model ScheduleWeeklyClient {
   updatedAt              DateTime              @updatedAt
 
   @@index([active])
+  @@index([borough])
   @@map("schedule_client")
 }
 

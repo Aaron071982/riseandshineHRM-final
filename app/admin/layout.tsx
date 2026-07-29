@@ -2,6 +2,7 @@ import AdminLayout from '@/components/layout/AdminLayout'
 import { cookies } from 'next/headers'
 import { validateSession, isAdmin, isBillingManager, isExecutiveAdmin } from '@/lib/auth'
 import { isOperationsViewer } from '@/lib/auth/operationsAccess'
+import { canAccessDocumentsEmail } from '@/lib/constants'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -38,6 +39,7 @@ export default async function AdminLayoutWrapper({
     <AdminLayout
       showBillingNav={isBillingManager(user)}
       showOperationsNav={isOperationsViewer(user)}
+      showDocumentsNav={canAccessDocumentsEmail(user.email)}
       showScheduleNav
       isExecutive={isExecutiveAdmin(user)}
     >

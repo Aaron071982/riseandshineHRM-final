@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminSession } from '@/lib/auth'
+import { requireDocumentsAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
 import {
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
 const ALLOWED_TYPES = new Set(['ACKNOWLEDGMENT', 'DOWNLOAD_UPLOAD', 'VIEW_ONLY'])
 
 export async function GET(request: NextRequest) {
-  const auth = await requireAdminSession()
+  const auth = await requireDocumentsAdminSession()
   if (auth.response) return auth.response
 
   const { searchParams } = new URL(request.url)
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdminSession()
+  const auth = await requireDocumentsAdminSession()
   if (auth.response) return auth.response
   const user = auth.user!
 

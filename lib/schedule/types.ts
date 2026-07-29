@@ -13,6 +13,7 @@ export type ScheduleClient = {
   id: string
   code: string | null
   name: string
+  borough: string | null
   insurance: string | null
   bcba: string | null
   authorizedHoursPerWeek: number | null

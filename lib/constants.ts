@@ -58,6 +58,7 @@ export function getBillingManagerEmails(): string[] {
 
 export function isBillingManagerEmail(email: string | null | undefined): boolean {
   if (!email) return false
+  if (isLimitedAdminEmail(email)) return false
   return getBillingManagerEmails().includes(email.trim().toLowerCase())
 }
 
@@ -85,6 +86,39 @@ export function getExecutiveAdminEmails(): string[] {
 export function isExecutiveAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false
   return getExecutiveAdminEmails().includes(email.trim().toLowerCase())
+}
+
+/**
+ * HR admins who should NOT see Billing, Payroll, Operations, or Documents.
+ * They still get full ADMIN access to everything else (schedule, employees, etc.).
+ */
+const DEFAULT_LIMITED_ADMIN_EMAILS = [
+  'afsana@riseandshineaba.com',
+  'tisha@riseandshineaba.com',
+] as const
+
+export function getLimitedAdminEmails(): string[] {
+  const fromEnv = process.env.LIMITED_ADMIN_EMAILS?.trim()
+  if (fromEnv) {
+    return fromEnv
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+  }
+  return [...DEFAULT_LIMITED_ADMIN_EMAILS]
+}
+
+export function isLimitedAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  return getLimitedAdminEmails().includes(email.trim().toLowerCase())
+}
+
+/** Documents tab/APIs — all ADMIN except limited admins. Super-admins always allowed. */
+export function canAccessDocumentsEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  if (isSuperAdminEmail(email)) return true
+  if (isLimitedAdminEmail(email)) return false
+  return true
 }
 
 /** Company-document TEST distribution goes only to this RBT account. */

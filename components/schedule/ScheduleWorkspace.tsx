@@ -8,7 +8,7 @@ import type {
   RowDimension,
 } from '@/lib/schedule/types'
 import { findConflicts, hoursOf, fmtH } from '@/lib/schedule/utils'
-import { downloadScheduleCsv } from '@/lib/schedule/export'
+import { downloadScheduleExport } from '@/lib/schedule/export'
 import { useToast } from '@/components/ui/toast'
 import ScheduleToolbar from './ScheduleToolbar'
 import RosterView from './RosterView'
@@ -129,8 +129,14 @@ export default function ScheduleWorkspace({ initial }: { initial: ScheduleWorksp
         onAddSession={() => openCreate()}
         onManage={() => setManageOpen(true)}
         onExport={() => {
-          downloadScheduleCsv(filteredSlots, therapists, clients)
-          showToast('Schedule exported', 'success')
+          void (async () => {
+            try {
+              await downloadScheduleExport(filteredSlots, therapists, clients)
+              showToast('Schedule exported (by borough → client)', 'success')
+            } catch {
+              showToast('Export failed', 'error')
+            }
+          })()
         }}
       />
 

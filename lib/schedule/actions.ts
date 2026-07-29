@@ -143,6 +143,7 @@ const ClientInput = z.object({
   id: z.string().optional(),
   code: z.string().max(20).optional().nullable(),
   name: z.string().min(1),
+  borough: z.string().max(60).optional().nullable(),
   insurance: z.string().optional().nullable(),
   bcba: z.string().optional().nullable(),
   authorizedHoursPerWeek: z.number().min(0).max(168).optional().nullable(),
@@ -158,6 +159,7 @@ export async function upsertClient(input: unknown) {
         data: {
           code: data.code ?? null,
           name: data.name,
+          borough: data.borough?.trim() || null,
           insurance: data.insurance ?? null,
           bcba: data.bcba ?? null,
           authorizedHoursPerWeek: data.authorizedHoursPerWeek ?? null,
@@ -168,6 +170,7 @@ export async function upsertClient(input: unknown) {
         data: {
           code: data.code ?? null,
           name: data.name,
+          borough: data.borough?.trim() || null,
           insurance: data.insurance ?? null,
           bcba: data.bcba ?? null,
           authorizedHoursPerWeek: data.authorizedHoursPerWeek ?? null,
@@ -224,10 +227,11 @@ export async function setAuthorizedHours(clientId: string, hours: number | null)
   return serializeClient(row)
 }
 
-/** Partial update for Client hours tab (bcba / insurance / authorized hours). */
+/** Partial update for Client hours tab (borough / bcba / insurance / authorized hours). */
 export async function updateClientMeta(
   clientId: string,
   patch: {
+    borough?: string | null
     bcba?: string | null
     insurance?: string | null
     authorizedHoursPerWeek?: number | null
@@ -235,10 +239,15 @@ export async function updateClientMeta(
 ) {
   await assertScheduleAccess()
   const data: {
+    borough?: string | null
     bcba?: string | null
     insurance?: string | null
     authorizedHoursPerWeek?: number | null
   } = {}
+  if ('borough' in patch) {
+    const v = patch.borough
+    data.borough = v == null || String(v).trim() === '' ? null : String(v).trim()
+  }
   if ('bcba' in patch) {
     const v = patch.bcba
     data.bcba = v == null || String(v).trim() === '' ? null : String(v).trim()
@@ -318,6 +327,7 @@ function serializeClient(row: {
   id: string
   code: string | null
   name: string
+  borough: string | null
   insurance: string | null
   bcba: string | null
   authorizedHoursPerWeek: unknown
@@ -327,6 +337,7 @@ function serializeClient(row: {
     id: row.id,
     code: row.code,
     name: row.name,
+    borough: row.borough,
     insurance: row.insurance,
     bcba: row.bcba,
     authorizedHoursPerWeek:

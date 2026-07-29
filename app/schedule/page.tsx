@@ -24,6 +24,7 @@ export default async function SchedulePage() {
       id: c.id,
       code: c.code,
       name: c.name,
+      borough: c.borough,
       insurance: c.insurance,
       bcba: c.bcba,
       authorizedHoursPerWeek:

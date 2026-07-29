@@ -6,6 +6,7 @@ import {
   isBillingManagerEmail,
   isExecutiveAdminEmail,
   isSuperAdminEmail,
+  canAccessDocumentsEmail,
   PLATFORM_OWNER_EMAIL,
 } from './constants'
 
@@ -307,6 +308,19 @@ export async function requireAdminSession(): Promise<
     return { user: null, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
   }
   return { user, response: null }
+}
+
+/** Admin + Documents access (excludes limited admins such as Afsana / Tisha ABA). */
+export async function requireDocumentsAdminSession(): Promise<
+  | { user: SessionUser; response: null }
+  | { user: null; response: NextResponse }
+> {
+  const auth = await requireAdminSession()
+  if (auth.response) return auth
+  if (!canAccessDocumentsEmail(auth.user.email)) {
+    return { user: null, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  }
+  return auth
 }
 
 /** Billing & Payroll: email allowlist (Aaron, Kazi/Jamal, Fardeen, Shazia) + super-admins. */
