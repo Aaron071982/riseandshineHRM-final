@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/prisma'
-import { inferBorough, normalizePersonName } from './borough'
+import { inferBorough, normalizeBorough, normalizePersonName } from './borough'
 
 /**
- * Fill therapist.borough from matched RBT profiles (city/zip) when unset.
+ * Fill therapist.borough from matched RBT profiles (city/zip) when unset,
+ * and re-normalize known aliases (e.g. Jericho → Long Island).
  * Returns number of therapists updated.
  */
 export async function syncTherapistBoroughsFromRbtProfiles(): Promise<number> {
@@ -34,7 +35,19 @@ export async function syncTherapistBoroughsFromRbtProfiles(): Promise<number> {
 
   let updated = 0
   for (const t of therapists) {
-    if (t.borough?.trim()) continue
+    // Re-normalize city aliases already stored (Jericho → Long Island)
+    if (t.borough?.trim()) {
+      const normalized = normalizeBorough(t.borough)
+      if (normalized !== 'Unassigned' && normalized !== t.borough) {
+        await prisma.scheduleTherapist.update({
+          where: { id: t.id },
+          data: { borough: normalized },
+        })
+        updated++
+      }
+      continue
+    }
+
     const email = t.email?.trim().toLowerCase()
     const match =
       (email ? byEmail.get(email) : undefined) ?? byName.get(normalizePersonName(t.name))

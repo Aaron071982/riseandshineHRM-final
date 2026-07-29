@@ -5,8 +5,8 @@ import ExcelJS from 'exceljs'
 import type { ScheduleClient, ScheduleSlot, ScheduleTherapist } from './types'
 import { DAY_FULL, hoursOf, minToLabel, type Day } from './utils'
 import {
-  NYC_BOROUGHS,
   boroughSortKey,
+  ensureAllBoroughSections,
   normalizeBorough,
 } from './borough'
 
@@ -121,7 +121,7 @@ function buildGrouped(
     }
   }
 
-  return [...boroughs.values()]
+  const mapped = [...boroughs.values()]
     .sort((a, b) => boroughSortKey(a.name) - boroughSortKey(b.name) || a.name.localeCompare(b.name))
     .map((b) => ({
       name: b.name,
@@ -129,6 +129,14 @@ function buildGrouped(
       sessionCount: b.sessionCount,
       rbts: [...b.rbts.values()].sort((a, c) => a.therapist.name.localeCompare(c.therapist.name)),
     }))
+
+  // Always include all 5 boroughs + Long Island (empty sections ok)
+  return ensureAllBoroughSections(mapped, (name) => ({
+    name,
+    totalHours: 0,
+    sessionCount: 0,
+    rbts: [],
+  }))
 }
 
 export function countUnassignedBoroughRbts(
@@ -190,9 +198,11 @@ export async function buildScheduleWorkbook(
 
   const totalSessions = grouped.reduce((a, b) => a + b.sessionCount, 0)
   const totalHours = grouped.reduce((a, b) => a + b.totalHours, 0)
-  const assignedBoroughs = grouped.filter((b) => b.name !== 'Unassigned').length
+  const activeBoroughs = grouped.filter(
+    (b) => b.name !== 'Unassigned' && b.sessionCount > 0
+  ).length
   const summary = sheet.addRow([
-    `${assignedBoroughs} assigned borough${assignedBoroughs === 1 ? '' : 's'} · ${totalRbtsWithSessions} RBTs with sessions · ${totalSessions} sessions · ${totalHours.toFixed(1)} hrs`,
+    `${activeBoroughs} borough${activeBoroughs === 1 ? '' : 's'} with sessions · ${totalRbtsWithSessions} RBTs with sessions · ${totalSessions} sessions · ${totalHours.toFixed(1)} hrs`,
   ])
   summary.font = { size: 11, bold: true }
   sheet.mergeCells(3, 1, 3, 15)

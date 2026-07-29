@@ -1,4 +1,4 @@
-/** Infer NYC borough from city / zip / free text. */
+/** Infer NYC borough / Long Island from city / zip / free text. */
 
 export const NYC_BOROUGHS = [
   'Bronx',
@@ -6,11 +6,12 @@ export const NYC_BOROUGHS = [
   'Manhattan',
   'Queens',
   'Staten Island',
+  'Long Island',
 ] as const
 
 export type NycBorough = (typeof NYC_BOROUGHS)[number]
 
-/** Common NYC ZIP → borough (first 3 digits / full zip prefixes). */
+/** Common ZIP 3-digit prefix → region. */
 const ZIP_PREFIX_TO_BOROUGH: Record<string, NycBorough> = {
   // Manhattan 100–102
   '100': 'Manhattan',
@@ -28,6 +29,11 @@ const ZIP_PREFIX_TO_BOROUGH: Record<string, NycBorough> = {
   '116': 'Queens',
   // Staten Island 103
   '103': 'Staten Island',
+  // Nassau / Suffolk (Long Island)
+  '115': 'Long Island',
+  '117': 'Long Island',
+  '118': 'Long Island',
+  '119': 'Long Island',
 }
 
 const CITY_ALIASES: Record<string, NycBorough> = {
@@ -51,6 +57,89 @@ const CITY_ALIASES: Record<string, NycBorough> = {
   // Brooklyn
   'brooklyn ny': 'Brooklyn',
   'brooklyn, new york, united states': 'Brooklyn',
+  // Long Island
+  'long island': 'Long Island',
+  li: 'Long Island',
+  nassau: 'Long Island',
+  suffolk: 'Long Island',
+  jericho: 'Long Island',
+  'south huntington': 'Long Island',
+  huntington: 'Long Island',
+  hicksville: 'Long Island',
+  levittown: 'Long Island',
+  freeport: 'Long Island',
+  'garden city': 'Long Island',
+  mineola: 'Long Island',
+  hempstead: 'Long Island',
+  massapequa: 'Long Island',
+  babylon: 'Long Island',
+  patchogue: 'Long Island',
+  riverhead: 'Long Island',
+  'valley stream': 'Long Island',
+  'westbury': 'Long Island',
+  syosset: 'Long Island',
+  plainview: 'Long Island',
+  'farmingdale': 'Long Island',
+  'east meadow': 'Long Island',
+  'uniondale': 'Long Island',
+  'rockville centre': 'Long Island',
+  'oceanside': 'Long Island',
+  'baldwin': 'Long Island',
+  'wantagh': 'Long Island',
+  'seaford': 'Long Island',
+  'bellmore': 'Long Island',
+  'merrick': 'Long Island',
+  'bethpage': 'Long Island',
+  'oyster bay': 'Long Island',
+  'glen cove': 'Long Island',
+  'port washington': 'Long Island',
+  'great neck': 'Long Island',
+  'manhasset': 'Long Island',
+  'roslyn': 'Long Island',
+  'carle place': 'Long Island',
+  'new hyde park': 'Long Island',
+  'floral park': 'Long Island',
+  'franklin square': 'Long Island',
+  'elmont': 'Long Island',
+  'bay shore': 'Long Island',
+  'islip': 'Long Island',
+  'smithtown': 'Long Island',
+  'commack': 'Long Island',
+  'dix hills': 'Long Island',
+  'melville': 'Long Island',
+  'deer park': 'Long Island',
+  'brentwood': 'Long Island',
+  'central islip': 'Long Island',
+  'hauppauge': 'Long Island',
+  'stony brook': 'Long Island',
+  'setauket': 'Long Island',
+  'port jefferson': 'Long Island',
+  'coram': 'Long Island',
+  'medford': 'Long Island',
+  'ronkonkoma': 'Long Island',
+  'holbrook': 'Long Island',
+  'holtsville': 'Long Island',
+  'centereach': 'Long Island',
+  'selden': 'Long Island',
+  'lake grove': 'Long Island',
+  'nesconset': 'Long Island',
+  'kings park': 'Long Island',
+  'northport': 'Long Island',
+  'huntington station': 'Long Island',
+  'greenlawn': 'Long Island',
+  'amityville': 'Long Island',
+  'copiague': 'Long Island',
+  'lindenhurst': 'Long Island',
+  'west islip': 'Long Island',
+  'east islip': 'Long Island',
+  'oakdale': 'Long Island',
+  'sayville': 'Long Island',
+  'bayport': 'Long Island',
+  'blue point': 'Long Island',
+  'hampton bays': 'Long Island',
+  'southampton': 'Long Island',
+  'east hampton': 'Long Island',
+  montauk: 'Long Island',
 }
 
 export function normalizeBorough(raw: string | null | undefined): string {
@@ -72,6 +161,10 @@ export function normalizeBorough(raw: string | null | undefined): string {
   if (lower.includes('manhattan')) return 'Manhattan'
   if (lower.includes('queens')) return 'Queens'
   if (lower.includes('staten')) return 'Staten Island'
+  if (lower.includes('long island') || lower.includes('nassau') || lower.includes('suffolk')) {
+    return 'Long Island'
+  }
+  // Unknown free-text cities stay as title case (e.g. Yonkers) for grouping
   return s.replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
@@ -105,6 +198,23 @@ export function boroughSortKey(name: string): number {
   if (i >= 0) return i
   if (name === 'Unassigned') return 100
   return 50
+}
+
+/** Canonical regions always shown in export (even if empty). */
+export function ensureAllBoroughSections<T extends { name: string }>(
+  grouped: T[],
+  emptyFactory: (name: (typeof NYC_BOROUGHS)[number]) => T
+): T[] {
+  const byName = new Map(grouped.map((g) => [g.name, g]))
+  const ordered: T[] = []
+  for (const name of NYC_BOROUGHS) {
+    ordered.push(byName.get(name) ?? emptyFactory(name))
+    byName.delete(name)
+  }
+  const extras = [...byName.values()].sort(
+    (a, b) => boroughSortKey(a.name) - boroughSortKey(b.name) || a.name.localeCompare(b.name)
+  )
+  return [...ordered, ...extras]
 }
 
 export function normalizePersonName(name: string): string {
