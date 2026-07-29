@@ -5,6 +5,7 @@ export type ScheduleTherapist = {
   name: string
   email: string | null
   role: ScheduleTherapistRole
+  borough: string | null
   colorKey: number | null
   active: boolean
 }

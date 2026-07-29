@@ -2147,6 +2147,8 @@ model ScheduleTherapist {
   name      String
   email     String?               @unique
   role      ScheduleTherapistRole @default(RBT)
+  /// NYC borough (or region) — used for schedule export grouping by RBT
+  borough   String?
   colorKey  Int?
   active    Boolean               @default(true)
   slots     ScheduleSessionSlot[]
@@ -2154,6 +2156,7 @@ model ScheduleTherapist {
   updatedAt DateTime              @updatedAt
 
   @@index([active])
+  @@index([borough])
   @@map("therapist")
 }
 

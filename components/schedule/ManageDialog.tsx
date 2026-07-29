@@ -6,6 +6,7 @@ import {
   upsertTherapist,
   upsertClient,
   updateClientMeta,
+  updateTherapistBorough,
   addAllowedUser,
   removeAllowedUser,
 } from '@/lib/schedule/actions'
@@ -38,15 +39,18 @@ export default function ManageDialog({
   onRefresh: () => void
 }) {
   const { showToast } = useToast()
-  const [newTherapist, setNewTherapist] = useState('')
+  const [newTherapist, setNewTherapist] = useState({ name: '', borough: '' })
   const [newClient, setNewClient] = useState({ name: '', code: '', borough: '' })
   const [newEmail, setNewEmail] = useState('')
 
   const addTherapist = async () => {
-    if (!newTherapist.trim()) return
+    if (!newTherapist.name.trim()) return
     try {
-      await upsertTherapist({ name: newTherapist.trim() })
-      setNewTherapist('')
+      await upsertTherapist({
+        name: newTherapist.name.trim(),
+        borough: newTherapist.borough.trim() || null,
+      })
+      setNewTherapist({ name: '', borough: '' })
       showToast('Therapist added', 'success')
       onRefresh()
     } catch {
@@ -70,10 +74,20 @@ export default function ManageDialog({
     }
   }
 
-  const setBorough = async (id: string, borough: string) => {
+  const setClientBorough = async (id: string, borough: string) => {
     try {
       await updateClientMeta(id, { borough: borough || null })
       showToast('Borough saved', 'success')
+      onRefresh()
+    } catch {
+      showToast('Failed to save borough', 'error')
+    }
+  }
+
+  const setTherapistBorough = async (id: string, borough: string) => {
+    try {
+      await updateTherapistBorough(id, borough || null)
+      showToast('RBT borough saved', 'success')
       onRefresh()
     } catch {
       showToast('Failed to save borough', 'error')
@@ -84,7 +98,13 @@ export default function ManageDialog({
     try {
       if (type === 'therapist') {
         const t = therapists.find((x) => x.id === id)
-        if (t) await upsertTherapist({ id, name: t.name, active: !active })
+        if (t)
+          await upsertTherapist({
+            id,
+            name: t.name,
+            borough: t.borough,
+            active: !active,
+          })
       } else {
         const c = clients.find((x) => x.id === id)
         if (c)
@@ -128,29 +148,63 @@ export default function ManageDialog({
           </TabsList>
 
           <TabsContent value="therapists" className="space-y-3 mt-3">
-            <div className="flex gap-2">
+            <p className="text-xs text-gray-500">
+              Export groups by RBT borough. Boroughs auto-fill from RBT profile city/zip when
+              possible — override anytime below.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
               <Input
                 placeholder="New therapist name"
-                value={newTherapist}
-                onChange={(e) => setNewTherapist(e.target.value)}
+                value={newTherapist.name}
+                onChange={(e) => setNewTherapist((p) => ({ ...p, name: e.target.value }))}
               />
-              <Button onClick={addTherapist} className="bg-[#0E4D52] shrink-0">
-                Add
-              </Button>
+              <select
+                className="h-9 rounded-md border px-2 text-sm"
+                value={newTherapist.borough}
+                onChange={(e) => setNewTherapist((p) => ({ ...p, borough: e.target.value }))}
+              >
+                <option value="">Borough (optional)</option>
+                {NYC_BOROUGHS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
             </div>
-            <ul className="text-sm space-y-1 max-h-48 overflow-y-auto">
+            <Button onClick={addTherapist} className="bg-[#0E4D52]">
+              Add
+            </Button>
+            <ul className="text-sm space-y-2 max-h-64 overflow-y-auto">
               {therapists.map((t) => (
-                <li key={t.id} className="flex justify-between items-center py-1 border-b">
-                  <span className={!t.active ? 'line-through text-gray-400' : ''}>
+                <li
+                  key={t.id}
+                  className="flex flex-wrap justify-between items-center gap-2 py-1.5 border-b"
+                >
+                  <span className={!t.active ? 'line-through text-gray-400 min-w-0' : 'min-w-0'}>
                     {t.name} <span className="text-xs text-gray-400">{t.role}</span>
                   </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => toggleActive('therapist', t.id, t.active)}
-                  >
-                    {t.active ? 'Deactivate' : 'Activate'}
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <select
+                      className="h-8 rounded-md border px-1.5 text-xs max-w-[8.5rem]"
+                      value={t.borough ?? ''}
+                      disabled={!t.active}
+                      onChange={(e) => void setTherapistBorough(t.id, e.target.value)}
+                    >
+                      <option value="">No borough</option>
+                      {NYC_BOROUGHS.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleActive('therapist', t.id, t.active)}
+                    >
+                      {t.active ? 'Deactivate' : 'Activate'}
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -158,7 +212,7 @@ export default function ManageDialog({
 
           <TabsContent value="clients" className="space-y-3 mt-3">
             <p className="text-xs text-gray-500">
-              Set each client&apos;s borough so Export groups by borough → client.
+              Optional — client borough for hours tracking (export groups by RBT borough).
             </p>
             <div className="grid grid-cols-2 gap-2">
               <Input
@@ -202,7 +256,7 @@ export default function ManageDialog({
                       className="h-8 rounded-md border px-1.5 text-xs max-w-[8.5rem]"
                       value={c.borough ?? ''}
                       disabled={!c.active}
-                      onChange={(e) => void setBorough(c.id, e.target.value)}
+                      onChange={(e) => void setClientBorough(c.id, e.target.value)}
                     >
                       <option value="">No borough</option>
                       {NYC_BOROUGHS.map((b) => (

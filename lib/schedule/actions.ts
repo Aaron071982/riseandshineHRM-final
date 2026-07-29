@@ -186,6 +186,7 @@ const TherapistInput = z.object({
   name: z.string().min(1),
   email: z.string().email().optional().nullable(),
   role: Role.optional(),
+  borough: z.string().max(60).optional().nullable(),
   colorKey: z.number().int().optional().nullable(),
   active: z.boolean().optional(),
 })
@@ -200,6 +201,7 @@ export async function upsertTherapist(input: unknown) {
           name: data.name,
           email: data.email ?? null,
           role: (data.role as ScheduleTherapistRole) ?? 'RBT',
+          borough: data.borough?.trim() || null,
           colorKey: data.colorKey ?? null,
           active: data.active ?? true,
         },
@@ -209,10 +211,24 @@ export async function upsertTherapist(input: unknown) {
           name: data.name,
           email: data.email ?? null,
           role: (data.role as ScheduleTherapistRole) ?? 'RBT',
+          borough: data.borough?.trim() || null,
           colorKey: data.colorKey ?? null,
           active: data.active ?? true,
         },
       })
+  revalidate()
+  return serializeTherapist(row)
+}
+
+/** Update RBT/therapist borough for export grouping. */
+export async function updateTherapistBorough(therapistId: string, borough: string | null) {
+  await assertScheduleAccess()
+  const row = await prisma.scheduleTherapist.update({
+    where: { id: therapistId },
+    data: {
+      borough: borough == null || String(borough).trim() === '' ? null : String(borough).trim(),
+    },
+  })
   revalidate()
   return serializeTherapist(row)
 }
@@ -351,6 +367,7 @@ function serializeTherapist(row: {
   name: string
   email: string | null
   role: ScheduleTherapistRole
+  borough: string | null
   colorKey: number | null
   active: boolean
 }) {
@@ -359,6 +376,7 @@ function serializeTherapist(row: {
     name: row.name,
     email: row.email,
     role: row.role,
+    borough: row.borough,
     colorKey: row.colorKey,
     active: row.active,
   }

@@ -1,9 +1,13 @@
 import { prisma } from '@/lib/prisma'
 import ScheduleWorkspace from '@/components/schedule/ScheduleWorkspace'
+import { syncTherapistBoroughsFromRbtProfiles } from '@/lib/schedule/syncTherapistBoroughs'
 
 export const dynamic = 'force-dynamic'
 
 export default async function SchedulePage() {
+  // Back-fill therapist boroughs from RBT profile city/zip when missing
+  await syncTherapistBoroughsFromRbtProfiles().catch(() => 0)
+
   const [therapists, clients, slots, allowedUsers] = await Promise.all([
     prisma.scheduleTherapist.findMany({ orderBy: { name: 'asc' } }),
     prisma.scheduleWeeklyClient.findMany({ orderBy: { name: 'asc' } }),
@@ -17,6 +21,7 @@ export default async function SchedulePage() {
       name: t.name,
       email: t.email,
       role: t.role,
+      borough: t.borough,
       colorKey: t.colorKey,
       active: t.active,
     })),

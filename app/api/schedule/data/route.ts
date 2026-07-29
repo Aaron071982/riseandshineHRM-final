@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireScheduleSession } from '@/lib/schedule/access'
+import { syncTherapistBoroughsFromRbtProfiles } from '@/lib/schedule/syncTherapistBoroughs'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   const auth = await requireScheduleSession()
   if (auth.response) return auth.response
+
+  await syncTherapistBoroughsFromRbtProfiles().catch(() => 0)
 
   const [therapists, clients, slots, allowedUsers] = await Promise.all([
     prisma.scheduleTherapist.findMany({ orderBy: { name: 'asc' } }),
@@ -21,6 +24,7 @@ export async function GET() {
       name: t.name,
       email: t.email,
       role: t.role,
+      borough: t.borough,
       colorKey: t.colorKey,
       active: t.active,
     })),

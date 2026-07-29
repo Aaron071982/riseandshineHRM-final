@@ -209,8 +209,8 @@ export default function ClientHoursPanel({
         <p className="text-center text-gray-500 py-12">No clients — add them in Manage.</p>
       )}
       <p className="text-xs text-gray-400 px-3 py-2 border-t border-[#E4E8E9]">
-        Click Borough, BCBA, Insurance, or Authorized/wk to edit. Set boroughs so Export groups by
-        borough → client. Enter to save, Esc to cancel.
+        Click Borough, BCBA, Insurance, or Authorized/wk to edit. Schedule export groups by RBT
+        borough. Enter to save, Esc to cancel.
       </p>
     </div>
   )
