@@ -5,9 +5,11 @@ import type { ScheduleTherapist, ScheduleClient } from '@/lib/schedule/types'
 import {
   upsertTherapist,
   upsertClient,
+  updateClientMeta,
   addAllowedUser,
   removeAllowedUser,
 } from '@/lib/schedule/actions'
+import { NYC_BOROUGHS } from '@/lib/schedule/export'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,7 +39,7 @@ export default function ManageDialog({
 }) {
   const { showToast } = useToast()
   const [newTherapist, setNewTherapist] = useState('')
-  const [newClient, setNewClient] = useState({ name: '', code: '' })
+  const [newClient, setNewClient] = useState({ name: '', code: '', borough: '' })
   const [newEmail, setNewEmail] = useState('')
 
   const addTherapist = async () => {
@@ -58,12 +60,23 @@ export default function ManageDialog({
       await upsertClient({
         name: newClient.name.trim(),
         code: newClient.code.trim() || null,
+        borough: newClient.borough.trim() || null,
       })
-      setNewClient({ name: '', code: '' })
+      setNewClient({ name: '', code: '', borough: '' })
       showToast('Client added', 'success')
       onRefresh()
     } catch {
       showToast('Failed to add client', 'error')
+    }
+  }
+
+  const setBorough = async (id: string, borough: string) => {
+    try {
+      await updateClientMeta(id, { borough: borough || null })
+      showToast('Borough saved', 'success')
+      onRefresh()
+    } catch {
+      showToast('Failed to save borough', 'error')
     }
   }
 
@@ -74,7 +87,14 @@ export default function ManageDialog({
         if (t) await upsertTherapist({ id, name: t.name, active: !active })
       } else {
         const c = clients.find((x) => x.id === id)
-        if (c) await upsertClient({ id, name: c.name, code: c.code, active: !active })
+        if (c)
+          await upsertClient({
+            id,
+            name: c.name,
+            code: c.code,
+            borough: c.borough,
+            active: !active,
+          })
       }
       onRefresh()
     } catch {
@@ -83,20 +103,20 @@ export default function ManageDialog({
   }
 
   const grantAccess = async () => {
-    if (!newEmail.includes('@')) return
+    if (!newEmail.trim()) return
     try {
-      await addAllowedUser(newEmail)
+      await addAllowedUser(newEmail.trim())
       setNewEmail('')
       showToast('Access granted', 'success')
       onRefresh()
     } catch {
-      showToast('Failed to add email', 'error')
+      showToast('Failed to add access', 'error')
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Manage schedule</DialogTitle>
         </DialogHeader>
@@ -137,6 +157,9 @@ export default function ManageDialog({
           </TabsContent>
 
           <TabsContent value="clients" className="space-y-3 mt-3">
+            <p className="text-xs text-gray-500">
+              Set each client&apos;s borough so Export groups by borough → client.
+            </p>
             <div className="grid grid-cols-2 gap-2">
               <Input
                 placeholder="Client name"
@@ -148,23 +171,54 @@ export default function ManageDialog({
                 value={newClient.code}
                 onChange={(e) => setNewClient((p) => ({ ...p, code: e.target.value }))}
               />
+              <select
+                className="col-span-2 h-9 rounded-md border px-2 text-sm"
+                value={newClient.borough}
+                onChange={(e) => setNewClient((p) => ({ ...p, borough: e.target.value }))}
+              >
+                <option value="">Borough (optional)</option>
+                {NYC_BOROUGHS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
             </div>
             <Button onClick={addClient} className="bg-[#0E4D52]">
               Add client
             </Button>
-            <ul className="text-sm space-y-1 max-h-48 overflow-y-auto">
+            <ul className="text-sm space-y-2 max-h-64 overflow-y-auto">
               {clients.map((c) => (
-                <li key={c.id} className="flex justify-between items-center py-1 border-b">
-                  <span className={!c.active ? 'line-through text-gray-400' : ''}>
+                <li
+                  key={c.id}
+                  className="flex flex-wrap justify-between items-center gap-2 py-1.5 border-b"
+                >
+                  <span className={!c.active ? 'line-through text-gray-400 min-w-0' : 'min-w-0'}>
                     {c.name} {c.code && <span className="text-xs text-gray-400">{c.code}</span>}
                   </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => toggleActive('client', c.id, c.active)}
-                  >
-                    {c.active ? 'Deactivate' : 'Activate'}
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Label className="sr-only">Borough</Label>
+                    <select
+                      className="h-8 rounded-md border px-1.5 text-xs max-w-[8.5rem]"
+                      value={c.borough ?? ''}
+                      disabled={!c.active}
+                      onChange={(e) => void setBorough(c.id, e.target.value)}
+                    >
+                      <option value="">No borough</option>
+                      {NYC_BOROUGHS.map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleActive('client', c.id, c.active)}
+                    >
+                      {c.active ? 'Deactivate' : 'Activate'}
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>

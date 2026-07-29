@@ -9,10 +9,11 @@ const TEAL = 'FF0E4D52'
 const TEAL_SOFT = 'FFE6F0F1'
 const BOROUGH_FILL = 'FF0D9488'
 const CLIENT_FILL = 'FFF0FDF9'
+const WARN_FILL = 'FFFEF3C7'
 const HEADER_FONT = { bold: true, color: { argb: 'FFFFFFFF' } }
 const DAY_ORDER = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const
 
-const NYC_BOROUGHS = [
+export const NYC_BOROUGHS = [
   'Bronx',
   'Brooklyn',
   'Manhattan',
@@ -55,6 +56,12 @@ type SessionRow = {
   note: string
 }
 
+function dayIndex(dayLabel: string): number {
+  const code = Object.entries(DAY_FULL).find(([, v]) => v === dayLabel)?.[0] ?? ''
+  const i = DAY_ORDER.indexOf(code as (typeof DAY_ORDER)[number])
+  return i >= 0 ? i : 99
+}
+
 function buildGrouped(
   slots: ScheduleSlot[],
   therapists: ScheduleTherapist[],
@@ -87,8 +94,7 @@ function buildGrouped(
       b = { name: boroughName, clients: new Map(), totalHours: 0, sessionCount: 0 }
       boroughs.set(boroughName, b)
     }
-    const clientKey = s.clientId
-    let cb = b.clients.get(clientKey)
+    let cb = b.clients.get(s.clientId)
     if (!cb) {
       cb = {
         client: c ?? {
@@ -104,7 +110,7 @@ function buildGrouped(
         sessions: [],
         totalHours: 0,
       }
-      b.clients.set(clientKey, cb)
+      b.clients.set(s.clientId, cb)
     }
     const hrs = hoursOf(s)
     cb.sessions.push({
@@ -124,31 +130,39 @@ function buildGrouped(
     b.sessionCount += 1
   }
 
-  // Sort sessions within each client
   for (const b of boroughs.values()) {
     for (const cb of b.clients.values()) {
       cb.sessions.sort((a, b) => {
-        const dayA = Object.entries(DAY_FULL).find(([, v]) => v === a.day)?.[0] ?? ''
-        const dayB = Object.entries(DAY_FULL).find(([, v]) => v === b.day)?.[0] ?? ''
-        const d =
-          DAY_ORDER.indexOf(dayA as (typeof DAY_ORDER)[number]) -
-          DAY_ORDER.indexOf(dayB as (typeof DAY_ORDER)[number])
+        const d = dayIndex(a.day) - dayIndex(b.day)
         if (d !== 0) return d
         return a.start.localeCompare(b.start)
       })
     }
   }
 
-  const sortedBoroughs = [...boroughs.values()].sort(
-    (a, b) => boroughSortKey(a.name) - boroughSortKey(b.name) || a.name.localeCompare(b.name)
-  )
+  return [...boroughs.values()]
+    .sort((a, b) => boroughSortKey(a.name) - boroughSortKey(b.name) || a.name.localeCompare(b.name))
+    .map((b) => ({
+      name: b.name,
+      totalHours: b.totalHours,
+      sessionCount: b.sessionCount,
+      clients: [...b.clients.values()].sort((a, c) => a.client.name.localeCompare(c.client.name)),
+    }))
+}
 
-  return sortedBoroughs.map((b) => ({
-    name: b.name,
-    totalHours: b.totalHours,
-    sessionCount: b.sessionCount,
-    clients: [...b.clients.values()].sort((a, c) => a.client.name.localeCompare(c.client.name)),
-  }))
+export function countUnassignedBoroughClients(
+  slots: ScheduleSlot[],
+  clients: ScheduleClient[]
+): { unassignedClients: number; totalActiveClientsWithSessions: number } {
+  const cMap = new Map(clients.map((c) => [c.id, c]))
+  const ids = new Set(
+    slots.filter((s) => s.status !== 'CANCELLED').map((s) => s.clientId)
+  )
+  let unassigned = 0
+  for (const id of ids) {
+    if (normalizeBorough(cMap.get(id)?.borough) === 'Unassigned') unassigned++
+  }
+  return { unassignedClients: unassigned, totalActiveClientsWithSessions: ids.size }
 }
 
 export async function buildScheduleWorkbook(
@@ -157,49 +171,76 @@ export async function buildScheduleWorkbook(
   clients: ScheduleClient[]
 ): Promise<ExcelJS.Buffer> {
   const grouped = buildGrouped(slots, therapists, clients)
+  const { unassignedClients, totalActiveClientsWithSessions } = countUnassignedBoroughClients(
+    slots,
+    clients
+  )
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Rise and Shine ABA'
   wb.created = new Date()
 
-  const sheet = wb.addWorksheet('Schedule by Borough', {
-    views: [{ state: 'frozen', ySplit: 5 }],
+  // ── Sheet 1: Borough → Client → sessions (Borough column on every row) ──
+  const sheet = wb.addWorksheet('By borough', {
+    views: [{ state: 'frozen', ySplit: 6 }],
     properties: { defaultRowHeight: 18 },
   })
 
   sheet.columns = [
-    { key: 'a', width: 14 },
-    { key: 'b', width: 12 },
-    { key: 'c', width: 12 },
-    { key: 'd', width: 10 },
-    { key: 'e', width: 22 },
-    { key: 'f', width: 12 },
-    { key: 'g', width: 14 },
-    { key: 'h', width: 14 },
-    { key: 'i', width: 16 },
-    { key: 'j', width: 28 },
+    { key: 'borough', width: 14 },
+    { key: 'client', width: 24 },
+    { key: 'code', width: 10 },
+    { key: 'day', width: 12 },
+    { key: 'start', width: 10 },
+    { key: 'end', width: 10 },
+    { key: 'hours', width: 8 },
+    { key: 'therapist', width: 22 },
+    { key: 'role', width: 10 },
+    { key: 'status', width: 12 },
+    { key: 'cpt', width: 10 },
+    { key: 'pos', width: 14 },
+    { key: 'bcba', width: 16 },
+    { key: 'insurance', width: 18 },
+    { key: 'note', width: 24 },
   ]
 
   const title = sheet.addRow(['Rise and Shine ABA — Weekly Schedule'])
   title.font = { bold: true, size: 16, color: { argb: TEAL } }
-  sheet.mergeCells(1, 1, 1, 10)
+  sheet.mergeCells(1, 1, 1, 15)
 
   const subtitle = sheet.addRow([
     `Exported ${new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })} · Grouped by borough → client → sessions`,
   ])
   subtitle.font = { size: 10, italic: true, color: { argb: 'FF64748B' } }
-  sheet.mergeCells(2, 1, 2, 10)
+  sheet.mergeCells(2, 1, 2, 15)
 
   const totalSessions = grouped.reduce((a, b) => a + b.sessionCount, 0)
   const totalHours = grouped.reduce((a, b) => a + b.totalHours, 0)
+  const assignedBoroughs = grouped.filter((b) => b.name !== 'Unassigned').length
   const summary = sheet.addRow([
-    `${grouped.length} boroughs · ${clients.filter((c) => c.active).length} clients · ${totalSessions} sessions · ${totalHours.toFixed(1)} hrs`,
+    `${assignedBoroughs} assigned borough${assignedBoroughs === 1 ? '' : 's'} · ${grouped.length} group${grouped.length === 1 ? '' : 's'} · ${totalActiveClientsWithSessions} clients with sessions · ${totalSessions} sessions · ${totalHours.toFixed(1)} hrs`,
   ])
   summary.font = { size: 11, bold: true }
-  sheet.mergeCells(3, 1, 3, 10)
+  sheet.mergeCells(3, 1, 3, 15)
+
+  if (unassignedClients > 0) {
+    const warn = sheet.addRow([
+      `Warning: ${unassignedClients} of ${totalActiveClientsWithSessions} clients have no borough set. Assign boroughs on the schedule Client hours tab (Borough column), then export again.`,
+    ])
+    warn.font = { size: 10, bold: true, color: { argb: 'FF92400E' } }
+    warn.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: WARN_FILL } }
+    })
+    sheet.mergeCells(4, 1, 4, 15)
+  } else {
+    sheet.addRow([])
+  }
 
   sheet.addRow([])
 
   const header = sheet.addRow([
+    'Borough',
+    'Client',
+    'Code',
     'Day',
     'Start',
     'End',
@@ -209,18 +250,23 @@ export async function buildScheduleWorkbook(
     'Status',
     'CPT',
     'Place of service',
+    'BCBA',
+    'Insurance',
     'Note',
   ])
   header.eachCell((cell) => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } }
     cell.font = HEADER_FONT
-    cell.alignment = { vertical: 'middle', horizontal: 'left' }
+    cell.alignment = { vertical: 'middle' }
   })
   header.height = 22
 
   for (const borough of grouped) {
     const bRow = sheet.addRow([
-      borough.name.toUpperCase(),
+      `BOROUGH: ${borough.name.toUpperCase()}`,
+      '',
+      '',
+      '',
       '',
       '',
       `${borough.totalHours.toFixed(1)} hrs`,
@@ -230,8 +276,10 @@ export async function buildScheduleWorkbook(
       '',
       '',
       '',
+      '',
+      '',
     ])
-    sheet.mergeCells(bRow.number, 1, bRow.number, 3)
+    sheet.mergeCells(bRow.number, 1, bRow.number, 6)
     bRow.eachCell((cell) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BOROUGH_FILL } }
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 }
@@ -240,29 +288,23 @@ export async function buildScheduleWorkbook(
 
     for (const cb of borough.clients) {
       const c = cb.client
-      const meta = [
-        c.code ? `Code ${c.code}` : null,
-        c.bcba ? `BCBA: ${c.bcba}` : null,
-        c.insurance ? c.insurance : null,
-        c.authorizedHoursPerWeek != null ? `Auth ${c.authorizedHoursPerWeek} hrs/wk` : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-
       const cRow = sheet.addRow([
-        `  ${c.name}`,
+        borough.name,
+        c.name,
+        c.code ?? '',
+        '',
         '',
         '',
         `${cb.totalHours.toFixed(1)} hrs`,
-        meta,
         '',
         '',
         '',
         '',
         '',
+        c.bcba ?? '',
+        c.insurance ?? '',
+        c.authorizedHoursPerWeek != null ? `Auth ${c.authorizedHoursPerWeek} hrs/wk` : '',
       ])
-      sheet.mergeCells(cRow.number, 1, cRow.number, 3)
-      sheet.mergeCells(cRow.number, 5, cRow.number, 10)
       cRow.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CLIENT_FILL } }
         cell.font = { bold: true, color: { argb: 'FF134E4A' }, size: 11 }
@@ -271,15 +313,20 @@ export async function buildScheduleWorkbook(
       let alt = false
       for (const s of cb.sessions) {
         const r = sheet.addRow([
+          borough.name,
+          c.name,
+          c.code ?? '',
           s.day,
           s.start,
           s.end,
-          s.hours.toFixed(2),
+          Number(s.hours.toFixed(2)),
           s.therapist,
           s.therapistRole,
           s.status,
           s.procedureCode,
           s.placeOfService,
+          c.bcba ?? '',
+          c.insurance ?? '',
           s.note,
         ])
         if (alt) {
@@ -288,7 +335,7 @@ export async function buildScheduleWorkbook(
           })
         }
         alt = !alt
-        r.getCell(4).alignment = { horizontal: 'right' }
+        r.getCell(7).alignment = { horizontal: 'right' }
       }
     }
 
@@ -299,7 +346,7 @@ export async function buildScheduleWorkbook(
     sheet.addRow(['No active sessions to export.'])
   }
 
-  // Flat reference sheet for filtering/pivot
+  // ── Sheet 2: flat list (easy filter / pivot) ──
   const flat = wb.addWorksheet('All sessions', {
     views: [{ state: 'frozen', ySplit: 1 }],
   })
@@ -349,6 +396,47 @@ export async function buildScheduleWorkbook(
     }
   }
 
+  // ── Sheet 3: client roster with borough assignment status ──
+  const roster = wb.addWorksheet('Client boroughs', {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  })
+  roster.columns = [
+    { header: 'Client', key: 'name', width: 28 },
+    { header: 'Code', key: 'code', width: 10 },
+    { header: 'Borough', key: 'borough', width: 16 },
+    { header: 'Status', key: 'status', width: 14 },
+    { header: 'BCBA', key: 'bcba', width: 18 },
+    { header: 'Insurance', key: 'insurance', width: 18 },
+    { header: 'Scheduled hrs', key: 'hours', width: 12 },
+  ]
+  roster.getRow(1).eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } }
+    cell.font = HEADER_FONT
+  })
+
+  const hoursByClient = new Map<string, number>()
+  for (const s of slots) {
+    if (s.status === 'CANCELLED') continue
+    hoursByClient.set(s.clientId, (hoursByClient.get(s.clientId) ?? 0) + hoursOf(s))
+  }
+
+  for (const c of [...clients].filter((x) => x.active).sort((a, b) => a.name.localeCompare(b.name))) {
+    const borough = normalizeBorough(c.borough)
+    const row = roster.addRow({
+      name: c.name,
+      code: c.code ?? '',
+      borough: c.borough?.trim() || '',
+      status: borough === 'Unassigned' ? 'NEEDS BOROUGH' : 'OK',
+      bcba: c.bcba ?? '',
+      insurance: c.insurance ?? '',
+      hours: Number((hoursByClient.get(c.id) ?? 0).toFixed(2)),
+    })
+    if (borough === 'Unassigned') {
+      row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: WARN_FILL } }
+      row.getCell(4).font = { bold: true, color: { argb: 'FF92400E' } }
+    }
+  }
+
   return wb.xlsx.writeBuffer() as Promise<ExcelJS.Buffer>
 }
 
@@ -357,7 +445,8 @@ export async function downloadScheduleExport(
   therapists: ScheduleTherapist[],
   clients: ScheduleClient[],
   filename = `schedule-by-borough-${new Date().toISOString().slice(0, 10)}.xlsx`
-) {
+): Promise<{ unassignedClients: number; totalActiveClientsWithSessions: number }> {
+  const counts = countUnassignedBoroughClients(slots, clients)
   const buf = await buildScheduleWorkbook(slots, therapists, clients)
   const blob = new Blob([buf as unknown as ArrayBuffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -368,92 +457,5 @@ export async function downloadScheduleExport(
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
-}
-
-/** @deprecated Prefer downloadScheduleExport (.xlsx). Kept for callers that still want CSV. */
-export function buildScheduleCsv(
-  slots: ScheduleSlot[],
-  therapists: ScheduleTherapist[],
-  clients: ScheduleClient[]
-): string {
-  const tMap = new Map(therapists.map((t) => [t.id, t]))
-  const cMap = new Map(clients.map((c) => [c.id, c]))
-  const headers = [
-    'Borough',
-    'Client',
-    'Client code',
-    'Day',
-    'Start',
-    'End',
-    'Hours',
-    'Therapist',
-    'Therapist role',
-    'Insurance',
-    'BCBA',
-    'Status',
-    'Procedure code',
-    'Place of service',
-    'Note',
-  ]
-  const sorted = [...slots]
-    .filter((s) => s.status !== 'CANCELLED')
-    .sort((a, b) => {
-      const ca = cMap.get(a.clientId)
-      const cb = cMap.get(b.clientId)
-      const ba = normalizeBorough(ca?.borough)
-      const bb = normalizeBorough(cb?.borough)
-      const bd = boroughSortKey(ba) - boroughSortKey(bb) || ba.localeCompare(bb)
-      if (bd !== 0) return bd
-      const cn = (ca?.name ?? '').localeCompare(cb?.name ?? '')
-      if (cn !== 0) return cn
-      const d = DAY_ORDER.indexOf(a.day as (typeof DAY_ORDER)[number]) - DAY_ORDER.indexOf(b.day as (typeof DAY_ORDER)[number])
-      if (d !== 0) return d
-      return a.startMin - b.startMin
-    })
-
-  const esc = (v: string | number | null | undefined) => {
-    const s = v == null ? '' : String(v)
-    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`
-    return s
-  }
-
-  const rows = sorted.map((s) => {
-    const t = tMap.get(s.therapistId)
-    const c = cMap.get(s.clientId)
-    return [
-      normalizeBorough(c?.borough),
-      c?.name ?? '',
-      c?.code ?? '',
-      DAY_FULL[s.day as Day] ?? s.day,
-      minToLabel(s.startMin),
-      minToLabel(s.endMin),
-      hoursOf(s).toFixed(2),
-      t?.name ?? '',
-      t?.role ?? '',
-      c?.insurance ?? '',
-      c?.bcba ?? '',
-      s.status,
-      s.procedureCode,
-      s.placeOfService,
-      s.note ?? '',
-    ].map(esc)
-  })
-
-  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
-}
-
-export function downloadScheduleCsv(
-  slots: ScheduleSlot[],
-  therapists: ScheduleTherapist[],
-  clients: ScheduleClient[],
-  filename = `weekly-schedule-${new Date().toISOString().slice(0, 10)}.csv`
-) {
-  const csv = '\uFEFF' + buildScheduleCsv(slots, therapists, clients)
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
+  return counts
 }

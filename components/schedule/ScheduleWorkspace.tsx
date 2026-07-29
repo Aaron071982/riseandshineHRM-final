@@ -131,8 +131,15 @@ export default function ScheduleWorkspace({ initial }: { initial: ScheduleWorksp
         onExport={() => {
           void (async () => {
             try {
-              await downloadScheduleExport(filteredSlots, therapists, clients)
-              showToast('Schedule exported (by borough → client)', 'success')
+              const counts = await downloadScheduleExport(filteredSlots, therapists, clients)
+              if (counts.unassignedClients > 0) {
+                showToast(
+                  `Exported — ${counts.unassignedClients} clients still need a borough (set on Client hours)`,
+                  'error'
+                )
+              } else {
+                showToast('Schedule exported (grouped by borough → client)', 'success')
+              }
             } catch {
               showToast('Export failed', 'error')
             }
