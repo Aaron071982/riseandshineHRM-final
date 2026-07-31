@@ -27,6 +27,7 @@ interface Props {
   onAddSession: () => void
   onManage: () => void
   onExport: () => void
+  onExportAll?: () => void
 }
 
 export default function ScheduleToolbar({
@@ -44,6 +45,7 @@ export default function ScheduleToolbar({
   onAddSession,
   onManage,
   onExport,
+  onExportAll,
 }: Props) {
   const tabs: { id: ViewMode; label: string }[] = [
     { id: 'roster', label: 'Roster' },
@@ -138,6 +140,11 @@ export default function ScheduleToolbar({
             <Download className="w-4 h-4 mr-1" />
             Export
           </Button>
+          {onExportAll && (
+            <Button size="sm" variant="ghost" onClick={onExportAll} title="Export all boroughs">
+              Export all
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={onManage}>
             <Settings2 className="w-4 h-4 mr-1" />
             Manage

@@ -1,58 +1,50 @@
-import { prisma } from '@/lib/prisma'
 import ScheduleWorkspace from '@/components/schedule/ScheduleWorkspace'
 import { syncTherapistBoroughsFromRbtProfiles } from '@/lib/schedule/syncTherapistBoroughs'
+import {
+  getLatestPeriodRange,
+  listSchedulePeriods,
+  loadPeriodWorkspaceData,
+} from '@/lib/schedule-import/periodData'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SchedulePage() {
-  // Back-fill therapist boroughs from RBT profile city/zip when missing
+export default async function SchedulePage({
+  searchParams,
+}: {
+  searchParams?: { periodStart?: string; periodEnd?: string; borough?: string }
+}) {
   await syncTherapistBoroughsFromRbtProfiles().catch(() => 0)
 
-  const [therapists, clients, slots, allowedUsers] = await Promise.all([
-    prisma.scheduleTherapist.findMany({ orderBy: { name: 'asc' } }),
-    prisma.scheduleWeeklyClient.findMany({ orderBy: { name: 'asc' } }),
-    prisma.scheduleSessionSlot.findMany(),
-    prisma.scheduleAllowedUser.findMany({ orderBy: { email: 'asc' } }),
-  ])
-
-  const initial = {
-    therapists: therapists.map((t) => ({
-      id: t.id,
-      name: t.name,
-      email: t.email,
-      role: t.role,
-      borough: t.borough,
-      colorKey: t.colorKey,
-      active: t.active,
-    })),
-    clients: clients.map((c) => ({
-      id: c.id,
-      code: c.code,
-      name: c.name,
-      borough: c.borough,
-      insurance: c.insurance,
-      bcba: c.bcba,
-      authorizedHoursPerWeek:
-        c.authorizedHoursPerWeek != null ? Number(c.authorizedHoursPerWeek) : null,
-      active: c.active,
-    })),
-    slots: slots.map((s) => ({
-      id: s.id,
-      therapistId: s.therapistId,
-      clientId: s.clientId,
-      day: s.day,
-      startMin: s.startMin,
-      endMin: s.endMin,
-      status: s.status,
-      procedureCode: s.procedureCode,
-      placeOfService: s.placeOfService,
-      note: s.note,
-      createdBy: s.createdBy,
-      updatedBy: s.updatedBy,
-    })),
-    allowedEmails: allowedUsers.map((u) => u.email),
-    allowedUsers: allowedUsers.map((u) => ({ id: u.id, email: u.email })),
+  const parse = (s?: string) => {
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null
+    const [y, m, d] = s.split('-').map(Number)
+    return new Date(y, m - 1, d)
   }
 
-  return <ScheduleWorkspace initial={initial} />
+  let periodStart = parse(searchParams?.periodStart)
+  let periodEnd = parse(searchParams?.periodEnd)
+  if (!periodStart || !periodEnd) {
+    const latest = await getLatestPeriodRange()
+    if (latest) {
+      periodStart = latest.periodStart
+      periodEnd = latest.periodEnd
+    }
+  }
+
+  const [data, periods] = await Promise.all([
+    loadPeriodWorkspaceData({
+      periodStart,
+      periodEnd,
+      boroughFilter: searchParams?.borough || null,
+    }),
+    listSchedulePeriods(),
+  ])
+
+  return (
+    <ScheduleWorkspace
+      initial={data}
+      periods={periods}
+      initialBorough={searchParams?.borough || ''}
+    />
+  )
 }

@@ -28,9 +28,24 @@ export async function GET(
     return NextResponse.json({ error: 'RBT profile not found' }, { status: 404 })
   }
 
+  const latest = await prisma.scheduleImportBatch.findFirst({
+    orderBy: [{ periodEnd: 'desc' }, { createdAt: 'desc' }],
+  })
+
   const [nativeRows, roster] = await Promise.all([
     prisma.rbtScheduleAssignment.findMany({
-      where: { rbtProfileId: id, isActive: true },
+      where: {
+        rbtProfileId: id,
+        isActive: true,
+        ...(latest
+          ? {
+              OR: [
+                { periodStart: latest.periodStart, periodEnd: latest.periodEnd },
+                { source: 'MANUAL', periodStart: null, periodEnd: null },
+              ],
+            }
+          : {}),
+      },
       orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
     }),
     rosterAssignmentsForRbt({
@@ -113,6 +128,14 @@ export async function POST(
             endTime,
             location,
             notes,
+            source: 'MANUAL',
+            clientBorough:
+              typeof body?.clientBorough === 'string'
+                ? body.clientBorough.trim() || 'Unset'
+                : 'Unset',
+            periodStart:
+              typeof body?.periodStart === 'string' ? new Date(body.periodStart) : undefined,
+            periodEnd: typeof body?.periodEnd === 'string' ? new Date(body.periodEnd) : undefined,
             createdBy: user.id,
           },
         })

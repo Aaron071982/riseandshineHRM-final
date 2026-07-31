@@ -34,9 +34,24 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const latest = await prisma.scheduleImportBatch.findFirst({
+      orderBy: [{ periodEnd: 'desc' }, { createdAt: 'desc' }],
+    })
+
     const [nativeRows, roster] = await Promise.all([
       prisma.rbtScheduleAssignment.findMany({
-        where: { rbtProfileId, isActive: true },
+        where: {
+          rbtProfileId,
+          isActive: true,
+          ...(latest
+            ? {
+                OR: [
+                  { periodStart: latest.periodStart, periodEnd: latest.periodEnd },
+                  { source: 'MANUAL', periodStart: null, periodEnd: null },
+                ],
+              }
+            : {}),
+        },
         orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
         select: {
           id: true,

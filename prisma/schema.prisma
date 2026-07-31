@@ -412,6 +412,8 @@ model User {
   artemisSessionRequestsResolved ArtemisSessionRequest[] @relation("ArtemisSessionRequestResolvedBy")
   terminationsDecided          Termination[]             @relation("TerminationDecisionMaker")
   rbtScheduleAssignmentsCreated RbtScheduleAssignment[]  @relation("RbtScheduleAssignmentCreatedBy")
+  scheduleImportBatches         ScheduleImportBatch[]    @relation("ScheduleImportBatchImportedBy")
+  clientBoroughsUpdated         ClientBorough[]          @relation("ClientBoroughUpdatedBy")
   payrollRunsUploaded           PayrollRun[]             @relation("PayrollRunUploadedBy")
   companyDocumentsUploaded      CompanyDocument[]        @relation("CompanyDocumentUploadedBy")
 
@@ -1394,27 +1396,78 @@ model RBTAuditLog {
   @@map("rbt_audit_logs")
 }
 
-/// Admin-entered weekly planning schedule for an RBT (standalone — not Artemis/payroll).
+/// Admin-entered / Artemis-imported weekly planning schedule for an RBT.
 model RbtScheduleAssignment {
-  id           String   @id @default(cuid())
-  rbtProfileId String
-  clientName   String
-  dayOfWeek    Int
-  startTime    String
-  endTime      String
-  location     String?
-  notes        String?  @db.Text
-  isActive     Boolean  @default(true)
-  createdBy    String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String                   @id @default(cuid())
+  rbtProfileId   String
+  clientName     String
+  dayOfWeek      Int
+  startTime      String
+  endTime        String
+  location       String?
+  notes          String?                  @db.Text
+  isActive       Boolean                  @default(true)
+  /// ARTEMIS_IMPORT | MANUAL — re-imports never overwrite MANUAL
+  source         RbtScheduleSource        @default(MANUAL)
+  /// Denormalized client borough for fast calendar filtering
+  clientBorough  String?
+  importBatchId  String?
+  periodStart    DateTime?                @db.Date
+  periodEnd      DateTime?                @db.Date
+  createdBy      String
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
 
-  rbtProfile  RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
-  createdByUser User     @relation("RbtScheduleAssignmentCreatedBy", fields: [createdBy], references: [id])
+  rbtProfile    RBTProfile          @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+  createdByUser User                @relation("RbtScheduleAssignmentCreatedBy", fields: [createdBy], references: [id])
+  importBatch   ScheduleImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
 
   @@index([rbtProfileId, isActive])
   @@index([rbtProfileId, dayOfWeek])
+  @@index([importBatchId])
+  @@index([periodStart, periodEnd])
+  @@index([clientBorough])
+  @@index([source])
   @@map("rbt_schedule_assignments")
+}
+
+enum RbtScheduleSource {
+  ARTEMIS_IMPORT
+  MANUAL
+}
+
+model ScheduleImportBatch {
+  id            String   @id @default(cuid())
+  fileName      String
+  periodStart   DateTime @db.Date
+  periodEnd     DateTime @db.Date
+  importedById  String
+  providerCount Int      @default(0)
+  slotCount     Int      @default(0)
+  mode          String   @default("REPLACE")
+  createdAt     DateTime @default(now())
+
+  importedBy  User                   @relation("ScheduleImportBatchImportedBy", fields: [importedById], references: [id])
+  assignments RbtScheduleAssignment[]
+
+  @@index([periodStart, periodEnd])
+  @@map("schedule_import_batches")
+}
+
+/// Remembered borough per free-text client name (Artemis has no borough data).
+model ClientBorough {
+  id          String   @id @default(cuid())
+  clientName  String   @unique
+  borough     String   @default("Unset")
+  notes       String?  @db.Text
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  updatedBy User? @relation("ClientBoroughUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([borough])
+  @@map("client_boroughs")
 }
 
 model Termination {

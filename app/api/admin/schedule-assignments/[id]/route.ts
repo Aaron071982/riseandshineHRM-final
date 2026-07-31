@@ -34,6 +34,8 @@ export async function PATCH(
       location?: string | null
       notes?: string | null
       isActive?: boolean
+      clientBorough?: string | null
+      source?: 'MANUAL'
     } = {}
 
     if (typeof body?.clientName === 'string') {
@@ -61,6 +63,14 @@ export async function PATCH(
       data.notes = typeof body.notes === 'string' ? body.notes.trim() || null : null
     }
     if (typeof body?.isActive === 'boolean') data.isActive = body.isActive
+    if (typeof body?.clientBorough === 'string') {
+      data.clientBorough = body.clientBorough.trim() || 'Unset'
+    }
+
+    // Manual edit of an imported row → convert to MANUAL so next import won't revert it
+    if (existing.source === 'ARTEMIS_IMPORT') {
+      data.source = 'MANUAL'
+    }
 
     const assignment = await prisma.rbtScheduleAssignment.update({
       where: { id },
