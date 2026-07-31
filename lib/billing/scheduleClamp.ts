@@ -1,15 +1,16 @@
 /**
- * Clamp payable session time to the overlap of scheduled and actual windows.
+ * Payable session time from appointment (scheduled) window.
  *
- * payStart = later of (scheduled start, actual start)
- * payEnd   = earlier of (scheduled end, actual end)
- * payable  = max(0, payEnd − payStart)
+ * Policy (current): pay appointed hours = scheduled end − scheduled start,
+ * regardless of early/late clock-in/out. Actual stay is stored for display only.
+ *
+ * Prior overlap-clamp policy is preserved as computeOverlapClampPayable for easy revert.
  */
 
 export const REVIEW_FLAG = {
   DATE_MISMATCH: 'NEEDS_REVIEW — date mismatch',
   NO_OVERLAP: 'NEEDS_REVIEW — no schedule overlap',
-  MISSING_TIMES: 'no clamp applied — missing times',
+  MISSING_TIMES: 'no appointment times — using actual duration',
 } as const
 
 export type ReviewFlag = (typeof REVIEW_FLAG)[keyof typeof REVIEW_FLAG] | string
@@ -27,8 +28,10 @@ export type ClampResult = {
   clampedPayableMinutes: number
   clampApplied: boolean
   reviewFlag: string | null
-  /** True when payable minutes differ from raw (docked or zeroed). */
+  /** True when appointed (payable) minutes differ from raw actual duration. */
   hoursChanged: boolean
+  /** rawActual − payable (positive = stayed longer than appointed; negative = shorter). */
+  varianceMinutes: number
 }
 
 /** Calendar day key in local time — used for date-mismatch detection. */
@@ -97,7 +100,61 @@ export function isBlockingReviewFlag(flag: string | null | undefined): boolean {
   return flag.includes('NEEDS_REVIEW') || flag === REVIEW_FLAG.MISSING_TIMES
 }
 
-export function computeClampedPayable(input: ClampInput): ClampResult {
+/**
+ * Pay appointed hours (appointment start → end). Actual stay is informational only.
+ */
+export function computeAppointedPayable(input: ClampInput): ClampResult {
+  const raw = Math.max(0, input.rawActualMinutes)
+  const { scheduledStart, scheduledEnd, actualStart } = input
+
+  if (!scheduledStart || !scheduledEnd) {
+    return {
+      payableMinutes: raw,
+      clampedPayableMinutes: raw,
+      clampApplied: false,
+      reviewFlag: REVIEW_FLAG.MISSING_TIMES,
+      hoursChanged: false,
+      varianceMinutes: 0,
+    }
+  }
+
+  const appointedMs = scheduledEnd.getTime() - scheduledStart.getTime()
+  if (appointedMs <= 0) {
+    return {
+      payableMinutes: raw,
+      clampedPayableMinutes: raw,
+      clampApplied: false,
+      reviewFlag: REVIEW_FLAG.MISSING_TIMES,
+      hoursChanged: false,
+      varianceMinutes: 0,
+    }
+  }
+
+  const payableMinutes = Math.max(0, appointedMs / 60000)
+  const varianceMinutes = raw - payableMinutes
+  const hoursChanged = Math.abs(varianceMinutes) > 0.01
+
+  let reviewFlag: string | null = null
+  // Flag data-entry errors; still pay appointed hours when the window is valid
+  if (actualStart && calendarDayKey(scheduledStart) !== calendarDayKey(actualStart)) {
+    reviewFlag = REVIEW_FLAG.DATE_MISMATCH
+  }
+
+  return {
+    payableMinutes,
+    clampedPayableMinutes: payableMinutes,
+    clampApplied: true,
+    reviewFlag,
+    hoursChanged,
+    varianceMinutes,
+  }
+}
+
+/**
+ * Legacy overlap clamp (pay only scheduled ∩ actual). Kept for easy revert.
+ * @deprecated Prefer computeAppointedPayable
+ */
+export function computeOverlapClampPayable(input: ClampInput): ClampResult {
   const raw = Math.max(0, input.rawActualMinutes)
   const { scheduledStart, scheduledEnd, actualStart, actualEnd } = input
 
@@ -109,10 +166,10 @@ export function computeClampedPayable(input: ClampInput): ClampResult {
       clampApplied: false,
       reviewFlag: REVIEW_FLAG.MISSING_TIMES,
       hoursChanged: false,
+      varianceMinutes: 0,
     }
   }
 
-  // Date mismatch: do NOT clamp across days — fall back to raw
   if (calendarDayKey(scheduledStart) !== calendarDayKey(actualStart)) {
     return {
       payableMinutes: raw,
@@ -120,6 +177,7 @@ export function computeClampedPayable(input: ClampInput): ClampResult {
       clampApplied: false,
       reviewFlag: REVIEW_FLAG.DATE_MISMATCH,
       hoursChanged: false,
+      varianceMinutes: 0,
     }
   }
 
@@ -135,10 +193,10 @@ export function computeClampedPayable(input: ClampInput): ClampResult {
       clampApplied: true,
       reviewFlag: REVIEW_FLAG.NO_OVERLAP,
       hoursChanged: raw > 0,
+      varianceMinutes: raw,
     }
   }
 
-  // Tiny float noise: treat as unchanged when within 0.01 min
   const hoursChanged = Math.abs(payableMinutes - raw) > 0.01
 
   return {
@@ -147,5 +205,11 @@ export function computeClampedPayable(input: ClampInput): ClampResult {
     clampApplied: true,
     reviewFlag: null,
     hoursChanged,
+    varianceMinutes: raw - payableMinutes,
   }
+}
+
+/** Active payroll policy — currently appointed hours. */
+export function computeClampedPayable(input: ClampInput): ClampResult {
+  return computeAppointedPayable(input)
 }

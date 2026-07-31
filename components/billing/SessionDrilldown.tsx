@@ -40,9 +40,9 @@ export default function SessionDrilldown({ sessions }: { sessions: DrilldownSess
   if (sessions.length === 0) return null
 
   const flagged = sessions.filter((s) => s.reviewFlag).length
-  const docked = sessions.filter((s) => {
+  const variance = sessions.filter((s) => {
     const raw = s.rawActualMinutes ?? s.actualMinutes
-    return raw - s.actualMinutes > 0.01
+    return Math.abs(raw - s.actualMinutes) > 0.01
   }).length
 
   return (
@@ -54,8 +54,10 @@ export default function SessionDrilldown({ sessions }: { sessions: DrilldownSess
       >
         {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-        {docked > 0 && (
-          <span className="ml-1 text-amber-700 dark:text-amber-300">· {docked} docked</span>
+        {variance > 0 && (
+          <span className="ml-1 text-amber-700 dark:text-amber-300">
+            · {variance} actual ≠ appointed
+          </span>
         )}
         {flagged > 0 && (
           <span className="ml-1 text-red-700 dark:text-red-300">· {flagged} need review</span>
@@ -69,10 +71,11 @@ export default function SessionDrilldown({ sessions }: { sessions: DrilldownSess
                 <th className="px-2 py-1 text-left">Date</th>
                 <th className="px-2 py-1 text-left">Client</th>
                 <th className="px-2 py-1 text-left">Status</th>
-                <th className="px-2 py-1 text-left">Scheduled</th>
-                <th className="px-2 py-1 text-left">Actual</th>
-                <th className="px-2 py-1 text-right">Raw hrs</th>
-                <th className="px-2 py-1 text-right">Payable hrs</th>
+                <th className="px-2 py-1 text-left">Appointed</th>
+                <th className="px-2 py-1 text-left">Actual stay</th>
+                <th className="px-2 py-1 text-right">Stay hrs</th>
+                <th className="px-2 py-1 text-right">Payable (appointed)</th>
+                <th className="px-2 py-1 text-left">Note</th>
                 <th className="px-2 py-1 text-left">Flag</th>
                 <th className="px-2 py-1 text-left">Code</th>
                 <th className="px-2 py-1 text-left">Location</th>
@@ -81,15 +84,24 @@ export default function SessionDrilldown({ sessions }: { sessions: DrilldownSess
             <tbody>
               {sessions.map((s) => {
                 const raw = s.rawActualMinutes ?? s.actualMinutes
-                const dockedRow = raw - s.actualMinutes > 0.01
+                const varianceMin = raw - s.actualMinutes
+                const varianceRow = Math.abs(varianceMin) > 0.01
+                const under = varianceMin < -0.01
+                const over = varianceMin > 0.01
                 const flaggedRow = !!s.reviewFlag
+                const note =
+                  under
+                    ? `Under by ${formatHours(-varianceMin / 60)}`
+                    : over
+                      ? `Over by ${formatHours(varianceMin / 60)}`
+                      : '—'
                 return (
                   <tr
                     key={s.id}
                     className={cn(
                       'border-t border-gray-100 dark:border-[var(--border-subtle)]',
                       flaggedRow && 'bg-red-50 dark:bg-red-950/30',
-                      !flaggedRow && dockedRow && 'bg-amber-50/80 dark:bg-amber-950/20'
+                      !flaggedRow && varianceRow && 'bg-amber-50/80 dark:bg-amber-950/20'
                     )}
                   >
                     <td className="px-2 py-1 whitespace-nowrap">{formatCalendarDate(s.dos)}</td>
@@ -104,13 +116,17 @@ export default function SessionDrilldown({ sessions }: { sessions: DrilldownSess
                       {formatWindow(s.actualStart, s.actualEnd)}
                     </td>
                     <td className="px-2 py-1 text-right tabular-nums">{formatHours(raw / 60)}</td>
+                    <td className="px-2 py-1 text-right tabular-nums font-medium text-[#0D9488]">
+                      {formatHours(s.actualMinutes / 60)}
+                    </td>
                     <td
                       className={cn(
-                        'px-2 py-1 text-right tabular-nums font-medium',
-                        dockedRow && 'text-amber-800 dark:text-amber-200'
+                        'px-2 py-1',
+                        under && 'text-amber-800 dark:text-amber-200',
+                        over && 'text-sky-800 dark:text-sky-200'
                       )}
                     >
-                      {formatHours(s.actualMinutes / 60)}
+                      {note}
                     </td>
                     <td
                       className={cn(

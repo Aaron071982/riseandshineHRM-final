@@ -167,7 +167,10 @@ export type ClampParseStats = {
   sessionsDateMismatch: number
   sessionsNoOverlap: number
   sessionsMissingTimes: number
+  /** Hours where actual stay < appointed (informational). */
   hoursRemovedByClamp: number
+  /** Hours where actual stay > appointed (informational). */
+  hoursOverAppointed: number
 }
 
 export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promise<ArtemisParseResult> {
@@ -206,6 +209,7 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
     sessionsNoOverlap: 0,
     sessionsMissingTimes: 0,
     hoursRemovedByClamp: 0,
+    hoursOverAppointed: 0,
   }
 
   for (let r = header.rowNumber + 1; r <= sheet.rowCount; r++) {
@@ -332,11 +336,13 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
       }
       if (clamp.hoursChanged) {
         clampStats.sessionsHoursChanged++
-        clampStats.hoursRemovedByClamp += Math.max(0, rawActualMinutes - clamp.payableMinutes) / 60
+        const deltaHrs = (rawActualMinutes - clamp.payableMinutes) / 60
+        if (deltaHrs < 0) clampStats.hoursRemovedByClamp += -deltaHrs
+        else clampStats.hoursOverAppointed += deltaHrs
       }
       if (clamp.reviewFlag?.includes('date mismatch')) clampStats.sessionsDateMismatch++
       if (clamp.reviewFlag?.includes('no schedule overlap')) clampStats.sessionsNoOverlap++
-      if (clamp.reviewFlag?.includes('missing times')) clampStats.sessionsMissingTimes++
+      if (clamp.reviewFlag?.includes('appointment times')) clampStats.sessionsMissingTimes++
       payrollSessions.push(session)
     } else if (isExcludedRole(roleKey)) {
       excludedSessions.push(session)

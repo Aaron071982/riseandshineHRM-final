@@ -5,9 +5,9 @@ export type ParsedSessionRow = {
   clientName: string
   dos: Date
   scheduledMinutes: number
-  /** Payable minutes after schedule-window clamp (or raw fallback). */
+  /** Payable minutes = appointed hours (or raw fallback if appointment times missing). */
   actualMinutes: number
-  /** Raw Artemis "Actual Duration" minutes before clamp. */
+  /** Raw Artemis "Actual Duration" minutes (stay log; display only). */
   rawActualMinutes: number
   clampedPayableMinutes: number
   clampApplied: boolean
@@ -46,14 +46,17 @@ export type ArtemisParseResult = {
     byRole: Record<string, number>
     /** Total hours per normalized status (includes cancelled/deleted for verification). */
     hoursByStatus: Record<string, number>
-    /** Schedule-window clamp summary from parse. */
+    /** Appointed-hours vs actual-stay summary from parse. */
     clamp?: {
       sessionsWithAllTimes: number
       sessionsHoursChanged: number
       sessionsDateMismatch: number
       sessionsNoOverlap: number
       sessionsMissingTimes: number
+      /** Hours where actual stay < appointed (informational). */
       hoursRemovedByClamp: number
+      /** Hours where actual stay > appointed (informational). */
+      hoursOverAppointed: number
     }
   }
   detectedDateRange: { min: Date | null; max: Date | null }

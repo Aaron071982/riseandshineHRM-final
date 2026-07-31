@@ -1,5 +1,5 @@
 /**
- * Verify schedule-window clamp against the 2026-07-31 Artemis file.
+ * Verify appointed-hours payable policy against the 2026-07-31 Artemis file.
  * Usage: npx tsx scripts/verify-clamp-2026-07-31.ts [path-to-xlsx]
  */
 import fs from 'fs'
@@ -26,9 +26,10 @@ async function main() {
 
   console.log('Payroll RBT/BT sessions:', sessions.length)
   console.log('With all four times:', clamp.sessionsWithAllTimes)
-  console.log('Hours changed by clamp:', clamp.sessionsHoursChanged)
+  console.log('Stay ≠ appointed:', clamp.sessionsHoursChanged)
   console.log('Date mismatch:', clamp.sessionsDateMismatch)
-  console.log('Hours removed:', clamp.hoursRemovedByClamp.toFixed(2))
+  console.log('Hours under stay:', clamp.hoursRemovedByClamp.toFixed(2))
+  console.log('Hours over stay:', clamp.hoursOverAppointed.toFixed(2))
 
   const intisar = sessions.find(
     (s) =>
@@ -57,15 +58,33 @@ async function main() {
   const checks: [string, boolean][] = [
     ['259 RBT/BT sessions', sessions.length === 259],
     ['259 with all four times', clamp.sessionsWithAllTimes === 259],
-    ['31 sessions hours changed', clamp.sessionsHoursChanged === 31],
     ['1 date mismatch', clamp.sessionsDateMismatch === 1],
-    ['Intisar → 3.7h', !!intisar && almost(intisar.actualMinutes / 60, 3.7)],
-    ['Amna → 3.78h', !!amna && almost(amna.actualMinutes / 60, 3.78)],
-    ['Carly → 3.0h', !!carly && almost(carly.actualMinutes / 60, 3.0)],
+    ['Intisar → 4.0h appointed', !!intisar && almost(intisar.actualMinutes / 60, 4.0)],
+    [
+      'Intisar stay logged as raw',
+      !!intisar && almost(intisar.rawActualMinutes / 60, 4.0),
+    ],
+    [
+      'Amna → appointed (not overlap-docked)',
+      !!amna && amna.scheduledStart && amna.scheduledEnd
+        ? almost(
+            amna.actualMinutes,
+            (amna.scheduledEnd.getTime() - amna.scheduledStart.getTime()) / 60000
+          )
+        : false,
+    ],
+    ['Carly → 3.0h appointed', !!carly && almost(carly.actualMinutes / 60, 3.0)],
     ['Quinton date mismatch flagged', !!quinton],
     [
-      'Quinton uses raw (not clamped across dates)',
-      !!quinton && quinton.actualMinutes === quinton.rawActualMinutes && !quinton.clampApplied,
+      'Quinton still pays appointed hours',
+      !!quinton &&
+        quinton.scheduledStart &&
+        quinton.scheduledEnd &&
+        almost(
+          quinton.actualMinutes,
+          (quinton.scheduledEnd.getTime() - quinton.scheduledStart.getTime()) / 60000
+        ) &&
+        quinton.clampApplied,
     ],
   ]
 
@@ -78,14 +97,40 @@ async function main() {
     }
   }
 
-  if (intisar) console.log('  Intisar:', (intisar.actualMinutes / 60).toFixed(4), 'h')
-  if (amna) console.log('  Amna:', (amna.actualMinutes / 60).toFixed(4), 'h')
-  if (carly) console.log('  Carly:', (carly.actualMinutes / 60).toFixed(4), 'h')
+  if (intisar) {
+    console.log(
+      '  Intisar payable:',
+      (intisar.actualMinutes / 60).toFixed(4),
+      'h | stay:',
+      (intisar.rawActualMinutes / 60).toFixed(4),
+      'h'
+    )
+  }
+  if (amna) {
+    console.log(
+      '  Amna payable:',
+      (amna.actualMinutes / 60).toFixed(4),
+      'h | stay:',
+      (amna.rawActualMinutes / 60).toFixed(4),
+      'h'
+    )
+  }
+  if (carly) {
+    console.log(
+      '  Carly payable:',
+      (carly.actualMinutes / 60).toFixed(4),
+      'h | stay:',
+      (carly.rawActualMinutes / 60).toFixed(4),
+      'h'
+    )
+  }
   if (quinton) {
     console.log(
       '  Quinton:',
       quinton.reviewFlag,
-      '| sched',
+      '| payable',
+      (quinton.actualMinutes / 60).toFixed(2),
+      'h | sched',
       quinton.scheduledStart?.toLocaleString(),
       '| actual',
       quinton.actualStart?.toLocaleString()

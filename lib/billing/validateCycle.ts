@@ -71,7 +71,7 @@ export function canFinalizeCycle(entries: EntryLike[]): boolean {
   return getCycleBlockers(entries).length === 0
 }
 
-/** Aggregate clamp summary across cycle sessions (payroll entries only). */
+/** Aggregate appointed-hours vs actual-stay summary (payroll entries only). */
 export function getClampSummary(
   entries: {
     isExcluded: boolean
@@ -83,12 +83,24 @@ export function getClampSummary(
     }[]
   }[]
 ): {
-  reducedCount: number
-  hoursRemoved: number
+  /** Sessions where actual stay ≠ appointed (payable) hours */
+  varianceCount: number
+  underCount: number
+  overCount: number
+  /** Hours where actual < appointed */
+  hoursUnder: number
+  /** Hours where actual > appointed */
+  hoursOver: number
   needsReviewCount: number
+  /** @deprecated alias for underCount (UI compat) */
+  reducedCount: number
+  /** @deprecated alias for hoursUnder */
+  hoursRemoved: number
 } {
-  let reducedCount = 0
-  let hoursRemoved = 0
+  let underCount = 0
+  let overCount = 0
+  let hoursUnder = 0
+  let hoursOver = 0
   let needsReviewCount = 0
 
   for (const e of entries) {
@@ -96,13 +108,26 @@ export function getClampSummary(
     for (const s of e.sessions) {
       const raw = s.rawActualMinutes ?? s.actualMinutes
       const payable = s.actualMinutes
-      if (raw - payable > 0.01) {
-        reducedCount++
-        hoursRemoved += (raw - payable) / 60
+      const diff = raw - payable
+      if (diff < -0.01) {
+        underCount++
+        hoursUnder += (payable - raw) / 60
+      } else if (diff > 0.01) {
+        overCount++
+        hoursOver += diff / 60
       }
       if (isBlockingReviewFlag(s.reviewFlag)) needsReviewCount++
     }
   }
 
-  return { reducedCount, hoursRemoved, needsReviewCount }
+  return {
+    varianceCount: underCount + overCount,
+    underCount,
+    overCount,
+    hoursUnder,
+    hoursOver,
+    needsReviewCount,
+    reducedCount: underCount,
+    hoursRemoved: hoursUnder,
+  }
 }
