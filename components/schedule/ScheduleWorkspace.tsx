@@ -347,6 +347,8 @@ export default function ScheduleWorkspace({
           therapists={therapists.filter((t) => t.active)}
           clients={clients.filter((c) => c.active)}
           conflicts={conflicts}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
           onClose={closeEditor}
           onSaved={onSlotSaved}
           onDeleted={onSlotDeleted}

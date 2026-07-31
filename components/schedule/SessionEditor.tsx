@@ -39,6 +39,8 @@ export default function SessionEditor({
   therapists,
   clients,
   conflicts,
+  periodStart,
+  periodEnd,
   onClose,
   onSaved,
   onDeleted,
@@ -49,6 +51,8 @@ export default function SessionEditor({
   therapists: ScheduleTherapist[]
   clients: ScheduleClient[]
   conflicts: Map<string, string[]>
+  periodStart?: string | null
+  periodEnd?: string | null
   onClose: () => void
   onSaved: (slot: ScheduleSlot, isNew: boolean) => void
   onDeleted: (id: string) => void
@@ -102,6 +106,8 @@ export default function SessionEditor({
         endMin,
         status,
         note: note || null,
+        periodStart: periodStart || null,
+        periodEnd: periodEnd || null,
       }
       if (mode === 'edit' && slot) {
         const updated = await updateSlot(slot.id, payload)
@@ -125,8 +131,8 @@ export default function SessionEditor({
       await deleteSlot(slot.id)
       onDeleted(slot.id)
       onClose()
-    } catch {
-      showToast('Delete failed', 'error')
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Delete failed', 'error')
     } finally {
       setSaving(false)
     }

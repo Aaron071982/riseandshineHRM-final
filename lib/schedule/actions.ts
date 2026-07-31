@@ -3,12 +3,24 @@
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import { assertScheduleAccess } from './access'
+import { assertScheduleAccess, getCurrentSessionUser } from './access'
 import type { ScheduleDayOfWeek, ScheduleSlotStatus, ScheduleTherapistRole } from '@prisma/client'
+import { formatMinutes } from '@/lib/rbt-schedule/utils'
 
 const Day = z.enum(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'])
 const Status = z.enum(['CONFIRMED', 'TENTATIVE', 'NEEDS_REVIEW', 'CANCELLED'])
 const Role = z.enum(['RBT', 'BT', 'BCBA', 'BCaBA', 'CLINICAL_DIRECTOR'])
+
+const DAY_TO_JS: Record<string, number> = {
+  SUN: 0,
+  MON: 1,
+  TUE: 2,
+  WED: 3,
+  THU: 4,
+  FRI: 5,
+  SAT: 6,
+}
+const JS_TO_DAY = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const
 
 const SlotInputBase = z.object({
   therapistId: z.string().min(1),
@@ -20,6 +32,9 @@ const SlotInputBase = z.object({
   note: z.string().max(500).optional().nullable(),
   procedureCode: z.string().optional(),
   placeOfService: z.string().optional(),
+  /** When set, create/update as period assignment (Artemis import mode). */
+  periodStart: z.string().optional().nullable(),
+  periodEnd: z.string().optional().nullable(),
 })
 
 const SlotInput = SlotInputBase.refine((v) => v.endMin > v.startMin, {
@@ -31,15 +46,121 @@ function revalidate() {
   revalidatePath('/schedule')
 }
 
+function isSyntheticClientId(id: string): boolean {
+  return id.startsWith('client:')
+}
+
+function clientNameFromId(clientId: string, fallbackName?: string): string {
+  if (isSyntheticClientId(clientId)) {
+    return clientId.slice('client:'.length)
+  }
+  return fallbackName ?? clientId
+}
+
+function parseIsoDate(s: string | null | undefined): Date | null {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function serializeAssignmentAsSlot(a: {
+  id: string
+  rbtProfileId: string
+  clientName: string
+  dayOfWeek: number
+  startTime: string
+  endTime: string
+  location: string | null
+  notes: string | null
+  createdBy: string
+}): ReturnType<typeof serializeSlot> {
+  const [sh, sm] = a.startTime.split(':').map(Number)
+  const [eh, em] = a.endTime.split(':').map(Number)
+  return {
+    id: a.id,
+    therapistId: a.rbtProfileId,
+    clientId: `client:${a.clientName.trim().toLowerCase()}`,
+    day: JS_TO_DAY[a.dayOfWeek] as ScheduleDayOfWeek,
+    startMin: sh * 60 + sm,
+    endMin: eh * 60 + em,
+    status: 'CONFIRMED',
+    procedureCode: '97153',
+    placeOfService: a.location || '12-Home',
+    note: a.notes,
+    createdBy: a.createdBy,
+    updatedBy: null,
+  }
+}
+
 export async function createSlot(input: unknown) {
   const email = await assertScheduleAccess()
   const data = SlotInput.parse(input)
+
+  // Period / assignment mode: therapistId is rbtProfileId, clientId may be synthetic
+  const looksLikeAssignment =
+    isSyntheticClientId(data.clientId) ||
+    !!(await prisma.rBTProfile.findUnique({ where: { id: data.therapistId }, select: { id: true } }))
+
+  if (looksLikeAssignment && isSyntheticClientId(data.clientId)) {
+    const user = await getCurrentSessionUser()
+    if (!user) throw new Error('Unauthorized')
+
+    let clientName = clientNameFromId(data.clientId)
+    // Prefer display name from schedule_client if we can resolve a real client later;
+    // synthetic ids store lowercase — look up remembered borough client casing
+    const boroughRow = await prisma.clientBorough.findFirst({
+      where: { clientName: { equals: clientName, mode: 'insensitive' } },
+    })
+    if (boroughRow) clientName = boroughRow.clientName
+
+    // If client id was client:key but we have the name from an existing assignment map,
+    // also try schedule_weekly_client
+    const weeklyClient = await prisma.scheduleWeeklyClient.findFirst({
+      where: { name: { equals: clientName, mode: 'insensitive' } },
+    })
+    if (weeklyClient) clientName = weeklyClient.name
+
+    const periodStart = parseIsoDate(data.periodStart ?? undefined)
+    const periodEnd = parseIsoDate(data.periodEnd ?? undefined)
+
+    const borough =
+      boroughRow?.borough ??
+      (await prisma.clientBorough.findFirst({
+        where: { clientName: { equals: clientName, mode: 'insensitive' } },
+      }))?.borough ??
+      'Unset'
+
+    const created = await prisma.rbtScheduleAssignment.create({
+      data: {
+        rbtProfileId: data.therapistId,
+        clientName,
+        dayOfWeek: DAY_TO_JS[data.day] ?? 1,
+        startTime: formatMinutes(data.startMin),
+        endTime: formatMinutes(data.endMin),
+        location: data.placeOfService || '12-Home',
+        notes: data.note ?? null,
+        source: 'MANUAL',
+        clientBorough: borough,
+        periodStart: periodStart ?? undefined,
+        periodEnd: periodEnd ?? undefined,
+        createdBy: user.id,
+      },
+    })
+    revalidate()
+    return serializeAssignmentAsSlot(created)
+  }
+
   const slot = await prisma.scheduleSessionSlot.create({
     data: {
-      ...data,
+      therapistId: data.therapistId,
+      clientId: data.clientId,
       day: data.day as ScheduleDayOfWeek,
+      startMin: data.startMin,
+      endMin: data.endMin,
       status: data.status as ScheduleSlotStatus,
       note: data.note ?? null,
+      procedureCode: data.procedureCode,
+      placeOfService: data.placeOfService,
       createdBy: email,
       updatedBy: email,
     },
@@ -51,12 +172,58 @@ export async function createSlot(input: unknown) {
 export async function updateSlot(id: string, input: unknown) {
   const email = await assertScheduleAccess()
   const data = SlotInputBase.partial().parse(input)
+
+  const assignment = await prisma.rbtScheduleAssignment.findUnique({ where: { id } })
+  if (assignment) {
+    let clientName = assignment.clientName
+    if (data.clientId) {
+      if (isSyntheticClientId(data.clientId)) {
+        clientName = clientNameFromId(data.clientId)
+        const row = await prisma.clientBorough.findFirst({
+          where: { clientName: { equals: clientName, mode: 'insensitive' } },
+        })
+        if (row) clientName = row.clientName
+      } else {
+        const c = await prisma.scheduleWeeklyClient.findUnique({ where: { id: data.clientId } })
+        if (c) clientName = c.name
+      }
+    }
+
+    const startMin = data.startMin
+    const endMin = data.endMin
+    const dayOfWeek =
+      data.day != null ? (DAY_TO_JS[data.day] ?? assignment.dayOfWeek) : assignment.dayOfWeek
+
+    const updated = await prisma.rbtScheduleAssignment.update({
+      where: { id },
+      data: {
+        clientName,
+        dayOfWeek,
+        startTime: startMin != null ? formatMinutes(startMin) : undefined,
+        endTime: endMin != null ? formatMinutes(endMin) : undefined,
+        location: data.placeOfService,
+        notes: data.note === undefined ? undefined : data.note,
+        // Manual edit of imported row → MANUAL so next import won't revert
+        source: 'MANUAL',
+        rbtProfileId: data.therapistId ?? undefined,
+      },
+    })
+    revalidate()
+    return serializeAssignmentAsSlot(updated)
+  }
+
   const slot = await prisma.scheduleSessionSlot.update({
     where: { id },
     data: {
-      ...data,
+      therapistId: data.therapistId,
+      clientId: data.clientId,
       day: data.day as ScheduleDayOfWeek | undefined,
+      startMin: data.startMin,
+      endMin: data.endMin,
       status: data.status as ScheduleSlotStatus | undefined,
+      note: data.note,
+      procedureCode: data.procedureCode,
+      placeOfService: data.placeOfService,
       updatedBy: email,
     },
   })
@@ -66,6 +233,18 @@ export async function updateSlot(id: string, input: unknown) {
 
 export async function deleteSlot(id: string) {
   await assertScheduleAccess()
+
+  const assignment = await prisma.rbtScheduleAssignment.findUnique({ where: { id } })
+  if (assignment) {
+    // Soft-delete so history remains; convert to MANUAL so re-import won't revive it
+    await prisma.rbtScheduleAssignment.update({
+      where: { id },
+      data: { isActive: false, source: 'MANUAL' },
+    })
+    revalidate()
+    return
+  }
+
   await prisma.scheduleSessionSlot.delete({ where: { id } })
   revalidate()
 }
@@ -135,7 +314,23 @@ export async function bulkUpdateSlots(
 
 export async function bulkDeleteSlots(ids: string[]) {
   await assertScheduleAccess()
-  await prisma.scheduleSessionSlot.deleteMany({ where: { id: { in: ids } } })
+  if (ids.length === 0) return
+
+  const assignments = await prisma.rbtScheduleAssignment.findMany({
+    where: { id: { in: ids } },
+    select: { id: true },
+  })
+  const assignmentIds = new Set(assignments.map((a) => a.id))
+  if (assignmentIds.size > 0) {
+    await prisma.rbtScheduleAssignment.updateMany({
+      where: { id: { in: [...assignmentIds] } },
+      data: { isActive: false, source: 'MANUAL' },
+    })
+  }
+  const slotIds = ids.filter((id) => !assignmentIds.has(id))
+  if (slotIds.length > 0) {
+    await prisma.scheduleSessionSlot.deleteMany({ where: { id: { in: slotIds } } })
+  }
   revalidate()
 }
 
