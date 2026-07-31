@@ -228,8 +228,13 @@ export async function commitScheduleImport(
     data: { slotCount, providerCount: matchedProviders.length },
   })
 
-  // Sync weekly roster templates for /schedule compatibility (matched only)
-  await syncRosterFromImport(matchedProviders, confirmedMatches, clientBoroughs)
+  // Sync weekly roster templates for /schedule compatibility (matched only).
+  // Non-fatal: period assignments are the source of truth; roster is a mirror.
+  try {
+    await syncRosterFromImport(matchedProviders, confirmedMatches, clientBoroughs)
+  } catch (err) {
+    console.error('[schedule-import] roster sync failed (assignments saved):', err)
+  }
 
   const unsetClientCount = Object.values(clientBoroughs).filter(
     (b) => !b || b === 'Unset'
@@ -287,10 +292,11 @@ async function syncRosterFromImport(
       })
     }
 
-    // Only replace prior Artemis-synced roster slots; leave manually created slots alone.
-    await prisma.scheduleSessionSlot.deleteMany({
-      where: { therapistId: therapist.id, note: 'Artemis import' },
-    })
+    // Upsert by unique (therapistId, clientId, day, startMin) so existing roster
+    // slots (including ones without note='Artemis import') don't fail the import.
+    const importedKeys: { clientId: string; day: (typeof dayEnum)[number]; startMin: number }[] =
+      []
+    const seen = new Set<string>()
 
     for (const slot of provider.slots) {
       let client = await prisma.scheduleWeeklyClient.findFirst({
@@ -312,11 +318,25 @@ async function syncRosterFromImport(
         })
       }
 
-      await prisma.scheduleSessionSlot.create({
-        data: {
+      const day = dayEnum[slot.dayOfWeek]
+      const dedupeKey = `${client.id}|${day}|${slot.startMin}`
+      if (seen.has(dedupeKey)) continue
+      seen.add(dedupeKey)
+      importedKeys.push({ clientId: client.id, day, startMin: slot.startMin })
+
+      await prisma.scheduleSessionSlot.upsert({
+        where: {
+          therapistId_clientId_day_startMin: {
+            therapistId: therapist.id,
+            clientId: client.id,
+            day,
+            startMin: slot.startMin,
+          },
+        },
+        create: {
           therapistId: therapist.id,
           clientId: client.id,
-          day: dayEnum[slot.dayOfWeek],
+          day,
           startMin: slot.startMin,
           endMin: slot.endMin,
           status: 'CONFIRMED',
@@ -324,6 +344,28 @@ async function syncRosterFromImport(
           placeOfService: '12-Home',
           note: 'Artemis import',
         },
+        update: {
+          endMin: slot.endMin,
+          status: 'CONFIRMED',
+          procedureCode: '97153',
+          placeOfService: '12-Home',
+          note: 'Artemis import',
+        },
+      })
+    }
+
+    // Drop stale Artemis-synced slots for this therapist that aren't in this import
+    if (importedKeys.length > 0) {
+      await prisma.scheduleSessionSlot.deleteMany({
+        where: {
+          therapistId: therapist.id,
+          note: 'Artemis import',
+          NOT: { OR: importedKeys },
+        },
+      })
+    } else {
+      await prisma.scheduleSessionSlot.deleteMany({
+        where: { therapistId: therapist.id, note: 'Artemis import' },
       })
     }
   }
