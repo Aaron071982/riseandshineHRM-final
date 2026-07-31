@@ -254,8 +254,9 @@ export async function deriveWeeklySchedulesFromArtemis(
     if (!start || !end || end.getTime() <= start.getTime()) continue
 
     const dayOfWeek = start.getDay()
-    const startMin = start.getHours() * 60 + start.getMinutes()
-    const endMin = end.getHours() * 60 + end.getMinutes()
+    // Artemis wall-clock is stored as UTC components — do not use local getters
+    const startMin = start.getUTCHours() * 60 + start.getUTCMinutes()
+    const endMin = end.getUTCHours() * 60 + end.getUTCMinutes()
     if (endMin <= startMin) continue
 
     raw.push({

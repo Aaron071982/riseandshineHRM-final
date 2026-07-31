@@ -34,20 +34,20 @@ async function main() {
   const intisar = sessions.find(
     (s) =>
       s.providerName.toLowerCase().includes('intisar') &&
-      s.actualStart?.getMinutes() === 18 &&
-      s.actualStart.getHours() === 16
+      s.actualStart?.getUTCMinutes() === 18 &&
+      s.actualStart.getUTCHours() === 16
   )
   const amna = sessions.find(
     (s) =>
       s.providerName.toLowerCase().includes('amna habib') &&
-      s.actualStart?.getMinutes() === 13 &&
-      s.actualStart.getHours() === 14
+      s.actualStart?.getUTCMinutes() === 13 &&
+      s.actualStart.getUTCHours() === 14
   )
   const carly = sessions.find(
     (s) =>
       s.providerName.toLowerCase().includes('carly') &&
-      s.actualStart?.getMinutes() === 57 &&
-      s.actualStart.getHours() === 13
+      s.actualStart?.getUTCMinutes() === 57 &&
+      s.actualStart.getUTCHours() === 13
   )
   const quinton = sessions.find(
     (s) =>
@@ -72,6 +72,16 @@ async function main() {
             (amna.scheduledEnd.getTime() - amna.scheduledStart.getTime()) / 60000
           )
         : false,
+    ],
+    [
+      'Amna Azaan appointed is 2:00 PM wall-clock (not +2h)',
+      sessions.some(
+        (s) =>
+          s.providerName.toLowerCase().includes('amna habib') &&
+          s.clientName.toLowerCase().includes('azaan') &&
+          s.scheduledStart?.getUTCHours() === 14 &&
+          s.scheduledEnd?.getUTCHours() === 18
+      ),
     ],
     ['Carly → 3.0h appointed', !!carly && almost(carly.actualMinutes / 60, 3.0)],
     ['Quinton date mismatch flagged', !!quinton],
@@ -130,10 +140,10 @@ async function main() {
       quinton.reviewFlag,
       '| payable',
       (quinton.actualMinutes / 60).toFixed(2),
-      'h | sched',
-      quinton.scheduledStart?.toLocaleString(),
-      '| actual',
-      quinton.actualStart?.toLocaleString()
+      'h | sched UTC',
+      quinton.scheduledStart?.toISOString(),
+      '| actual UTC',
+      quinton.actualStart?.toISOString()
     )
   }
 

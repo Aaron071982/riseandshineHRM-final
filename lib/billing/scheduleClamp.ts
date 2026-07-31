@@ -34,24 +34,58 @@ export type ClampResult = {
   varianceMinutes: number
 }
 
-/** Calendar day key in local time — used for date-mismatch detection. */
+/**
+ * Calendar day key from Artemis wall-clock times (stored as UTC components).
+ * Used for date-mismatch detection — must not use local timezone getters.
+ */
 export function calendarDayKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+/**
+ * Format an Artemis wall-clock time for UI.
+ * Times are stored as UTC components (2:00 PM → 14:00Z); never use local TZ getters.
+ */
+export function formatArtemisClockTime(value: string | Date | null | undefined): string {
+  if (!value) return '—'
+  const d = typeof value === 'string' ? new Date(value) : value
+  if (!Number.isFinite(d.getTime())) return '—'
+  let hour = d.getUTCHours()
+  const minute = d.getUTCMinutes()
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  hour = hour % 12
+  if (hour === 0) hour = 12
+  return `${hour}:${String(minute).padStart(2, '0')} ${ampm}`
+}
+
+export function formatArtemisClockWindow(
+  start: string | Date | null | undefined,
+  end: string | Date | null | undefined
+): string {
+  if (!start || !end) return '—'
+  const a = formatArtemisClockTime(start)
+  const b = formatArtemisClockTime(end)
+  if (a === '—' || b === '—') return '—'
+  return `${a} – ${b}`
 }
 
 /**
  * Parse Artemis datetimes like "7/29/2026, 4:00 PM" or "7/29/2026 4:00 PM".
  * Also accepts Excel Date objects / serials already coerced by ExcelJS.
+ *
+ * Artemis times are timezone-naive wall clocks (report labeled CST). We store them
+ * as UTC components so server TZ (Vercel UTC) and browser TZ never shift the clock.
  */
 export function parseArtemisDateTime(value: unknown): Date | null {
   if (value == null || value === '') return null
 
   if (value instanceof Date) {
+    // ExcelJS encodes Excel wall-clock as UTC components — keep as-is.
     return Number.isFinite(value.getTime()) ? value : null
   }
 
   if (typeof value === 'number' && Number.isFinite(value)) {
-    // Excel serial date (days since 1899-12-30)
+    // Excel serial date (days since 1899-12-30) → UTC wall-clock
     if (value > 20000 && value < 100000) {
       const excelEpoch = Date.UTC(1899, 11, 30)
       const ms = excelEpoch + value * 86400000
@@ -86,11 +120,17 @@ export function parseArtemisDateTime(value: unknown): Date | null {
     const ampm = m[7].toUpperCase()
     if (ampm === 'PM' && hour < 12) hour += 12
     if (ampm === 'AM' && hour === 12) hour = 0
-    const d = new Date(year, month - 1, day, hour, minute, second)
+    const d = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
     return Number.isFinite(d.getTime()) ? d : null
   }
 
-  // Fallback: native parse (ISO, etc.)
+  // ISO with Z / offset: keep absolute instant (already timezone-aware)
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    const d = new Date(s)
+    return Number.isFinite(d.getTime()) ? d : null
+  }
+
+  // Fallback: native parse
   const d = new Date(s)
   return Number.isFinite(d.getTime()) ? d : null
 }

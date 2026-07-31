@@ -4,17 +4,9 @@ import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { formatHours } from '@/lib/billing/format'
 import { formatCalendarDate } from '@/lib/billing/calendarDate'
+import { formatArtemisClockWindow } from '@/lib/billing/scheduleClamp'
 import SessionStatusBadge from '@/components/billing/SessionStatusBadge'
 import { cn } from '@/lib/utils'
-
-function formatWindow(start: string | Date | null | undefined, end: string | Date | null | undefined): string {
-  if (!start || !end) return '—'
-  const s = typeof start === 'string' ? new Date(start) : start
-  const e = typeof end === 'string' ? new Date(end) : end
-  if (!Number.isFinite(s.getTime()) || !Number.isFinite(e.getTime())) return '—'
-  const opts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
-  return `${s.toLocaleTimeString('en-US', opts)} – ${e.toLocaleTimeString('en-US', opts)}`
-}
 
 export type DrilldownSession = {
   id: string
@@ -110,10 +102,10 @@ export default function SessionDrilldown({ sessions }: { sessions: DrilldownSess
                       <SessionStatusBadge status={s.sessionStatus} />
                     </td>
                     <td className="px-2 py-1 whitespace-nowrap">
-                      {formatWindow(s.scheduledStart, s.scheduledEnd)}
+                      {formatArtemisClockWindow(s.scheduledStart, s.scheduledEnd)}
                     </td>
                     <td className="px-2 py-1 whitespace-nowrap">
-                      {formatWindow(s.actualStart, s.actualEnd)}
+                      {formatArtemisClockWindow(s.actualStart, s.actualEnd)}
                     </td>
                     <td className="px-2 py-1 text-right tabular-nums">{formatHours(raw / 60)}</td>
                     <td className="px-2 py-1 text-right tabular-nums font-medium text-[#0D9488]">

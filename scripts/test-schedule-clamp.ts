@@ -7,6 +7,7 @@ import {
   calendarDayKey,
   computeAppointedPayable,
   computeOverlapClampPayable,
+  formatArtemisClockTime,
   parseArtemisDateTime,
 } from '../lib/billing/scheduleClamp'
 
@@ -24,10 +25,18 @@ function almostEqual(a: number, b: number, eps = 0.001) {
 
 // Parse formats
 const withComma = parseArtemisDateTime('7/29/2026, 4:00 PM')
-assert(!!withComma && withComma.getHours() === 16 && withComma.getMinutes() === 0, 'parse with comma')
+assert(
+  !!withComma && withComma.getUTCHours() === 16 && withComma.getUTCMinutes() === 0,
+  'parse with comma (UTC wall-clock)'
+)
 const noComma = parseArtemisDateTime('7/29/2026 4:00 PM')
-assert(!!noComma && noComma.getHours() === 16, 'parse without comma')
+assert(!!noComma && noComma.getUTCHours() === 16, 'parse without comma (UTC wall-clock)')
 assert(calendarDayKey(withComma!) === '2026-07-29', 'calendar day key')
+assert(
+  withComma!.toISOString() === '2026-07-29T16:00:00.000Z',
+  'parse stores wall-clock as UTC'
+)
+assert(formatArtemisClockTime(withComma) === '4:00 PM', 'format ignores local TZ offset')
 
 // Late start → still pay full appointment
 {
