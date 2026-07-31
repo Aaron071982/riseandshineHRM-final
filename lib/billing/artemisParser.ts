@@ -7,6 +7,7 @@ import {
   type ArtemisSessionStatusKey,
 } from './sessionStatus'
 import { parseCalendarDate } from './calendarDate'
+import { computeClampedPayable, parseArtemisDateTime } from './scheduleClamp'
 
 const PAYROLL_ROLES = new Set(['rbt', 'bt'])
 const EXCLUDED_ROLES = new Set(['bcba', 'clinical director'])
@@ -48,6 +49,17 @@ function cellText(cell: ExcelJS.Cell): string {
     return String((v as { result: unknown }).result ?? '').trim()
   }
   return String(v).trim()
+}
+
+function cellValue(cell: ExcelJS.Cell): unknown {
+  const v = cell.value
+  if (v != null && typeof v === 'object' && 'result' in v) {
+    return (v as { result: unknown }).result
+  }
+  if (v != null && typeof v === 'object' && 'text' in v) {
+    return (v as { text: unknown }).text
+  }
+  return v
 }
 
 function normalizeHeaderKey(header: string): string {
@@ -103,6 +115,11 @@ function findHeaderRow(sheet: ExcelJS.Worksheet): { rowNumber: number; colMap: R
         if (k.includes('practice procedure code') || k === 'procedure code') colMap.procedureCode = col
         if (k === 'location') colMap.location = col
         if (k.includes('case') && k.includes('role')) colMap.role = col
+        // Schedule / actual windows for payable clamp
+        if (k.includes('appointment start')) colMap.appointmentStart = col
+        if (k.includes('appointment end')) colMap.appointmentEnd = col
+        if (k.includes('actual start')) colMap.actualStart = col
+        if (k.includes('actual end') && !k.includes('duration')) colMap.actualEnd = col
       }
       const statusCols = findStatusColumn(headers)
       if (statusCols.status) colMap.status = statusCols.status
@@ -144,6 +161,15 @@ function addHoursByStatus(
   hoursByStatus[statusKey] = (hoursByStatus[statusKey] ?? 0) + hours
 }
 
+export type ClampParseStats = {
+  sessionsWithAllTimes: number
+  sessionsHoursChanged: number
+  sessionsDateMismatch: number
+  sessionsNoOverlap: number
+  sessionsMissingTimes: number
+  hoursRemovedByClamp: number
+}
+
 export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promise<ArtemisParseResult> {
   const workbook = new ExcelJS.Workbook()
   const data = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer)
@@ -173,6 +199,14 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
   let cancelledSessionCount = 0
   let skippedSessionCount = 0
   let inheritedGroupStatus = ''
+  const clampStats: ClampParseStats = {
+    sessionsWithAllTimes: 0,
+    sessionsHoursChanged: 0,
+    sessionsDateMismatch: 0,
+    sessionsNoOverlap: 0,
+    sessionsMissingTimes: 0,
+    hoursRemovedByClamp: 0,
+  }
 
   for (let r = header.rowNumber + 1; r <= sheet.rowCount; r++) {
     const row = sheet.getRow(r)
@@ -200,7 +234,7 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
       ? cellText(row.getCell(header.colMap.providerName))
       : ''
 
-    const actualMinutes = header.colMap.actualDuration
+    const rawActualMinutes = header.colMap.actualDuration
       ? parseMinutes(row.getCell(header.colMap.actualDuration).value)
       : 0
 
@@ -210,8 +244,8 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
       isAlwaysExcludedStatus(statusKey) ||
       (effectiveStatusRaw != null && /\bcancel/i.test(effectiveStatusRaw))
 
-    if (isCancelledOrDeleted && actualMinutes > 0) {
-      const hours = actualMinutes / 60
+    if (isCancelledOrDeleted && rawActualMinutes > 0) {
+      const hours = rawActualMinutes / 60
       if (statusKey === 'cancelled' || /\bcancel/i.test(effectiveStatusRaw ?? '')) {
         addHoursByStatus(hoursByStatus, 'cancelled', hours)
         cancelledSessionCount++
@@ -225,10 +259,34 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
       continue
     }
 
-    if (!providerName || actualMinutes <= 0) continue
+    // Keep sessions with recorded work even if clamp yields 0 (flagged for review)
+    if (!providerName || rawActualMinutes <= 0) continue
+
+    const scheduledStart = header.colMap.appointmentStart
+      ? parseArtemisDateTime(cellValue(row.getCell(header.colMap.appointmentStart)))
+      : null
+    const scheduledEnd = header.colMap.appointmentEnd
+      ? parseArtemisDateTime(cellValue(row.getCell(header.colMap.appointmentEnd)))
+      : null
+    const actualStart = header.colMap.actualStart
+      ? parseArtemisDateTime(cellValue(row.getCell(header.colMap.actualStart)))
+      : null
+    const actualEnd = header.colMap.actualEnd
+      ? parseArtemisDateTime(cellValue(row.getCell(header.colMap.actualEnd)))
+      : null
+
+    const clamp = computeClampedPayable({
+      scheduledStart,
+      scheduledEnd,
+      actualStart,
+      actualEnd,
+      rawActualMinutes,
+    })
+
+    const payableMinutes = clamp.payableMinutes
 
     if (statusKey) {
-      addHoursByStatus(hoursByStatus, statusKey, actualMinutes / 60)
+      addHoursByStatus(hoursByStatus, statusKey, payableMinutes / 60)
     }
 
     totalRows++
@@ -250,7 +308,15 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
       scheduledMinutes: header.colMap.duration
         ? parseMinutes(row.getCell(header.colMap.duration).value)
         : 0,
-      actualMinutes,
+      actualMinutes: payableMinutes,
+      rawActualMinutes,
+      clampedPayableMinutes: clamp.clampedPayableMinutes,
+      clampApplied: clamp.clampApplied,
+      reviewFlag: clamp.reviewFlag,
+      scheduledStart,
+      scheduledEnd,
+      actualStart,
+      actualEnd,
       procedureCode: header.colMap.procedureCode
         ? cellText(row.getCell(header.colMap.procedureCode)) || null
         : null,
@@ -261,6 +327,16 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
     }
 
     if (isPayrollRole(roleKey)) {
+      if (scheduledStart && scheduledEnd && actualStart && actualEnd) {
+        clampStats.sessionsWithAllTimes++
+      }
+      if (clamp.hoursChanged) {
+        clampStats.sessionsHoursChanged++
+        clampStats.hoursRemovedByClamp += Math.max(0, rawActualMinutes - clamp.payableMinutes) / 60
+      }
+      if (clamp.reviewFlag?.includes('date mismatch')) clampStats.sessionsDateMismatch++
+      if (clamp.reviewFlag?.includes('no schedule overlap')) clampStats.sessionsNoOverlap++
+      if (clamp.reviewFlag?.includes('missing times')) clampStats.sessionsMissingTimes++
       payrollSessions.push(session)
     } else if (isExcludedRole(roleKey)) {
       excludedSessions.push(session)
@@ -283,6 +359,7 @@ export async function parseArtemisWorkbook(buffer: Buffer | ArrayBuffer): Promis
       excludedProviderCount: excludedGroups.length,
       byRole,
       hoursByStatus,
+      clamp: clampStats,
     },
     detectedDateRange: { min: minDate, max: maxDate },
   }

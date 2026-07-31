@@ -26,6 +26,9 @@ export async function POST(
 
   const entries = await prisma.billingEntry.findMany({
     where: { billingCycleId: params.id },
+    include: {
+      sessions: { select: { reviewFlag: true, clientName: true } },
+    },
   })
 
   const blockers = getCycleBlockers(entries)

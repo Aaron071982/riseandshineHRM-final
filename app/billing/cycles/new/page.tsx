@@ -48,10 +48,21 @@ type Entry = {
   role: string | null
   notes: string | null
   sessions: {
+    id?: string
     sessionStatus: string | null
     actualMinutes: number
+    rawActualMinutes?: number | null
+    clampedPayableMinutes?: number | null
+    clampApplied?: boolean | null
+    reviewFlag?: string | null
+    scheduledStart?: string | null
+    scheduledEnd?: string | null
+    actualStart?: string | null
+    actualEnd?: string | null
     dos: string
     clientName: string
+    procedureCode?: string | null
+    location?: string | null
   }[]
   rbtProfile: { firstName: string; lastName: string; email?: string | null } | null
   payrollOnly: { id: string; fullName: string; email: string | null } | null
@@ -409,8 +420,8 @@ export default function NewCycleWizardPage() {
             <div className="rounded-md bg-red-50 text-red-800 px-4 py-3 text-sm">
               <p className="font-medium mb-1">Issues to resolve before finalizing:</p>
               <ul className="list-disc pl-5">
-                {blockers.map((b) => (
-                  <li key={b.entryId}>{b.message}</li>
+                {blockers.map((b, i) => (
+                  <li key={`${b.type}-${b.entryId}-${i}`}>{b.message}</li>
                 ))}
               </ul>
             </div>

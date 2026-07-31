@@ -20,7 +20,7 @@ type EditorEntry = MatchEntry & {
   adjustment: number
   adjustmentNote: string | null
   finalPay: number
-  sessions: BreakdownEntry['sessions']
+  sessions: NonNullable<MatchEntry['sessions']>
 }
 
 function sortEntries(entries: EditorEntry[]): EditorEntry[] {
@@ -91,7 +91,12 @@ export default function CycleDetailEditor({
         totalSessions: e.totalSessions,
         rbtProfile: e.rbtProfile,
         payrollOnly: e.payrollOnly,
-        sessions: e.sessions,
+        sessions: e.sessions.map((s) => ({
+          sessionStatus: s.sessionStatus,
+          actualMinutes: s.actualMinutes,
+          dos: typeof s.dos === 'string' ? s.dos : new Date(s.dos).toISOString(),
+          clientName: s.clientName,
+        })),
       })),
     [payrollEntries]
   )

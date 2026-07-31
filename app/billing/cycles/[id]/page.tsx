@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CycleStatusBadge, MatchStatusBadge } from '@/components/billing/MatchStatusBadge'
 import { CurrencyCell } from '@/components/billing/CurrencyCell'
 import SessionDrilldown from '@/components/billing/SessionDrilldown'
+import ClampSummaryBanner from '@/components/billing/ClampSummaryBanner'
 import EntryHoursConfirmationButton from '@/components/billing/EntryHoursConfirmationButton'
 import ExcludedProvidersSection from '@/components/billing/ExcludedProvidersSection'
 import CycleDetailActions from '@/components/billing/CycleDetailActions'
@@ -21,6 +22,42 @@ import { suggestPayRatesForRbts } from '@/lib/billing/payRate'
 import { format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
+
+function serializeSession(s: {
+  id: string
+  clientName: string
+  dos: Date
+  actualMinutes: number
+  rawActualMinutes: number | null
+  clampedPayableMinutes: number | null
+  clampApplied: boolean
+  reviewFlag: string | null
+  scheduledStart: Date | null
+  scheduledEnd: Date | null
+  actualStart: Date | null
+  actualEnd: Date | null
+  procedureCode: string | null
+  location: string | null
+  sessionStatus: string | null
+}) {
+  return {
+    id: s.id,
+    clientName: s.clientName,
+    dos: s.dos.toISOString(),
+    actualMinutes: s.actualMinutes,
+    rawActualMinutes: s.rawActualMinutes,
+    clampedPayableMinutes: s.clampedPayableMinutes,
+    clampApplied: s.clampApplied,
+    reviewFlag: s.reviewFlag,
+    scheduledStart: s.scheduledStart?.toISOString() ?? null,
+    scheduledEnd: s.scheduledEnd?.toISOString() ?? null,
+    actualStart: s.actualStart?.toISOString() ?? null,
+    actualEnd: s.actualEnd?.toISOString() ?? null,
+    procedureCode: s.procedureCode,
+    location: s.location,
+    sessionStatus: s.sessionStatus,
+  }
+}
 
 export default async function CycleDetailPage({ params }: { params: { id: string } }) {
   const exists = await prisma.billingCycle.findUnique({
@@ -140,12 +177,7 @@ export default async function CycleDetailPage({ params }: { params: { id: string
         ? { firstName: e.rbtProfile.firstName, lastName: e.rbtProfile.lastName }
         : null,
       payrollOnly: e.payrollOnly,
-      sessions: e.sessions.map((s) => ({
-        sessionStatus: s.sessionStatus,
-        actualMinutes: s.actualMinutes,
-        dos: s.dos.toISOString(),
-        clientName: s.clientName,
-      })),
+      sessions: e.sessions.map(serializeSession),
     }
   })
 
@@ -176,12 +208,14 @@ export default async function CycleDetailPage({ params }: { params: { id: string
         />
       </div>
 
+      <ClampSummaryBanner entries={payrollEntries} />
+
       {cycle.status === 'REVIEW' && blockers.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
           <p className="font-medium mb-2">Resolve before finalizing:</p>
           <ul className="list-disc pl-5 space-y-1">
-            {blockers.map((b) => (
-              <li key={b.entryId}>{b.message}</li>
+            {blockers.map((b, i) => (
+              <li key={`${b.type}-${b.entryId}-${i}`}>{b.message}</li>
             ))}
           </ul>
         </div>
@@ -278,12 +312,7 @@ export default async function CycleDetailPage({ params }: { params: { id: string
                     )}
                   </div>
                 </div>
-                <SessionDrilldown
-                  sessions={e.sessions.map((s) => ({
-                    ...s,
-                    dos: s.dos.toISOString(),
-                  }))}
-                />
+                <SessionDrilldown sessions={e.sessions.map(serializeSession)} />
               </div>
             ))}
           </div>

@@ -18,6 +18,8 @@ import { formatHours } from '@/lib/billing/format'
 import type { BillingMatchStatus } from '@prisma/client'
 import { cn } from '@/lib/utils'
 import { ChevronDown, RotateCcw } from 'lucide-react'
+import SessionDrilldown, { type DrilldownSession } from '@/components/billing/SessionDrilldown'
+import ClampSummaryBanner from '@/components/billing/ClampSummaryBanner'
 
 export type MatchEntry = {
   id: string
@@ -37,6 +39,7 @@ export type MatchEntry = {
   isExcluded: boolean
   rbtProfile: { firstName: string; lastName: string } | null
   payrollOnly: { id: string; fullName: string; email: string | null } | null
+  sessions?: DrilldownSession[]
 }
 
 export type MatchCandidate = {
@@ -151,6 +154,17 @@ export default function MatchReviewTable({
 
   return (
     <div className="space-y-4">
+      <ClampSummaryBanner
+        entries={payrollEntries.map((e) => ({
+          isExcluded: e.isExcluded,
+          sessions: (e.sessions ?? []).map((s) => ({
+            actualMinutes: s.actualMinutes,
+            rawActualMinutes: s.rawActualMinutes,
+            reviewFlag: s.reviewFlag,
+          })),
+        }))}
+      />
+
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-wrap gap-2 text-sm">
           {unmatched > 0 && (
@@ -212,15 +226,28 @@ export default function MatchReviewTable({
               const isResolved =
                 e.matchStatus === 'MATCHED' || e.matchStatus === 'PAYROLL_ONLY'
               const selectId = e.rbtProfileId ?? e.suggestedRbtProfileId ?? ''
+              const sessionFlags = (e.sessions ?? []).filter((s) => s.reviewFlag).length
               return (
                 <tr
                   key={e.id}
-                  className={cn('border-t dark:border-[var(--border-subtle)]', rowClass(e.matchStatus, e.isExcluded))}
+                  className={cn(
+                    'border-t dark:border-[var(--border-subtle)]',
+                    rowClass(e.matchStatus, e.isExcluded),
+                    sessionFlags > 0 && 'ring-1 ring-inset ring-red-300 dark:ring-red-800'
+                  )}
                 >
-                  <td className="px-3 py-2 font-medium">
+                  <td className="px-3 py-2 font-medium align-top">
                     {e.providerNameRaw}
                     {e.role && (
                       <span className="block text-xs text-gray-500 font-normal">{e.role}</span>
+                    )}
+                    {sessionFlags > 0 && (
+                      <span className="block text-xs text-red-700 font-medium mt-0.5">
+                        {sessionFlags} session flag{sessionFlags === 1 ? '' : 's'}
+                      </span>
+                    )}
+                    {e.sessions && e.sessions.length > 0 && (
+                      <SessionDrilldown sessions={e.sessions} />
                     )}
                   </td>
                   <td className="px-3 py-2">

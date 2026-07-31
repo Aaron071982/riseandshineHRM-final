@@ -1960,21 +1960,32 @@ model BillingEntry {
 }
 
 model BillingSession {
-  id               String   @id @default(cuid())
-  billingEntryId   String
-  clientName       String
-  dos              DateTime @db.Date
-  scheduledMinutes Float    @default(0)
-  actualMinutes    Float    @default(0)
-  procedureCode    String?
-  location         String?
-  rawStatus        String?
-  sessionStatus    String?
-  createdAt        DateTime @default(now())
+  id                     String    @id @default(cuid())
+  billingEntryId         String
+  clientName             String
+  dos                    DateTime  @db.Date
+  scheduledMinutes       Float     @default(0)
+  /// Payable minutes (schedule-window clamped, or raw fallback)
+  actualMinutes          Float     @default(0)
+  /// Raw Artemis "Actual Duration" before clamp
+  rawActualMinutes       Float?
+  clampedPayableMinutes  Float?
+  clampApplied           Boolean   @default(false)
+  reviewFlag             String?
+  scheduledStart         DateTime?
+  scheduledEnd           DateTime?
+  actualStart            DateTime?
+  actualEnd              DateTime?
+  procedureCode          String?
+  location               String?
+  rawStatus              String?
+  sessionStatus          String?
+  createdAt              DateTime  @default(now())
 
   billingEntry BillingEntry @relation(fields: [billingEntryId], references: [id], onDelete: Cascade)
 
   @@index([billingEntryId])
+  @@index([reviewFlag])
   @@map("billing_sessions")
 }
 

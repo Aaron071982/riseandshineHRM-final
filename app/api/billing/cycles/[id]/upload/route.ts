@@ -85,7 +85,8 @@ export async function POST(
     detectedDateRange: result.detectedDateRange,
     periodWarning,
     entries: entriesWithSuggestions,
-    preview: `Parsed ${parseResult.stats.payrollSessionCount} RBT/BT sessions across ${parseResult.stats.payrollProviderCount} providers. Status hours: ${Object.entries(parseResult.stats.hoursByStatus).map(([k, h]) => `${k} ${h.toFixed(1)}h`).join(', ')}. Payable defaults: Completed + Ready to Bill.`,
+    preview: `Parsed ${parseResult.stats.payrollSessionCount} RBT/BT sessions across ${parseResult.stats.payrollProviderCount} providers. Schedule clamp: ${parseResult.stats.clamp?.sessionsHoursChanged ?? 0} sessions reduced (${(parseResult.stats.clamp?.hoursRemovedByClamp ?? 0).toFixed(2)} hrs removed); ${parseResult.stats.clamp?.sessionsDateMismatch ?? 0} date mismatch. Status hours: ${Object.entries(parseResult.stats.hoursByStatus).map(([k, h]) => `${k} ${h.toFixed(1)}h`).join(', ')}. Payable defaults: Completed + Ready to Bill.`,
     hoursByStatus: parseResult.stats.hoursByStatus,
+    clamp: parseResult.stats.clamp,
   })
 }

@@ -5,7 +5,17 @@ export type ParsedSessionRow = {
   clientName: string
   dos: Date
   scheduledMinutes: number
+  /** Payable minutes after schedule-window clamp (or raw fallback). */
   actualMinutes: number
+  /** Raw Artemis "Actual Duration" minutes before clamp. */
+  rawActualMinutes: number
+  clampedPayableMinutes: number
+  clampApplied: boolean
+  reviewFlag: string | null
+  scheduledStart: Date | null
+  scheduledEnd: Date | null
+  actualStart: Date | null
+  actualEnd: Date | null
   procedureCode: string | null
   location: string | null
   role: string
@@ -36,6 +46,15 @@ export type ArtemisParseResult = {
     byRole: Record<string, number>
     /** Total hours per normalized status (includes cancelled/deleted for verification). */
     hoursByStatus: Record<string, number>
+    /** Schedule-window clamp summary from parse. */
+    clamp?: {
+      sessionsWithAllTimes: number
+      sessionsHoursChanged: number
+      sessionsDateMismatch: number
+      sessionsNoOverlap: number
+      sessionsMissingTimes: number
+      hoursRemovedByClamp: number
+    }
   }
   detectedDateRange: { min: Date | null; max: Date | null }
 }
@@ -58,7 +77,7 @@ export type MatchResult = {
 }
 
 export type CycleBlocker = {
-  type: 'unmatched' | 'needs_review' | 'missing_rate'
+  type: 'unmatched' | 'needs_review' | 'missing_rate' | 'session_review'
   entryId: string
   providerNameRaw: string
   message: string
