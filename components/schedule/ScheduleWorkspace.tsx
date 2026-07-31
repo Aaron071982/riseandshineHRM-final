@@ -275,13 +275,13 @@ export default function ScheduleWorkspace({
             try {
               const counts = await downloadScheduleExport(filteredSlots, therapists, clients)
               const filterNote = borough ? ` (borough: ${borough})` : ' (all)'
-              if (counts.unassignedRbts > 0) {
+              if (counts.unassignedClients > 0) {
                 showToast(
-                  `Exported${filterNote} — ${counts.unassignedRbts} RBTs still need a borough`,
+                  `Exported${filterNote} — ${counts.unassignedClients} clients still need a borough`,
                   'error'
                 )
               } else {
-                showToast(`Schedule exported${filterNote}`, 'success')
+                showToast(`Schedule exported by client borough${filterNote}`, 'success')
               }
             } catch {
               showToast('Export failed', 'error')

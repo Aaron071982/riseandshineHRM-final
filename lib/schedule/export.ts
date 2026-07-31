@@ -1,5 +1,5 @@
 /**
- * Schedule export — Excel workbook grouped by RBT borough → RBT → sessions.
+ * Schedule export — Excel workbook grouped by client borough → client → sessions.
  */
 import ExcelJS from 'exceljs'
 import type { ScheduleClient, ScheduleSlot, ScheduleTherapist } from './types'
@@ -15,7 +15,7 @@ export { NYC_BOROUGHS, normalizeBorough } from './borough'
 const TEAL = 'FF0E4D52'
 const TEAL_SOFT = 'FFE6F0F1'
 const BOROUGH_FILL = 'FF0D9488'
-const RBT_FILL = 'FFF0FDF9'
+const CLIENT_FILL = 'FFF0FDF9'
 const WARN_FILL = 'FFFEF3C7'
 const HEADER_FONT = { bold: true, color: { argb: 'FFFFFFFF' } }
 const DAY_ORDER = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const
@@ -25,10 +25,8 @@ type SessionRow = {
   start: string
   end: string
   hours: number
-  client: string
-  clientCode: string
-  clientBcba: string
-  clientInsurance: string
+  rbt: string
+  role: string
   status: string
   procedureCode: string
   placeOfService: string
@@ -49,14 +47,14 @@ function buildGrouped(
   const tMap = new Map(therapists.map((t) => [t.id, t]))
   const cMap = new Map(clients.map((c) => [c.id, c]))
 
-  type RbtBucket = {
-    therapist: ScheduleTherapist
+  type ClientBucket = {
+    client: ScheduleClient
     sessions: SessionRow[]
     totalHours: number
   }
   type BoroughBucket = {
     name: string
-    rbts: Map<string, RbtBucket>
+    clients: Map<string, ClientBucket>
     totalHours: number
     sessionCount: number
   }
@@ -67,56 +65,56 @@ function buildGrouped(
     if (s.status === 'CANCELLED') continue
     const t = tMap.get(s.therapistId)
     const c = cMap.get(s.clientId)
-    const boroughName = normalizeBorough(t?.borough)
+    const boroughName = normalizeBorough(c?.borough)
     let b = boroughs.get(boroughName)
     if (!b) {
-      b = { name: boroughName, rbts: new Map(), totalHours: 0, sessionCount: 0 }
+      b = { name: boroughName, clients: new Map(), totalHours: 0, sessionCount: 0 }
       boroughs.set(boroughName, b)
     }
-    let rb = b.rbts.get(s.therapistId)
-    if (!rb) {
-      rb = {
-        therapist: t ?? {
-          id: s.therapistId,
-          name: 'Unknown therapist',
-          email: null,
-          role: 'RBT',
+    const clientId = s.clientId
+    let cb = b.clients.get(clientId)
+    if (!cb) {
+      cb = {
+        client: c ?? {
+          id: clientId,
+          code: null,
+          name: 'Unknown client',
           borough: null,
-          colorKey: null,
+          insurance: null,
+          bcba: null,
+          authorizedHoursPerWeek: null,
           active: true,
         },
         sessions: [],
         totalHours: 0,
       }
-      b.rbts.set(s.therapistId, rb)
+      b.clients.set(clientId, cb)
     }
     const hrs = hoursOf(s)
-    rb.sessions.push({
+    cb.sessions.push({
       day: DAY_FULL[s.day as Day] ?? s.day,
       start: minToLabel(s.startMin),
       end: minToLabel(s.endMin),
       hours: hrs,
-      client: c?.name ?? 'Unknown client',
-      clientCode: c?.code ?? '',
-      clientBcba: c?.bcba ?? '',
-      clientInsurance: c?.insurance ?? '',
+      rbt: t?.name ?? 'Unknown therapist',
+      role: t?.role ?? 'RBT',
       status: s.status,
       procedureCode: s.procedureCode,
       placeOfService: s.placeOfService,
       note: s.note ?? '',
     })
-    rb.totalHours += hrs
+    cb.totalHours += hrs
     b.totalHours += hrs
     b.sessionCount += 1
   }
 
   for (const b of boroughs.values()) {
-    for (const rb of b.rbts.values()) {
-      rb.sessions.sort((a, c) => {
+    for (const cb of b.clients.values()) {
+      cb.sessions.sort((a, c) => {
         const d = dayIndex(a.day) - dayIndex(c.day)
         if (d !== 0) return d
         if (a.start !== c.start) return a.start.localeCompare(c.start)
-        return a.client.localeCompare(c.client)
+        return a.rbt.localeCompare(c.rbt)
       })
     }
   }
@@ -127,22 +125,46 @@ function buildGrouped(
       name: b.name,
       totalHours: b.totalHours,
       sessionCount: b.sessionCount,
-      rbts: [...b.rbts.values()].sort((a, c) => a.therapist.name.localeCompare(c.therapist.name)),
+      clients: [...b.clients.values()].sort((a, c) => a.client.name.localeCompare(c.client.name)),
     }))
 
-  // Always include all 5 boroughs + Long Island (empty sections ok)
   return ensureAllBoroughSections(mapped, (name) => ({
     name,
     totalHours: 0,
     sessionCount: 0,
-    rbts: [],
+    clients: [],
   }))
 }
 
+/** Clients with sessions who have no borough set. */
+export function countUnassignedBoroughClients(
+  slots: ScheduleSlot[],
+  clients: ScheduleClient[]
+): { unassignedClients: number; totalClientsWithSessions: number } {
+  const cMap = new Map(clients.map((c) => [c.id, c]))
+  const ids = new Set(slots.filter((s) => s.status !== 'CANCELLED').map((s) => s.clientId))
+  let unassigned = 0
+  for (const id of ids) {
+    if (normalizeBorough(cMap.get(id)?.borough) === 'Unassigned') unassigned++
+  }
+  return { unassignedClients: unassigned, totalClientsWithSessions: ids.size }
+}
+
+/** @deprecated use countUnassignedBoroughClients */
 export function countUnassignedBoroughRbts(
   slots: ScheduleSlot[],
-  therapists: ScheduleTherapist[]
-): { unassignedRbts: number; totalRbtsWithSessions: number } {
+  therapists: ScheduleTherapist[],
+  clients?: ScheduleClient[]
+): { unassignedRbts: number; totalRbtsWithSessions: number; unassignedClients?: number; totalClientsWithSessions?: number } {
+  if (clients) {
+    const c = countUnassignedBoroughClients(slots, clients)
+    return {
+      unassignedRbts: c.unassignedClients,
+      totalRbtsWithSessions: c.totalClientsWithSessions,
+      unassignedClients: c.unassignedClients,
+      totalClientsWithSessions: c.totalClientsWithSessions,
+    }
+  }
   const tMap = new Map(therapists.map((t) => [t.id, t]))
   const ids = new Set(slots.filter((s) => s.status !== 'CANCELLED').map((s) => s.therapistId))
   let unassigned = 0
@@ -158,22 +180,26 @@ export async function buildScheduleWorkbook(
   clients: ScheduleClient[]
 ): Promise<ExcelJS.Buffer> {
   const grouped = buildGrouped(slots, therapists, clients)
-  const { unassignedRbts, totalRbtsWithSessions } = countUnassignedBoroughRbts(slots, therapists)
+  const { unassignedClients, totalClientsWithSessions } = countUnassignedBoroughClients(
+    slots,
+    clients
+  )
+  const rbtIds = new Set(slots.filter((s) => s.status !== 'CANCELLED').map((s) => s.therapistId))
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Rise and Shine ABA'
   wb.created = new Date()
 
-  const sheet = wb.addWorksheet('By RBT borough', {
+  const sheet = wb.addWorksheet('By client borough', {
     views: [{ state: 'frozen', ySplit: 6 }],
     properties: { defaultRowHeight: 18 },
   })
 
   sheet.columns = [
     { key: 'borough', width: 14 },
-    { key: 'rbt', width: 22 },
-    { key: 'role', width: 10 },
     { key: 'client', width: 24 },
     { key: 'code', width: 10 },
+    { key: 'rbt', width: 22 },
+    { key: 'role', width: 10 },
     { key: 'day', width: 12 },
     { key: 'start', width: 10 },
     { key: 'end', width: 10 },
@@ -191,7 +217,7 @@ export async function buildScheduleWorkbook(
   sheet.mergeCells(1, 1, 1, 15)
 
   const subtitle = sheet.addRow([
-    `Exported ${new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })} · Grouped by RBT borough → RBT → sessions`,
+    `Exported ${new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })} · Grouped by client borough → client → sessions`,
   ])
   subtitle.font = { size: 10, italic: true, color: { argb: 'FF64748B' } }
   sheet.mergeCells(2, 1, 2, 15)
@@ -202,14 +228,14 @@ export async function buildScheduleWorkbook(
     (b) => b.name !== 'Unassigned' && b.sessionCount > 0
   ).length
   const summary = sheet.addRow([
-    `${activeBoroughs} borough${activeBoroughs === 1 ? '' : 's'} with sessions · ${totalRbtsWithSessions} RBTs with sessions · ${totalSessions} sessions · ${totalHours.toFixed(1)} hrs`,
+    `${activeBoroughs} borough${activeBoroughs === 1 ? '' : 's'} with sessions · ${rbtIds.size} RBTs · ${totalClientsWithSessions} clients · ${totalSessions} sessions · ${totalHours.toFixed(1)} hrs`,
   ])
   summary.font = { size: 11, bold: true }
   sheet.mergeCells(3, 1, 3, 15)
 
-  if (unassignedRbts > 0) {
+  if (unassignedClients > 0) {
     const warn = sheet.addRow([
-      `Warning: ${unassignedRbts} of ${totalRbtsWithSessions} RBTs have no borough. Set borough in Manage → Therapists (or match RBT profile city/zip), then export again.`,
+      `Warning: ${unassignedClients} of ${totalClientsWithSessions} clients have no borough. Set borough in Manage → Clients (or Import Artemis client boroughs), then export again.`,
     ])
     warn.font = { size: 10, bold: true, color: { argb: 'FF92400E' } }
     warn.eachCell((cell) => {
@@ -224,10 +250,10 @@ export async function buildScheduleWorkbook(
 
   const header = sheet.addRow([
     'Borough',
-    'RBT',
-    'Role',
     'Client',
     'Code',
+    'RBT',
+    'Role',
     'Day',
     'Start',
     'End',
@@ -258,7 +284,7 @@ export async function buildScheduleWorkbook(
       '',
       `${borough.totalHours.toFixed(1)} hrs`,
       `${borough.sessionCount} sessions`,
-      `${borough.rbts.length} RBTs`,
+      `${borough.clients.length} clients`,
       '',
       '',
       '',
@@ -271,38 +297,38 @@ export async function buildScheduleWorkbook(
     })
     bRow.height = 24
 
-    for (const rb of borough.rbts) {
-      const t = rb.therapist
-      const rRow = sheet.addRow([
+    for (const cb of borough.clients) {
+      const c = cb.client
+      const cRow = sheet.addRow([
         borough.name,
-        t.name,
-        t.role,
+        c.name,
+        c.code ?? '',
         '',
         '',
         '',
         '',
         '',
-        `${rb.totalHours.toFixed(1)} hrs`,
-        `${rb.sessions.length} sessions`,
+        `${cb.totalHours.toFixed(1)} hrs`,
+        `${cb.sessions.length} sessions`,
         '',
         '',
-        '',
-        '',
+        c.bcba ?? '',
+        c.insurance ?? '',
         '',
       ])
-      rRow.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: RBT_FILL } }
+      cRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: CLIENT_FILL } }
         cell.font = { bold: true, color: { argb: 'FF134E4A' }, size: 11 }
       })
 
       let alt = false
-      for (const s of rb.sessions) {
+      for (const s of cb.sessions) {
         const row = sheet.addRow([
           borough.name,
-          t.name,
-          t.role,
-          s.client,
-          s.clientCode,
+          c.name,
+          c.code ?? '',
+          s.rbt,
+          s.role,
           s.day,
           s.start,
           s.end,
@@ -310,8 +336,8 @@ export async function buildScheduleWorkbook(
           s.status,
           s.procedureCode,
           s.placeOfService,
-          s.clientBcba,
-          s.clientInsurance,
+          c.bcba ?? '',
+          c.insurance ?? '',
           s.note,
         ])
         if (alt) {
@@ -337,10 +363,10 @@ export async function buildScheduleWorkbook(
   })
   flat.columns = [
     { header: 'Borough', key: 'borough', width: 14 },
-    { header: 'RBT', key: 'rbt', width: 22 },
-    { header: 'Role', key: 'role', width: 10 },
     { header: 'Client', key: 'client', width: 24 },
     { header: 'Client code', key: 'code', width: 12 },
+    { header: 'RBT', key: 'rbt', width: 22 },
+    { header: 'Role', key: 'role', width: 10 },
     { header: 'Day', key: 'day', width: 12 },
     { header: 'Start', key: 'start', width: 10 },
     { header: 'End', key: 'end', width: 10 },
@@ -358,14 +384,14 @@ export async function buildScheduleWorkbook(
   })
 
   for (const borough of grouped) {
-    for (const rb of borough.rbts) {
-      for (const s of rb.sessions) {
+    for (const cb of borough.clients) {
+      for (const s of cb.sessions) {
         flat.addRow({
           borough: borough.name,
-          rbt: rb.therapist.name,
-          role: rb.therapist.role,
-          client: s.client,
-          code: s.clientCode,
+          client: cb.client.name,
+          code: cb.client.code ?? '',
+          rbt: s.rbt,
+          role: s.role,
           day: s.day,
           start: s.start,
           end: s.end,
@@ -373,24 +399,24 @@ export async function buildScheduleWorkbook(
           status: s.status,
           cpt: s.procedureCode,
           pos: s.placeOfService,
-          bcba: s.clientBcba,
-          insurance: s.clientInsurance,
+          bcba: cb.client.bcba ?? '',
+          insurance: cb.client.insurance ?? '',
           note: s.note,
         })
       }
     }
   }
 
-  // RBT borough roster
-  const roster = wb.addWorksheet('RBT boroughs', {
+  // Client borough roster
+  const roster = wb.addWorksheet('Client boroughs', {
     views: [{ state: 'frozen', ySplit: 1 }],
   })
   roster.columns = [
-    { header: 'RBT', key: 'name', width: 24 },
-    { header: 'Role', key: 'role', width: 10 },
+    { header: 'Client', key: 'name', width: 28 },
+    { header: 'Code', key: 'code', width: 12 },
     { header: 'Borough', key: 'borough', width: 16 },
     { header: 'Status', key: 'status', width: 14 },
-    { header: 'Email', key: 'email', width: 28 },
+    { header: 'BCBA', key: 'bcba', width: 16 },
     { header: 'Scheduled hrs', key: 'hours', width: 12 },
   ]
   roster.getRow(1).eachCell((cell) => {
@@ -398,21 +424,21 @@ export async function buildScheduleWorkbook(
     cell.font = HEADER_FONT
   })
 
-  const hoursByTherapist = new Map<string, number>()
+  const hoursByClient = new Map<string, number>()
   for (const s of slots) {
     if (s.status === 'CANCELLED') continue
-    hoursByTherapist.set(s.therapistId, (hoursByTherapist.get(s.therapistId) ?? 0) + hoursOf(s))
+    hoursByClient.set(s.clientId, (hoursByClient.get(s.clientId) ?? 0) + hoursOf(s))
   }
 
-  for (const t of [...therapists].filter((x) => x.active).sort((a, b) => a.name.localeCompare(b.name))) {
-    const borough = normalizeBorough(t.borough)
+  for (const c of [...clients].filter((x) => x.active).sort((a, b) => a.name.localeCompare(b.name))) {
+    const borough = normalizeBorough(c.borough)
     const row = roster.addRow({
-      name: t.name,
-      role: t.role,
-      borough: t.borough?.trim() || '',
+      name: c.name,
+      code: c.code ?? '',
+      borough: c.borough?.trim() || '',
       status: borough === 'Unassigned' ? 'NEEDS BOROUGH' : 'OK',
-      email: t.email ?? '',
-      hours: Number((hoursByTherapist.get(t.id) ?? 0).toFixed(2)),
+      bcba: c.bcba ?? '',
+      hours: Number((hoursByClient.get(c.id) ?? 0).toFixed(2)),
     })
     if (borough === 'Unassigned') {
       row.getCell(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: WARN_FILL } }
@@ -427,9 +453,14 @@ export async function downloadScheduleExport(
   slots: ScheduleSlot[],
   therapists: ScheduleTherapist[],
   clients: ScheduleClient[],
-  filename = `schedule-by-rbt-borough-${new Date().toISOString().slice(0, 10)}.xlsx`
-): Promise<{ unassignedRbts: number; totalRbtsWithSessions: number }> {
-  const counts = countUnassignedBoroughRbts(slots, therapists)
+  filename = `schedule-by-client-borough-${new Date().toISOString().slice(0, 10)}.xlsx`
+): Promise<{
+  unassignedRbts: number
+  totalRbtsWithSessions: number
+  unassignedClients: number
+  totalClientsWithSessions: number
+}> {
+  const clientCounts = countUnassignedBoroughClients(slots, clients)
   const buf = await buildScheduleWorkbook(slots, therapists, clients)
   const blob = new Blob([buf as unknown as ArrayBuffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -440,5 +471,10 @@ export async function downloadScheduleExport(
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
-  return counts
+  return {
+    unassignedRbts: clientCounts.unassignedClients,
+    totalRbtsWithSessions: clientCounts.totalClientsWithSessions,
+    unassignedClients: clientCounts.unassignedClients,
+    totalClientsWithSessions: clientCounts.totalClientsWithSessions,
+  }
 }

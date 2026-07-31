@@ -149,8 +149,8 @@ export default function ManageDialog({
 
           <TabsContent value="therapists" className="space-y-3 mt-3">
             <p className="text-xs text-gray-500">
-              Export groups by RBT borough. Boroughs auto-fill from RBT profile city/zip when
-              possible — override anytime below.
+              Export groups by client borough. Set each client&apos;s borough below (or during
+              Artemis import) — remembered for future exports.
             </p>
             <div className="grid grid-cols-2 gap-2">
               <Input
@@ -212,7 +212,7 @@ export default function ManageDialog({
 
           <TabsContent value="clients" className="space-y-3 mt-3">
             <p className="text-xs text-gray-500">
-              Optional — client borough for hours tracking (export groups by RBT borough).
+              Set each client&apos;s borough so Export groups by borough → client.
             </p>
             <div className="grid grid-cols-2 gap-2">
               <Input
