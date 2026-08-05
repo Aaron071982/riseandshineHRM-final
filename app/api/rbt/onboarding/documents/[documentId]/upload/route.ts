@@ -4,6 +4,11 @@ import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
 import { syncTierMilestones, canUnlockStep, completedStepNumbers } from '@/lib/onboarding/progress'
+import {
+  ONBOARDING_UPLOAD_SLUG_TO_DOC_TYPE,
+  mimeTypeFromFileName,
+  replaceRbtDocumentOfType,
+} from '@/lib/rbtDocumentsSync'
 import type { FolderType } from '@prisma/client'
 
 const SLUG_FOLDER: Record<string, FolderType> = {
@@ -110,6 +115,22 @@ export async function POST(
         },
       }),
     ])
+
+    // Mirror into rbt_documents so admin Documents + RBT Document Center show the file
+    const docType = ONBOARDING_UPLOAD_SLUG_TO_DOC_TYPE[document.slug]
+    if (docType) {
+      try {
+        await replaceRbtDocumentOfType(prisma, {
+          rbtProfileId: user.rbtProfileId,
+          documentType: docType,
+          fileName: file.name || document.slug,
+          fileType: file.type || mimeTypeFromFileName(file.name || path),
+          fileBase64: buffer.toString('base64'),
+        })
+      } catch (e) {
+        console.error('[onboarding document upload] Failed to sync to rbt_documents:', e)
+      }
+    }
 
     await syncTierMilestones(user.rbtProfileId)
     return NextResponse.json({ success: true, path })

@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ADMIN_RBT_DOCUMENT_TYPES, formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
+import { isOnboardingUploadSlug } from '@/lib/rbtDocumentsSync'
 import { formatUserAgentShort } from '@/lib/user-agent-short'
 import { LEGAL_BASIS } from '@/lib/signature-certificate'
 import { getAcknowledgmentAdminSummary } from '@/lib/acknowledgment-admin-summary'
@@ -33,6 +34,17 @@ import {
 } from '@/lib/acknowledgment-audit-display'
 import AcknowledgmentAuditPanel from '@/components/admin/AcknowledgmentAuditPanel'
 import type { RBTProfileDocument, RBTProfileOnboardingCompletion } from './types'
+
+function completionDownloadFileName(c: RBTProfileOnboardingCompletion): string {
+  const safeTitle = c.document.title.replace(/\W+/g, '_') || 'document'
+  const path = c.signedPdfUrl?.trim()
+  if (path) {
+    const base = path.split('/').pop() || ''
+    const ext = base.includes('.') ? base.slice(base.lastIndexOf('.')) : ''
+    if (ext) return `${safeTitle}${ext}`
+  }
+  return `${safeTitle}.pdf`
+}
 
 const dancingScript = Dancing_Script({ weight: '400', subsets: ['latin'] })
 
@@ -73,14 +85,19 @@ export default function RBTProfileDocuments({
     if (files.length === 0) return
     onFilesSelected(files, uploadDocType)
   }
-  const completedWithPdf = onboardingCompletions.filter(
+  const completedWithPdf = onboardingCompletions.filter((c) => {
+    if (c.status !== 'COMPLETED') return false
+    const hasFile = Boolean(c.signedPdfUrl?.trim()) || Boolean(c.hasSignedPdfData)
+    if (!hasFile) return false
+    // Fillable PDFs + catalog UPLOAD steps (SSC, CPR, certificates)
+    return c.document.type === 'FILLABLE_PDF' || isOnboardingUploadSlug(c.document.slug)
+  })
+  const completedAcknowledgments = onboardingCompletions.filter(
     (c) =>
       c.status === 'COMPLETED' &&
-      c.document.type === 'FILLABLE_PDF' &&
-      (Boolean(c.signedPdfUrl?.trim()) || Boolean(c.hasSignedPdfData))
-  )
-  const completedAcknowledgments = onboardingCompletions.filter(
-    (c) => c.status === 'COMPLETED' && c.document.type === 'ACKNOWLEDGMENT'
+      c.document.type === 'ACKNOWLEDGMENT' &&
+      // UPLOAD steps are file uploads, not e-sign acknowledgments
+      !isOnboardingUploadSlug(c.document.slug)
   )
 
   const [certModalOpen, setCertModalOpen] = useState(false)
@@ -458,7 +475,7 @@ export default function RBTProfileDocuments({
                   >
                     <a
                       href={`/api/admin/rbts/${rbtProfileId}/documents/completion/${c.id}/download`}
-                      download={`${c.document.title.replace(/\W+/g, '_')}.pdf`}
+                      download={completionDownloadFileName(c)}
                     >
                       <Download className="w-4 h-4 mr-1" />
                       Download

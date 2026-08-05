@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
+import { mimeTypeFromFileName } from '@/lib/rbtDocumentsSync'
 
 export async function GET(
   _request: Request,
@@ -21,23 +22,26 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    const fileName = `${completion.document.title.replace(/\W+/g, '_')}.pdf`
+    const safeTitle = completion.document.title.replace(/\W+/g, '_') || 'document'
 
     if (completion.signedPdfUrl?.trim()) {
       if (!supabaseAdmin) {
         return NextResponse.json({ error: 'Storage not configured' }, { status: 500 })
       }
+      const storagePath = completion.signedPdfUrl.trim()
       const bucket = completion.storageBucket?.trim() || STORAGE_BUCKET
-      const { data, error } = await supabaseAdmin.storage
-        .from(bucket)
-        .download(completion.signedPdfUrl.trim())
+      const { data, error } = await supabaseAdmin.storage.from(bucket).download(storagePath)
       if (error || !data) {
         return NextResponse.json({ error: 'Failed to download file' }, { status: 500 })
       }
       const buf = Buffer.from(await data.arrayBuffer())
+      const pathBase = storagePath.split('/').pop() || `${safeTitle}.bin`
+      const ext = pathBase.includes('.') ? pathBase.slice(pathBase.lastIndexOf('.')) : ''
+      const fileName = ext ? `${safeTitle}${ext}` : pathBase
+      const contentType = mimeTypeFromFileName(fileName)
       return new NextResponse(new Uint8Array(buf), {
         headers: {
-          'Content-Type': 'application/pdf',
+          'Content-Type': contentType,
           'Content-Disposition': `attachment; filename="${fileName}"`,
           'Content-Length': buf.length.toString(),
         },
@@ -51,6 +55,7 @@ export async function GET(
         if (buf.length === 0) {
           return NextResponse.json({ error: 'Empty PDF data' }, { status: 404 })
         }
+        const fileName = `${safeTitle}.pdf`
         return new NextResponse(new Uint8Array(buf), {
           headers: {
             'Content-Type': 'application/pdf',

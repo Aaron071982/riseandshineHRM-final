@@ -17,6 +17,7 @@
     "db:studio": "prisma studio",
     "db:clear-rbts": "tsx scripts/clear-rbts.ts",
     "db:backfill-onboarding": "tsx scripts/backfill-onboarding-tasks.ts",
+    "db:backfill-upload-docs": "tsx scripts/backfill-onboarding-upload-documents.ts",
     "fix:hired-rbts": "tsx scripts/fix-hired-rbts.ts",
     "db:add-admin": "tsx scripts/add-admin.ts",
     "db:add-billing-user": "tsx scripts/add-billing-user.ts",
