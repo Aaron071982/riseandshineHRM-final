@@ -117,6 +117,10 @@ export default function ApplicationStepReview({ data, consent, onConsentChange }
             <p>
               <strong>Government ID:</strong> {data.idDocument ? data.idDocument.name : 'Not uploaded'}
             </p>
+            <p>
+              <strong>High school diploma / GED:</strong>{' '}
+              {data.diplomaGed ? data.diplomaGed.name : 'Not uploaded'}
+            </p>
             {data.rbtCertificate && (
               <p>
                 <strong>RBT Certificate:</strong> {data.rbtCertificate.name}

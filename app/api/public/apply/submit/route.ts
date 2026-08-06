@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
       'canPassBackgroundCheck',
       'resumeUrl',
       'idDocumentUrl',
+      'diplomaGedUrl',
     ]
 
     for (const field of requiredFields) {
@@ -283,6 +284,18 @@ export async function POST(request: NextRequest) {
             fileData: '',
             filePath: body.idDocumentUrl,
             documentType: 'GOVERNMENT_ID',
+          },
+        })
+      }
+      if (body.diplomaGedUrl) {
+        await tx.rBTDocument.create({
+          data: {
+            rbtProfileId: profile.id,
+            fileName: body.diplomaGedFileName || 'high-school-diploma-or-ged',
+            fileType: body.diplomaGedMimeType || 'application/pdf',
+            fileData: '',
+            filePath: body.diplomaGedUrl,
+            documentType: 'HIGH_SCHOOL_DIPLOMA_OR_GED',
           },
         })
       }

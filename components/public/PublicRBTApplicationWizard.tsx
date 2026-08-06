@@ -19,9 +19,19 @@ import {
   ApplicationStepReview,
 } from './application-wizard'
 import type { ApplicationData } from './application-wizard'
+import type { ApplicationFileField } from './application-wizard/types'
 import { effectiveFileMime } from '@/lib/public-application-file'
 
 const STEPS = ['Personal Info', 'RBT Readiness', 'Availability', 'Compliance', 'Resume', 'Review']
+const IMAGE_OR_PDF_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/heic',
+  'image/heif',
+  'image/webp',
+]
 
 export default function PublicRBTApplicationWizard() {
   const router = useRouter()
@@ -64,6 +74,8 @@ export default function PublicRBTApplicationWizard() {
     resumeUrl: null,
     idDocument: null,
     idDocumentUrl: null,
+    diplomaGed: null,
+    diplomaGedUrl: null,
     rbtCertificate: null,
     cprCard: null,
   })
@@ -155,10 +167,16 @@ export default function PublicRBTApplicationWizard() {
           setError('Please upload your government-issued ID')
           return false
         }
+        if (!data.diplomaGed) {
+          setError('Please upload your high school diploma or GED')
+          return false
+        }
         return true
       case 6:
-        if (!data.resumeUrl?.trim() || !data.idDocumentUrl?.trim()) {
-          setError('Your resume and ID must finish uploading. Go back to the Resume step and click Next again.')
+        if (!data.resumeUrl?.trim() || !data.idDocumentUrl?.trim() || !data.diplomaGedUrl?.trim()) {
+          setError(
+            'Your resume, ID, and diploma/GED must finish uploading. Go back to the Resume step and click Next again.'
+          )
           return false
         }
         if (!consent) {
@@ -178,7 +196,7 @@ export default function PublicRBTApplicationWizard() {
       setStep5Uploading(true)
       setError('')
       try {
-        const updated = await uploadResumeAndIdIfNeeded(data)
+        const updated = await uploadRequiredDocumentsIfNeeded(data)
         setData(updated)
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : 'Upload failed. Please try again.')
@@ -201,29 +219,38 @@ export default function PublicRBTApplicationWizard() {
     }
   }
 
-  const handleFileChange = (field: 'resume' | 'idDocument' | 'rbtCertificate' | 'cprCard', file: File | null) => {
+  const handleFileChange = (field: ApplicationFileField, file: File | null) => {
     const maxSize = 10 * 1024 * 1024 // 10MB
     if (field === 'resume' && file) {
       if (file.size > maxSize) {
         setError(`Resume file size exceeds 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)} MB.`)
         return
       }
-      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+      const allowedTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ]
       const mime = effectiveFileMime(file)
       if (!allowedTypes.includes(mime)) {
         setError('Resume must be a PDF, DOC, or DOCX file')
         return
       }
     }
-    if (field === 'idDocument' && file) {
+    if ((field === 'idDocument' || field === 'diplomaGed') && file) {
       if (file.size > maxSize) {
-        setError(`ID file size exceeds 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)} MB.`)
+        setError(
+          `${field === 'idDocument' ? 'ID' : 'Diploma/GED'} file size exceeds 10MB. Your file is ${(file.size / 1024 / 1024).toFixed(2)} MB.`
+        )
         return
       }
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif', 'image/webp']
       const mime = effectiveFileMime(file)
-      if (!allowedTypes.includes(mime)) {
-        setError('ID must be a PDF, JPG, PNG, HEIC, or WEBP file')
+      if (!IMAGE_OR_PDF_TYPES.includes(mime)) {
+        setError(
+          field === 'idDocument'
+            ? 'ID must be a PDF, JPG, PNG, HEIC, or WEBP file'
+            : 'Diploma/GED must be a PDF, JPG, PNG, HEIC, or WEBP file'
+        )
         return
       }
     }
@@ -233,15 +260,16 @@ export default function PublicRBTApplicationWizard() {
       [field]: file,
       ...(field === 'resume' ? { resumeUrl: null } : {}),
       ...(field === 'idDocument' ? { idDocumentUrl: null } : {}),
+      ...(field === 'diplomaGed' ? { diplomaGedUrl: null } : {}),
     }))
     setError('')
   }
 
-  /** Upload resume + ID to storage so step 6 only submits JSON (mobile Safari can fail on large JSON + File). */
-  const uploadResumeAndIdIfNeeded = useCallback(
+  /** Upload resume + ID + diploma/GED so step 6 only submits JSON (mobile Safari can fail on large JSON + File). */
+  const uploadRequiredDocumentsIfNeeded = useCallback(
     async (d: ApplicationData): Promise<ApplicationData> => {
-      if (!d.resume || !d.idDocument) {
-        throw new Error('Please upload your resume and government-issued ID')
+      if (!d.resume || !d.idDocument || !d.diplomaGed) {
+        throw new Error('Please upload your resume, government-issued ID, and high school diploma or GED')
       }
       let resumeUrl = d.resumeUrl
       if (!resumeUrl) {
@@ -271,10 +299,25 @@ export default function PublicRBTApplicationWizard() {
         const idJson = await idRes.json()
         idDocumentUrl = idJson.url
       }
+      let diplomaGedUrl = d.diplomaGedUrl
+      if (!diplomaGedUrl) {
+        const diplomaForm = new FormData()
+        diplomaForm.append('file', d.diplomaGed)
+        diplomaForm.append('documentType', 'HIGH_SCHOOL_DIPLOMA_OR_GED')
+        if (draftToken) diplomaForm.append('token', draftToken)
+        const diplomaRes = await fetch('/api/public/apply/upload', { method: 'POST', body: diplomaForm })
+        if (!diplomaRes.ok) {
+          const err = await diplomaRes.json().catch(() => ({}))
+          throw new Error(err.error || `Failed to upload diploma/GED (${diplomaRes.status})`)
+        }
+        const diplomaJson = await diplomaRes.json()
+        diplomaGedUrl = diplomaJson.url
+      }
       return {
         ...d,
         resumeUrl,
         idDocumentUrl,
+        diplomaGedUrl,
       }
     },
     [draftToken]
@@ -288,18 +331,19 @@ export default function PublicRBTApplicationWizard() {
 
     try {
       let working = data
-      if (!data.resumeUrl?.trim() || !data.idDocumentUrl?.trim()) {
-        if (!data.resume || !data.idDocument) {
-          setError('Please upload your resume and government-issued ID')
+      if (!data.resumeUrl?.trim() || !data.idDocumentUrl?.trim() || !data.diplomaGedUrl?.trim()) {
+        if (!data.resume || !data.idDocument || !data.diplomaGed) {
+          setError('Please upload your resume, government-issued ID, and high school diploma or GED')
           setSubmitting(false)
           return
         }
-        working = await uploadResumeAndIdIfNeeded(data)
+        working = await uploadRequiredDocumentsIfNeeded(data)
         setData(working)
       }
 
       const resumeUrl = working.resumeUrl!.trim()
       const idDocumentUrl = working.idDocumentUrl!.trim()
+      const diplomaGedUrl = working.diplomaGedUrl!.trim()
 
       let rbtCertificateUrl: string | null = null
       let rbtCertificateFileName: string | null = null
@@ -335,7 +379,14 @@ export default function PublicRBTApplicationWizard() {
         }
       }
 
-      const { resume, idDocument, rbtCertificate: _cert, cprCard: _cpr, ...serializable } = working
+      const {
+        resume,
+        idDocument,
+        diplomaGed,
+        rbtCertificate: _cert,
+        cprCard: _cpr,
+        ...serializable
+      } = working
 
       const submitResponse = await fetch('/api/public/apply/submit', {
         method: 'POST',
@@ -344,11 +395,14 @@ export default function PublicRBTApplicationWizard() {
           ...serializable,
           resumeUrl,
           idDocumentUrl,
+          diplomaGedUrl,
           resumeFileName: resume?.name || null,
           resumeMimeType: resume ? effectiveFileMime(resume) : null,
           resumeSize: resume?.size ?? null,
           idDocumentFileName: idDocument?.name || null,
           idDocumentMimeType: idDocument ? effectiveFileMime(idDocument) : null,
+          diplomaGedFileName: diplomaGed?.name || null,
+          diplomaGedMimeType: diplomaGed ? effectiveFileMime(diplomaGed) : null,
           experienceYearsDisplay: working.experienceYears,
           preferredAgeGroups: working.preferredAgeGroups,
           authorizedToWork: working.authorizedToWork,
@@ -410,7 +464,7 @@ export default function PublicRBTApplicationWizard() {
   }
 
   const tips = [
-    'Have your resume ready (PDF, DOC, or DOCX format)',
+    'Have your resume, government ID, and high school diploma or GED ready',
     'Most sessions occur after 2PM on weekdays and on weekends',
     'Weekend availability is highly valued',
     'If you don&apos;t have RBT certification, we can help you obtain it',

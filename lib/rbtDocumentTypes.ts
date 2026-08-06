@@ -8,6 +8,7 @@ export const ADMIN_RBT_DOCUMENT_TYPES: ReadonlyArray<{ value: string; label: str
   { value: 'CPR_CARD', label: 'CPR / First aid card' },
   { value: 'MANDATED_REPORTER_CERTIFICATE', label: 'Mandated reporter certificate' },
   { value: 'GOVERNMENT_ID', label: 'Government ID' },
+  { value: 'HIGH_SCHOOL_DIPLOMA_OR_GED', label: 'High school diploma / GED' },
   { value: 'CONTRACT', label: 'Contract / offer' },
   { value: 'W4', label: 'W-4 / tax form' },
 ]

@@ -31,7 +31,11 @@ export interface ApplicationData {
   resumeUrl: string | null
   idDocument: File | null
   idDocumentUrl: string | null
+  diplomaGed: File | null
+  diplomaGedUrl: string | null
   rbtCertificate: File | null
   cprCard: File | null
   website?: string
 }
+
+export type ApplicationFileField = 'resume' | 'idDocument' | 'diplomaGed' | 'rbtCertificate' | 'cprCard'

@@ -30,9 +30,9 @@ function checkRateLimit(key: string, maxRequests: number, windowMs: number): boo
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting: generous limit for resume + ID + optional docs + retries
+    // Rate limiting: generous limit for resume + ID + diploma + optional docs + retries
     const rateLimitKey = getRateLimitKey(request)
-    // Allow resume + ID + optional docs + retries in one session (mobile users retry often)
+    // Allow resume + ID + diploma/GED + optional docs + retries in one session (mobile users retry often)
     if (!checkRateLimit(rateLimitKey, 25, 60 * 1000)) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
@@ -70,13 +70,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate file type: resume = PDF/DOC/DOCX; RBT_CERTIFICATE/CPR_CARD = PDF or images
+    // Validate file type: resume = PDF/DOC/DOCX; ID / diploma / certs = PDF or images
     const resumeTypes = [
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ]
-    const optionalDocTypes = [
+    const imageOrPdfTypes = [
       'application/pdf',
       'image/jpeg',
       'image/jpg',
@@ -85,10 +85,12 @@ export async function POST(request: NextRequest) {
       'image/heif',
       'image/webp',
     ]
-    const allowedTypes =
-      documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD' || documentType === 'GOVERNMENT_ID'
-        ? optionalDocTypes
-        : resumeTypes
+    const isImageOrPdfDoc =
+      documentType === 'RBT_CERTIFICATE' ||
+      documentType === 'CPR_CARD' ||
+      documentType === 'GOVERNMENT_ID' ||
+      documentType === 'HIGH_SCHOOL_DIPLOMA_OR_GED'
+    const allowedTypes = isImageOrPdfDoc ? imageOrPdfTypes : resumeTypes
     const mime = effectiveFileMime(file)
     if (!mime || !allowedTypes.includes(mime)) {
       return NextResponse.json(
@@ -96,9 +98,11 @@ export async function POST(request: NextRequest) {
           error:
             documentType === 'GOVERNMENT_ID'
               ? 'Invalid file type. Please upload a PDF, JPG, PNG, HEIC, or WEBP file for your ID.'
-              : documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD'
-                ? 'Invalid file type. Please upload a PDF, JPG, PNG, HEIC, or WEBP file.'
-                : 'Invalid file type. Please upload a PDF, DOC, or DOCX file.',
+              : documentType === 'HIGH_SCHOOL_DIPLOMA_OR_GED'
+                ? 'Invalid file type. Please upload a PDF, JPG, PNG, HEIC, or WEBP file for your diploma or GED.'
+                : documentType === 'RBT_CERTIFICATE' || documentType === 'CPR_CARD'
+                  ? 'Invalid file type. Please upload a PDF, JPG, PNG, HEIC, or WEBP file.'
+                  : 'Invalid file type. Please upload a PDF, DOC, or DOCX file.',
         },
         { status: 400 }
       )
