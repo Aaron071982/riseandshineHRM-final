@@ -1750,6 +1750,74 @@ export function generateOnboardingDocumentsNotifyEmail(
   return { subject, html }
 }
 
+/** Sent when HR distributes a company-wide document to active RBTs. */
+export function generateCompanyDocumentNotifyEmail(params: {
+  firstName: string
+  title: string
+  actionCopy: string
+  portalUrl: string
+  isTest?: boolean
+}): { subject: string; html: string } {
+  const firstName = params.firstName.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const title = params.title.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const actionCopy = params.actionCopy.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const subject = params.isTest
+    ? `[TEST] Action required: ${params.title} — Rise & Shine ABA`
+    : `Action required: ${params.title} — Rise & Shine ABA`
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0; }
+        .header { background: linear-gradient(135deg, #E4893D 0%, #FF9F5A 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 26px; font-weight: bold; }
+        .header p { margin: 10px 0 0 0; font-size: 16px; opacity: 0.95; }
+        .content { padding: 30px 20px; background-color: #ffffff; }
+        .content p { margin: 16px 0; }
+        .highlight { background-color: #fff5f0; border-left: 4px solid #E4893D; padding: 16px 20px; margin: 20px 0; border-radius: 4px; }
+        .cta-button { display: inline-block; padding: 14px 28px; background: #E4893D; color: white !important; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0; }
+        .footer { padding: 24px 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Rise &amp; Shine ABA</h1>
+          <p>New document for your file</p>
+        </div>
+        <div class="content">
+          <p>Hi <strong>${firstName}</strong>,</p>
+          <p>We have a new document for you in the HRM portal that needs your attention:</p>
+          <div class="highlight">
+            <p style="margin: 0;"><strong>${title}</strong></p>
+          </div>
+          <p>${actionCopy}</p>
+          ${
+            params.isTest
+              ? '<p style="font-size: 13px; color: #666;">This is a <strong>TEST</strong> distribution — only the designated test account receives it.</p>'
+              : ''
+          }
+          <p style="text-align: center;">
+            <a href="${params.portalUrl}" class="cta-button">Open Documents</a>
+          </p>
+          <p style="font-size: 14px; color: #666;">Or visit: <a href="${params.portalUrl}" style="color: #E4893D;">${params.portalUrl}</a></p>
+          <p>If you have any questions, contact <a href="mailto:info@riseandshine.nyc" style="color: #E4893D;">info@riseandshine.nyc</a>.</p>
+          <p style="margin-top: 32px;">Thank you,<br><strong>Rise &amp; Shine ABA HR Team</strong></p>
+        </div>
+        <div class="footer">
+          <p><strong>Rise &amp; Shine ABA</strong> — HRM Portal</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+  return { subject, html }
+}
+
 export function generateNewMessageFromAdminEmail(firstName: string, portalUrl: string): { subject: string; html: string } {
   const subject = 'You have a new message from Rise and Shine'
   const html = `

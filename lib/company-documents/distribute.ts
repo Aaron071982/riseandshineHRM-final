@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { sendGenericEmail } from '@/lib/email'
+import { sendGenericEmail, generateCompanyDocumentNotifyEmail } from '@/lib/email'
 import {
   COMPANY_DOC_TEST_EMAIL,
   isCompanyDocTestEmail,
@@ -89,19 +89,13 @@ export function buildCompanyDocEmail(opts: {
 }): { subject: string; html: string } {
   const base = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'https://www.riseandshinehrm.com'
   const link = `${base}/rbt/documents`
-  const subject = opts.isTest
-    ? `[TEST] New document from Rise & Shine: ${opts.title}`
-    : `📄 New document from Rise & Shine: ${opts.title}`
-  const html = `
-  <div style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111">
-    <p>Hi ${opts.firstName},</p>
-    <p><strong>New document from Rise &amp; Shine: ${opts.title}</strong> — please review in your portal.</p>
-    <p>${actionCopy(opts.documentType)}</p>
-    ${opts.isTest ? '<p style="color:#6b7280;font-size:13px">This is a TEST distribution — only the designated test account receives it.</p>' : ''}
-    <p><a href="${link}" style="display:inline-block;background:#e36f1e;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600">Open Documents</a></p>
-    <p style="color:#6b7280;font-size:13px">Or visit: ${link}</p>
-  </div>`
-  return { subject, html }
+  return generateCompanyDocumentNotifyEmail({
+    firstName: opts.firstName,
+    title: opts.title,
+    actionCopy: actionCopy(opts.documentType),
+    portalUrl: link,
+    isTest: opts.isTest,
+  })
 }
 
 export async function emailCompanyDocRecipients(opts: {
