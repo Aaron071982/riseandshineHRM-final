@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/toast'
-import { FileText, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { Download, FileText, Loader2, Plus, RefreshCw } from 'lucide-react'
 
 type DocListItem = {
   id: string
@@ -42,6 +42,7 @@ type DetailRecipient = {
   viewedAt: string | null
   submittedAt: string | null
   emailSentAt: string | null
+  uploadedFileUrl: string | null
   rbt: { id: string; name: string; email: string | null }
 }
 
@@ -54,6 +55,7 @@ export default function AdminCompanyDocumentsPage() {
   const [saving, setSaving] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [detail, setDetail] = useState<{
+    id: string
     title: string
     isTest: boolean
     documentType: string
@@ -102,6 +104,7 @@ export default function AdminCompanyDocumentsPage() {
         return
       }
       setDetail({
+        id: data.document.id,
         title: data.document.title,
         isTest: data.document.isTest,
         documentType: data.document.documentType,
@@ -340,11 +343,36 @@ export default function AdminCompanyDocumentsPage() {
                     key={r.id}
                     className="flex items-center justify-between gap-2 border rounded-md px-3 py-2 text-sm"
                   >
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{r.rbt.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">
+                        <Link
+                          href={`/admin/rbts/${r.rbt.id}`}
+                          className="hover:text-orange-600 hover:underline"
+                        >
+                          {r.rbt.name}
+                        </Link>
+                      </p>
                       <p className="text-xs text-gray-500 truncate">{r.rbt.email ?? '—'}</p>
+                      {r.submittedAt && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Submitted {new Date(r.submittedAt).toLocaleString()}
+                        </p>
+                      )}
                     </div>
-                    <Badge variant="outline">{r.status}</Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(r.status === 'SUBMITTED' || r.uploadedFileUrl) && (
+                        <Button size="sm" variant="outline" asChild className="text-orange-600">
+                          <a
+                            href={`/api/admin/documents/company/${detail.id}/recipients/${r.id}/submission`}
+                            download
+                          >
+                            <Download className="w-3.5 h-3.5 mr-1" />
+                            Download
+                          </a>
+                        </Button>
+                      )}
+                      <Badge variant="outline">{r.status}</Badge>
+                    </div>
                   </div>
                 ))}
               </div>

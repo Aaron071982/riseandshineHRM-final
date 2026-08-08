@@ -3,6 +3,7 @@ import { requireRbtSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
 import { isCompanyDocTestEmail } from '@/lib/constants'
+import { upsertCompanyDocSubmissionOnProfile } from '@/lib/rbtDocumentsSync'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,6 +61,18 @@ export async function POST(
       viewedAt: row.viewedAt ?? now,
     },
   })
+
+  try {
+    await upsertCompanyDocSubmissionOnProfile(prisma, {
+      rbtProfileId,
+      companyDocumentTitle: row.companyDocument.title,
+      storagePath: path,
+      fileName: file.name || undefined,
+      fileType: file.type || undefined,
+    })
+  } catch (e) {
+    console.error('[company-doc upload] Failed to sync submission to rbt_documents:', e)
+  }
 
   return NextResponse.json({
     recipient: {

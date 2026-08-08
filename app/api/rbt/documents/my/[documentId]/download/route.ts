@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { supabaseAdmin, RESUMES_STORAGE_BUCKET } from '@/lib/supabase'
+import { supabaseAdmin, RESUMES_STORAGE_BUCKET, STORAGE_BUCKET } from '@/lib/supabase'
 
 export async function GET(
   _request: NextRequest,
@@ -29,8 +29,11 @@ export async function GET(
 
     let fileBuffer: Buffer
     if (document.filePath && supabaseAdmin) {
-      const bucket = RESUMES_STORAGE_BUCKET
-      const { data, error } = await supabaseAdmin.storage.from(bucket).download(document.filePath)
+      const path = document.filePath.trim()
+      const bucket = path.startsWith('company-documents/')
+        ? STORAGE_BUCKET
+        : RESUMES_STORAGE_BUCKET
+      const { data, error } = await supabaseAdmin.storage.from(bucket).download(path)
       if (error || !data) {
         console.error('Supabase download error:', error)
         return NextResponse.json(
@@ -52,9 +55,6 @@ export async function GET(
     })
   } catch (error) {
     console.error('[rbt/documents/my] download error:', error)
-    return NextResponse.json(
-      { error: 'Failed to download document' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to download document' }, { status: 500 })
   }
 }

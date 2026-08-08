@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/auth'
-import { supabaseAdmin, RESUMES_STORAGE_BUCKET } from '@/lib/supabase'
+import { supabaseAdmin, RESUMES_STORAGE_BUCKET, STORAGE_BUCKET } from '@/lib/supabase'
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string; documentId: string }> }
 ) {
   try {
     const auth = await requireAdminSession()
     if (auth.response) return auth.response
-    const user = auth.user
 
     const { documentId } = await params
 
@@ -19,17 +18,16 @@ export async function GET(
     })
 
     if (!document) {
-      return NextResponse.json(
-        { error: 'Document not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
 
     let fileBuffer: Buffer
     if (document.filePath && supabaseAdmin) {
-      const { data, error } = await supabaseAdmin.storage
-        .from(RESUMES_STORAGE_BUCKET)
-        .download(document.filePath)
+      const path = document.filePath.trim()
+      const bucket = path.startsWith('company-documents/')
+        ? STORAGE_BUCKET
+        : RESUMES_STORAGE_BUCKET
+      const { data, error } = await supabaseAdmin.storage.from(bucket).download(path)
       if (error || !data) {
         console.error('Supabase download error:', error)
         return NextResponse.json(
@@ -49,12 +47,8 @@ export async function GET(
         'Content-Length': fileBuffer.length.toString(),
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error downloading document:', error)
-    return NextResponse.json(
-      { error: 'Failed to download document' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to download document' }, { status: 500 })
   }
 }
-

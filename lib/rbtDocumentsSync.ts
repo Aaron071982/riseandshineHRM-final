@@ -65,3 +65,48 @@ export async function replaceRbtDocumentOfType(
     },
   })
 }
+
+export const COMPANY_DOC_SUBMISSION_TYPE = 'COMPANY_DOCUMENT_SUBMISSION'
+
+/**
+ * Mirror a company-document DOWNLOAD_UPLOAD submission onto the RBT Documents tab.
+ * One row per company document title (re-submit replaces the prior file for that title).
+ */
+export async function upsertCompanyDocSubmissionOnProfile(
+  prisma: PrismaClient,
+  input: {
+    rbtProfileId: string
+    companyDocumentTitle: string
+    storagePath: string
+    fileName?: string
+    fileType?: string
+  }
+) {
+  const pathBase = input.storagePath.split('/').pop() || 'submission.bin'
+  const ext = pathBase.includes('.') ? pathBase.slice(pathBase.lastIndexOf('.')) : ''
+  const safeTitle =
+    input.companyDocumentTitle.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_|_$/g, '') ||
+    'company_document'
+  // Stable name so re-submits replace the prior profile copy for this company doc title
+  const fileName = `${safeTitle}_submitted${ext || ''}`
+  const fileType = input.fileType || mimeTypeFromFileName(input.fileName || fileName)
+
+  await prisma.rBTDocument.deleteMany({
+    where: {
+      rbtProfileId: input.rbtProfileId,
+      documentType: COMPANY_DOC_SUBMISSION_TYPE,
+      fileName,
+    },
+  })
+
+  return prisma.rBTDocument.create({
+    data: {
+      rbtProfileId: input.rbtProfileId,
+      fileName,
+      fileType,
+      fileData: '',
+      filePath: input.storagePath,
+      documentType: COMPANY_DOC_SUBMISSION_TYPE,
+    },
+  })
+}
