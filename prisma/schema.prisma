@@ -412,6 +412,14 @@ model User {
   artemisSessionRequestsResolved ArtemisSessionRequest[] @relation("ArtemisSessionRequestResolvedBy")
   terminationsDecided          Termination[]             @relation("TerminationDecisionMaker")
   rbtScheduleAssignmentsCreated RbtScheduleAssignment[]  @relation("RbtScheduleAssignmentCreatedBy")
+  serviceClientsCreated        ServiceClient[]           @relation("ServiceClientCreatedBy")
+  serviceClientDocsCollected   ServiceClientDocument[]   @relation("ServiceClientDocCollectedBy")
+  serviceClientNotesAuthored   ServiceClientNote[]       @relation("ServiceClientNoteAuthor")
+  clientAccessLogs             ClientAccessLog[]
+  clientServicesSessions       ClientServicesSession[]
+  clientServiceBreaksCreated   ClientServiceBreak[]      @relation("ClientServiceBreakCreatedBy")
+  clientRbtBreaksCreated       ClientRbtBreak[]          @relation("ClientRbtBreakCreatedBy")
+  serviceClientStatusChanges   ServiceClientStatusHistory[] @relation("ServiceClientStatusChangedBy")
   scheduleImportBatches         ScheduleImportBatch[]    @relation("ScheduleImportBatchImportedBy")
   clientBoroughsUpdated         ClientBorough[]          @relation("ClientBoroughUpdatedBy")
   payrollRunsUploaded           PayrollRun[]             @relation("PayrollRunUploadedBy")
@@ -1414,6 +1422,10 @@ model RbtScheduleAssignment {
   importBatchId  String?
   periodStart    DateTime?                @db.Date
   periodEnd      DateTime?                @db.Date
+  /// Optional link to Client Services PHI record (name-matched or manual)
+  serviceClientId String?
+  /// When true, auto-resolve on import will not change serviceClientId
+  serviceClientLinkManual Boolean         @default(false)
   createdBy      String
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
@@ -1421,6 +1433,7 @@ model RbtScheduleAssignment {
   rbtProfile    RBTProfile          @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
   createdByUser User                @relation("RbtScheduleAssignmentCreatedBy", fields: [createdBy], references: [id])
   importBatch   ScheduleImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  serviceClient ServiceClient?       @relation(fields: [serviceClientId], references: [id], onDelete: SetNull)
 
   @@index([rbtProfileId, isActive])
   @@index([rbtProfileId, dayOfWeek])
@@ -1428,6 +1441,7 @@ model RbtScheduleAssignment {
   @@index([periodStart, periodEnd])
   @@index([clientBorough])
   @@index([source])
+  @@index([serviceClientId])
   @@map("rbt_schedule_assignments")
 }
 
@@ -2414,19 +2428,22 @@ model CompanyDocument {
 }
 
 model CompanyDocumentRecipient {
-  id                String                         @id @default(cuid())
-  companyDocumentId String
-  rbtProfileId      String
-  status            CompanyDocumentRecipientStatus @default(PENDING)
-  signedName        String?
-  signedAt          DateTime?
-  signatureIp       String?
-  uploadedFileUrl   String?
-  viewedAt          DateTime?
-  submittedAt       DateTime?
-  emailSentAt       DateTime?
-  createdAt         DateTime                       @default(now())
-  updatedAt         DateTime                       @updatedAt
+  id                   String                         @id @default(cuid())
+  companyDocumentId    String
+  rbtProfileId         String
+  status               CompanyDocumentRecipientStatus @default(PENDING)
+  signedName           String?
+  signedAt             DateTime?
+  signatureIp          String?
+  uploadedFileUrl      String?
+  viewedAt             DateTime?
+  submittedAt          DateTime?
+  emailSentAt          DateTime?
+  /// SHA-256 hex of the magic-link token emailed for VIEW_ONLY / ACKNOWLEDGMENT
+  accessTokenHash      String?
+  accessTokenExpiresAt DateTime?
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
 
   companyDocument CompanyDocument @relation(fields: [companyDocumentId], references: [id], onDelete: Cascade)
   rbtProfile      RBTProfile      @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
@@ -2434,7 +2451,235 @@ model CompanyDocumentRecipient {
   @@unique([companyDocumentId, rbtProfileId])
   @@index([rbtProfileId, status])
   @@index([companyDocumentId, status])
+  @@unique([accessTokenHash])
   @@map("company_document_recipients")
+}
+
+// ─── Client Services Portal (PHI) ────────────────────────────────────────────
+
+enum ServiceClientStatus {
+  NEW
+  ACTIVE
+  ON_HOLD
+  DISCHARGED
+}
+
+enum ServiceBtAssignmentStatus {
+  ACTIVE
+  ENDED
+}
+
+enum ServiceClientDocumentType {
+  INSURANCE_CARD
+  MEDICAID_CARD
+  DIAGNOSTIC_EVAL
+  PHYSICIAN_REFERRAL
+  IEP_IFSP
+  CUSTODY_GUARDIAN
+  PRIOR_ABA_RECORDS
+  CONSENT_FORM
+  MEET_AND_GREET_FORM
+}
+
+model ServiceClient {
+  id                   String              @id @default(cuid())
+  clientCode           String              @unique
+  firstName            String
+  lastName             String
+  status               ServiceClientStatus @default(NEW)
+  dateOfBirth          DateTime?           @db.Date
+  addressLine          String?
+  city                 String?
+  borough              String?
+  state                String?
+  zip                  String?
+  insuranceProvider    String?
+  insuranceId          String?
+  diagnosis            String?
+  parentName           String?
+  parentPhone          String?
+  parentEmail          String?
+  parentRelationship   String?
+  bcbaName             String?
+  caseCoordinatorName  String?
+  serviceStartDate     DateTime?           @db.Date
+  serviceEndDate       DateTime?           @db.Date
+  authLengthMonths     Int?
+  authHours            Float?
+  currentHoursPerWeek  Float?
+  notes                String?             @db.Text
+  createdBy            String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  createdByUser User?                        @relation("ServiceClientCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  btAssignments ServiceClientBtAssignment[]
+  documents     ServiceClientDocument[]
+  clientNotes   ServiceClientNote[]
+  accessLogs    ClientAccessLog[]
+  scheduleAssignments RbtScheduleAssignment[]
+  serviceBreaks ClientServiceBreak[]
+  rbtBreaks     ClientRbtBreak[]
+  statusHistory ServiceClientStatusHistory[]
+
+  @@index([status])
+  @@index([borough])
+  @@index([bcbaName])
+  @@index([caseCoordinatorName])
+  @@index([lastName, firstName])
+  @@map("service_clients")
+}
+
+model ServiceClientBtAssignment {
+  id              String                    @id @default(cuid())
+  serviceClientId String
+  btName          String
+  isPrimary       Boolean                   @default(false)
+  status          ServiceBtAssignmentStatus @default(ACTIVE)
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+
+  @@index([serviceClientId, status])
+  @@map("service_client_bt_assignments")
+}
+
+model ServiceClientDocument {
+  id              String                    @id @default(cuid())
+  serviceClientId String
+  documentType    ServiceClientDocumentType
+  collected       Boolean                   @default(false)
+  collectedAt     DateTime?
+  collectedBy     String?
+  fileUrl         String?
+  notes           String?                   @db.Text
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  serviceClient   ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  collectedByUser User?         @relation("ServiceClientDocCollectedBy", fields: [collectedBy], references: [id], onDelete: SetNull)
+
+  @@unique([serviceClientId, documentType])
+  @@index([serviceClientId, collected])
+  @@map("service_client_documents")
+}
+
+model ServiceClientNote {
+  id              String   @id @default(cuid())
+  serviceClientId String
+  authorId        String
+  content         String   @db.Text
+  createdAt       DateTime @default(now())
+
+  serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  author        User          @relation("ServiceClientNoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([serviceClientId, createdAt])
+  @@map("service_client_notes")
+}
+
+model ClientAccessLog {
+  id              String   @id @default(cuid())
+  userId          String
+  serviceClientId String?
+  action          String
+  ip              String?
+  createdAt       DateTime @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceClient ServiceClient? @relation(fields: [serviceClientId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([serviceClientId, createdAt])
+  @@index([action, createdAt])
+  @@map("client_access_logs")
+}
+
+model ClientServicesSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("client_services_sessions")
+}
+
+enum ClientBreakStatus {
+  ON_BREAK
+  RETURNED
+}
+
+enum ClientBreakReason {
+  VACATION
+  MEDICAL
+  FAMILY
+  OTHER
+}
+
+model ClientServiceBreak {
+  id                 String            @id @default(cuid())
+  serviceClientId    String
+  reason             ClientBreakReason @default(OTHER)
+  startDate          DateTime          @db.Date
+  expectedReturnDate DateTime          @db.Date
+  actualReturnDate   DateTime?         @db.Date
+  status             ClientBreakStatus @default(ON_BREAK)
+  notes              String?           @db.Text
+  createdBy          String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  createdByUser User?         @relation("ClientServiceBreakCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([serviceClientId, status])
+  @@index([expectedReturnDate])
+  @@map("client_service_breaks")
+}
+
+model ClientRbtBreak {
+  id                 String            @id @default(cuid())
+  serviceClientId    String
+  btName             String
+  reason             ClientBreakReason @default(OTHER)
+  startDate          DateTime          @db.Date
+  expectedReturnDate DateTime          @db.Date
+  actualReturnDate   DateTime?         @db.Date
+  status             ClientBreakStatus @default(ON_BREAK)
+  coverageNotes      String?           @db.Text
+  hasCoverage        Boolean           @default(false)
+  createdBy          String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  createdByUser User?         @relation("ClientRbtBreakCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([serviceClientId, status])
+  @@index([expectedReturnDate])
+  @@map("client_rbt_breaks")
+}
+
+model ServiceClientStatusHistory {
+  id              String               @id @default(cuid())
+  serviceClientId String
+  fromStatus      ServiceClientStatus?
+  toStatus        ServiceClientStatus
+  reason          String?
+  changedBy       String?
+  createdAt       DateTime             @default(now())
+
+  serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  changedByUser User?         @relation("ServiceClientStatusChangedBy", fields: [changedBy], references: [id], onDelete: SetNull)
+
+  @@index([serviceClientId, createdAt])
+  @@map("service_client_status_history")
 }
 
 

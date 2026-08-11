@@ -21,7 +21,7 @@ import ClientHoursPanel from './ClientHoursPanel'
 import SessionEditor from './SessionEditor'
 import ManageDialog from './ManageDialog'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Upload } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2, Upload } from 'lucide-react'
 
 type EditorState =
   | { mode: 'closed' }
@@ -62,6 +62,7 @@ export default function ScheduleWorkspace({
   const [showAllRows, setShowAllRows] = useState(false)
   const [editor, setEditor] = useState<EditorState>({ mode: 'closed' })
   const [manageOpen, setManageOpen] = useState(false)
+  const [deletingPeriod, setDeletingPeriod] = useState(false)
 
   const visibleSlots = useMemo(
     () => (showCancelled ? slots : slots.filter((s) => s.status !== 'CANCELLED')),
@@ -120,6 +121,73 @@ export default function ScheduleWorkspace({
     router.push(
       `/schedule?periodStart=${next.periodStart}&periodEnd=${next.periodEnd}${borough ? `&borough=${encodeURIComponent(borough)}` : ''}`
     )
+  }
+
+  const deleteCurrentPeriod = async () => {
+    if (!periodStart || !periodEnd || deletingPeriod) return
+    const slotHint =
+      periodList.find((p) => p.periodStart === periodStart && p.periodEnd === periodEnd)
+        ?.slotCount ?? slots.length
+    const ok = confirm(
+      `Delete schedule period ${periodStart} → ${periodEnd}?\n\nThis removes all ${slotHint} session(s) for this week from the schedule. This cannot be undone from the UI (re-import to restore).`
+    )
+    if (!ok) return
+
+    setDeletingPeriod(true)
+    try {
+      const params = new URLSearchParams({ periodStart, periodEnd })
+      const res = await fetch(`/api/schedule/periods?${params}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || 'Failed to delete period', 'error')
+        return
+      }
+      showToast(
+        `Deleted ${data.deactivatedAssignments ?? 0} session(s) for ${periodStart} → ${periodEnd}`,
+        'success'
+      )
+      if (data.periods) setPeriodList(data.periods)
+
+      const ps = data.nextPeriod?.periodStart as string | undefined
+      const pe = data.nextPeriod?.periodEnd as string | undefined
+      if (ps && pe) {
+        setPeriodStart(ps)
+        setPeriodEnd(pe)
+        const loadParams = new URLSearchParams({ periodStart: ps, periodEnd: pe })
+        if (borough) loadParams.set('borough', borough)
+        const loadRes = await fetch(`/api/schedule/periods?${loadParams}`, {
+          credentials: 'include',
+        })
+        if (loadRes.ok) {
+          const nextData = await loadRes.json()
+          setTherapists(nextData.therapists ?? [])
+          setClients(nextData.clients ?? [])
+          setSlots(nextData.slots ?? [])
+          setAllowedUsers(nextData.allowedUsers ?? [])
+          setUnsetClientCount(nextData.unsetClientCount ?? 0)
+          if (nextData.periods) setPeriodList(nextData.periods)
+        }
+        router.push(
+          `/schedule?periodStart=${ps}&periodEnd=${pe}${borough ? `&borough=${encodeURIComponent(borough)}` : ''}`
+        )
+      } else {
+        setPeriodStart(null)
+        setPeriodEnd(null)
+        setSlots([])
+        setTherapists([])
+        setClients([])
+        setPeriodList([])
+        router.push('/schedule')
+      }
+      router.refresh()
+    } catch {
+      showToast('Failed to delete period', 'error')
+    } finally {
+      setDeletingPeriod(false)
+    }
   }
 
   const onSlotSaved = useCallback(
@@ -213,6 +281,19 @@ export default function ScheduleWorkspace({
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
+          {periodStart && periodEnd && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-700 border-red-200 hover:bg-red-50 hover:text-red-800"
+              disabled={deletingPeriod}
+              onClick={() => void deleteCurrentPeriod()}
+              title="Delete this schedule period"
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              {deletingPeriod ? 'Deleting…' : 'Delete week'}
+            </Button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

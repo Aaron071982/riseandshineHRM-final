@@ -26,6 +26,7 @@ import {
   DollarSign,
   LineChart,
   FileText,
+  Shield,
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
@@ -38,6 +39,7 @@ interface AdminLayoutProps {
   showBillingNav?: boolean
   showOperationsNav?: boolean
   showDocumentsNav?: boolean
+  showClientServicesNav?: boolean
   showScheduleNav?: boolean
   /** Kazi executive portal — indigo accent + reorganized nav */
   isExecutive?: boolean
@@ -70,6 +72,11 @@ const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system
 const billingNavItem: NavItem = { href: '/billing/dashboard', label: 'Billing', icon: DollarSign }
 const payrollNavItem: NavItem = { href: '/admin/payroll', label: 'Payroll', icon: DollarSign }
 const operationsNavItem: NavItem = { href: '/operations', label: 'Operations', icon: LineChart }
+const clientServicesNavItem: NavItem = {
+  href: '/client-services',
+  label: 'Client Services',
+  icon: Shield,
+}
 
 const EXEC_ACCENT = '#4F46E5'
 
@@ -80,6 +87,7 @@ function pathIsActive(pathname: string, href: string): boolean {
     return pathname.startsWith('/admin/payroll') || pathname.startsWith('/billing/payroll')
   if (href === '/operations') return pathname.startsWith('/operations')
   if (href === '/schedule') return pathname.startsWith('/schedule')
+  if (href === '/client-services') return pathname.startsWith('/client-services')
   if (href === '/admin/documents') return pathname.startsWith('/admin/documents')
   if (href === '/admin/employees') return pathname.startsWith('/admin/employees') || pathname.startsWith('/admin/rbts')
   return pathname === href
@@ -91,6 +99,7 @@ function isPortalHref(href: string): boolean {
     href === '/admin/payroll' ||
     href === '/operations' ||
     href === '/schedule' ||
+    href === '/client-services' ||
     href === '/admin/documents'
   )
 }
@@ -100,6 +109,7 @@ export default function AdminLayout({
   showBillingNav,
   showOperationsNav,
   showDocumentsNav = true,
+  showClientServicesNav = false,
   showScheduleNav: _showScheduleNav = true,
   isExecutive = false,
 }: AdminLayoutProps) {
@@ -136,8 +146,11 @@ export default function AdminLayout({
     if (showDocumentsNav) {
       top.push(documentsNavItem)
     }
+    if (showClientServicesNav) {
+      top.push(clientServicesNavItem)
+    }
     return top
-  }, [isExecutive, showBillingNav, showDocumentsNav])
+  }, [isExecutive, showBillingNav, showDocumentsNav, showClientServicesNav])
 
   const moreItems = useMemo((): NavItem[] => {
     if (isExecutive) {
@@ -154,15 +167,17 @@ export default function AdminLayout({
         { href: '/admin/mcp-connections', label: 'MCP Connections', icon: Plug },
       ]
       if (showOperationsNav) items.splice(4, 0, operationsNavItem)
+      if (showClientServicesNav) items.splice(showOperationsNav ? 5 : 4, 0, clientServicesNavItem)
       return items
     }
     return [
       ...(showBillingNav ? [billingNavItem, payrollNavItem] : []),
       ...(showOperationsNav ? [operationsNavItem] : []),
+      ...(showClientServicesNav ? [clientServicesNavItem] : []),
       ...(showDocumentsNav ? [documentsNavItem] : []),
       ...secondaryBaseWithoutDocs,
     ]
-  }, [isExecutive, showBillingNav, showOperationsNav, showDocumentsNav])
+  }, [isExecutive, showBillingNav, showOperationsNav, showDocumentsNav, showClientServicesNav])
 
   const moreMenuHasActive = useMemo(
     () => moreItems.some((i) => pathIsActive(pathname, i.href)),

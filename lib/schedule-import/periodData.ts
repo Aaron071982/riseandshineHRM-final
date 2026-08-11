@@ -45,6 +45,44 @@ export async function getLatestPeriodRange(): Promise<{
 }
 
 /**
+ * Soft-deactivate all assignments for a period and remove import batch records
+ * so the week leaves the period picker. Does not touch MANUAL rows with null periods.
+ */
+export async function deleteSchedulePeriod(opts: {
+  periodStart: Date
+  periodEnd: Date
+}): Promise<{
+  deactivatedAssignments: number
+  deletedBatches: number
+  periodStart: string
+  periodEnd: string
+}> {
+  const { periodStart, periodEnd } = opts
+
+  const [assignments, batches] = await Promise.all([
+    prisma.rbtScheduleAssignment.updateMany({
+      where: {
+        isActive: true,
+        periodStart,
+        periodEnd,
+      },
+      data: { isActive: false },
+    }),
+    prisma.scheduleImportBatch.deleteMany({
+      where: { periodStart, periodEnd },
+    }),
+  ])
+
+  return {
+    deactivatedAssignments: assignments.count,
+    deletedBatches: batches.count,
+    periodStart: isoDate(periodStart),
+    periodEnd: isoDate(periodEnd),
+  }
+}
+
+
+/**
  * Load schedule workspace data for a biweekly period from rbt_schedule_assignments,
  * falling back to classic session_slot templates when no period data exists.
  */

@@ -23,7 +23,46 @@
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 22 72% 58%;
-    --radius: 0.75rem;
+
+    /* Sunrise design system — brand swap points */
+    --brand: #e7692c;
+    --brand-2: #ce551b;
+    --sunrise-a: #ffa94d;
+    --sunrise-b: #f2652a;
+
+    --side: #2a2019;
+    --side-2: #1d1610;
+    --side-line: #3b2e24;
+    --side-txt: #c4b4a4;
+    --side-txt-strong: #f4ece2;
+    --side-txt-dim: #8a7565;
+
+    --bg: #f7f4ef;
+    --surface: #ffffff;
+    --line: #ece7e0;
+    --line-2: #f2ede6;
+    --ink: #1b1917;
+    --muted-ink: #78716c;
+    --faint: #a8a29e;
+
+    --urgent: #dc3b40;
+    --urgent-bg: #fdf0f0;
+    --green: #2f9e44;
+    --green-bg: #edf6ef;
+    --amber: #c6870b;
+    --amber-bg: #fbf3e4;
+    --slate: #5b6472;
+    --slate-bg: #f0f2f5;
+    --blue: #3b7dd8;
+    --blue-bg: #eaf1fb;
+
+    --brand-ring: rgba(231, 105, 44, 0.14);
+    --radius: 12px;
+    --row-hover: #fcfbf9;
+    --urgent-row: #fef6f6;
+    --phi-pill-fg: #f5c2c4;
+    --phi-pill-border: rgba(220, 59, 64, 0.35);
+    --phi-pill-bg: rgba(220, 59, 64, 0.12);
   }
 
   /* Dark mode palette – spec variables + Tailwind semantic overrides */
@@ -118,6 +157,16 @@
     @apply bg-background text-foreground;
     background: linear-gradient(135deg, #ffffff 0%, #fef5f0 100%);
     min-height: 100vh;
+  }
+  .font-display {
+    font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+  /* Sunrise shell scopes warm neutrals to Client Services only */
+  .sunrise-shell {
+    font-variant-numeric: tabular-nums lining-nums;
+    background: var(--bg);
+    color: var(--ink);
   }
   .dark body {
     background: var(--bg-primary) !important;

@@ -236,6 +236,20 @@ export async function commitScheduleImport(
     console.error('[schedule-import] roster sync failed (assignments saved):', err)
   }
 
+  // Client Services Phase 2: re-link schedule names → service_clients (anti-decay)
+  try {
+    const { resolveScheduleClientLinks } = await import('@/lib/client-services/scheduleSync')
+    const linkResult = await resolveScheduleClientLinks()
+    console.info(
+      '[schedule-import] client-services links:',
+      linkResult.linked,
+      'unmatched:',
+      linkResult.unmatchedNames.length
+    )
+  } catch (err) {
+    console.error('[schedule-import] client-services link resolve failed:', err)
+  }
+
   const unsetClientCount = Object.values(clientBoroughs).filter(
     (b) => !b || b === 'Unset'
   ).length

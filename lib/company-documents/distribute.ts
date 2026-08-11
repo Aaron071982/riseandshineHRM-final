@@ -8,22 +8,30 @@ import {
   EMAIL_BLAST_BATCH_DELAY_MS,
   EMAIL_BLAST_BATCH_SIZE,
 } from '@/lib/email-blast/constants'
+import {
+  issueCompanyDocAccessToken,
+  supportsDirectEmailAccess,
+} from '@/lib/company-documents/accessToken'
 import type { CompanyDocumentType } from '@prisma/client'
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
 }
 
-function actionCopy(documentType: CompanyDocumentType): string {
+function actionCopy(documentType: CompanyDocumentType, direct: boolean): string {
   switch (documentType) {
     case 'ACKNOWLEDGMENT':
-      return 'Please open your portal, review the document, and sign to acknowledge.'
+      return direct
+        ? 'Open the document below to review it, then type your full name to acknowledge.'
+        : 'Please open your portal, review the document, and sign to acknowledge.'
     case 'DOWNLOAD_UPLOAD':
-      return 'Please download the document, complete it, and upload your finished version.'
+      return 'Please download the document, complete it, and upload your finished version in the HRM portal.'
     case 'VIEW_ONLY':
-      return 'Please review the document in your portal (no signature required).'
+      return direct
+        ? 'Open or download the document below to review it. No signature is required.'
+        : 'Please review the document in your portal (no signature required).'
     default:
-      return 'Please review the document in your portal.'
+      return 'Please review the document.'
   }
 }
 
@@ -86,14 +94,22 @@ export function buildCompanyDocEmail(opts: {
   title: string
   documentType: CompanyDocumentType
   isTest: boolean
+  /** Magic-link URL for view/ack; portal URL for download-upload */
+  actionUrl: string
+  downloadUrl?: string | null
 }): { subject: string; html: string } {
-  const base = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'https://www.riseandshinehrm.com'
-  const link = `${base}/rbt/documents`
+  const direct = supportsDirectEmailAccess(opts.documentType)
   return generateCompanyDocumentNotifyEmail({
     firstName: opts.firstName,
     title: opts.title,
-    actionCopy: actionCopy(opts.documentType),
-    portalUrl: link,
+    actionCopy: actionCopy(opts.documentType, direct),
+    portalUrl: opts.actionUrl,
+    downloadUrl: direct ? opts.downloadUrl ?? null : null,
+    ctaLabel: direct
+      ? opts.documentType === 'ACKNOWLEDGMENT'
+        ? 'View & acknowledge'
+        : 'View document'
+      : 'Open Documents',
     isTest: opts.isTest,
   })
 }
@@ -105,17 +121,37 @@ export async function emailCompanyDocRecipients(opts: {
   isTest: boolean
   companyDocumentId: string
 }): Promise<number> {
+  const base = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') || 'https://www.riseandshinehrm.com'
+  const portalLink = `${base}/rbt/documents`
+  const direct = supportsDirectEmailAccess(opts.documentType)
+
   let sent = 0
   const now = new Date()
   for (let i = 0; i < opts.recipients.length; i += EMAIL_BLAST_BATCH_SIZE) {
     const batch = opts.recipients.slice(i, i + EMAIL_BLAST_BATCH_SIZE)
     await Promise.all(
       batch.map(async (r) => {
+        let actionUrl = portalLink
+        let downloadUrl: string | null = null
+
+        if (direct) {
+          const issued = await issueCompanyDocAccessToken({
+            companyDocumentId: opts.companyDocumentId,
+            rbtProfileId: r.id,
+          })
+          if (issued) {
+            actionUrl = `${base}/d/${issued.token}`
+            downloadUrl = `${base}/api/public/company-docs/${issued.token}/file?download=1`
+          }
+        }
+
         const { subject, html } = buildCompanyDocEmail({
           firstName: r.firstName,
           title: opts.title,
           documentType: opts.documentType,
           isTest: opts.isTest,
+          actionUrl,
+          downloadUrl,
         })
         const ok = await sendGenericEmail(r.email, subject, html).catch(() => false)
         if (ok) {

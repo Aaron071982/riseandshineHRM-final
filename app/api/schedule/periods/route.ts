@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireScheduleSession } from '@/lib/schedule/access'
 import {
+  deleteSchedulePeriod,
   getLatestPeriodRange,
   listSchedulePeriods,
   loadPeriodWorkspaceData,
@@ -41,4 +42,50 @@ export async function GET(request: NextRequest) {
   })
 
   return NextResponse.json({ ...data, periods })
+}
+
+/** Soft-delete all sessions for a schedule period and remove it from the picker. */
+export async function DELETE(request: NextRequest) {
+  const auth = await requireScheduleSession()
+  if (auth.response) return auth.response
+
+  const { searchParams } = new URL(request.url)
+  let periodStart = parseDate(searchParams.get('periodStart'))
+  let periodEnd = parseDate(searchParams.get('periodEnd'))
+
+  if ((!periodStart || !periodEnd) && request.headers.get('content-type')?.includes('json')) {
+    try {
+      const body = await request.json()
+      periodStart = periodStart ?? parseDate(body?.periodStart ?? null)
+      periodEnd = periodEnd ?? parseDate(body?.periodEnd ?? null)
+    } catch {
+      // ignore — fall through to validation
+    }
+  }
+
+  if (!periodStart || !periodEnd) {
+    return NextResponse.json(
+      { error: 'periodStart and periodEnd required (YYYY-MM-DD)' },
+      { status: 400 }
+    )
+  }
+  if (periodEnd < periodStart) {
+    return NextResponse.json({ error: 'periodEnd must be on or after periodStart' }, { status: 400 })
+  }
+
+  const result = await deleteSchedulePeriod({ periodStart, periodEnd })
+  const periods = await listSchedulePeriods()
+  const next = await getLatestPeriodRange()
+
+  return NextResponse.json({
+    success: true,
+    ...result,
+    periods,
+    nextPeriod: next
+      ? {
+          periodStart: next.periodStart.toISOString().slice(0, 10),
+          periodEnd: next.periodEnd.toISOString().slice(0, 10),
+        }
+      : null,
+  })
 }

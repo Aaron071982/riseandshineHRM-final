@@ -13,6 +13,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Company document magic links (view / acknowledge without login)
+  if (pathname.startsWith('/d/')) {
+    return NextResponse.next()
+  }
+
   // OAuth discovery + MCP must be reachable without a session cookie
   if (pathname.startsWith('/.well-known/')) {
     return NextResponse.next()

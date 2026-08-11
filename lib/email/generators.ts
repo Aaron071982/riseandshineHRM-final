@@ -1756,14 +1756,23 @@ export function generateCompanyDocumentNotifyEmail(params: {
   title: string
   actionCopy: string
   portalUrl: string
+  /** Optional direct download URL (view/ack magic links only). */
+  downloadUrl?: string | null
+  ctaLabel?: string
   isTest?: boolean
 }): { subject: string; html: string } {
   const firstName = params.firstName.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const title = params.title.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const actionCopy = params.actionCopy.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const ctaLabel = (params.ctaLabel || 'Open Documents').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const subject = params.isTest
     ? `[TEST] Action required: ${params.title} — Rise & Shine ABA`
     : `Action required: ${params.title} — Rise & Shine ABA`
+  const downloadBtn = params.downloadUrl
+    ? `<p style="text-align: center; margin-top: 8px;">
+            <a href="${params.downloadUrl}" class="cta-button" style="background: #fff; color: #E4893D !important; border: 2px solid #E4893D;">Download document</a>
+          </p>`
+    : ''
   const html = `
     <!DOCTYPE html>
     <html>
@@ -1779,7 +1788,7 @@ export function generateCompanyDocumentNotifyEmail(params: {
         .content { padding: 30px 20px; background-color: #ffffff; }
         .content p { margin: 16px 0; }
         .highlight { background-color: #fff5f0; border-left: 4px solid #E4893D; padding: 16px 20px; margin: 20px 0; border-radius: 4px; }
-        .cta-button { display: inline-block; padding: 14px 28px; background: #E4893D; color: white !important; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0; }
+        .cta-button { display: inline-block; padding: 14px 28px; background: #E4893D; color: white !important; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 8px 0; }
         .footer { padding: 24px 20px; text-align: center; font-size: 12px; color: #666; background-color: #f9f9f9; border-radius: 0 0 12px 12px; }
       </style>
     </head>
@@ -1791,7 +1800,7 @@ export function generateCompanyDocumentNotifyEmail(params: {
         </div>
         <div class="content">
           <p>Hi <strong>${firstName}</strong>,</p>
-          <p>We have a new document for you in the HRM portal that needs your attention:</p>
+          <p>We have a new document that needs your attention:</p>
           <div class="highlight">
             <p style="margin: 0;"><strong>${title}</strong></p>
           </div>
@@ -1802,9 +1811,10 @@ export function generateCompanyDocumentNotifyEmail(params: {
               : ''
           }
           <p style="text-align: center;">
-            <a href="${params.portalUrl}" class="cta-button">Open Documents</a>
+            <a href="${params.portalUrl}" class="cta-button">${ctaLabel}</a>
           </p>
-          <p style="font-size: 14px; color: #666;">Or visit: <a href="${params.portalUrl}" style="color: #E4893D;">${params.portalUrl}</a></p>
+          ${downloadBtn}
+          <p style="font-size: 14px; color: #666;">Or open this link: <a href="${params.portalUrl}" style="color: #E4893D;">${params.portalUrl}</a></p>
           <p>If you have any questions, contact <a href="mailto:info@riseandshine.nyc" style="color: #E4893D;">info@riseandshine.nyc</a>.</p>
           <p style="margin-top: 32px;">Thank you,<br><strong>Rise &amp; Shine ABA HR Team</strong></p>
         </div>

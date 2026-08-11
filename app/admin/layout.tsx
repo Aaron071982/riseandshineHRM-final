@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { validateSession, isAdmin, isBillingManager, isExecutiveAdmin } from '@/lib/auth'
 import { isOperationsViewer } from '@/lib/auth/operationsAccess'
 import { canAccessDocumentsEmail } from '@/lib/constants'
+import { canAccessClientServices } from '@/lib/client-services/access'
 import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
@@ -40,6 +41,7 @@ export default async function AdminLayoutWrapper({
       showBillingNav={isBillingManager(user)}
       showOperationsNav={isOperationsViewer(user)}
       showDocumentsNav={canAccessDocumentsEmail(user.email)}
+      showClientServicesNav={await canAccessClientServices(user)}
       showScheduleNav
       isExecutive={isExecutiveAdmin(user)}
     >

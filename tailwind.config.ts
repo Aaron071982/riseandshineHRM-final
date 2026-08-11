@@ -52,13 +52,51 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        /* Sunrise tokens */
+        brand: {
+          DEFAULT: "var(--brand)",
+          2: "var(--brand-2)",
+        },
+        sunrise: {
+          a: "var(--sunrise-a)",
+          b: "var(--sunrise-b)",
+        },
+        side: {
+          DEFAULT: "var(--side)",
+          2: "var(--side-2)",
+          line: "var(--side-line)",
+          txt: "var(--side-txt)",
+          strong: "var(--side-txt-strong)",
+          dim: "var(--side-txt-dim)",
+        },
+        surface: "var(--surface)",
+        ink: "var(--ink)",
+        quiet: "var(--muted-ink)",
+        faint: "var(--faint)",
+        line: {
+          DEFAULT: "var(--line)",
+          2: "var(--line-2)",
+        },
+        urgent: "var(--urgent)",
+        info: "var(--blue)",
+        /* semantic fills without clobbering Tailwind green-/amber-/slate- scales */
+        sem: {
+          green: "var(--green)",
+          amber: "var(--amber)",
+          slate: "var(--slate)",
+        },
+      },
+      fontFamily: {
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
       },
       borderRadius: {
+        DEFAULT: "var(--radius)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
-        card: "1.125rem", // 18px
-        cardLg: "1.5rem", // 24px
+        card: "1.125rem",
+        cardLg: "1.5rem",
         pill: "9999px",
       },
       keyframes: {
@@ -70,10 +108,14 @@ const config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        shimmer: {
+          "100%": { transform: "translateX(100%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        shimmer: "shimmer 1.2s ease-in-out infinite",
       },
     },
   },
