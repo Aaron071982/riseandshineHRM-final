@@ -17,7 +17,7 @@ export function companyDocFileResponse(
           : 'application/octet-stream'
   const ext = contentType === 'image/png' ? 'png' : contentType === 'application/pdf' ? 'pdf' : 'bin'
   const safeName = row.companyDocument.title.replace(/[^a-zA-Z0-9._-]/g, '_')
-  return new NextResponse(buf, {
+  return new NextResponse(new Uint8Array(buf), {
     status: 200,
     headers: {
       'Content-Type': contentType,
