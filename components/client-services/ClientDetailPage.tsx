@@ -586,7 +586,7 @@ export default function ClientDetailPage({
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {editing ? (
               <>
                 <Button
@@ -610,30 +610,28 @@ export default function ClientDetailPage({
                   {saving ? 'Saving…' : 'Save'}
                 </Button>
               </>
-            ) : (
-              canEditPhi && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-[#E5E7EB] text-[#5F6B7A]"
-                    onClick={startEdit}
-                  >
-                    <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-[#F5C4C4] text-[#A32D2D] hover:bg-[#FCEBEB]"
-                    disabled={deleting}
-                    onClick={deleteClient}
-                  >
-                    <Trash2 className="w-3.5 h-3.5 mr-1" />
-                    {deleting ? 'Deleting…' : 'Delete'}
-                  </Button>
-                </>
-              )
-            )}
+            ) : canEditPhi ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-[#E5E7EB] text-[#5F6B7A]"
+                  onClick={startEdit}
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  disabled={deleting}
+                  onClick={deleteClient}
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                  {deleting ? 'Deleting…' : 'Delete client'}
+                </Button>
+              </>
+            ) : null}
           </div>
         </div>
       </Card>
@@ -1256,6 +1254,24 @@ export default function ClientDetailPage({
           )}
         </ul>
       </Collapsible>
+
+      {canEditPhi && (
+        <Card title="Delete client">
+          <p className="text-sm text-[#5F6B7A] mb-3">
+            Permanently remove this client and their notes, documents, and breaks. Schedule
+            assignments will be unlinked. This cannot be undone.
+          </p>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={deleting}
+            onClick={deleteClient}
+          >
+            <Trash2 className="w-4 h-4 mr-1.5" />
+            {deleting ? 'Deleting…' : 'Delete this client'}
+          </Button>
+        </Card>
+      )}
     </div>
   )
 }
