@@ -21,6 +21,7 @@ const DEFAULT_CLIENT_SERVICES_EMAILS = [
   'fadeen@riseandshineaba.com',
   'shazia@riseandshineaba.com',
   'afsana@riseandshineaba.com',
+  'afrin@riseandshineaba.com',
 ] as const
 
 /** Any email containing these substrings also gets Client Services access. */
