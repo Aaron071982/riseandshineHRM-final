@@ -619,6 +619,10 @@ function AddClientModal({
     status: 'NEW',
     dateOfBirth: '',
     borough: '',
+    addressLine: '',
+    city: '',
+    state: 'NY',
+    zip: '',
     bcbaName: '',
     caseCoordinatorName: '',
     parentName: '',
@@ -736,6 +740,12 @@ function AddClientModal({
                 ))}
               </select>
             </label>
+          </div>
+          {field('Street address', 'addressLine')}
+          <div className="grid grid-cols-3 gap-3">
+            {field('City', 'city')}
+            {field('State', 'state')}
+            {field('ZIP', 'zip')}
           </div>
           <div className="grid grid-cols-2 gap-3">
             {field('BCBA', 'bcbaName')}

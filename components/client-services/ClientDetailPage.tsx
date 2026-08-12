@@ -579,6 +579,10 @@ export default function ClientDetailPage({
     lastName: editing && f ? f.lastName : client.lastName,
     status: editing && f ? f.status : client.status,
     borough: editing && f ? f.borough : client.borough,
+    addressLine: editing && f ? f.addressLine : client.addressLine,
+    city: editing && f ? f.city : client.city,
+    state: editing && f ? f.state : client.state,
+    zip: editing && f ? f.zip : client.zip,
     bcbaName: editing && f ? f.bcbaName : client.bcbaName,
     caseCoordinatorName: editing && f ? f.caseCoordinatorName : client.caseCoordinatorName,
     insuranceProvider: editing && f ? f.insuranceProvider : client.insuranceProvider,
@@ -1112,6 +1116,81 @@ export default function ClientDetailPage({
                 </span>
               </span>
             ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Address */}
+      <Card title="Address">
+        {editing && f ? (
+          <div className="space-y-2">
+            <Field label="Street">
+              <input
+                className={inputCls}
+                value={f.addressLine}
+                onChange={(e) => setForm({ ...f, addressLine: e.target.value })}
+                placeholder="Street address"
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Field label="City">
+                <input
+                  className={inputCls}
+                  value={f.city}
+                  onChange={(e) => setForm({ ...f, city: e.target.value })}
+                />
+              </Field>
+              <Field label="Borough">
+                <select
+                  className={inputCls}
+                  value={f.borough}
+                  onChange={(e) => setForm({ ...f, borough: e.target.value })}
+                >
+                  <option value="">Select…</option>
+                  {NY_BOROUGHS.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="State">
+                <input
+                  className={inputCls}
+                  value={f.state}
+                  onChange={(e) => setForm({ ...f, state: e.target.value })}
+                  placeholder="NY"
+                />
+              </Field>
+              <Field label="ZIP">
+                <input
+                  className={inputCls}
+                  value={f.zip}
+                  onChange={(e) => setForm({ ...f, zip: e.target.value })}
+                />
+              </Field>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-[#1a1d21] space-y-0.5">
+            {display.addressLine || display.city || display.borough || display.zip ? (
+              <>
+                {display.addressLine && <div>{display.addressLine}</div>}
+                <div className="text-[#5F6B7A]">
+                  {[
+                    display.city || display.borough,
+                    [display.state, display.zip].filter(Boolean).join(' '),
+                  ]
+                    .filter(Boolean)
+                    .join(', ') || null}
+                </div>
+                {display.borough && display.city && display.borough !== display.city && (
+                  <div className="text-xs text-[#8B95A1]">Borough: {display.borough}</div>
+                )}
+              </>
+            ) : (
+              <span className="text-[#5F6B7A]">No address on file</span>
+            )}
           </div>
         )}
       </Card>

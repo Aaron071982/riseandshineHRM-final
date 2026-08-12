@@ -191,7 +191,11 @@ function ClientTableRow({ row }: { row: ClientRow }) {
         <StatusBadge status={row.status} />
       </td>
       <td className="px-3 py-2.5 text-quiet">{row.bcba || '—'}</td>
-      <td className="px-3 py-2.5 text-quiet">{row.location || '—'}</td>
+      <td className="px-3 py-2.5 text-quiet">
+        <span className="block max-w-[14rem] truncate" title={row.address || row.location || undefined}>
+          {row.address || row.location || '—'}
+        </span>
+      </td>
       <td className="px-3 py-2.5">
         {row.behaviorTechs.length === 0 ? (
           <span className="font-medium text-urgent">No BT assigned</span>

@@ -112,7 +112,17 @@ export async function importClientsMasterCsv(
       const { firstName, lastName } = splitClientName(fullName)
       const status = parseCsvStatus(getField(row, 'Status'))
       const dateOfBirth = parseDateLoose(getField(row, 'DOB'))
-      const address = parseAddress(getField(row, 'Address'))
+      const address = parseAddress(
+        getField(
+          row,
+          'Address',
+          'Home Address',
+          'Client Address',
+          'Street Address',
+          'Full Address',
+          'Residential Address'
+        )
+      )
       const insuranceProvider = getField(row, 'Insurance') || null
       const parentName = getField(row, 'Parent Name') || null
       const parentPhone = getField(row, 'Parent Number') || null

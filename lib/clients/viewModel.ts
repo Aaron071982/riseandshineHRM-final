@@ -7,6 +7,7 @@ export type ClientRow = {
   status: CaseStatus
   bcba: string | null
   location: string | null
+  address: string | null
   behaviorTechs: string[]
   hours: { scheduled: number; target: number } | null
   docs: { done: number; total: number }
@@ -24,6 +25,10 @@ export type ApiCaseloadClient = {
   lastName: string
   status: string
   borough: string | null
+  addressLine?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
   bcbaName: string | null
   authHours: number | null
   scheduledHoursPerWeek: number
@@ -47,10 +52,27 @@ export function formatClientDisplayName(firstName: string, lastName: string): st
   return [initial, last].filter(Boolean).join(' ') || 'Unknown'
 }
 
+export function formatClientAddress(c: {
+  addressLine?: string | null
+  city?: string | null
+  borough?: string | null
+  state?: string | null
+  zip?: string | null
+}): string | null {
+  const line = (c.addressLine ?? '').trim()
+  const city = (c.city ?? c.borough ?? '').trim()
+  const state = (c.state ?? '').trim()
+  const zip = (c.zip ?? '').trim()
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+  const full = [line, cityStateZip].filter(Boolean).join(', ')
+  return full || null
+}
+
 export function toClientRow(c: ApiCaseloadClient): ClientRow {
   const status = resolveCaseStatus(c)
   const scheduled = c.scheduledHoursPerWeek ?? 0
   const target = c.authHours
+  const address = formatClientAddress(c)
   return {
     id: c.id,
     name: formatClientDisplayName(c.firstName, c.lastName),
@@ -58,6 +80,7 @@ export function toClientRow(c: ApiCaseloadClient): ClientRow {
     status,
     bcba: c.bcbaName,
     location: c.borough,
+    address,
     behaviorTechs: c.btNames ?? [],
     hours:
       target != null || scheduled > 0
