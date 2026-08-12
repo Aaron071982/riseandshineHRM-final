@@ -238,6 +238,13 @@ export async function commitScheduleImport(
 
   // Client Services Phase 2: re-link schedule names → service_clients (anti-decay)
   try {
+    const { setClientSchedulePeriod } = await import('@/lib/client-services/schedulePeriod')
+    await setClientSchedulePeriod(toIsoDate(periodStart)!, toIsoDate(periodEnd)!)
+  } catch (err) {
+    console.error('[schedule-import] client-services period sync failed:', err)
+  }
+
+  try {
     const { resolveScheduleClientLinks } = await import('@/lib/client-services/scheduleSync')
     const linkResult = await resolveScheduleClientLinks()
     console.info(

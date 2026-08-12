@@ -196,6 +196,9 @@ export default function ClientDetailPage({
   const [rbtCoverageNotes, setRbtCoverageNotes] = useState('')
   const [unlinkedNames, setUnlinkedNames] = useState<string[]>([])
   const [linkPick, setLinkPick] = useState('')
+  const [linkPeriodLabel, setLinkPeriodLabel] = useState('')
+  const [linkBusy, setLinkBusy] = useState(false)
+  const [showLinkUi, setShowLinkUi] = useState(false)
 
   const load = async () => {
     setError('')
@@ -419,26 +422,64 @@ export default function ClientDetailPage({
   }
 
   const loadUnlinked = async () => {
-    const res = await fetch('/api/client-services/schedule-links', { credentials: 'include' })
-    if (!res.ok) return
-    const data = await res.json()
-    setUnlinkedNames((data.unlinked ?? []).map((u: { clientName: string }) => u.clientName))
+    setShowLinkUi(true)
+    setLinkBusy(true)
+    try {
+      const prefer = client
+        ? `${client.firstName} ${client.lastName}`.trim()
+        : ''
+      const params = new URLSearchParams()
+      if (prefer) {
+        params.set('prefer', prefer)
+        params.set('q', prefer)
+      }
+      const res = await fetch(`/api/client-services/schedule-links?${params}`, {
+        credentials: 'include',
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      const names: string[] = (data.unlinked ?? []).map(
+        (u: { clientName: string }) => u.clientName
+      )
+      setUnlinkedNames(names)
+      setLinkPeriodLabel(data.schedulePeriod?.label ?? '')
+      // Pre-select best match when unique-ish
+      const exact = prefer
+        ? names.find((n) => n.toLowerCase() === prefer.toLowerCase())
+        : undefined
+      const fuzzy = prefer
+        ? names.find((n) => {
+            const nl = n.toLowerCase()
+            const parts = prefer.toLowerCase().split(/\s+/).filter(Boolean)
+            return parts.every((p) => nl.includes(p))
+          })
+        : undefined
+      setLinkPick(exact || fuzzy || '')
+    } finally {
+      setLinkBusy(false)
+    }
   }
 
   const linkSchedule = async () => {
-    if (!linkPick) return
-    await fetch('/api/client-services/schedule-links', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'link',
-        scheduleClientName: linkPick,
-        serviceClientId: clientId,
-      }),
-    })
-    setLinkPick('')
-    await load()
+    if (!linkPick.trim()) return
+    setLinkBusy(true)
+    try {
+      await fetch('/api/client-services/schedule-links', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'link',
+          scheduleClientName: linkPick.trim(),
+          serviceClientId: clientId,
+        }),
+      })
+      setLinkPick('')
+      setShowLinkUi(false)
+      await load()
+    } finally {
+      setLinkBusy(false)
+    }
   }
 
   if (error && !client) {
@@ -834,15 +875,16 @@ export default function ClientDetailPage({
                   size="sm"
                   variant="outline"
                   className="border-[#E5E7EB] text-xs"
+                  disabled={linkBusy}
                   onClick={loadUnlinked}
                 >
-                  Link to schedule
+                  {linkBusy ? 'Loading…' : 'Link to schedule'}
                 </Button>
-                {unlinkedNames.length > 0 && (
+                {showLinkUi && (
                   <>
                     <select
-                      className={inputCls}
-                      value={linkPick}
+                      className={inputCls + ' min-w-[12rem]'}
+                      value={unlinkedNames.includes(linkPick) ? linkPick : ''}
                       onChange={(e) => setLinkPick(e.target.value)}
                     >
                       <option value="">Schedule name…</option>
@@ -852,15 +894,35 @@ export default function ClientDetailPage({
                         </option>
                       ))}
                     </select>
+                    <input
+                      className={inputCls + ' min-w-[10rem]'}
+                      list="cs-schedule-names"
+                      placeholder="Or type schedule name"
+                      value={linkPick}
+                      onChange={(e) => setLinkPick(e.target.value)}
+                    />
+                    <datalist id="cs-schedule-names">
+                      {unlinkedNames.map((n) => (
+                        <option key={n} value={n} />
+                      ))}
+                    </datalist>
                     <Button
                       size="sm"
                       className="text-white text-xs"
                       style={{ backgroundColor: CS_ACCENT.solid }}
-                      disabled={!linkPick}
+                      disabled={!linkPick.trim() || linkBusy}
                       onClick={linkSchedule}
                     >
                       Link
                     </Button>
+                    {linkPeriodLabel && (
+                      <span className="text-[11px] text-[#8B95A1]">
+                        Period {linkPeriodLabel}
+                        {unlinkedNames.length === 0
+                          ? ' · no unlinked names (try typing the exact schedule name)'
+                          : ` · ${unlinkedNames.length} name(s)`}
+                      </span>
+                    )}
                   </>
                 )}
               </div>

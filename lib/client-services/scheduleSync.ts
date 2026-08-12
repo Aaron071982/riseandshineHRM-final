@@ -156,7 +156,8 @@ export async function unlinkServiceClientSchedule(serviceClientId: string): Prom
 
 /** Unlinked schedule client names within the active Client Services period. */
 export async function getUnlinkedScheduleClientNames(
-  period?: ClientSchedulePeriod
+  period?: ClientSchedulePeriod,
+  opts?: { preferQuery?: string }
 ): Promise<{ clientName: string; assignmentCount: number }[]> {
   const activePeriod = period ?? (await getClientSchedulePeriod())
   const rows = await prisma.rbtScheduleAssignment.groupBy({
@@ -168,8 +169,73 @@ export async function getUnlinkedScheduleClientNames(
     _count: { _all: true },
     orderBy: { clientName: 'asc' },
   })
-  return rows.map((r) => ({
+  let list = rows.map((r) => ({
     clientName: r.clientName,
     assignmentCount: r._count._all,
   }))
+
+  const q = (opts?.preferQuery ?? '').trim().toLowerCase()
+  if (q) {
+    const score = (name: string) => {
+      const n = name.toLowerCase()
+      if (n === q) return 0
+      if (n.includes(q) || q.includes(n)) return 1
+      const parts = q.split(/\s+/).filter(Boolean)
+      if (parts.every((p) => n.includes(p))) return 2
+      if (parts.some((p) => n.includes(p))) return 3
+      return 9
+    }
+    list = [...list].sort((a, b) => {
+      const sa = score(a.clientName)
+      const sb = score(b.clientName)
+      if (sa !== sb) return sa - sb
+      return a.clientName.localeCompare(b.clientName)
+    })
+  }
+
+  return list
+}
+
+/**
+ * All distinct schedule client names in the period (for search / manual link).
+ * Prefer unlinked; optionally include already-linked names for reassignment.
+ */
+export async function searchScheduleClientNames(
+  period: ClientSchedulePeriod,
+  query: string,
+  opts?: { includeLinked?: boolean; limit?: number }
+): Promise<{ clientName: string; assignmentCount: number; linked: boolean }[]> {
+  const q = query.trim()
+  const rows = await prisma.rbtScheduleAssignment.groupBy({
+    by: ['clientName', 'serviceClientId'],
+    where: {
+      ...schedulePeriodWhere(period),
+      ...(q
+        ? { clientName: { contains: q, mode: 'insensitive' as const } }
+        : {}),
+      ...(opts?.includeLinked ? {} : { serviceClientId: null }),
+    },
+    _count: { _all: true },
+    orderBy: { clientName: 'asc' },
+  })
+
+  const byName = new Map<string, { clientName: string; assignmentCount: number; linked: boolean }>()
+  for (const r of rows) {
+    const existing = byName.get(r.clientName)
+    const linked = r.serviceClientId != null
+    if (!existing) {
+      byName.set(r.clientName, {
+        clientName: r.clientName,
+        assignmentCount: r._count._all,
+        linked,
+      })
+    } else {
+      existing.assignmentCount += r._count._all
+      existing.linked = existing.linked || linked
+    }
+  }
+
+  return [...byName.values()]
+    .sort((a, b) => Number(a.linked) - Number(b.linked) || a.clientName.localeCompare(b.clientName))
+    .slice(0, opts?.limit ?? 100)
 }

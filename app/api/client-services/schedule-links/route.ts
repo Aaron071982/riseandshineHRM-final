@@ -12,6 +12,7 @@ import {
   manualLinkScheduleName,
   manualUnlinkScheduleName,
   resolveScheduleClientLinks,
+  searchScheduleClientNames,
   unlinkServiceClientSchedule,
 } from '@/lib/client-services/scheduleSync'
 import { getClientSchedulePeriod } from '@/lib/client-services/schedulePeriod'
@@ -33,13 +34,33 @@ export async function GET(request: NextRequest) {
   }
 
   const period = await getClientSchedulePeriod()
-  const [unlinked, clients] = await Promise.all([
-    getUnlinkedScheduleClientNames(period),
+  const prefer = (request.nextUrl.searchParams.get('prefer') ?? '').trim()
+  const q = (request.nextUrl.searchParams.get('q') ?? '').trim()
+
+  const [unlinked, searched, clients] = await Promise.all([
+    getUnlinkedScheduleClientNames(period, { preferQuery: prefer || q }),
+    q
+      ? searchScheduleClientNames(period, q, { includeLinked: true, limit: 50 })
+      : Promise.resolve([]),
     prisma.serviceClient.findMany({
       select: { id: true, clientCode: true, firstName: true, lastName: true },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     }),
   ])
+
+  // Merge search hits (may include linked names) ahead of plain unlinked list
+  const seen = new Set<string>()
+  const merged: { clientName: string; assignmentCount: number; linked?: boolean }[] = []
+  for (const row of searched) {
+    if (seen.has(row.clientName)) continue
+    seen.add(row.clientName)
+    merged.push(row)
+  }
+  for (const row of unlinked) {
+    if (seen.has(row.clientName)) continue
+    seen.add(row.clientName)
+    merged.push(row)
+  }
 
   await logClientAccess({
     userId: user.id,
@@ -48,7 +69,7 @@ export async function GET(request: NextRequest) {
   })
 
   return NextResponse.json({
-    unlinked,
+    unlinked: merged,
     clients,
     schedulePeriod: {
       start: period.start,
