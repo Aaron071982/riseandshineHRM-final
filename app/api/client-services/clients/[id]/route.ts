@@ -251,3 +251,46 @@ export async function PATCH(request: NextRequest, context: Ctx) {
 
   return NextResponse.json({ client: updated })
 }
+
+/** Permanently delete a service client (full-access allowlist only). */
+export async function DELETE(request: NextRequest, context: Ctx) {
+  const auth = await requireClientServicesSession()
+  if (auth.response) return auth.response
+  const { user, scope } = auth
+  const { id } = await context.params
+
+  const denied = await enforceClientScope(user, scope, id, request)
+  if (denied) return denied
+
+  if (!isClientServicesFullAccessEmail(user.email)) {
+    return NextResponse.json({ error: 'Forbidden — delete requires full access' }, { status: 403 })
+  }
+
+  const existing = await prisma.serviceClient.findUnique({
+    where: { id },
+    select: { id: true, firstName: true, lastName: true, clientCode: true },
+  })
+  if (!existing) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  const ip = getClientIpFromRequest(request)
+  await logClientAccess({
+    userId: user.id,
+    serviceClientId: id,
+    action: 'CLIENT_DELETE',
+    ip,
+  })
+
+  // Schedule links use onDelete: SetNull; child PHI rows cascade.
+  await prisma.serviceClient.delete({ where: { id } })
+
+  return NextResponse.json({
+    ok: true,
+    deleted: {
+      id: existing.id,
+      clientCode: existing.clientCode,
+      name: `${existing.firstName} ${existing.lastName}`.trim(),
+    },
+  })
+}

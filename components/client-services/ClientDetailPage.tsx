@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   ArrowLeft,
@@ -13,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   Pencil,
+  Trash2,
   X,
 } from 'lucide-react'
 import BreakCountdown from '@/components/client-services/BreakCountdown'
@@ -168,6 +170,7 @@ export default function ClientDetailPage({
   clientId: string
   canEditPhi: boolean
 }) {
+  const router = useRouter()
   const [client, setClient] = useState<Client | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [error, setError] = useState('')
@@ -178,6 +181,7 @@ export default function ClientDetailPage({
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<EditForm | null>(null)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [notesOpen, setNotesOpen] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [expandedNoteIds, setExpandedNoteIds] = useState<Record<string, boolean>>({})
@@ -386,6 +390,34 @@ export default function ClientDetailPage({
     await load()
   }
 
+  const deleteClient = async () => {
+    if (!client || !canEditPhi || deleting) return
+    const label = `${client.firstName} ${client.lastName}`.trim()
+    const ok = window.confirm(
+      `Delete ${label} (${client.clientCode}) permanently?\n\nThis cannot be undone. Schedule links will be unlinked; notes, documents, and breaks for this client will be removed.`
+    )
+    if (!ok) return
+    setDeleting(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/client-services/clients/${clientId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || 'Failed to delete client')
+        return
+      }
+      router.push('/client-services')
+      router.refresh()
+    } catch {
+      setError('Failed to delete client')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const loadUnlinked = async () => {
     const res = await fetch('/api/client-services/schedule-links', { credentials: 'include' })
     if (!res.ok) return
@@ -580,14 +612,26 @@ export default function ClientDetailPage({
               </>
             ) : (
               canEditPhi && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-[#E5E7EB] text-[#5F6B7A]"
-                  onClick={startEdit}
-                >
-                  <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-[#E5E7EB] text-[#5F6B7A]"
+                    onClick={startEdit}
+                  >
+                    <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-[#F5C4C4] text-[#A32D2D] hover:bg-[#FCEBEB]"
+                    disabled={deleting}
+                    onClick={deleteClient}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    {deleting ? 'Deleting…' : 'Delete'}
+                  </Button>
+                </>
               )
             )}
           </div>
