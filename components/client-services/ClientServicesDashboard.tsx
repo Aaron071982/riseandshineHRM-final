@@ -548,7 +548,7 @@ function ClientCard({
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold text-ink">{c.name}</div>
           <div className="mt-0.5 truncate text-xs text-quiet">
-            {[c.location, c.bcba ? `BCBA ${c.bcba}` : null].filter(Boolean).join(' · ') ||
+            {[c.address || c.location, c.bcba ? `BCBA ${c.bcba}` : null].filter(Boolean).join(' · ') ||
               c.code}
           </div>
         </div>
