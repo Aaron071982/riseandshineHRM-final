@@ -63,12 +63,14 @@ export function buildPeriod(start: string, end: string): ClientSchedulePeriod | 
   }
 }
 
-/** Prisma where clause fragment for assignments in the active period. */
+/** Prisma where for assignments visible for a CS period — matches Schedule workspace. */
 export function schedulePeriodWhere(period: ClientSchedulePeriod) {
   return {
     isActive: true as const,
-    periodStart: period.startDate,
-    periodEnd: period.endDate,
+    OR: [
+      { periodStart: period.startDate, periodEnd: period.endDate },
+      { source: 'MANUAL' as const, periodStart: null, periodEnd: null },
+    ],
   }
 }
 

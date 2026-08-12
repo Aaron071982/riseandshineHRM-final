@@ -199,6 +199,13 @@ export default function ClientDetailPage({
   const [linkPeriodLabel, setLinkPeriodLabel] = useState('')
   const [linkBusy, setLinkBusy] = useState(false)
   const [showLinkUi, setShowLinkUi] = useState(false)
+  const [linkError, setLinkError] = useState('')
+  const [showManualSchedule, setShowManualSchedule] = useState(false)
+  const [manualName, setManualName] = useState('')
+  const [manualBt, setManualBt] = useState('')
+  const [manualStart, setManualStart] = useState('15:00')
+  const [manualEnd, setManualEnd] = useState('19:00')
+  const [manualDays, setManualDays] = useState<number[]>([1, 2, 3, 4, 5])
 
   const load = async () => {
     setError('')
@@ -424,6 +431,7 @@ export default function ClientDetailPage({
   const loadUnlinked = async () => {
     setShowLinkUi(true)
     setLinkBusy(true)
+    setLinkError('')
     try {
       const prefer = client
         ? `${client.firstName} ${client.lastName}`.trim()
@@ -443,7 +451,6 @@ export default function ClientDetailPage({
       )
       setUnlinkedNames(names)
       setLinkPeriodLabel(data.schedulePeriod?.label ?? '')
-      // Pre-select best match when unique-ish
       const exact = prefer
         ? names.find((n) => n.toLowerCase() === prefer.toLowerCase())
         : undefined
@@ -454,7 +461,8 @@ export default function ClientDetailPage({
             return parts.every((p) => nl.includes(p))
           })
         : undefined
-      setLinkPick(exact || fuzzy || '')
+      setLinkPick(exact || fuzzy || prefer || '')
+      if (!manualName && prefer) setManualName(prefer)
     } finally {
       setLinkBusy(false)
     }
@@ -463,8 +471,9 @@ export default function ClientDetailPage({
   const linkSchedule = async () => {
     if (!linkPick.trim()) return
     setLinkBusy(true)
+    setLinkError('')
     try {
-      await fetch('/api/client-services/schedule-links', {
+      const res = await fetch('/api/client-services/schedule-links', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -474,12 +483,62 @@ export default function ClientDetailPage({
           serviceClientId: clientId,
         }),
       })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setLinkError(data.error || 'Link failed')
+        setShowManualSchedule(true)
+        if (!manualName) setManualName(linkPick.trim())
+        return
+      }
       setLinkPick('')
       setShowLinkUi(false)
+      setShowManualSchedule(false)
       await load()
+    } catch {
+      setLinkError('Link failed')
     } finally {
       setLinkBusy(false)
     }
+  }
+
+  const createManualSchedule = async () => {
+    if (!manualName.trim() || !manualBt.trim() || manualDays.length === 0) return
+    setLinkBusy(true)
+    setLinkError('')
+    try {
+      const res = await fetch('/api/client-services/schedule-links', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create-manual',
+          serviceClientId: clientId,
+          scheduleClientName: manualName.trim(),
+          btName: manualBt.trim(),
+          days: manualDays,
+          startTime: manualStart,
+          endTime: manualEnd,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setLinkError(data.error || 'Could not create schedule sessions')
+        return
+      }
+      setShowManualSchedule(false)
+      setShowLinkUi(false)
+      await load()
+    } catch {
+      setLinkError('Could not create schedule sessions')
+    } finally {
+      setLinkBusy(false)
+    }
+  }
+
+  const toggleManualDay = (day: number) => {
+    setManualDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
+    )
   }
 
   if (error && !client) {
@@ -870,18 +929,35 @@ export default function ClientDetailPage({
               Not linked to schedule assignments — not counted as unserved until linked.
             </p>
             {canEditPhi && (
-              <div className="flex flex-wrap gap-2 items-center">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-[#E5E7EB] text-xs"
-                  disabled={linkBusy}
-                  onClick={loadUnlinked}
-                >
-                  {linkBusy ? 'Loading…' : 'Link to schedule'}
-                </Button>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-[#E5E7EB] text-xs"
+                    disabled={linkBusy}
+                    onClick={loadUnlinked}
+                  >
+                    {linkBusy ? 'Loading…' : 'Link to schedule'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-[#E5E7EB] text-xs"
+                    disabled={linkBusy}
+                    onClick={() => {
+                      setShowManualSchedule(true)
+                      setShowLinkUi(true)
+                      if (!manualName && client) {
+                        setManualName(`${client.firstName} ${client.lastName}`.trim())
+                      }
+                    }}
+                  >
+                    Add schedule sessions
+                  </Button>
+                </div>
                 {showLinkUi && (
-                  <>
+                  <div className="flex flex-wrap gap-2 items-center">
                     <select
                       className={inputCls + ' min-w-[12rem]'}
                       value={unlinkedNames.includes(linkPick) ? linkPick : ''}
@@ -919,11 +995,100 @@ export default function ClientDetailPage({
                       <span className="text-[11px] text-[#8B95A1]">
                         Period {linkPeriodLabel}
                         {unlinkedNames.length === 0
-                          ? ' · no unlinked names (try typing the exact schedule name)'
+                          ? ' · no matching names — type it or add sessions below'
                           : ` · ${unlinkedNames.length} name(s)`}
                       </span>
                     )}
-                  </>
+                  </div>
+                )}
+                {linkError && (
+                  <p className="text-sm" style={{ color: '#A32D2D' }}>
+                    {linkError}
+                  </p>
+                )}
+                {showManualSchedule && (
+                  <div className="rounded-lg border border-[#E5E7EB] bg-[#F7F8FA] p-3 space-y-2">
+                    <p className="text-xs font-medium text-[#5F6B7A]">
+                      Add sessions manually (client name, BT, days, times)
+                    </p>
+                    <input
+                      className={inputCls}
+                      placeholder="Schedule client name (e.g. Inayah Irfan)"
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                    />
+                    <input
+                      className={inputCls}
+                      placeholder="BT / RBT name (e.g. Yan Suen Ho)"
+                      value={manualBt}
+                      onChange={(e) => setManualBt(e.target.value)}
+                      list="cs-bt-options"
+                    />
+                    <datalist id="cs-bt-options">
+                      {btOptions.map((n) => (
+                        <option key={n} value={n} />
+                      ))}
+                    </datalist>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { d: 1, label: 'Mon' },
+                        { d: 2, label: 'Tue' },
+                        { d: 3, label: 'Wed' },
+                        { d: 4, label: 'Thu' },
+                        { d: 5, label: 'Fri' },
+                        { d: 6, label: 'Sat' },
+                        { d: 0, label: 'Sun' },
+                      ].map(({ d, label }) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => toggleManualDay(d)}
+                          className={cn(
+                            'rounded-md border px-2 py-1 text-xs font-medium',
+                            manualDays.includes(d)
+                              ? 'border-[#378ADD] bg-[#E6F1FB] text-[#185FA5]'
+                              : 'border-[#E5E7EB] bg-white text-[#5F6B7A]'
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="text-xs text-[#5F6B7A]">
+                        Start
+                        <input
+                          type="time"
+                          className={inputCls + ' mt-1'}
+                          value={manualStart}
+                          onChange={(e) => setManualStart(e.target.value)}
+                        />
+                      </label>
+                      <label className="text-xs text-[#5F6B7A]">
+                        End
+                        <input
+                          type="time"
+                          className={inputCls + ' mt-1'}
+                          value={manualEnd}
+                          onChange={(e) => setManualEnd(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="text-white text-xs"
+                      style={{ backgroundColor: CS_ACCENT.solid }}
+                      disabled={
+                        linkBusy ||
+                        !manualName.trim() ||
+                        !manualBt.trim() ||
+                        manualDays.length === 0
+                      }
+                      onClick={createManualSchedule}
+                    >
+                      {linkBusy ? 'Saving…' : 'Save sessions & link'}
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
