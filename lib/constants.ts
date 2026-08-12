@@ -4,7 +4,11 @@ import { UserRole } from '@prisma/client'
 export const PLATFORM_OWNER_EMAIL = 'aaronsiam21@gmail.com'
 
 /** Super-admin emails (full platform access). Override via SUPER_ADMIN_EMAILS (comma-separated). */
-const DEFAULT_SUPER_ADMIN_EMAILS = [PLATFORM_OWNER_EMAIL, 'kazi@siyam.nyc'] as const
+const DEFAULT_SUPER_ADMIN_EMAILS = [
+  PLATFORM_OWNER_EMAIL,
+  'kazi@siyam.nyc',
+  'fardeen@riseandshineaba.com',
+] as const
 
 function normalizeEmailList(emails: readonly string[]): string[] {
   return [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))]

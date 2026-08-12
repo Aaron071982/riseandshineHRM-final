@@ -7,7 +7,7 @@ export const CS_SESSION_COOKIE = 'cs_session'
 export const CS_SESSION_DURATION_MS = 30 * 60 * 1000
 
 /**
- * Client Services access — exact email allowlist only.
+ * Client Services access — exact email allowlist, plus name substrings.
  * Override via CLIENT_SERVICES_FULL_ACCESS_EMAILS (comma-separated);
  * platform owner is always included.
  */
@@ -23,6 +23,9 @@ const DEFAULT_CLIENT_SERVICES_EMAILS = [
   'afsana@riseandshineaba.com',
 ] as const
 
+/** Any email containing these substrings also gets Client Services access. */
+const CLIENT_SERVICES_EMAIL_SUBSTRINGS = ['jaden', 'azm'] as const
+
 export function getClientServicesFullAccessEmails(): string[] {
   const fromEnv = process.env.CLIENT_SERVICES_FULL_ACCESS_EMAILS?.trim()
   const base = fromEnv
@@ -34,11 +37,12 @@ export function getClientServicesFullAccessEmails(): string[] {
   return [...new Set([...base, PLATFORM_OWNER_EMAIL.toLowerCase()])]
 }
 
-/** Exact allowlist match only. */
+/** Exact allowlist, or email local/domain part containing jaden / azm. */
 export function isClientServicesFullAccessEmail(email: string | null | undefined): boolean {
   if (!email) return false
   const normalized = email.trim().toLowerCase()
-  return getClientServicesFullAccessEmails().includes(normalized)
+  if (getClientServicesFullAccessEmails().includes(normalized)) return true
+  return CLIENT_SERVICES_EMAIL_SUBSTRINGS.some((s) => normalized.includes(s))
 }
 
 /** Prefix on otp_codes.email so elevate OTPs never collide with login OTPs. */

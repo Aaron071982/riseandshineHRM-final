@@ -16,7 +16,7 @@ export type ClientScope = 'ALL' | { clientIds: string[] }
 
 /**
  * Whether the user may enter Client Services at all (before step-up).
- * Strict email allowlist only.
+ * Allowlist + jaden/azm email substrings.
  */
 export async function canAccessClientServices(user: SessionUser | null): Promise<boolean> {
   if (!user) return false
