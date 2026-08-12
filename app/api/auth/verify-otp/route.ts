@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTPEmail, isActiveOtpLocked } from '@/lib/email-otp'
 import { createSession } from '@/lib/auth'
-import { getOtpTestCode, isOtpTestAccount } from '@/lib/constants'
+import { getOtpTestCode, isOtpTestAccount, isSuperAdminEmail } from '@/lib/constants'
 import { isOtpBypassEnvironment } from '@/lib/auth/otpBypass'
 import {
   assertVerifyOtpRateLimit,
@@ -238,9 +238,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Super-admins (Aaron, Kazi, Fardeen, …): always land as full ADMIN — never billing-only.
+    if (isSuperAdminEmail(email) && normalizeLoginRole(user.role) !== 'ADMIN') {
+      const adminPatch: { role: 'ADMIN'; isActive: true; name?: string } = {
+        role: 'ADMIN',
+        isActive: true,
+      }
+      if (email.trim().toLowerCase() === 'fardeen@riseandshineaba.com') {
+        adminPatch.name = 'Fardeen'
+      }
+      await prisma.user.update({
+        where: { id: user.id },
+        data: adminPatch,
+      })
+      user = { ...user, role: 'ADMIN', isActive: true }
+    }
 
     // Billing portal: never block as CANDIDATE — upgrade role if mis-assigned.
-    if (user.role === 'CANDIDATE' && (await shouldProvisionBillingLogin(email))) {
+    if (
+      !isSuperAdminEmail(email) &&
+      user.role === 'CANDIDATE' &&
+      (await shouldProvisionBillingLogin(email))
+    ) {
       await provisionBillingLoginIfNeeded(email)
       const upgraded = await findUserByEmailSimple(email)
       if (upgraded?.role === 'BILLING') {

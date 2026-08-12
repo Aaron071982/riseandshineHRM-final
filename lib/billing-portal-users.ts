@@ -1,11 +1,11 @@
 import { prisma } from '@/lib/prisma'
+import { isSuperAdminEmail } from '@/lib/constants'
 
 /** Billing-only portal logins (role BILLING). Extend via BILLING_PORTAL_EMAILS env (comma-separated). */
 export const BILLING_PORTAL_USERS = [
   { email: 'rafique@riseandshineaba.com', name: 'Rafique' },
   { email: 'afrin@riseandshineaba.com', name: 'Afrin' },
   { email: 'jaden.j.brown2025@gmail.com', name: 'Jaden Brown' },
-  { email: 'fardeen@riseandshineaba.com', name: 'Fardeen' },
 ] as const
 
 export function getBillingPortalEmailSet(): Set<string> {
@@ -19,7 +19,10 @@ export function getBillingPortalEmailSet(): Set<string> {
 
 export function isBillingPortalEmail(email: string | null | undefined): boolean {
   if (!email) return false
-  return getBillingPortalEmailSet().has(email.trim().toLowerCase())
+  const normalized = email.trim().toLowerCase()
+  // Super-admins must never be treated as billing-only portal users.
+  if (isSuperAdminEmail(normalized)) return false
+  return getBillingPortalEmailSet().has(normalized)
 }
 
 function displayNameForBillingEmail(normalizedEmail: string, fallback?: string | null): string {
@@ -45,6 +48,7 @@ export function isBillingLoginEmail(email: string): boolean {
 
 /** True if this email should use the billing portal (allowlist or billing_profiles row). */
 export async function shouldProvisionBillingLogin(email: string): Promise<boolean> {
+  if (isSuperAdminEmail(email)) return false
   if (isBillingPortalEmail(email)) return true
   const profile = await findBillingProfileByEmail(email)
   return !!profile?.email
@@ -66,6 +70,7 @@ async function createBillingUserMinimal(normalized: string, name: string): Promi
 /**
  * Create or update an active User with role BILLING for portal login.
  * Profile creation is best-effort — login still works if user_profiles is missing.
+ * Never downgrades super-admin emails to BILLING.
  */
 export async function ensureBillingLoginUser(
   email: string,
@@ -74,6 +79,9 @@ export async function ensureBillingLoginUser(
   const normalized = email.trim().toLowerCase()
   if (!normalized.includes('@')) {
     throw new Error('Invalid email for billing login user')
+  }
+  if (isSuperAdminEmail(normalized)) {
+    throw new Error('Super-admin emails cannot be provisioned as billing-only users')
   }
 
   const name = displayNameForBillingEmail(normalized, fullName)
@@ -127,6 +135,8 @@ export async function ensureBillingPortalUser(email: string): Promise<{ id: stri
  */
 export async function provisionBillingLoginIfNeeded(email: string): Promise<void> {
   const normalized = email.trim().toLowerCase()
+  if (isSuperAdminEmail(normalized)) return
+
   let fullName: string | null = null
 
   if (isBillingPortalEmail(normalized)) {
@@ -154,10 +164,12 @@ export async function syncBillingProfileLoginUsers(): Promise<number> {
   for (const p of profiles) {
     const email = p.email?.trim()
     if (!email) continue
+    if (isSuperAdminEmail(email)) continue
     await ensureBillingLoginUser(email, p.fullName)
     count++
   }
   for (const { email, name } of BILLING_PORTAL_USERS) {
+    if (isSuperAdminEmail(email)) continue
     await ensureBillingLoginUser(email, name)
     count++
   }
