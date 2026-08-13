@@ -203,6 +203,39 @@ export default function NewCycleWizardPage() {
     }
   }
 
+  const clearSessionReviews = async () => {
+    if (!cycleId) return
+    if (
+      !confirm(
+        'Accept appointed hours and clear session review flags (date mismatch / missing appointment times)? Payable hours will not change.'
+      )
+    ) {
+      return
+    }
+    setLoading(true)
+    setFinalizeError(null)
+    try {
+      const res = await fetch(`/api/billing/cycles/${cycleId}/bulk-actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clear_session_review_flags' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setFinalizeError(data.error || 'Could not clear review flags')
+        return
+      }
+      setEntries((prev) =>
+        prev.map((e) => ({
+          ...e,
+          sessions: (e.sessions ?? []).map((s) => ({ ...s, reviewFlag: null })),
+        }))
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const finalize = async () => {
     if (!cycleId) return
     setLoading(true)
@@ -424,6 +457,12 @@ export default function NewCycleWizardPage() {
                   <li key={`${b.type}-${b.entryId}-${i}`}>{b.message}</li>
                 ))}
               </ul>
+              {blockers.some((b) => b.type === 'session_review') && (
+                <p className="mt-2 text-xs">
+                  Date mismatches do not change payable hours. On the Finalize step, use{' '}
+                  <strong>Accept session reviews</strong> if the hours are correct.
+                </p>
+              )}
             </div>
           )}
           <div className="overflow-x-auto rounded-lg border dark:border-[var(--border-subtle)]">
@@ -533,8 +572,16 @@ export default function NewCycleWizardPage() {
               </div>
             </div>
             {blockers.length > 0 && (
-              <div className="rounded-md bg-red-50 text-red-800 px-4 py-3 text-sm">
-                Cannot finalize until all blockers are resolved ({blockers.length} remaining).
+              <div className="rounded-md bg-red-50 text-red-800 px-4 py-3 text-sm space-y-2">
+                <p>
+                  Cannot finalize until all blockers are resolved ({blockers.length} remaining).
+                </p>
+                {blockers.some((b) => b.type === 'session_review') && (
+                  <p className="text-xs">
+                    If hours look correct despite date mismatches, click{' '}
+                    <strong>Accept session reviews</strong> first — payable hours stay the same.
+                  </p>
+                )}
               </div>
             )}
             {finalizeError && (
@@ -545,6 +592,21 @@ export default function NewCycleWizardPage() {
                 Back
               </Button>
               <div className="flex flex-wrap gap-2">
+                {cycleId && blockers.some((b) => b.type === 'session_review') && (
+                  <Button
+                    variant="outline"
+                    className="border-amber-300 text-amber-900 hover:bg-amber-50"
+                    onClick={clearSessionReviews}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Check className="w-4 h-4 mr-2" />
+                    )}
+                    Accept session reviews
+                  </Button>
+                )}
                 {cycleId && (
                   <>
                     <HoursConfirmationModal

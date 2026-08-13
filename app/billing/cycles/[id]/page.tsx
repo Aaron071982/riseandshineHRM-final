@@ -218,6 +218,12 @@ export default async function CycleDetailPage({ params }: { params: { id: string
               <li key={`${b.type}-${b.entryId}-${i}`}>{b.message}</li>
             ))}
           </ul>
+          {blockers.some((b) => b.type === 'session_review') && (
+            <p className="mt-2 text-xs">
+              Date mismatches / missing appointment times do not change payable hours. If the hours
+              look correct, use <strong>Accept session reviews</strong> (top right), then finalize.
+            </p>
+          )}
         </div>
       )}
 

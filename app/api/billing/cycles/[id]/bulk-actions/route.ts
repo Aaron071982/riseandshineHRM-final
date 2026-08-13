@@ -63,5 +63,28 @@ export async function POST(
     return NextResponse.json({ count })
   }
 
+  /**
+   * Accept appointed-hours as-is and clear session review flags that block finalize
+   * (date mismatch / no overlap / missing appointment times). Hours are unchanged.
+   */
+  if (body.action === 'clear_session_review_flags') {
+    const entries = await prisma.billingEntry.findMany({
+      where: { billingCycleId: params.id, isExcluded: false },
+      select: { id: true },
+    })
+    const entryIds = entries.map((e) => e.id)
+    if (entryIds.length === 0) {
+      return NextResponse.json({ cleared: 0 })
+    }
+    const result = await prisma.billingSession.updateMany({
+      where: {
+        billingEntryId: { in: entryIds },
+        reviewFlag: { not: null },
+      },
+      data: { reviewFlag: null },
+    })
+    return NextResponse.json({ cleared: result.count })
+  }
+
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
