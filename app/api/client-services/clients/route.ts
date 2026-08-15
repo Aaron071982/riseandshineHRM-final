@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getClientIpFromRequest } from '@/lib/client-ip'
-import {
-  requireClientServicesSession,
-  scopeAllowsClient,
-} from '@/lib/client-services/access'
+import { requireClientServicesSession } from '@/lib/client-services/access'
+import { getVisibleClientsWhere } from '@/lib/crm/access'
 import { logClientAccess } from '@/lib/client-services/audit'
 import {
   deriveMetricsForClients,
@@ -13,6 +11,8 @@ import {
 } from '@/lib/client-services/serviceStatus'
 import { getUnlinkedScheduleClientNames } from '@/lib/client-services/scheduleSync'
 import { getClientSchedulePeriod } from '@/lib/client-services/schedulePeriod'
+import { caseloadQueueWhere, isClientStage } from '@/lib/crm/caseloadFilters'
+import { daysInStage, isStalled } from '@/lib/crm/thresholds'
 import type { Prisma, ServiceClientStatus } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const auth = await requireClientServicesSession()
   if (auth.response) return auth.response
-  const { user, scope } = auth
+  const { user } = auth
 
   const sp = request.nextUrl.searchParams
   const q = sp.get('q')?.trim() || ''
@@ -30,13 +30,34 @@ export async function GET(request: NextRequest) {
   const cc = sp.get('cc')?.trim() || ''
   const insurance = sp.get('insurance')?.trim() || ''
   const docs = sp.get('docs')?.trim() || ''
-  const serviceStatus = sp.get('serviceStatus')?.trim() || '' // board bucket
-  const alert = sp.get('alert')?.trim() || '' // dashboard alert filter key
+  const serviceStatus = sp.get('serviceStatus')?.trim() || ''
+  const alert = sp.get('alert')?.trim() || ''
+  const stage = sp.get('stage')?.trim() || ''
+  const queue = sp.get('queue')?.trim() || ''
+  const group = sp.get('group')?.trim() || ''
 
-  const where: Prisma.ServiceClientWhereInput = {}
+  const where: Prisma.ServiceClientWhereInput = {
+    ...getVisibleClientsWhere(user),
+  }
 
-  if (scope !== 'ALL') {
-    where.id = { in: scope.clientIds.length ? scope.clientIds : ['__none__'] }
+  if (stage && isClientStage(stage)) {
+    where.stage = stage
+    if (!where.pipelineStatus) where.pipelineStatus = 'LIVE'
+  }
+
+  if (queue) {
+    const qw = caseloadQueueWhere(queue)
+    if (qw) Object.assign(where, qw)
+  }
+
+  if (group === 'pipeline') {
+    Object.assign(where, caseloadQueueWhere('pipeline') ?? {})
+  } else if (group === 'staffing') {
+    Object.assign(where, caseloadQueueWhere('staffing') ?? {})
+  } else if (group === 'active') {
+    Object.assign(where, caseloadQueueWhere('active') ?? {})
+  } else if (group === 'on_hold') {
+    Object.assign(where, caseloadQueueWhere('on_hold') ?? {})
   }
 
   if (status && ['NEW', 'ACTIVE', 'ON_HOLD', 'DISCHARGED'].includes(status)) {
@@ -61,8 +82,32 @@ export async function GET(request: NextRequest) {
     prisma.serviceClient.findMany({
       where,
       include: {
-        btAssignments: { where: { status: 'ACTIVE' }, orderBy: { createdAt: 'asc' } },
+        btAssignments: {
+          where: { status: 'ACTIVE' },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+          include: {
+            rbtProfile: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+          },
+        },
         documents: { select: { collected: true } },
+        authorizations: {
+          where: { authType: 'TREATMENT', status: 'APPROVED' },
+          orderBy: { expirationDate: 'asc' },
+          take: 1,
+          select: { expirationDate: true },
+        },
+        alerts: {
+          where: { resolvedAt: null },
+          select: { id: true },
+          take: 1,
+        },
+        tasks: {
+          where: { status: 'OPEN', dueAt: { lt: new Date() } },
+          select: { id: true },
+          take: 1,
+        },
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     }),
@@ -85,6 +130,14 @@ export async function GET(request: NextRequest) {
     const docsCollected = c.documents.filter((d) => d.collected).length
     const docsTotal = c.documents.length || 9
     const m = metricsMap.get(c.id)!
+    const primaryBt = c.btAssignments[0]
+    const rbtName = primaryBt?.rbtProfile
+      ? `${primaryBt.rbtProfile.firstName} ${primaryBt.rbtProfile.lastName}`.trim()
+      : primaryBt?.btName ?? null
+    const days = daysInStage(c)
+    const stalled = isStalled(c)
+    const needsAttention =
+      stalled || c.alerts.length > 0 || c.tasks.length > 0
     const btNames =
       m.careTeamBtNames.length > 0 ? m.careTeamBtNames : m.scheduleBtNames
     return {
@@ -93,6 +146,18 @@ export async function GET(request: NextRequest) {
       firstName: c.firstName,
       lastName: c.lastName,
       status: c.status,
+      stage: c.stage,
+      pipelineStatus: c.pipelineStatus,
+      currentOwnerDept: c.currentOwnerDept,
+      nextAction: c.nextAction,
+      nextActionDueAt: c.nextActionDueAt,
+      stageEnteredAt: c.stageEnteredAt,
+      daysInStage: days,
+      stalled,
+      needsAttention,
+      rbtName,
+      rbtProfileId: primaryBt?.rbtProfileId ?? null,
+      authExpirationDate: c.authorizations[0]?.expirationDate ?? null,
       borough: c.borough,
       addressLine: c.addressLine,
       city: c.city,
@@ -108,7 +173,6 @@ export async function GET(request: NextRequest) {
       docsCollected,
       docsTotal,
       docsComplete: docsCollected >= 9,
-      // Phase 2 derived (active schedule period)
       scheduledHoursPerWeek: m.scheduledHoursPerWeek,
       hoursGap: m.hoursGap,
       needsAdditionalHours: m.needsAdditionalHours,
@@ -153,10 +217,7 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  list = list.filter((c) => scopeAllowsClient(scope, c.id))
-
-  const unlinked =
-    scope === 'ALL' ? await getUnlinkedScheduleClientNames(period) : []
+  const unlinked = await getUnlinkedScheduleClientNames(period)
 
   await logClientAccess({
     userId: user.id,

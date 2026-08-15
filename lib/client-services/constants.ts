@@ -3,8 +3,8 @@ import { PLATFORM_OWNER_EMAIL } from '@/lib/constants'
 /** Cookie for elevated Client Services PHI session (separate from main HRM session). */
 export const CS_SESSION_COOKIE = 'cs_session'
 
-/** Elevated session TTL — 30 minutes. */
-export const CS_SESSION_DURATION_MS = 30 * 60 * 1000
+/** Elevated session TTL — 8 hours (access-code unlock). */
+export const CS_SESSION_DURATION_MS = 8 * 60 * 60 * 1000
 
 /**
  * Client Services access — exact email allowlist, plus name substrings.

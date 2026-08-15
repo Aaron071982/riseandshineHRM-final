@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { generateOTP } from '@/lib/otp'
 import { storeOTPEmail, verifyOTPEmail, sendOTPEmail } from '@/lib/email-otp'
 import {
@@ -14,17 +15,31 @@ import {
   setElevatedSessionCookie,
   clearElevatedSessionCookie,
 } from '@/lib/client-services/access'
-import { clientServicesOtpEmailKey } from '@/lib/client-services/constants'
+import {
+  clientServicesOtpEmailKey,
+  CS_SESSION_COOKIE,
+  CS_SESSION_DURATION_MS,
+} from '@/lib/client-services/constants'
 import { logClientAccess } from '@/lib/client-services/audit'
 import { prisma } from '@/lib/prisma'
-import { CS_SESSION_COOKIE } from '@/lib/client-services/constants'
 
 export const dynamic = 'force-dynamic'
 
+function timingSafeEqualString(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a)
+  const bBuf = Buffer.from(b)
+  if (aBuf.length !== bBuf.length) {
+    crypto.timingSafeEqual(aBuf, aBuf)
+    return false
+  }
+  return crypto.timingSafeEqual(aBuf, bBuf)
+}
+
 /**
- * Step-up OTP for Client Services.
- * POST { action: 'send' | 'verify' | 'logout', code?: string }
- * NO fixed/bypass codes — real emailed OTP only.
+ * Step-up for Client Services.
+ * POST { action: 'unlock' | 'send' | 'verify' | 'logout', code?: string }
+ * Preferred: action=unlock with CLIENT_SERVICES_ACCESS_CODE.
+ * Legacy OTP send/verify kept for existing ElevateGate until Phase 2 UI.
  */
 export async function POST(request: NextRequest) {
   const auth = await requireClientServicesEligibleSession()
@@ -53,6 +68,27 @@ export async function POST(request: NextRequest) {
     const res = NextResponse.json({ success: true })
     clearElevatedSessionCookie(res)
     await logClientAccess({ userId: user.id, action: 'SECTION_EXIT', ip })
+    return res
+  }
+
+  if (action === 'unlock') {
+    const expected = process.env.CLIENT_SERVICES_ACCESS_CODE?.trim()
+    if (!expected) {
+      return NextResponse.json({ error: 'Access code not configured' }, { status: 500 })
+    }
+    const submitted = (body.code ?? '').trim()
+    if (!timingSafeEqualString(submitted, expected)) {
+      await logClientAccess({ userId: user.id, action: 'UNLOCK_FAILED', ip })
+      return NextResponse.json({ error: 'Invalid access code' }, { status: 401 })
+    }
+
+    const token = await createElevatedSession(user.id, ip)
+    const res = NextResponse.json({
+      success: true,
+      expiresInHours: CS_SESSION_DURATION_MS / (60 * 60 * 1000),
+    })
+    setElevatedSessionCookie(res, token)
+    await logClientAccess({ userId: user.id, action: 'SECTION_ENTRY', ip })
     return res
   }
 
@@ -92,7 +128,10 @@ export async function POST(request: NextRequest) {
     }
 
     const token = await createElevatedSession(user.id, ip)
-    const res = NextResponse.json({ success: true, expiresInMinutes: 30 })
+    const res = NextResponse.json({
+      success: true,
+      expiresInHours: CS_SESSION_DURATION_MS / (60 * 60 * 1000),
+    })
     setElevatedSessionCookie(res, token)
     await logClientAccess({ userId: user.id, action: 'SECTION_ENTRY', ip })
     return res
@@ -102,12 +141,9 @@ export async function POST(request: NextRequest) {
 }
 
 async function sendClientServicesOtpEmail(email: string, code: string): Promise<boolean> {
-  // Reuse Resend path via temporary store — sendOTPEmail uses generic HRM copy;
-  // for PHI step-up we send a distinct subject through the same transport.
   const { Resend } = await import('resend')
   const resendApiKey = process.env.RESEND_API_KEY
   if (!resendApiKey) {
-    // Dev without Resend: still store OTP; code is NOT returned in response.
     console.info('[client-services] OTP generated (no RESEND_API_KEY); check otp_codes / get-latest-otp')
     return true
   }
@@ -135,7 +171,6 @@ async function sendClientServicesOtpEmail(email: string, code: string): Promise<
     return true
   } catch (err) {
     console.error('[client-services] OTP email failed', err)
-    // Fall back to shared helper
     return sendOTPEmail(email, code)
   }
 }

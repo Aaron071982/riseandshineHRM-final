@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Users } from 'lucide-react'
+import { LayoutDashboard, Users } from 'lucide-react'
 import AppShell from '@/components/shell/AppShell'
 import type { ShellNavItem } from '@/components/shell/AppSidebar'
 
 const CS_NAV: ShellNavItem[] = [
-  { href: '/client-services', label: 'Clients', icon: Users },
+  { href: '/client-services', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/client-services/clients', label: 'Clients', icon: Users },
 ]
 
 export default function ClientServicesLayout({
@@ -29,10 +30,12 @@ export default function ClientServicesLayout({
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch('/api/client-services/dashboard', { credentials: 'include' })
+        const res = await fetch('/api/client-services/crm-dashboard', {
+          credentials: 'include',
+        })
         if (!res.ok || cancelled) return
         const data = await res.json()
-        if (!cancelled) setNeedsAction(data.alerts?.needsRbt ?? 0)
+        if (!cancelled) setNeedsAction(data.kpis?.needsAttention ?? 0)
       } catch {
         // ignore
       }
@@ -52,17 +55,27 @@ export default function ClientServicesLayout({
     router.push('/admin/dashboard')
   }
 
-  const onDetail = pathname.startsWith('/client-services/clients/')
+  const onDetail =
+    pathname.startsWith('/client-services/clients/') &&
+    pathname !== '/client-services/clients'
+  const onCaseload = pathname === '/client-services/clients'
   const crumbs = onDetail
     ? [
         { label: 'Admin', href: '/admin/dashboard' },
         { label: 'Client Services', href: '/client-services' },
+        { label: 'Clients', href: '/client-services/clients' },
         { label: 'Client' },
       ]
-    : [
-        { label: 'Admin', href: '/admin/dashboard' },
-        { label: 'Client Services' },
-      ]
+    : onCaseload
+      ? [
+          { label: 'Admin', href: '/admin/dashboard' },
+          { label: 'Client Services', href: '/client-services' },
+          { label: 'Clients' },
+        ]
+      : [
+          { label: 'Admin', href: '/admin/dashboard' },
+          { label: 'Client Services' },
+        ]
 
   if (!elevated) {
     return (
@@ -89,6 +102,11 @@ export default function ClientServicesLayout({
         window.dispatchEvent(
           new CustomEvent('cs-global-search', { detail: { q: search } })
         )
+        if (!pathname.startsWith('/client-services/clients')) {
+          router.push(
+            `/client-services/clients${search ? `?q=${encodeURIComponent(search)}` : ''}`
+          )
+        }
       }}
       showSearch={!onDetail}
     >

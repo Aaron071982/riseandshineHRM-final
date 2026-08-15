@@ -6,6 +6,7 @@ import {
   isClientServicesFullAccessEmail,
   enforceClientScope,
 } from '@/lib/client-services/access'
+import { getVisibleClientsWhere } from '@/lib/crm/access'
 import { logClientAccess } from '@/lib/client-services/audit'
 import {
   createManualClientSessions,
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
       : // Still surface period names even without q so dropdown isn't empty for MANUAL rows
         searchScheduleClientNames(period, prefer || '', { includeLinked: true, limit: 200 }),
     prisma.serviceClient.findMany({
+      where: getVisibleClientsWhere(user),
       select: { id: true, clientCode: true, firstName: true, lastName: true },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     }),

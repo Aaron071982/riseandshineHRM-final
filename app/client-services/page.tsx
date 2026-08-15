@@ -1,15 +1,11 @@
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
-import { isClientServicesFullAccessEmail } from '@/lib/client-services/constants'
-import ClientServicesDashboard from '@/components/client-services/ClientServicesDashboard'
+import { getClientServicesUser } from '@/lib/crm/access'
+import { loadManagerDashboard } from '@/lib/crm/dashboard'
+import ManagerDashboard from '@/components/crm/ManagerDashboard'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ClientServicesPage() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('session')?.value
-  const user = token ? await validateSession(token) : null
-  const canImport = isClientServicesFullAccessEmail(user?.email)
-
-  return <ClientServicesDashboard canImport={canImport} />
+export default async function ClientServicesHomePage() {
+  const user = await getClientServicesUser()
+  const data = await loadManagerDashboard(user)
+  return <ManagerDashboard data={data} />
 }

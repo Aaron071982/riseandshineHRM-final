@@ -6,8 +6,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Session-mode / direct Postgres (port 5432). Required for prisma db push against Supabase.
+  directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -413,6 +415,8 @@ model User {
   terminationsDecided          Termination[]             @relation("TerminationDecisionMaker")
   rbtScheduleAssignmentsCreated RbtScheduleAssignment[]  @relation("RbtScheduleAssignmentCreatedBy")
   serviceClientsCreated        ServiceClient[]           @relation("ServiceClientCreatedBy")
+  serviceClientsOwned          ServiceClient[]           @relation("ServiceClientCurrentOwner")
+  serviceClientsCaseCoordinated ServiceClient[]          @relation("ServiceClientCaseCoordinator")
   serviceClientDocsCollected   ServiceClientDocument[]   @relation("ServiceClientDocCollectedBy")
   serviceClientNotesAuthored   ServiceClientNote[]       @relation("ServiceClientNoteAuthor")
   clientAccessLogs             ClientAccessLog[]
@@ -424,6 +428,12 @@ model User {
   clientBoroughsUpdated         ClientBorough[]          @relation("ClientBoroughUpdatedBy")
   payrollRunsUploaded           PayrollRun[]             @relation("PayrollRunUploadedBy")
   companyDocumentsUploaded      CompanyDocument[]        @relation("CompanyDocumentUploadedBy")
+  clientRequirementsCompleted  ClientRequirement[]       @relation("ClientRequirementCompletedBy")
+  clientTasksAssigned          ClientTask[]              @relation("ClientTaskAssignedTo")
+  clientTasksCompleted         ClientTask[]              @relation("ClientTaskCompletedBy")
+  clientTasksCreated           ClientTask[]              @relation("ClientTaskCreatedBy")
+  clientCommunicationsSent     ClientCommunication[]     @relation("ClientCommunicationSentBy")
+  clientAlertsResolved         ClientAlert[]             @relation("ClientAlertResolvedBy")
 
   @@map("users")
 }
@@ -723,6 +733,7 @@ model RBTProfile {
   payStatements               RbtPayStatement[]
   payrollRunEntries           PayrollRunEntry[]
   companyDocumentRecipients   CompanyDocumentRecipient[]
+  serviceClientBtAssignments  ServiceClientBtAssignment[]
 
   @@index([artemisTrainingCompleted])
   @@index([postHireStage])
@@ -1644,6 +1655,8 @@ model BCBAProfile {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
+  serviceClients ServiceClient[] @relation("ServiceClientBcbaProfile")
+
   @@map("bcba_profiles")
 }
 
@@ -2481,13 +2494,154 @@ enum ServiceClientDocumentType {
   MEET_AND_GREET_FORM
 }
 
+enum ClientStage {
+  INQUIRY
+  INTAKE
+  CONSENT
+  DOCUMENTS
+  BENEFITS
+  ASSESSMENT
+  TREATMENT_PLAN
+  AUTHORIZATION
+  APPROVED
+  READY_FOR_STAFFING
+  RBT_SEARCH
+  RBT_ASSIGNED
+  SCHEDULE_COORDINATION
+  SCHEDULE_CONFIRMED
+  PRE_START
+  ACTIVE
+}
+
+enum ClientPipelineStatus {
+  LIVE
+  ON_HOLD
+  DISCHARGED
+  LOST
+}
+
+enum ClientOwnerDept {
+  INTAKE
+  CASE_COORDINATION
+  CLINICAL
+  AUTHORIZATION
+  STAFFING
+}
+
+enum ClientReferralSource {
+  PHONE
+  WEBSITE
+  EMAIL
+  REFERRAL
+  SOCIAL_MEDIA
+  PROVIDER
+  COMMUNITY
+  OTHER
+}
+
+enum RequirementType {
+  DOCUMENT
+  FIELD
+  TASK
+}
+
+enum RequirementStatus {
+  PENDING
+  RECEIVED
+  MISSING
+  EXPIRED
+  NOT_APPLICABLE
+  COMPLETE
+}
+
+enum AuthType {
+  ASSESSMENT
+  TREATMENT
+}
+
+enum AuthStatus {
+  REQUESTED
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+  CANCELLED
+}
+
+enum CommTemplate {
+  INQUIRY_ACK
+  CONSENT_REQUEST
+  DOCS_NEEDED
+  BENEFITS_UPDATE
+  ASSESSMENT_SCHEDULED
+  AUTH_APPROVED
+  READY_FOR_STAFFING
+  RBT_ASSIGNED
+  SCHEDULE_CONFIRMED
+  SERVICES_STARTED
+  MANUAL
+}
+
+enum CommChannel {
+  EMAIL
+  PHONE
+  SMS
+}
+
+enum CommDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum ClientAlertType {
+  AUTH_EXPIRING
+  UNCONTACTED_INQUIRY
+  DOCS_MISSING
+  STAGE_STALLED
+  RBT_REPLACEMENT_NEEDED
+  SERVICE_GAP
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  URGENT
+}
+
+enum AssignmentStage {
+  SEARCHING
+  CONTACTED
+  INTERESTED
+  MATCH_PENDING
+  ASSIGNED
+}
+
 model ServiceClient {
-  id                   String              @id @default(cuid())
-  clientCode           String              @unique
+  id                   String                @id @default(cuid())
+  clientCode           String                @unique
   firstName            String
   lastName             String
-  status               ServiceClientStatus @default(NEW)
-  dateOfBirth          DateTime?           @db.Date
+  /// @deprecated Prefer pipelineStatus + stage; kept for backward compatibility.
+  status               ServiceClientStatus   @default(NEW)
+  stage                ClientStage           @default(INQUIRY)
+  pipelineStatus       ClientPipelineStatus  @default(LIVE)
+  stageEnteredAt       DateTime?
+  currentOwnerDept     ClientOwnerDept?
+  currentOwnerUserId   String?
+  caseCoordinatorUserId String?
+  bcbaProfileId        String?
+  nextAction           String?
+  nextActionDueAt      DateTime?
+  referralSource       ClientReferralSource?
+  inquiryReceivedAt    DateTime?
+  lastParentContactAt  DateTime?
+  actualServiceStartDate DateTime?
+  dateOfBirth          DateTime?             @db.Date
   addressLine          String?
   city                 String?
   borough              String?
@@ -2502,31 +2656,44 @@ model ServiceClient {
   parentRelationship   String?
   bcbaName             String?
   caseCoordinatorName  String?
-  serviceStartDate     DateTime?           @db.Date
-  serviceEndDate       DateTime?           @db.Date
+  serviceStartDate     DateTime?             @db.Date
+  serviceEndDate       DateTime?             @db.Date
   authLengthMonths     Int?
   authHours            Float?
   currentHoursPerWeek  Float?
-  notes                String?             @db.Text
+  notes                String?               @db.Text
   createdBy            String?
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
-  createdByUser User?                        @relation("ServiceClientCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
-  btAssignments ServiceClientBtAssignment[]
-  documents     ServiceClientDocument[]
-  clientNotes   ServiceClientNote[]
-  accessLogs    ClientAccessLog[]
+  createdByUser       User?                        @relation("ServiceClientCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  currentOwnerUser    User?                        @relation("ServiceClientCurrentOwner", fields: [currentOwnerUserId], references: [id], onDelete: SetNull)
+  caseCoordinatorUser User?                        @relation("ServiceClientCaseCoordinator", fields: [caseCoordinatorUserId], references: [id], onDelete: SetNull)
+  bcbaProfile         BCBAProfile?                 @relation("ServiceClientBcbaProfile", fields: [bcbaProfileId], references: [id], onDelete: SetNull)
+  btAssignments       ServiceClientBtAssignment[]
+  documents           ServiceClientDocument[]
+  clientNotes         ServiceClientNote[]
+  accessLogs          ClientAccessLog[]
   scheduleAssignments RbtScheduleAssignment[]
-  serviceBreaks ClientServiceBreak[]
-  rbtBreaks     ClientRbtBreak[]
-  statusHistory ServiceClientStatusHistory[]
+  serviceBreaks       ClientServiceBreak[]
+  rbtBreaks           ClientRbtBreak[]
+  statusHistory       ServiceClientStatusHistory[]
+  requirements        ClientRequirement[]
+  authorizations      ClientAuthorization[]
+  tasks               ClientTask[]
+  communications      ClientCommunication[]
+  alerts              ClientAlert[]
 
   @@index([status])
+  @@index([stage])
+  @@index([pipelineStatus])
   @@index([borough])
   @@index([bcbaName])
   @@index([caseCoordinatorName])
   @@index([lastName, firstName])
+  @@index([currentOwnerUserId])
+  @@index([caseCoordinatorUserId])
+  @@index([bcbaProfileId])
   @@map("service_clients")
 }
 
@@ -2534,14 +2701,18 @@ model ServiceClientBtAssignment {
   id              String                    @id @default(cuid())
   serviceClientId String
   btName          String
+  rbtProfileId    String?
+  assignmentStage AssignmentStage           @default(ASSIGNED)
   isPrimary       Boolean                   @default(false)
   status          ServiceBtAssignmentStatus @default(ACTIVE)
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
 
   serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  rbtProfile    RBTProfile?   @relation(fields: [rbtProfileId], references: [id], onDelete: SetNull)
 
   @@index([serviceClientId, status])
+  @@index([rbtProfileId])
   @@map("service_client_bt_assignments")
 }
 
@@ -2670,7 +2841,12 @@ model ServiceClientStatusHistory {
   id              String               @id @default(cuid())
   serviceClientId String
   fromStatus      ServiceClientStatus?
-  toStatus        ServiceClientStatus
+  /// Legacy status target; nullable for stage-only transitions.
+  toStatus        ServiceClientStatus?
+  fromStage       ClientStage?
+  toStage         ClientStage?
+  /// Seconds spent in the previous status/stage before this transition.
+  durationSeconds Int?
   reason          String?
   changedBy       String?
   createdAt       DateTime             @default(now())
@@ -2680,6 +2856,132 @@ model ServiceClientStatusHistory {
 
   @@index([serviceClientId, createdAt])
   @@map("service_client_status_history")
+}
+
+model ClientRequirement {
+  id                   String            @id @default(cuid())
+  serviceClientId      String
+  stage                ClientStage
+  key                  String
+  label                String
+  type                 RequirementType
+  status               RequirementStatus @default(PENDING)
+  isRequiredToAdvance  Boolean           @default(true)
+  fileUrl              String?
+  expiresAt            DateTime?
+  completedAt          DateTime?
+  completedByUserId    String?
+  notes                String?           @db.Text
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  serviceClient   ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  completedByUser User?         @relation("ClientRequirementCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([serviceClientId, stage])
+  @@map("client_requirements")
+}
+
+model ClientAuthorization {
+  id                String     @id @default(cuid())
+  serviceClientId   String
+  authType          AuthType
+  payerName         String
+  authNumber        String?
+  status            AuthStatus @default(REQUESTED)
+  requestedAt       DateTime?
+  approvedAt        DateTime?
+  effectiveDate     DateTime?
+  expirationDate    DateTime?
+  renderingProvider String?
+  notes             String?    @db.Text
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  serviceClient ServiceClient             @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  lines         ClientAuthorizationLine[]
+
+  @@index([serviceClientId])
+  @@index([expirationDate])
+  @@map("client_authorizations")
+}
+
+model ClientAuthorizationLine {
+  id              String @id @default(cuid())
+  authorizationId String
+  cptCode         String
+  unitsAuthorized Int
+  unitsUsed       Int    @default(0)
+  description     String?
+
+  authorization ClientAuthorization @relation(fields: [authorizationId], references: [id], onDelete: Cascade)
+
+  @@index([authorizationId])
+  @@map("client_authorization_lines")
+}
+
+model ClientTask {
+  id               String          @id @default(cuid())
+  serviceClientId  String
+  title            String
+  description      String?         @db.Text
+  ownerDept        ClientOwnerDept
+  assignedToUserId String?
+  dueAt            DateTime?
+  status           TaskStatus      @default(OPEN)
+  completedAt      DateTime?
+  completedByUserId String?
+  createdByUserId  String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  serviceClient   ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  assignedToUser  User?         @relation("ClientTaskAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  completedByUser User?         @relation("ClientTaskCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  createdByUser   User          @relation("ClientTaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([serviceClientId, status])
+  @@index([assignedToUserId, status])
+  @@map("client_tasks")
+}
+
+model ClientCommunication {
+  id              String        @id @default(cuid())
+  serviceClientId String
+  template        CommTemplate
+  channel         CommChannel
+  direction       CommDirection
+  subject         String?
+  body            String?       @db.Text
+  sentByUserId    String?
+  sentAt          DateTime      @default(now())
+  status          String?
+  createdAt       DateTime      @default(now())
+
+  serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  sentByUser    User?         @relation("ClientCommunicationSentBy", fields: [sentByUserId], references: [id], onDelete: SetNull)
+
+  @@index([serviceClientId, sentAt])
+  @@map("client_communications")
+}
+
+model ClientAlert {
+  id              String          @id @default(cuid())
+  serviceClientId String
+  alertType       ClientAlertType
+  severity        AlertSeverity
+  message         String
+  dueAt           DateTime?
+  resolvedAt      DateTime?
+  resolvedByUserId String?
+  createdAt       DateTime        @default(now())
+
+  serviceClient   ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  resolvedByUser  User?         @relation("ClientAlertResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([serviceClientId])
+  @@index([resolvedAt])
+  @@map("client_alerts")
 }
 
 

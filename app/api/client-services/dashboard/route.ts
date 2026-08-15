@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import { requireClientServicesSession } from '@/lib/client-services/access'
+import { getVisibleClientsWhere } from '@/lib/crm/access'
 import { logClientAccess } from '@/lib/client-services/audit'
 import {
   deriveMetricsForClients,
@@ -47,22 +48,12 @@ function trendFromCounts(current: number, previous: number): {
 export async function GET(request: NextRequest) {
   const auth = await requireClientServicesSession()
   if (auth.response) return auth.response
-  const { user, scope } = auth
+  const { user } = auth
 
   const range = parseRange(request.nextUrl.searchParams.get('range'))
   const window = rangeWindow(range)
 
-  const scopeWhere: Prisma.ServiceClientWhereInput =
-    scope === 'ALL'
-      ? {}
-      : { id: { in: scope.clientIds.length ? scope.clientIds : ['__none__'] } }
-
-  const scopedIds =
-    scope === 'ALL'
-      ? undefined
-      : scope.clientIds.length
-        ? scope.clientIds
-        : ['__none__']
+  const scopeWhere: Prisma.ServiceClientWhereInput = getVisibleClientsWhere(user)
 
   const [clients, threshold, period] = await Promise.all([
     prisma.serviceClient.findMany({
@@ -76,6 +67,8 @@ export async function GET(request: NextRequest) {
     getClientSchedulePeriod(),
   ])
 
+  const scopedIds = clients.map((c) => c.id)
+
   const [metricsMap, unlinked] = await Promise.all([
     deriveMetricsForClients(
       clients.map((c) => ({
@@ -87,7 +80,7 @@ export async function GET(request: NextRequest) {
       threshold,
       period
     ),
-    scope === 'ALL' ? getUnlinkedScheduleClientNames(period) : Promise.resolve([]),
+    getUnlinkedScheduleClientNames(period),
   ])
 
   let noService = 0
@@ -163,8 +156,7 @@ export async function GET(request: NextRequest) {
         }
       : null
 
-  const breakWhereBase =
-    scopedIds != null ? { serviceClientId: { in: scopedIds } } : {}
+  const breakWhereBase = { serviceClientId: { in: scopedIds.length ? scopedIds : ['__none__'] } }
 
   const [newClients, newClientsPrev, breaksNow, breaksPrev] = await Promise.all([
     prisma.serviceClient.count({ where: clientCreatedWhere }),

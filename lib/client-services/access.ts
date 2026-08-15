@@ -25,12 +25,15 @@ export async function canAccessClientServices(user: SessionUser | null): Promise
 
 /**
  * Scope for list/detail queries.
+ * Prefer getVisibleClientsWhere from lib/crm/access for Prisma filters.
  * Allowlisted users → full caseload ('ALL').
  */
 export async function getClientScopeForUser(user: SessionUser): Promise<ClientScope> {
   if (isClientServicesFullAccessEmail(user.email)) {
     return 'ALL'
   }
+  // TODO: coordinator role source — coordinators get empty id list here;
+  // use getVisibleClientsWhere({ caseCoordinatorUserId }) for real scoping.
   return { clientIds: [] }
 }
 
@@ -186,19 +189,28 @@ export async function requireClientServicesEligibleSession(): Promise<
 
 export async function enforceClientScope(
   user: SessionUser,
-  scope: ClientScope,
+  _scope: ClientScope,
   clientId: string,
   request?: NextRequest
 ): Promise<NextResponse | null> {
-  if (scopeAllowsClient(scope, clientId)) return null
-  const ip = request ? getClientIpFromRequest(request) : null
-  await logClientAccess({
-    userId: user.id,
-    serviceClientId: clientId,
-    action: 'ACCESS_VIOLATION',
-    ip,
-  })
-  return NextResponse.json({ error: 'Forbidden — outside caseload' }, { status: 403 })
+  // Delegate to CRM access seam (full-access vs case-coordinator scoping).
+  const { assertCanViewClient, CrmAccessError } = await import('@/lib/crm/access')
+  try {
+    await assertCanViewClient(user, clientId)
+    return null
+  } catch (err) {
+    if (err instanceof CrmAccessError) {
+      const ip = request ? getClientIpFromRequest(request) : null
+      await logClientAccess({
+        userId: user.id,
+        serviceClientId: clientId,
+        action: 'ACCESS_VIOLATION',
+        ip,
+      })
+      return NextResponse.json({ error: 'Forbidden — outside caseload' }, { status: 403 })
+    }
+    throw err
+  }
 }
 
 export { isClientServicesFullAccessEmail }

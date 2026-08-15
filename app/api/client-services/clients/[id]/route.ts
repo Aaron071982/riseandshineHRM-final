@@ -3,9 +3,14 @@ import { prisma } from '@/lib/prisma'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import {
   requireClientServicesSession,
-  enforceClientScope,
   isClientServicesFullAccessEmail,
 } from '@/lib/client-services/access'
+import {
+  assertCanEditClient,
+  assertCanViewClient,
+  CrmAccessError,
+  getVisibleClientsWhere,
+} from '@/lib/crm/access'
 import { logClientAccess } from '@/lib/client-services/audit'
 import { ageFromDob } from '@/lib/client-services/parse'
 import { SERVICE_CLIENT_DOCUMENT_LABELS } from '@/lib/client-services/constants'
@@ -26,14 +31,20 @@ type Ctx = { params: Promise<{ id: string }> }
 export async function GET(request: NextRequest, context: Ctx) {
   const auth = await requireClientServicesSession()
   if (auth.response) return auth.response
-  const { user, scope } = auth
+  const { user } = auth
   const { id } = await context.params
 
-  const denied = await enforceClientScope(user, scope, id, request)
-  if (denied) return denied
+  try {
+    await assertCanViewClient(user, id)
+  } catch (err) {
+    if (err instanceof CrmAccessError) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: err.status })
+    }
+    throw err
+  }
 
-  const client = await prisma.serviceClient.findUnique({
-    where: { id },
+  const client = await prisma.serviceClient.findFirst({
+    where: { id, ...getVisibleClientsWhere(user) },
     include: {
       btAssignments: { orderBy: [{ status: 'asc' }, { createdAt: 'asc' }] },
       documents: { orderBy: { documentType: 'asc' } },
@@ -111,7 +122,7 @@ export async function GET(request: NextRequest, context: Ctx) {
   await logClientAccess({
     userId: user.id,
     serviceClientId: id,
-    action: 'CLIENT_VIEW',
+    action: 'VIEW',
     ip: getClientIpFromRequest(request),
   })
 
@@ -145,13 +156,19 @@ export async function GET(request: NextRequest, context: Ctx) {
 export async function PATCH(request: NextRequest, context: Ctx) {
   const auth = await requireClientServicesSession()
   if (auth.response) return auth.response
-  const { user, scope } = auth
+  const { user } = auth
   const { id } = await context.params
 
-  const denied = await enforceClientScope(user, scope, id, request)
-  if (denied) return denied
+  try {
+    await assertCanEditClient(user, id)
+  } catch (err) {
+    if (err instanceof CrmAccessError) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: err.status })
+    }
+    throw err
+  }
 
-  // Only full-access users may edit core PHI fields
+  // Only full-access users may edit core PHI fields via this legacy endpoint
   if (!isClientServicesFullAccessEmail(user.email)) {
     return NextResponse.json({ error: 'Forbidden — edit requires full access' }, { status: 403 })
   }
@@ -256,11 +273,17 @@ export async function PATCH(request: NextRequest, context: Ctx) {
 export async function DELETE(request: NextRequest, context: Ctx) {
   const auth = await requireClientServicesSession()
   if (auth.response) return auth.response
-  const { user, scope } = auth
+  const { user } = auth
   const { id } = await context.params
 
-  const denied = await enforceClientScope(user, scope, id, request)
-  if (denied) return denied
+  try {
+    await assertCanEditClient(user, id)
+  } catch (err) {
+    if (err instanceof CrmAccessError) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: err.status })
+    }
+    throw err
+  }
 
   if (!isClientServicesFullAccessEmail(user.email)) {
     return NextResponse.json({ error: 'Forbidden — delete requires full access' }, { status: 403 })

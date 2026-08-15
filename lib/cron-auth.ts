@@ -46,3 +46,25 @@ export function assertCronOrResponse(request: NextRequest): NextResponse | null 
   }
   return null
 }
+
+/**
+ * Strict cron auth for CRM write endpoints (alerts / digest).
+ * Always requires CRON_SECRET and a matching Authorization Bearer token
+ * (or ?secret=). Missing secret → 503; mismatch → 401.
+ */
+export function assertCrmCronOrResponse(request: NextRequest): NextResponse | null {
+  const CRON_SECRET = process.env.CRON_SECRET
+  if (!CRON_SECRET) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 503 })
+  }
+
+  const authHeader = request.headers.get('authorization')
+  const secretParam = request.nextUrl.searchParams.get('secret')
+  const bearerToken = authHeader?.replace(/^Bearer\s+/i, '')
+  const providedSecret = secretParam ?? bearerToken ?? ''
+
+  if (providedSecret !== CRON_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return null
+}
