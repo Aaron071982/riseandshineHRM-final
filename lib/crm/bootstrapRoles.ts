@@ -1,5 +1,5 @@
 import type { CrmRole } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
+import { prisma, isPrismaMissingSchemaError } from '@/lib/prisma'
 
 /** Emails seeded as CRM SUPER_ADMIN when a matching users row exists. */
 export const CRM_SUPER_ADMIN_BOOTSTRAP_EMAILS = [
@@ -24,6 +24,31 @@ export async function bootstrapCrmSuperAdmins(
   const granted: BootstrapCrmRolesResult['granted'] = []
   const skipped: BootstrapCrmRolesResult['skipped'] = []
   const reactivated: BootstrapCrmRolesResult['reactivated'] = []
+
+  try {
+    await applyCrmSuperAdminBootstrap(grantedByUserId, {
+      granted,
+      skipped,
+      reactivated,
+    })
+  } catch (error) {
+    if (isPrismaMissingSchemaError(error)) {
+      console.warn(
+        '[crm-bootstrap] user_crm_roles is missing — run prisma db push. Skipping grants.'
+      )
+      return { granted, skipped, reactivated }
+    }
+    throw error
+  }
+
+  return { granted, skipped, reactivated }
+}
+
+async function applyCrmSuperAdminBootstrap(
+  grantedByUserId: string | null | undefined,
+  out: BootstrapCrmRolesResult
+): Promise<void> {
+  const { granted, skipped, reactivated } = out
 
   for (const email of CRM_SUPER_ADMIN_BOOTSTRAP_EMAILS) {
     const user = await prisma.user.findFirst({
@@ -71,6 +96,4 @@ export async function bootstrapCrmSuperAdmins(
     })
     granted.push({ email: user.email ?? email, userId: user.id })
   }
-
-  return { granted, skipped, reactivated }
 }

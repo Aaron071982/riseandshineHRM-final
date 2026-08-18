@@ -9,7 +9,7 @@ import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { validateSession, type SessionUser } from '@/lib/auth'
 import { getClientIpFromHeaders } from '@/lib/client-ip'
-import { prisma } from '@/lib/prisma'
+import { prisma, isPrismaMissingSchemaError } from '@/lib/prisma'
 import {
   CS_SESSION_COOKIE,
   isClientServicesFullAccessEmail,
@@ -57,11 +57,21 @@ export type CrmAccessSubject = {
 
 /** Active CRM roles for a user (DB). */
 export async function fetchUserCrmRoles(userId: string): Promise<CrmRole[]> {
-  const rows = await prisma.userCrmRole.findMany({
-    where: { userId, revokedAt: null },
-    select: { role: true },
-  })
-  return rows.map((r) => r.role)
+  try {
+    const rows = await prisma.userCrmRole.findMany({
+      where: { userId, revokedAt: null },
+      select: { role: true },
+    })
+    return rows.map((r) => r.role)
+  } catch (error) {
+    if (isPrismaMissingSchemaError(error)) {
+      console.warn(
+        '[crm] user_crm_roles is missing — run prisma db push. Falling back to email allowlist.'
+      )
+      return []
+    }
+    throw error
+  }
 }
 
 /** Sync helper — uses `crmRoles` on the subject when present. */

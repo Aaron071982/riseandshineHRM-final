@@ -68,6 +68,14 @@ export function logPrismaError(context: string, error: unknown) {
   console.error(`[Prisma Error] ${context}:`, JSON.stringify(errorInfo, null, 2))
 }
 
+/** Table or column is missing from the live database (schema not pushed yet). */
+export function isPrismaMissingSchemaError(error: unknown): boolean {
+  return (
+    error instanceof PrismaClientKnownRequestError &&
+    (error.code === 'P2021' || error.code === 'P2022')
+  )
+}
+
 // Ensure DATABASE_URL is set
 if (!process.env.DATABASE_URL) {
   const error = new Error('DATABASE_URL environment variable is not set')

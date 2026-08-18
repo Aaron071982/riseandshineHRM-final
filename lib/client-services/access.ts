@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { prisma, isPrismaMissingSchemaError } from '@/lib/prisma'
 import { validateSession, type SessionUser } from '@/lib/auth'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import {
@@ -84,15 +84,33 @@ export async function validateElevatedSession(
   token: string | undefined | null
 ): Promise<SessionUser | null> {
   if (!token) return null
-  const row = await prisma.clientServicesSession.findUnique({
-    where: { token },
-  })
-  if (!row) return null
+  let row: {
+    id: string
+    userId: string
+    lastActiveAt: Date
+    createdAt: Date
+    expiresAt: Date
+  }
+  try {
+    const found = await prisma.clientServicesSession.findUnique({
+      where: { token },
+    })
+    if (!found) return null
+    row = found
+  } catch (error) {
+    if (isPrismaMissingSchemaError(error)) {
+      console.warn(
+        '[client-services] client_services_sessions schema is behind — run prisma db push.'
+      )
+      return null
+    }
+    throw error
+  }
 
   const now = Date.now()
   const expired = isElevatedSessionExpired({
     nowMs: now,
-    lastActiveAtMs: row.lastActiveAt.getTime(),
+    lastActiveAtMs: (row.lastActiveAt ?? row.createdAt).getTime(),
     createdAtMs: row.createdAt.getTime(),
     expiresAtMs: row.expiresAt.getTime(),
     idleMs: CS_SESSION_IDLE_MS,

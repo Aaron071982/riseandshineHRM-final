@@ -44,7 +44,11 @@ export default async function ClientServicesSectionLayout({
   let showTherapistSearch = false
   let departmentNav: { href: string; label: string }[] = []
   if (elevated && elevatedUser) {
-    await bootstrapCrmSuperAdmins()
+    try {
+      await bootstrapCrmSuperAdmins()
+    } catch (error) {
+      console.error('[client-services] CRM role bootstrap failed', error)
+    }
     const crmRoles = await fetchUserCrmRoles(elevatedUser.id)
     const subject = {
       id: elevatedUser.id,
