@@ -554,6 +554,133 @@ export async function updateClientPreferences(
   }
 }
 
+const REFERRAL_SOURCES = new Set<ClientReferralSource>([
+  'PHONE',
+  'WEBSITE',
+  'EMAIL',
+  'REFERRAL',
+  'SOCIAL_MEDIA',
+  'PROVIDER',
+  'COMMUNITY',
+  'OTHER',
+])
+
+function parseOptionalDate(v?: string | null): Date | null {
+  if (!v?.trim()) return null
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+export type UpdateClientOverviewInput = {
+  dateOfBirth?: string | null
+  addressLine?: string | null
+  city?: string | null
+  borough?: string | null
+  state?: string | null
+  zip?: string | null
+  insuranceProvider?: string | null
+  insuranceId?: string | null
+  diagnosis?: string | null
+  parentName?: string | null
+  parentPhone?: string | null
+  parentEmail?: string | null
+  parentRelationship?: string | null
+  bcbaName?: string | null
+  caseCoordinatorName?: string | null
+  referralSource?: ClientReferralSource | null
+  inquiryReceivedAt?: string | null
+  actualServiceStartDate?: string | null
+}
+
+export async function updateClientOverview(
+  clientId: string,
+  input: UpdateClientOverviewInput
+): Promise<ActionResult> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+
+    const trim = (v?: string | null) => {
+      if (v == null) return null
+      const t = v.trim()
+      return t || null
+    }
+
+    if (
+      input.referralSource != null &&
+      !REFERRAL_SOURCES.has(input.referralSource)
+    ) {
+      return { ok: false, error: 'Invalid referral source' }
+    }
+
+    await prisma.serviceClient.update({
+      where: { id: clientId },
+      data: {
+        ...(input.dateOfBirth !== undefined
+          ? { dateOfBirth: parseOptionalDate(input.dateOfBirth) }
+          : {}),
+        ...(input.addressLine !== undefined
+          ? { addressLine: trim(input.addressLine) }
+          : {}),
+        ...(input.city !== undefined ? { city: trim(input.city) } : {}),
+        ...(input.borough !== undefined ? { borough: trim(input.borough) } : {}),
+        ...(input.state !== undefined ? { state: trim(input.state) } : {}),
+        ...(input.zip !== undefined ? { zip: trim(input.zip) } : {}),
+        ...(input.insuranceProvider !== undefined
+          ? { insuranceProvider: trim(input.insuranceProvider) }
+          : {}),
+        ...(input.insuranceId !== undefined
+          ? { insuranceId: trim(input.insuranceId) }
+          : {}),
+        ...(input.diagnosis !== undefined
+          ? { diagnosis: trim(input.diagnosis) }
+          : {}),
+        ...(input.parentName !== undefined
+          ? { parentName: trim(input.parentName) }
+          : {}),
+        ...(input.parentPhone !== undefined
+          ? { parentPhone: trim(input.parentPhone) }
+          : {}),
+        ...(input.parentEmail !== undefined
+          ? { parentEmail: trim(input.parentEmail) }
+          : {}),
+        ...(input.parentRelationship !== undefined
+          ? { parentRelationship: trim(input.parentRelationship) }
+          : {}),
+        ...(input.bcbaName !== undefined
+          ? { bcbaName: trim(input.bcbaName) }
+          : {}),
+        ...(input.caseCoordinatorName !== undefined
+          ? { caseCoordinatorName: trim(input.caseCoordinatorName) }
+          : {}),
+        ...(input.referralSource !== undefined
+          ? { referralSource: input.referralSource ?? 'OTHER' }
+          : {}),
+        ...(input.inquiryReceivedAt !== undefined
+          ? { inquiryReceivedAt: parseOptionalDate(input.inquiryReceivedAt) }
+          : {}),
+        ...(input.actualServiceStartDate !== undefined
+          ? {
+              actualServiceStartDate: parseOptionalDate(
+                input.actualServiceStartDate
+              ),
+            }
+          : {}),
+      },
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'OVERVIEW_UPDATE',
+    })
+    revalidateClient(clientId)
+    return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 const SATISFIED: ReadonlySet<RequirementStatus> = new Set([
   'COMPLETE',
   'RECEIVED',

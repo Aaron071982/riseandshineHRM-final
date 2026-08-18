@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type {
   ClientPipelineStatus,
+  ClientReferralSource,
   CommChannel,
   EthnicityPreference,
   GenderPreference,
@@ -12,9 +13,106 @@ import {
   addClientNote,
   logParentContact,
   setPipelineStatus,
+  updateClientOverview,
   updateClientPreferences,
 } from '@/lib/crm/actions'
+import { NY_BOROUGHS } from '@/lib/client-services/constants'
+import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 import { cn } from '@/lib/utils'
+
+const REFERRAL_SOURCES: ClientReferralSource[] = [
+  'PHONE',
+  'WEBSITE',
+  'EMAIL',
+  'REFERRAL',
+  'SOCIAL_MEDIA',
+  'PROVIDER',
+  'COMMUNITY',
+  'OTHER',
+]
+
+const inputCls =
+  'w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-ink focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]'
+
+function toDateInputValue(d: string | Date | null): string {
+  if (!d) return ''
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
+type OverviewClient = {
+  id: string
+  firstName: string
+  lastName: string
+  clientCode: string
+  dateOfBirth: string | Date | null
+  addressLine: string | null
+  city: string | null
+  borough: string | null
+  state: string | null
+  zip: string | null
+  insuranceProvider: string | null
+  insuranceId: string | null
+  diagnosis: string | null
+  parentName: string | null
+  parentPhone: string | null
+  parentEmail: string | null
+  parentRelationship: string | null
+  bcbaName: string | null
+  caseCoordinatorName: string | null
+  bcbaProfile: { fullName: string; email: string | null } | null
+  caseCoordinatorUser: { name: string | null; email: string | null } | null
+  referralSource: string | null
+  inquiryReceivedAt: string | Date | null
+  actualServiceStartDate: string | Date | null
+  preferredRbtGender: GenderPreference | null
+  preferredRbtEthnicities: EthnicityPreference[]
+}
+
+type OverviewForm = {
+  dateOfBirth: string
+  addressLine: string
+  city: string
+  borough: string
+  state: string
+  zip: string
+  insuranceProvider: string
+  insuranceId: string
+  diagnosis: string
+  parentName: string
+  parentPhone: string
+  parentEmail: string
+  parentRelationship: string
+  bcbaName: string
+  caseCoordinatorName: string
+  referralSource: ClientReferralSource
+  inquiryReceivedAt: string
+  actualServiceStartDate: string
+}
+
+function buildOverviewForm(client: OverviewClient): OverviewForm {
+  return {
+    dateOfBirth: toDateInputValue(client.dateOfBirth),
+    addressLine: client.addressLine ?? '',
+    city: client.city ?? '',
+    borough: client.borough ?? '',
+    state: client.state ?? 'NY',
+    zip: client.zip ?? '',
+    insuranceProvider: client.insuranceProvider ?? '',
+    insuranceId: client.insuranceId ?? '',
+    diagnosis: client.diagnosis ?? '',
+    parentName: client.parentName ?? '',
+    parentPhone: client.parentPhone ?? '',
+    parentEmail: client.parentEmail ?? '',
+    parentRelationship: client.parentRelationship ?? '',
+    bcbaName: client.bcbaName ?? '',
+    caseCoordinatorName: client.caseCoordinatorName ?? '',
+    referralSource: (client.referralSource as ClientReferralSource) || 'OTHER',
+    inquiryReceivedAt: toDateInputValue(client.inquiryReceivedAt),
+    actualServiceStartDate: toDateInputValue(client.actualServiceStartDate),
+  }
+}
 
 type Note = {
   id: string
@@ -229,37 +327,13 @@ export function OverviewPanel({
   canEdit = false,
 }: {
   canEdit?: boolean
-  client: {
-    id: string
-    firstName: string
-    lastName: string
-    clientCode: string
-    dateOfBirth: string | Date | null
-    addressLine: string | null
-    city: string | null
-    borough: string | null
-    state: string | null
-    zip: string | null
-    insuranceProvider: string | null
-    insuranceId: string | null
-    diagnosis: string | null
-    parentName: string | null
-    parentPhone: string | null
-    parentEmail: string | null
-    parentRelationship: string | null
-    bcbaName: string | null
-    caseCoordinatorName: string | null
-    bcbaProfile: { fullName: string; email: string | null } | null
-    caseCoordinatorUser: { name: string | null; email: string | null } | null
-    referralSource: string | null
-    inquiryReceivedAt: string | Date | null
-    actualServiceStartDate: string | Date | null
-    preferredRbtGender: GenderPreference | null
-    preferredRbtEthnicities: EthnicityPreference[]
-  }
+  client: OverviewClient
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState<OverviewForm>(() => buildOverviewForm(client))
+  const [overviewError, setOverviewError] = useState('')
   const [gender, setGender] = useState<'' | GenderPreference>(
     client.preferredRbtGender ?? ''
   )
@@ -270,7 +344,40 @@ export function OverviewPanel({
   useEffect(() => {
     setGender(client.preferredRbtGender ?? '')
     setEthnicities(client.preferredRbtEthnicities ?? [])
-  }, [client.preferredRbtGender, client.preferredRbtEthnicities])
+    if (!editing) {
+      setForm(buildOverviewForm(client))
+    }
+  }, [client, editing])
+
+  const setField = <K extends keyof OverviewForm>(
+    key: K,
+    value: OverviewForm[K]
+  ) => setForm((f) => ({ ...f, [key]: value }))
+
+  const startEdit = () => {
+    setForm(buildOverviewForm(client))
+    setOverviewError('')
+    setEditing(true)
+  }
+
+  const cancelEdit = () => {
+    setForm(buildOverviewForm(client))
+    setOverviewError('')
+    setEditing(false)
+  }
+
+  const saveOverview = () => {
+    startTransition(async () => {
+      setOverviewError('')
+      const res = await updateClientOverview(client.id, form)
+      if (!res.ok) {
+        setOverviewError(res.error)
+        return
+      }
+      setEditing(false)
+      router.refresh()
+    })
+  }
 
   const savePrefs = () => {
     startTransition(async () => {
@@ -348,26 +455,300 @@ export function OverviewPanel({
 
   return (
     <div className="space-y-4">
-      <dl className="grid gap-3 sm:grid-cols-2">
-        {rows.map((r) => (
-          <div
-            key={r.label}
-            className="rounded-xl border border-line bg-surface px-3 py-2.5"
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-display text-base font-semibold text-ink">
+          Client information
+        </h3>
+        {canEdit && !editing && (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="h-8 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink hover:bg-line-2"
           >
-            <dt className="text-[11px] font-medium uppercase tracking-wide text-faint">
-              {r.label}
-            </dt>
-            <dd
-              className={cn(
-                'mt-0.5 text-sm text-ink',
-                r.label.includes('phone') && 'tabular-nums'
-              )}
+            Edit
+          </button>
+        )}
+        {canEdit && editing && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={cancelEdit}
+              className="h-8 rounded-lg border border-line bg-surface px-3 text-sm font-medium text-ink hover:bg-line-2 disabled:opacity-50"
             >
-              {r.value}
-            </dd>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={saveOverview}
+              className="h-8 rounded-lg bg-brand px-3 text-sm font-medium text-white hover:bg-brand-2 disabled:opacity-50"
+            >
+              {pending ? 'Saving…' : 'Save'}
+            </button>
           </div>
-        ))}
-      </dl>
+        )}
+      </div>
+
+      {overviewError && (
+        <p className="rounded-lg bg-[var(--urgent-bg)] px-3 py-2 text-sm text-[var(--urgent)]">
+          {overviewError}
+        </p>
+      )}
+
+      {editing ? (
+        <div className="space-y-4 rounded-xl border border-line bg-surface p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Client code
+              </span>
+              <input value={client.clientCode} disabled className={inputCls} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Date of birth
+              </span>
+              <input
+                type="date"
+                value={form.dateOfBirth}
+                onChange={(e) => setField('dateOfBirth', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+          </div>
+
+          <div>
+            <AddressAutocomplete
+              label="Search address"
+              defaultValue={form.addressLine}
+              onAddressSelect={(selected) => {
+                setForm((f) => ({
+                  ...f,
+                  addressLine: selected.addressLine1,
+                  city: selected.city,
+                  state: selected.state || 'NY',
+                  zip: selected.zipCode,
+                }))
+              }}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Street
+              </span>
+              <input
+                value={form.addressLine}
+                onChange={(e) => setField('addressLine', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                City
+              </span>
+              <input
+                value={form.city}
+                onChange={(e) => setField('city', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Borough
+              </span>
+              <select
+                value={form.borough}
+                onChange={(e) => setField('borough', e.target.value)}
+                className={inputCls}
+              >
+                <option value="">—</option>
+                {NY_BOROUGHS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                State
+              </span>
+              <input
+                value={form.state}
+                onChange={(e) => setField('state', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                ZIP
+              </span>
+              <input
+                value={form.zip}
+                onChange={(e) => setField('zip', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Insurance
+              </span>
+              <input
+                value={form.insuranceProvider}
+                onChange={(e) => setField('insuranceProvider', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Member ID
+              </span>
+              <input
+                value={form.insuranceId}
+                onChange={(e) => setField('insuranceId', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Diagnosis
+              </span>
+              <input
+                value={form.diagnosis}
+                onChange={(e) => setField('diagnosis', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Parent name
+              </span>
+              <input
+                value={form.parentName}
+                onChange={(e) => setField('parentName', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Parent phone
+              </span>
+              <input
+                value={form.parentPhone}
+                onChange={(e) => setField('parentPhone', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Parent email
+              </span>
+              <input
+                type="email"
+                value={form.parentEmail}
+                onChange={(e) => setField('parentEmail', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Relationship
+              </span>
+              <input
+                value={form.parentRelationship}
+                onChange={(e) => setField('parentRelationship', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                BCBA name
+              </span>
+              <input
+                value={form.bcbaName}
+                onChange={(e) => setField('bcbaName', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Case coordinator name
+              </span>
+              <input
+                value={form.caseCoordinatorName}
+                onChange={(e) => setField('caseCoordinatorName', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Referral source
+              </span>
+              <select
+                value={form.referralSource}
+                onChange={(e) =>
+                  setField('referralSource', e.target.value as ClientReferralSource)
+                }
+                className={inputCls}
+              >
+                {REFERRAL_SOURCES.map((s) => (
+                  <option key={s} value={s}>
+                    {s.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Inquiry received
+              </span>
+              <input
+                type="date"
+                value={form.inquiryReceivedAt}
+                onChange={(e) => setField('inquiryReceivedAt', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Actual start
+              </span>
+              <input
+                type="date"
+                value={form.actualServiceStartDate}
+                onChange={(e) =>
+                  setField('actualServiceStartDate', e.target.value)
+                }
+                className={inputCls}
+              />
+            </label>
+          </div>
+        </div>
+      ) : (
+        <dl className="grid gap-3 sm:grid-cols-2">
+          {rows.map((r) => (
+            <div
+              key={r.label}
+              className="rounded-xl border border-line bg-surface px-3 py-2.5"
+            >
+              <dt className="text-[11px] font-medium uppercase tracking-wide text-faint">
+                {r.label}
+              </dt>
+              <dd
+                className={cn(
+                  'mt-0.5 text-sm text-ink',
+                  r.label.includes('phone') && 'tabular-nums'
+                )}
+              >
+                {r.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       <section className="rounded-xl border border-line bg-surface p-4">
         <h3 className="font-display text-sm font-semibold text-ink">
