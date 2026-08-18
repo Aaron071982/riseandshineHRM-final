@@ -29,6 +29,10 @@
     --brand-2: #ce551b;
     --sunrise-a: #ffa94d;
     --sunrise-b: #f2652a;
+    /* CRM action tokens: amber fill + deep-brown ink */
+    --sunrise: #ffb066;
+    --sunrise-soft: #fff4e8;
+    --espresso: #2f2318;
 
     --side: #2a2019;
     --side-2: #1d1610;
@@ -45,16 +49,28 @@
     --muted-ink: #78716c;
     --faint: #a8a29e;
 
-    --urgent: #dc3b40;
-    --urgent-bg: #fdf0f0;
-    --green: #2f9e44;
-    --green-bg: #edf6ef;
-    --amber: #c6870b;
-    --amber-bg: #fbf3e4;
-    --slate: #5b6472;
-    --slate-bg: #f0f2f5;
-    --blue: #3b7dd8;
-    --blue-bg: #eaf1fb;
+    --urgent: #e02d33;
+    --urgent-bg: #fdeced;
+    --green: #24953a;
+    --green-bg: #e8f5eb;
+    --amber: #d18f00;
+    --amber-bg: #fdf4e0;
+    --slate: #4a5568;
+    --slate-bg: #e8ebf0;
+    --blue: #2f6fd4;
+    --blue-bg: #e3edfb;
+
+    /* Stage-group accents (~20% more saturated for funnel / caseload) */
+    --stage-intake: #2a6ae0;
+    --stage-intake-bg: #dce9fc;
+    --stage-clinical: #1f9a3a;
+    --stage-clinical-bg: #ddf3e3;
+    --stage-staffing: #e85a1c;
+    --stage-staffing-bg: #fde8dc;
+    --stage-coord: #c97a00;
+    --stage-coord-bg: #fcebcc;
+    --stage-active: #2f9e44;
+    --stage-active-bg: #edf6ef;
 
     --brand-ring: rgba(231, 105, 44, 0.14);
     --radius: 12px;

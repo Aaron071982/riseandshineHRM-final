@@ -15,6 +15,9 @@ import { cn } from '@/lib/utils'
 import { NY_BOROUGHS } from '@/lib/client-services/constants'
 import { toClientRow, type ApiCaseloadClient, type ClientRow } from '@/lib/clients/viewModel'
 import { STATUS, type CaseStatus } from '@/lib/clients/status'
+import AddressAutocomplete, {
+  type StructuredAddress,
+} from '@/components/ui/AddressAutocomplete'
 import ClientsTable from '@/components/clients/ClientsTable'
 import ClientAvatar from '@/components/clients/ClientAvatar'
 import StatusBadge from '@/components/clients/StatusBadge'
@@ -741,6 +744,20 @@ function AddClientModal({
               </select>
             </label>
           </div>
+          <AddressAutocomplete
+            id="add-client-modal-address"
+            label="Search address"
+            placeholder="Start typing an address..."
+            onAddressSelect={(selected: StructuredAddress) =>
+              setForm((f) => ({
+                ...f,
+                addressLine: selected.addressLine1,
+                city: selected.city,
+                state: selected.state || f.state,
+                zip: selected.zipCode,
+              }))
+            }
+          />
           {field('Street address', 'addressLine')}
           <div className="grid grid-cols-3 gap-3">
             {field('City', 'city')}

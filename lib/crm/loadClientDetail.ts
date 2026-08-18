@@ -96,7 +96,13 @@ export async function loadClientCrmDetail(clientId: string) {
     action: 'VIEW',
   })
 
-  const gate = canAdvance(client, client.requirements)
+  const gate = canAdvance(
+    {
+      stage: client.stage,
+      treatmentPlanStatus: client.treatmentPlanStatus,
+    },
+    client.requirements
+  )
   const daysInStage = daysSince(client.stageEnteredAt)
   const weeklyScheduleHours = client.scheduleAssignments.reduce(
     (sum, s) => sum + hoursBetween(s.startTime, s.endTime),

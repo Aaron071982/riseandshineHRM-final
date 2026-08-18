@@ -48,8 +48,8 @@ export default function ElevateGate({ userEmail }: { userEmail: string }) {
         </h2>
         <p className="mx-auto mt-2 mb-6 text-center text-sm leading-relaxed text-quiet">
           Enter the Client Services access code to unlock this section for{' '}
-          <span className="font-medium text-ink">{userEmail}</span>. Access lasts
-          8 hours.
+          <span className="font-medium text-ink">{userEmail}</span>. The session
+          ends after 1 hour of inactivity (max 12 hours).
         </p>
 
         <form onSubmit={unlock} className="space-y-4">

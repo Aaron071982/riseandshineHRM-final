@@ -21,6 +21,8 @@
     "dev:setup": "bash scripts/dev-setup.sh",
     "clients:scrub": "tsx scripts/scrub-clients-csv.ts",
     "clients:import": "dotenv -e .env.development -- tsx scripts/import-clients.ts",
+    "crm:bootstrap-roles": "dotenv -e .env.development -- tsx scripts/bootstrap-crm-roles.ts",
+    "crm:backfill-owner-dept": "dotenv -e .env.development -- tsx scripts/backfill-owner-dept.ts",
     "db:studio": "prisma studio",
     "db:clear-rbts": "tsx scripts/clear-rbts.ts",
     "db:backfill-onboarding": "tsx scripts/backfill-onboarding-tasks.ts",

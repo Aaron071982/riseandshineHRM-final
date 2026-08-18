@@ -7,6 +7,15 @@ export function crmEmailsEnabled(): boolean {
   return process.env.CRM_EMAILS_ENABLED === 'true'
 }
 
+/**
+ * Parent stage-transition emails have a separate opt-in switch. Keeping this
+ * false leaves templates and delivery code available without generating,
+ * logging, retrying, or sending a message on every stage change.
+ */
+export function crmJourneyEmailsEnabled(): boolean {
+  return process.env.CRM_JOURNEY_EMAILS_ENABLED === 'true'
+}
+
 /** True only on Vercel production (or NODE_ENV production when not on Vercel). */
 export function isCrmEmailProductionEnv(): boolean {
   if (process.env.VERCEL_ENV) {

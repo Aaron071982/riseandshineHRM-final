@@ -2,11 +2,17 @@
 
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import type { ClientPipelineStatus, CommChannel } from '@prisma/client'
+import type {
+  ClientPipelineStatus,
+  CommChannel,
+  EthnicityPreference,
+  GenderPreference,
+} from '@prisma/client'
 import {
   addClientNote,
   logParentContact,
   setPipelineStatus,
+  updateClientPreferences,
 } from '@/lib/crm/actions'
 import { cn } from '@/lib/utils'
 
@@ -220,8 +226,11 @@ export function NotesPanel({
 
 export function OverviewPanel({
   client,
+  canEdit = false,
 }: {
+  canEdit?: boolean
   client: {
+    id: string
     firstName: string
     lastName: string
     clientCode: string
@@ -245,8 +254,40 @@ export function OverviewPanel({
     referralSource: string | null
     inquiryReceivedAt: string | Date | null
     actualServiceStartDate: string | Date | null
+    preferredRbtGender: GenderPreference | null
+    preferredRbtEthnicities: EthnicityPreference[]
   }
 }) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [gender, setGender] = useState<'' | GenderPreference>(
+    client.preferredRbtGender ?? ''
+  )
+  const [ethnicities, setEthnicities] = useState<EthnicityPreference[]>(
+    client.preferredRbtEthnicities ?? []
+  )
+
+  useEffect(() => {
+    setGender(client.preferredRbtGender ?? '')
+    setEthnicities(client.preferredRbtEthnicities ?? [])
+  }, [client.preferredRbtGender, client.preferredRbtEthnicities])
+
+  const savePrefs = () => {
+    startTransition(async () => {
+      await updateClientPreferences(client.id, {
+        preferredRbtGender: gender || null,
+        preferredRbtEthnicities: ethnicities,
+      })
+      router.refresh()
+    })
+  }
+
+  const toggleEth = (v: EthnicityPreference) => {
+    setEthnicities((prev) =>
+      prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]
+    )
+  }
+
   const rows: { label: string; value: string }[] = [
     { label: 'Client code', value: client.clientCode },
     {
@@ -296,26 +337,120 @@ export function OverviewPanel({
     },
   ]
 
+  const ethOptions: { value: EthnicityPreference; label: string }[] = [
+    { value: 'WHITE', label: 'White' },
+    { value: 'ASIAN', label: 'Asian' },
+    { value: 'BLACK', label: 'Black' },
+    { value: 'HISPANIC', label: 'Hispanic' },
+    { value: 'SOUTH_ASIAN', label: 'South Asian' },
+    { value: 'MIDDLE_EASTERN', label: 'Middle Eastern' },
+  ]
+
   return (
-    <dl className="grid gap-3 sm:grid-cols-2">
-      {rows.map((r) => (
-        <div
-          key={r.label}
-          className="rounded-xl border border-line bg-surface px-3 py-2.5"
-        >
-          <dt className="text-[11px] font-medium uppercase tracking-wide text-faint">
-            {r.label}
-          </dt>
-          <dd
-            className={cn(
-              'mt-0.5 text-sm text-ink',
-              r.label.includes('phone') && 'tabular-nums'
-            )}
+    <div className="space-y-4">
+      <dl className="grid gap-3 sm:grid-cols-2">
+        {rows.map((r) => (
+          <div
+            key={r.label}
+            className="rounded-xl border border-line bg-surface px-3 py-2.5"
           >
-            {r.value}
-          </dd>
+            <dt className="text-[11px] font-medium uppercase tracking-wide text-faint">
+              {r.label}
+            </dt>
+            <dd
+              className={cn(
+                'mt-0.5 text-sm text-ink',
+                r.label.includes('phone') && 'tabular-nums'
+              )}
+            >
+              {r.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      <section className="rounded-xl border border-line bg-surface p-4">
+        <h3 className="font-display text-sm font-semibold text-ink">
+          RBT preferences
+        </h3>
+        <p className="mt-0.5 text-xs text-quiet">
+          Used by Therapist Search later — empty means no preference.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+              Preferred gender
+            </span>
+            {canEdit ? (
+              <select
+                value={gender}
+                onChange={(e) =>
+                  setGender(e.target.value as '' | GenderPreference)
+                }
+                onBlur={savePrefs}
+                className="w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm"
+              >
+                <option value="">No preference</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+                <option value="ANY">Any</option>
+              </select>
+            ) : (
+              <p className="text-sm text-ink">{gender || '—'}</p>
+            )}
+          </label>
+          <div>
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+              Preferred ethnicities
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {ethOptions.map((o) => {
+                const on = ethnicities.includes(o.value)
+                return canEdit ? (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => {
+                      toggleEth(o.value)
+                    }}
+                    onBlur={savePrefs}
+                    className={cn(
+                      'rounded-md border px-2 py-0.5 text-xs font-medium',
+                      on
+                        ? 'border-brand bg-[color-mix(in_srgb,var(--brand)_12%,white)] text-brand'
+                        : 'border-line text-quiet'
+                    )}
+                  >
+                    {o.label}
+                  </button>
+                ) : (
+                  on && (
+                    <span
+                      key={o.value}
+                      className="rounded-md border border-line px-2 py-0.5 text-xs"
+                    >
+                      {o.label}
+                    </span>
+                  )
+                )
+              })}
+              {!canEdit && ethnicities.length === 0 && (
+                <span className="text-sm text-quiet">—</span>
+              )}
+            </div>
+            {canEdit && (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={savePrefs}
+                className="mt-2 text-xs font-medium text-brand hover:text-brand-2"
+              >
+                {pending ? 'Saving…' : 'Save preferences'}
+              </button>
+            )}
+          </div>
         </div>
-      ))}
-    </dl>
+      </section>
+    </div>
   )
 }

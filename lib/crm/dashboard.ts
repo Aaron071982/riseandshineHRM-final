@@ -3,10 +3,11 @@ import { prisma } from '@/lib/prisma'
 import {
   getVisibleClientsWhere,
   isFullAccess,
+  auditClientAction,
   type CrmUser,
 } from '@/lib/crm/access'
 import type { SessionUser } from '@/lib/auth'
-import { CLIENT_STAGE_ORDER, STAGE_LABELS } from '@/lib/crm/stages'
+import { LINEAR_STAGE_ORDER, STAGE_LABELS } from '@/lib/crm/stages'
 import {
   AUTH_EXPIRY_BANDS,
   PRE_ACTIVE_STAGES,
@@ -72,16 +73,19 @@ export async function getPipelineCounts(user: DashUser): Promise<PipelineCounts>
     pipelineGroups.map((g) => [g.pipelineStatus, g._count._all])
   )
 
-  const byStage = CLIENT_STAGE_ORDER.map((stage) => ({
+  const byStage = LINEAR_STAGE_ORDER.map((stage) => ({
     stage,
     label: STAGE_LABELS[stage],
     count: stageMap.get(stage) ?? 0,
     stalled: stalledMap.get(stage) ?? 0,
   }))
 
+  // Legacy TREATMENT_PLAN rows still count toward pipeline totals
+  const treatmentPlanCount = stageMap.get('TREATMENT_PLAN') ?? 0
+
   const inPipeline = byStage
     .filter((s) => s.stage !== 'ACTIVE')
-    .reduce((n, s) => n + s.count, 0)
+    .reduce((n, s) => n + s.count, 0) + treatmentPlanCount
   const active = stageMap.get('ACTIVE') ?? 0
 
   return {
@@ -192,7 +196,24 @@ export async function getDepartmentQueues(
       },
     }),
     prisma.serviceClient.count({
-      where: { ...live, stage: 'TREATMENT_PLAN' },
+      where: {
+        ...live,
+        treatmentPlanStatus: { in: ['NOT_STARTED', 'IN_PROGRESS'] },
+        stage: {
+          in: [
+            'ASSESSMENT',
+            'AUTHORIZATION',
+            'APPROVED',
+            'READY_FOR_STAFFING',
+            'RBT_SEARCH',
+            'RBT_ASSIGNED',
+            'SCHEDULE_COORDINATION',
+            'SCHEDULE_CONFIRMED',
+            'PRE_START',
+            'TREATMENT_PLAN',
+          ],
+        },
+      },
     }),
     prisma.serviceClient.count({
       where: {
@@ -781,6 +802,11 @@ export async function loadManagerDashboard(
     needsAttention: stalledTotal + unresolvedAlerts + overdueTasks,
     authExpiring60,
   }
+
+  await auditClientAction({
+    userId: user.id,
+    action: 'DASHBOARD_VIEW',
+  })
 
   return { kpis, pipeline, queues, health, performance }
 }

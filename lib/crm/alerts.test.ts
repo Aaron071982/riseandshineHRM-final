@@ -7,9 +7,11 @@ import {
 } from '@/lib/crm/alertRules'
 import {
   crmEmailsEnabled,
+  crmJourneyEmailsEnabled,
   isJourneyLockedStatus,
   resolveCrmEmailRecipient,
 } from '@/lib/crm/emails/safety'
+import { sendJourneyTemplate } from '@/lib/crm/emails/send'
 
 describe('alertRules', () => {
   it('maps auth days into tightest band and severity', () => {
@@ -41,6 +43,34 @@ describe('crm email safety', () => {
     delete process.env.CRM_EMAILS_ENABLED
     expect(crmEmailsEnabled()).toBe(false)
     process.env.CRM_EMAILS_ENABLED = prev
+  })
+
+  it('parent stage-transition emails require a separate explicit opt-in', () => {
+    const prev = process.env.CRM_JOURNEY_EMAILS_ENABLED
+    delete process.env.CRM_JOURNEY_EMAILS_ENABLED
+    expect(crmJourneyEmailsEnabled()).toBe(false)
+    process.env.CRM_JOURNEY_EMAILS_ENABLED = 'false'
+    expect(crmJourneyEmailsEnabled()).toBe(false)
+    process.env.CRM_JOURNEY_EMAILS_ENABLED = 'true'
+    expect(crmJourneyEmailsEnabled()).toBe(true)
+    if (prev == null) delete process.env.CRM_JOURNEY_EMAILS_ENABLED
+    else process.env.CRM_JOURNEY_EMAILS_ENABLED = prev
+  })
+
+  it('standby exits before loading a client or creating a communication', async () => {
+    const prev = process.env.CRM_JOURNEY_EMAILS_ENABLED
+    process.env.CRM_JOURNEY_EMAILS_ENABLED = 'false'
+    const result = await sendJourneyTemplate(
+      'does-not-exist-and-must-not-be-queried',
+      'READY_FOR_STAFFING'
+    )
+    expect(result).toEqual({
+      status: 'SKIPPED',
+      reason: 'CRM_JOURNEY_EMAILS_ENABLED is not true',
+      to: null,
+    })
+    if (prev == null) delete process.env.CRM_JOURNEY_EMAILS_ENABLED
+    else process.env.CRM_JOURNEY_EMAILS_ENABLED = prev
   })
 
   it('does not resolve a real recipient when disabled', () => {

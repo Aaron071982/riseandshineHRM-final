@@ -1,5 +1,6 @@
-import SchedulingBeta from '@/components/admin/SchedulingBeta'
+import { redirect } from 'next/navigation'
 
+/** Legacy scheduling demo — proximity search now lives in Client Services. */
 export default function SchedulingBetaPage() {
-  return <SchedulingBeta />
+  redirect('/client-services/therapist-search')
 }

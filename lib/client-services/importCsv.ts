@@ -166,9 +166,18 @@ export async function importClientsMasterCsv(
 
       let serviceClientId: string
       if (existing) {
+        const existingFull = await prisma.serviceClient.findUnique({
+          where: { id: existing.id },
+          select: { currentOwnerDept: true },
+        })
         await prisma.serviceClient.update({
           where: { id: existing.id },
-          data,
+          data: {
+            ...data,
+            ...(existingFull?.currentOwnerDept
+              ? {}
+              : { currentOwnerDept: 'INTAKE' }),
+          },
         })
         serviceClientId = existing.id
         result.updated++
@@ -182,6 +191,8 @@ export async function importClientsMasterCsv(
           data: {
             clientCode,
             ...data,
+            stage: 'INQUIRY',
+            currentOwnerDept: 'INTAKE',
             createdBy: createdByUserId,
           },
         })

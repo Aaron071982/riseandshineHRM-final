@@ -20,9 +20,7 @@ import {
   CalendarDays,
   Settings,
   MessageCircle,
-  LayoutGrid,
   Network,
-  Plug,
   DollarSign,
   LineChart,
   FileText,
@@ -59,12 +57,9 @@ const documentsNavItem: NavItem = { href: '/admin/documents', label: 'Documents'
 const secondaryBaseWithoutDocs: NavItem[] = [
   { href: '/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
-  { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
   { href: '/admin/org-chart', label: 'Company hierarchy', icon: Network },
-  { href: '/admin/mcp-activity', label: 'MCP Activity', icon: Plug },
-  { href: '/admin/mcp-connections', label: 'MCP Connections', icon: Plug },
 ]
 
 const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
@@ -159,12 +154,9 @@ export default function AdminLayout({
         { href: '/admin/interviews', label: 'Interviews', icon: Calendar },
         { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
         { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
-        { href: '/admin/scheduling-beta', label: 'Scheduling demo', icon: LayoutGrid },
         { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
         { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
         { href: '/admin/org-chart', label: 'Company hierarchy', icon: Network },
-        { href: '/admin/mcp-activity', label: 'MCP Activity', icon: Plug },
-        { href: '/admin/mcp-connections', label: 'MCP Connections', icon: Plug },
       ]
       if (showOperationsNav) items.splice(4, 0, operationsNavItem)
       if (showClientServicesNav) items.splice(showOperationsNav ? 5 : 4, 0, clientServicesNavItem)

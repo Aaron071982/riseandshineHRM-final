@@ -1,26 +1,29 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-const WINDOW_MS = 15 * 60 * 1000
+const DEFAULT_WINDOW_MS = 15 * 60 * 1000
 
-function currentWindowStart(now = new Date()): Date {
-  return new Date(Math.floor(now.getTime() / WINDOW_MS) * WINDOW_MS)
+function currentWindowStart(windowMs: number, now = new Date()): Date {
+  return new Date(Math.floor(now.getTime() / windowMs) * windowMs)
 }
 
-function retryAfterSeconds(windowStart: Date, now = new Date()): number {
-  const windowEnd = windowStart.getTime() + WINDOW_MS
+function retryAfterSeconds(windowStart: Date, windowMs: number, now = new Date()): number {
+  const windowEnd = windowStart.getTime() + windowMs
   return Math.max(1, Math.ceil((windowEnd - now.getTime()) / 1000))
 }
 
-async function pruneOldWindows(): Promise<void> {
-  const cutoff = new Date(Date.now() - WINDOW_MS * 2)
+async function pruneOldWindows(windowMs: number): Promise<void> {
+  const cutoff = new Date(Date.now() - windowMs * 2)
   await prisma.otpRateLimit.deleteMany({
     where: { windowStart: { lt: cutoff } },
   })
 }
 
-export async function getRateLimitCount(key: string): Promise<number> {
-  const windowStart = currentWindowStart()
+export async function getRateLimitCount(
+  key: string,
+  windowMs: number = DEFAULT_WINDOW_MS
+): Promise<number> {
+  const windowStart = currentWindowStart(windowMs)
   const row = await prisma.otpRateLimit.findUnique({
     where: { key_windowStart: { key, windowStart } },
     select: { count: true },
@@ -28,15 +31,18 @@ export async function getRateLimitCount(key: string): Promise<number> {
   return row?.count ?? 0
 }
 
-export async function incrementRateLimit(key: string): Promise<number> {
-  const windowStart = currentWindowStart()
+export async function incrementRateLimit(
+  key: string,
+  windowMs: number = DEFAULT_WINDOW_MS
+): Promise<number> {
+  const windowStart = currentWindowStart(windowMs)
   const row = await prisma.otpRateLimit.upsert({
     where: { key_windowStart: { key, windowStart } },
     create: { key, windowStart, count: 1 },
     update: { count: { increment: 1 } },
     select: { count: true },
   })
-  void pruneOldWindows()
+  void pruneOldWindows(windowMs)
   return row.count
 }
 
@@ -53,26 +59,49 @@ export function rateLimitedResponse(
   )
 }
 
+/**
+ * Shared DB-backed rate limit (otp_rate_limits table).
+ * Returns a 429 when over `limit` in the current window; otherwise increments and returns null.
+ */
+export async function assertRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number = DEFAULT_WINDOW_MS,
+  message?: string
+): Promise<NextResponse | null> {
+  const windowStart = currentWindowStart(windowMs)
+  const count = await getRateLimitCount(key, windowMs)
+  if (count >= limit) {
+    return rateLimitedResponse(
+      retryAfterSeconds(windowStart, windowMs),
+      message ?? 'Too many attempts. Please try again later.'
+    )
+  }
+  await incrementRateLimit(key, windowMs)
+  return null
+}
+
 export async function assertSendOtpRateLimit(
   email: string,
   ip: string | null
 ): Promise<NextResponse | null> {
-  const windowStart = currentWindowStart()
+  const windowMs = DEFAULT_WINDOW_MS
+  const windowStart = currentWindowStart(windowMs)
   const emailKey = `otp:send:email:${email}`
-  const emailCount = await getRateLimitCount(emailKey)
+  const emailCount = await getRateLimitCount(emailKey, windowMs)
   if (emailCount >= 5) {
     return rateLimitedResponse(
-      retryAfterSeconds(windowStart),
+      retryAfterSeconds(windowStart, windowMs),
       'Too many verification codes requested for this email. Please wait before trying again.'
     )
   }
 
   if (ip) {
     const ipKey = `otp:send:ip:${ip}`
-    const ipCount = await getRateLimitCount(ipKey)
+    const ipCount = await getRateLimitCount(ipKey, windowMs)
     if (ipCount >= 10) {
       return rateLimitedResponse(
-        retryAfterSeconds(windowStart),
+        retryAfterSeconds(windowStart, windowMs),
         'Too many verification code requests from this network. Please wait before trying again.'
       )
     }
@@ -89,12 +118,13 @@ export async function recordSendOtpAttempt(email: string, ip: string | null): Pr
 }
 
 export async function assertVerifyOtpRateLimit(email: string): Promise<NextResponse | null> {
-  const windowStart = currentWindowStart()
+  const windowMs = DEFAULT_WINDOW_MS
+  const windowStart = currentWindowStart(windowMs)
   const failKey = `otp:verify-fail:email:${email}`
-  const failCount = await getRateLimitCount(failKey)
+  const failCount = await getRateLimitCount(failKey, windowMs)
   if (failCount >= 5) {
     return rateLimitedResponse(
-      retryAfterSeconds(windowStart),
+      retryAfterSeconds(windowStart, windowMs),
       'Too many failed verification attempts. Please wait before trying again.'
     )
   }

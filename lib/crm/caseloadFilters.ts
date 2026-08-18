@@ -73,6 +73,25 @@ export function caseloadQueueWhere(
         stage: 'ASSESSMENT',
         stageEnteredAt: { lt: stageStaleBefore('ASSESSMENT', now) },
       }
+    case 'clinical_treatment_plan_pending':
+      return {
+        ...live,
+        treatmentPlanStatus: { in: ['NOT_STARTED', 'IN_PROGRESS'] },
+        stage: {
+          in: [
+            'ASSESSMENT',
+            'TREATMENT_PLAN',
+            'AUTHORIZATION',
+            'APPROVED',
+            'READY_FOR_STAFFING',
+            'RBT_SEARCH',
+            'RBT_ASSIGNED',
+            'SCHEDULE_COORDINATION',
+            'SCHEDULE_CONFIRMED',
+            'PRE_START',
+          ],
+        },
+      }
     case 'auth_pending':
       return {
         ...live,

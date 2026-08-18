@@ -1436,12 +1436,6 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                         >
                           Add assignment
                         </Button>
-                        <Link
-                          href="/admin/scheduling-beta"
-                          className="text-xs font-semibold text-orange-600 hover:underline dark:text-[var(--orange-primary)]"
-                        >
-                          Open scheduling demo →
-                        </Link>
                       </div>
                     </div>
 
@@ -1848,11 +1842,11 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                 </div>
               ) : schedulingClients.length === 0 ? (
                 <p className="text-sm text-amber-700 mt-2">
-                  No clients in the list. Add one from{' '}
-                  <Link href="/admin/scheduling-beta" className="underline font-medium">
-                    scheduling beta
-                  </Link>{' '}
-                  or create via API.
+                  No clients in the list. Add clients in{' '}
+                  <Link href="/client-services/clients" className="underline font-medium">
+                    Client Services
+                  </Link>
+                  , then assign here.
                 </p>
               ) : (
                 <Select value={addAssignmentClientId} onValueChange={setAddAssignmentClientId}>

@@ -6,34 +6,38 @@ import { prisma } from '@/lib/prisma'
 import { validateSession, type SessionUser } from '@/lib/auth'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import {
+  CS_SESSION_ABSOLUTE_MS,
   CS_SESSION_COOKIE,
-  CS_SESSION_DURATION_MS,
+  CS_SESSION_IDLE_MS,
   isClientServicesFullAccessEmail,
 } from '@/lib/client-services/constants'
 import { logClientAccess } from '@/lib/client-services/audit'
+import { isElevatedSessionExpired } from '@/lib/client-services/sessionExpiry'
 
 export type ClientScope = 'ALL' | { clientIds: string[] }
 
 /**
  * Whether the user may enter Client Services at all (before step-up).
- * Allowlist + jaden/azm email substrings.
+ * Allowlist break-glass OR any active CRM role.
  */
 export async function canAccessClientServices(user: SessionUser | null): Promise<boolean> {
   if (!user) return false
-  return isClientServicesFullAccessEmail(user.email)
+  if (isClientServicesFullAccessEmail(user.email)) return true
+  const { fetchUserCrmRoles } = await import('@/lib/crm/access')
+  const roles = await fetchUserCrmRoles(user.id)
+  return roles.length > 0
 }
 
 /**
  * Scope for list/detail queries.
  * Prefer getVisibleClientsWhere from lib/crm/access for Prisma filters.
- * Allowlisted users → full caseload ('ALL').
  */
 export async function getClientScopeForUser(user: SessionUser): Promise<ClientScope> {
-  if (isClientServicesFullAccessEmail(user.email)) {
+  const { fetchUserCrmRoles, isFullAccess } = await import('@/lib/crm/access')
+  const crmRoles = await fetchUserCrmRoles(user.id)
+  if (isFullAccess({ id: user.id, email: user.email, crmRoles })) {
     return 'ALL'
   }
-  // TODO: coordinator role source — coordinators get empty id list here;
-  // use getVisibleClientsWhere({ caseCoordinatorUserId }) for real scoping.
   return { clientIds: [] }
 }
 
@@ -47,12 +51,13 @@ export async function createElevatedSession(
   ipAddress?: string | null
 ): Promise<string> {
   const token = crypto.randomBytes(32).toString('hex')
-  const expiresAt = new Date(Date.now() + CS_SESSION_DURATION_MS)
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + CS_SESSION_ABSOLUTE_MS)
 
   await prisma.clientServicesSession.deleteMany({
     where: {
       userId,
-      expiresAt: { lt: new Date() },
+      expiresAt: { lt: now },
     },
   })
 
@@ -61,6 +66,7 @@ export async function createElevatedSession(
       userId,
       token,
       expiresAt,
+      lastActiveAt: now,
       ipAddress: ipAddress ?? null,
     },
   })
@@ -68,6 +74,12 @@ export async function createElevatedSession(
   return token
 }
 
+/**
+ * Elevated CS session is valid when:
+ * - absolute age since createdAt is under CS_SESSION_ABSOLUTE_MS, AND
+ * - idle time since lastActiveAt is under CS_SESSION_IDLE_MS.
+ * Each successful check slides lastActiveAt forward.
+ */
 export async function validateElevatedSession(
   token: string | undefined | null
 ): Promise<SessionUser | null> {
@@ -75,10 +87,20 @@ export async function validateElevatedSession(
   const row = await prisma.clientServicesSession.findUnique({
     where: { token },
   })
-  if (!row || row.expiresAt < new Date()) {
-    if (row) {
-      await prisma.clientServicesSession.delete({ where: { id: row.id } }).catch(() => {})
-    }
+  if (!row) return null
+
+  const now = Date.now()
+  const expired = isElevatedSessionExpired({
+    nowMs: now,
+    lastActiveAtMs: row.lastActiveAt.getTime(),
+    createdAtMs: row.createdAt.getTime(),
+    expiresAtMs: row.expiresAt.getTime(),
+    idleMs: CS_SESSION_IDLE_MS,
+    absoluteMs: CS_SESSION_ABSOLUTE_MS,
+  })
+
+  if (expired) {
+    await prisma.clientServicesSession.delete({ where: { id: row.id } }).catch(() => {})
     return null
   }
 
@@ -88,6 +110,15 @@ export async function validateElevatedSession(
   const user = await validateSession(mainToken)
   if (!user || user.id !== row.userId) return null
   if (!(await canAccessClientServices(user))) return null
+
+  // Sliding idle window — DB is the source of truth (not cookie maxAge).
+  await prisma.clientServicesSession
+    .update({
+      where: { id: row.id },
+      data: { lastActiveAt: new Date(now) },
+    })
+    .catch(() => {})
+
   return user
 }
 
@@ -96,7 +127,8 @@ export function setElevatedSessionCookie(response: NextResponse, token: string):
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: Math.floor(CS_SESSION_DURATION_MS / 1000),
+    // Cookie outlives the idle window; idle/absolute expiry is enforced in DB.
+    maxAge: Math.floor(CS_SESSION_ABSOLUTE_MS / 1000),
     path: '/',
   })
 }
@@ -120,9 +152,14 @@ export async function getElevatedClientServicesUser(): Promise<SessionUser | nul
 
 /**
  * API guard: main session + canAccess + elevated cs_session.
+ * Attaches active `crmRoles` for the access seam.
  */
 export async function requireClientServicesSession(): Promise<
-  | { user: SessionUser; scope: ClientScope; response: null }
+  | {
+      user: SessionUser & { crmRoles: import('@prisma/client').CrmRole[] }
+      scope: ClientScope
+      response: null
+    }
   | { user: null; scope: null; response: NextResponse }
 > {
   const cookieStore = await cookies()
@@ -164,7 +201,13 @@ export async function requireClientServicesSession(): Promise<
   }
 
   const scope = await getClientScopeForUser(user)
-  return { user, scope, response: null }
+  const { fetchUserCrmRoles } = await import('@/lib/crm/access')
+  const crmRoles = await fetchUserCrmRoles(elevated.id)
+  return {
+    user: { ...elevated, crmRoles },
+    scope,
+    response: null,
+  }
 }
 
 /** Main session + allowlist only (for elevate OTP send/verify before elevated cookie exists). */
@@ -193,10 +236,13 @@ export async function enforceClientScope(
   clientId: string,
   request?: NextRequest
 ): Promise<NextResponse | null> {
-  // Delegate to CRM access seam (full-access vs case-coordinator scoping).
-  const { assertCanViewClient, CrmAccessError } = await import('@/lib/crm/access')
+  // Delegate to CRM access seam (full-access vs department / coordinator scoping).
+  const { assertCanViewClient, CrmAccessError, fetchUserCrmRoles } = await import(
+    '@/lib/crm/access'
+  )
   try {
-    await assertCanViewClient(user, clientId)
+    const crmRoles = await fetchUserCrmRoles(user.id)
+    await assertCanViewClient({ ...user, crmRoles }, clientId)
     return null
   } catch (err) {
     if (err instanceof CrmAccessError) {

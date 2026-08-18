@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { RBTStatus } from '@prisma/client'
 import { requireAdminSession } from '@/lib/auth'
 import { runRbtProximitySearch } from '@/lib/scheduling-beta/proximitySearch'
+import { PLACEABLE_RBT_WHERE } from '@/lib/crm/therapistSearch'
 
 const DEFAULT_LIMIT = 6
 
@@ -19,14 +19,13 @@ export async function POST(req: NextRequest) {
     const clientZip = typeof body.clientZip === 'string' ? body.clientZip.trim() : ''
     const limit = Math.min(10, Math.max(1, Number(body.limit) || DEFAULT_LIMIT))
 
-    /** Include all pipeline stages except rejected candidates. */
     const result = await runRbtProximitySearch({
       clientAddress,
       clientCity,
       clientState,
       clientZip,
       limit,
-      rbtWhere: { status: { not: RBTStatus.REJECTED } },
+      rbtWhere: PLACEABLE_RBT_WHERE,
     })
 
     if ('error' in result && result.error) {

@@ -622,13 +622,13 @@ async function main() {
           authLengthMonths: incomingCore.authLengthMonths,
           serviceStartDate: incomingCore.serviceStartDate,
           serviceEndDate: incomingCore.serviceEndDate,
-          // Only set stage/pipeline/status if somehow missing (shouldn't be)
+          // Fill-null owner even without --force so department queues stay populated
+          currentOwnerDept: incomingCore.currentOwnerDept,
           ...(force
             ? {
                 stage: incomingCore.stage,
                 pipelineStatus: incomingCore.pipelineStatus,
                 status: incomingCore.status,
-                currentOwnerDept: incomingCore.currentOwnerDept,
                 stageEnteredAt: incomingCore.stageEnteredAt,
               }
             : {}),

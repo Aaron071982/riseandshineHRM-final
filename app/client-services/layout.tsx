@@ -5,6 +5,19 @@ import {
   canAccessClientServices,
   getElevatedClientServicesUser,
 } from '@/lib/client-services/access'
+import {
+  canAccessDepartment,
+  fetchUserCrmRoles,
+  isFullAccess,
+  isSuperAdmin,
+} from '@/lib/crm/access'
+import { bootstrapCrmSuperAdmins } from '@/lib/crm/bootstrapRoles'
+import {
+  DEPT_SLUGS,
+  DEPT_SLUG_TO_OWNER,
+  deptHref,
+  deptLabel,
+} from '@/lib/crm/departments'
 import ClientServicesLayout from '@/components/client-services/ClientServicesLayout'
 import ElevateGate from '@/components/client-services/ElevateGate'
 
@@ -27,10 +40,35 @@ export default async function ClientServicesSectionLayout({
   const elevatedUser = await getElevatedClientServicesUser()
   const elevated = !!elevatedUser
 
+  let showAdmin = false
+  let showTherapistSearch = false
+  let departmentNav: { href: string; label: string }[] = []
+  if (elevated && elevatedUser) {
+    await bootstrapCrmSuperAdmins()
+    const crmRoles = await fetchUserCrmRoles(elevatedUser.id)
+    const subject = {
+      id: elevatedUser.id,
+      email: elevatedUser.email,
+      crmRoles,
+    }
+    showAdmin = isSuperAdmin(subject)
+    showTherapistSearch = canAccessDepartment(subject, 'STAFFING')
+    const full = isFullAccess(subject)
+    departmentNav = DEPT_SLUGS.filter((slug) =>
+      full ? true : canAccessDepartment(subject, DEPT_SLUG_TO_OWNER[slug])
+    ).map((slug) => ({
+      href: deptHref(slug),
+      label: deptLabel(slug),
+    }))
+  }
+
   return (
     <ClientServicesLayout
       userName={user.name ?? user.email ?? 'User'}
       elevated={elevated}
+      showAdmin={showAdmin}
+      showTherapistSearch={showTherapistSearch}
+      departmentNav={departmentNav}
     >
       {elevated ? children : <ElevateGate userEmail={user.email ?? ''} />}
     </ClientServicesLayout>

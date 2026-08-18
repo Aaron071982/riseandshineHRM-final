@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { ClientOwnerDept, ClientStage } from '@prisma/client'
-import { STAGE_LABELS } from '@/lib/crm/stages'
+import { STAGE_GROUP, STAGE_LABELS } from '@/lib/crm/stages'
 import { OwnerDeptBadge } from '@/components/crm/StageStepper'
 import { EXPIRY_TONE_CLASS, expiryBand } from '@/components/crm/ProfilePicker'
 import { cn } from '@/lib/utils'
@@ -24,6 +24,19 @@ export type CaseloadRow = {
   rbtName: string | null
   rbtProfileId: string | null
   authExpirationDate: string | null
+}
+
+const STAGE_TONE: Record<string, string> = {
+  INTAKE:
+    'bg-[var(--stage-intake-bg)] text-[var(--stage-intake)] ring-1 ring-[color-mix(in_srgb,var(--stage-intake)_35%,transparent)]',
+  CLINICAL_AUTH:
+    'bg-[var(--stage-clinical-bg)] text-[var(--stage-clinical)] ring-1 ring-[color-mix(in_srgb,var(--stage-clinical)_35%,transparent)]',
+  STAFFING:
+    'bg-[var(--stage-staffing-bg)] text-[var(--stage-staffing)] ring-1 ring-[color-mix(in_srgb,var(--stage-staffing)_35%,transparent)]',
+  COORDINATION:
+    'bg-[var(--stage-coord-bg)] text-[var(--stage-coord)] ring-1 ring-[color-mix(in_srgb,var(--stage-coord)_35%,transparent)]',
+  ACTIVE:
+    'bg-[var(--stage-active-bg)] text-[var(--stage-active)] ring-1 ring-[color-mix(in_srgb,var(--stage-active)_35%,transparent)]',
 }
 
 const GROUPS = [
@@ -163,7 +176,12 @@ export default function CaseloadTable({
                       </div>
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className="inline-flex rounded-md bg-[color-mix(in_srgb,var(--brand)_10%,white)] px-2 py-0.5 text-xs font-medium text-brand">
+                      <span
+                        className={cn(
+                          'inline-flex rounded-md px-2 py-0.5 text-xs font-semibold',
+                          STAGE_TONE[STAGE_GROUP[r.stage]]
+                        )}
+                      >
                         {STAGE_LABELS[r.stage]}
                       </span>
                       {r.stalled && (

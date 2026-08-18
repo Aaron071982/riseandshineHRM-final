@@ -65,9 +65,8 @@ export function CommunicationsPanel({
       )}
 
       <p className="text-sm text-quiet">
-        Parent-journey emails send automatically on stage advances when
-        enabled in env. With sends off, the timeline still records SKIPPED
-        rows so you can see what would have gone out.
+        Parent stage emails are on standby. They are generated and sent only
+        when the dedicated journey-email feature flag is explicitly enabled.
       </p>
 
       {canEdit && (
@@ -214,11 +213,15 @@ export function CommunicationsPanel({
               {c.subject && (
                 <p className="mt-1 text-sm text-ink">{c.subject}</p>
               )}
-              {c.body && (
+              {c.status === 'SKIPPED' ? (
+                <p className="mt-0.5 text-sm text-quiet">
+                  Not sent — parent journey email automation was disabled.
+                </p>
+              ) : c.body ? (
                 <p className="mt-0.5 whitespace-pre-wrap text-sm text-quiet">
                   {c.body}
                 </p>
-              )}
+              ) : null}
               <p className="mt-1 text-xs text-faint">
                 {c.sentByUser?.name || c.sentByUser?.email || 'System'}
                 {c.status ? ` · ${c.status}` : ''}

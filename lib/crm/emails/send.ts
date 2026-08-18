@@ -5,6 +5,7 @@ import { logClientAccess } from '@/lib/client-services/audit'
 import { STAGE_JOURNEY_TEMPLATE } from '@/lib/crm/alertRules'
 import {
   crmEmailsEnabled,
+  crmJourneyEmailsEnabled,
   isJourneyLockedStatus,
   resolveCrmEmailRecipient,
 } from '@/lib/crm/emails/safety'
@@ -116,7 +117,7 @@ async function deliverViaResend(params: {
 }
 
 /**
- * Send (or record SKIPPED) a journey email for a stage transition.
+ * Send a journey email for a stage transition when explicitly enabled.
  * Idempotent: SENT/SKIPPED for the same template blocks automatic resend.
  */
 export async function maybeSendJourneyEmail(
@@ -136,6 +137,15 @@ export async function sendJourneyTemplate(
   template: CommTemplate,
   opts?: { actorUserId?: string | null; force?: boolean }
 ): Promise<JourneySendResult> {
+  // Standby means no render, communication row, retry lock, or delivery.
+  if (!crmJourneyEmailsEnabled()) {
+    return {
+      status: 'SKIPPED',
+      reason: 'CRM_JOURNEY_EMAILS_ENABLED is not true',
+      to: null,
+    }
+  }
+
   const client = await loadMergeContext(clientId)
   if (!client) {
     return { status: 'FAILED', reason: 'Client not found' }
@@ -302,7 +312,7 @@ export async function retryFailedJourneyEmails(): Promise<{
 }> {
   const stats = { attempted: 0, sent: 0, failed: 0, skipped: 0 }
 
-  if (!crmEmailsEnabled()) {
+  if (!crmJourneyEmailsEnabled() || !crmEmailsEnabled()) {
     return stats
   }
 

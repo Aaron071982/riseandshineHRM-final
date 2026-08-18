@@ -20,7 +20,7 @@ export default async function ClientServicesCaseloadPage() {
         </div>
       }
     >
-      <CaseloadPageClient canImport={canImport} />
+      <CaseloadPageClient canCreate={canImport} />
     </Suspense>
   )
 }

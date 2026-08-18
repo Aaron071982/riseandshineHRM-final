@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import type { Ethnicity, PostHireStage, Prisma, RBTStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { geocodeAddress } from '@/lib/mapbox-geocode'
 import { haversineMiles } from '@/lib/scheduling-beta/zipToCoord'
@@ -41,7 +41,10 @@ export type ProximityRbtRow = {
   availabilityDayOfWeeks: number[]
   phoneNumber: string
   email: string | null
-  status: unknown
+  status: RBTStatus
+  postHireStage: PostHireStage | null
+  gender: string | null
+  ethnicity: Ethnicity | null
 }
 
 export interface RunRbtProximitySearchResult {
@@ -122,6 +125,9 @@ export async function runRbtProximitySearch(
         languagesJson: true,
         availabilityJson: true,
         status: true,
+        postHireStage: true,
+        gender: true,
+        ethnicity: true,
         availabilitySlots: { select: { dayOfWeek: true } },
       },
     }),
@@ -230,6 +236,9 @@ export async function runRbtProximitySearch(
       phoneNumber: profile.phoneNumber,
       email: profile.email,
       status: profile.status,
+      postHireStage: profile.postHireStage,
+      gender: profile.gender,
+      ethnicity: profile.ethnicity,
     }
   })
 

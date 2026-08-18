@@ -12,9 +12,11 @@ import {
 } from '@/lib/client-services/access'
 import {
   CS_SESSION_COOKIE,
-  CS_SESSION_DURATION_MS,
+  CS_SESSION_IDLE_MS,
+  CS_SESSION_ABSOLUTE_MS,
 } from '@/lib/client-services/constants'
 import { logClientAccess } from '@/lib/client-services/audit'
+import { getRateLimitCount, incrementRateLimit } from '@/lib/otp-rate-limit'
 
 function timingSafeEqualString(a: string, b: string): boolean {
   const aBuf = Buffer.from(a)
@@ -33,12 +35,13 @@ function getAccessCodeFromEnv(): string | null {
 }
 
 export type UnlockClientServicesResult =
-  | { ok: true; expiresInHours: number }
+  | { ok: true; idleTimeoutMinutes: number; absoluteMaxHours: number }
   | { ok: false; error: string }
 
 /**
  * Step-up unlock for Client Services using CLIENT_SERVICES_ACCESS_CODE.
- * On success: mints client_services_sessions + httpOnly cookie (8h).
+ * On success: mints client_services_sessions + httpOnly cookie.
+ * Idle timeout is 1h (sliding); absolute cap is 12h.
  * On failure: logs UNLOCK_FAILED.
  */
 export async function unlockClientServices(
@@ -57,6 +60,16 @@ export async function unlockClientServices(
 
   const hdrs = await headers()
   const ip = getClientIpFromHeaders(hdrs)
+
+  const unlockWindowMs = 15 * 60 * 1000
+  const unlockKey = `crm:unlock:user:${user.id}`
+  if ((await getRateLimitCount(unlockKey, unlockWindowMs)) >= 10) {
+    return {
+      ok: false,
+      error: 'Too many unlock attempts. Please wait before trying again.',
+    }
+  }
+  await incrementRateLimit(unlockKey, unlockWindowMs)
 
   const expected = getAccessCodeFromEnv()
   if (!expected) {
@@ -80,7 +93,7 @@ export async function unlockClientServices(
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: Math.floor(CS_SESSION_DURATION_MS / 1000),
+    maxAge: Math.floor(CS_SESSION_ABSOLUTE_MS / 1000),
     path: '/',
   })
 
@@ -90,7 +103,11 @@ export async function unlockClientServices(
     ip,
   })
 
-  return { ok: true, expiresInHours: CS_SESSION_DURATION_MS / (60 * 60 * 1000) }
+  return {
+    ok: true,
+    idleTimeoutMinutes: CS_SESSION_IDLE_MS / (60 * 1000),
+    absoluteMaxHours: CS_SESSION_ABSOLUTE_MS / (60 * 60 * 1000),
+  }
 }
 
 /** Guard for pages: redirects to /client-services if elevated session missing. */

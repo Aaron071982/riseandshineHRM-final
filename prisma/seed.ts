@@ -309,6 +309,36 @@ async function main() {
     displayName: string
   }
   const bts: BtSeed[] = []
+  const rbtSeedLocations = [
+    {
+      address: '20 Jay St',
+      city: 'Brooklyn',
+      zip: '11201',
+      latitude: 40.7043,
+      longitude: -73.9866,
+    },
+    {
+      address: '30-30 Thomson Ave',
+      city: 'Long Island City',
+      zip: '11101',
+      latitude: 40.744,
+      longitude: -73.9357,
+    },
+    {
+      address: '1200 Waters Pl',
+      city: 'Bronx',
+      zip: '10461',
+      latitude: 40.8526,
+      longitude: -73.8377,
+    },
+    {
+      address: '90-15 Queens Blvd',
+      city: 'Elmhurst',
+      zip: '11373',
+      latitude: 40.7346,
+      longitude: -73.8697,
+    },
+  ] as const
 
   for (let i = 0; i < 20; i++) {
     const firstName = faker.person.firstName()
@@ -317,6 +347,7 @@ async function main() {
     const phone = `55501${String(10000 + i).slice(-5)}`
     const status = btStatuses[i % btStatuses.length]
     const isSupervisorish = i < 3
+    const seedLocation = rbtSeedLocations[i % rbtSeedLocations.length]
 
     const user = await prisma.user.create({
       data: {
@@ -335,9 +366,13 @@ async function main() {
         lastName,
         phoneNumber: phone,
         email,
-        locationCity: faker.helpers.arrayElement(BOROUGHS),
+        addressLine1: seedLocation.address,
+        locationCity: seedLocation.city,
         locationState: 'NY',
-        zipCode: faker.location.zipCode('1####'),
+        zipCode: seedLocation.zip,
+        latitude: seedLocation.latitude,
+        longitude: seedLocation.longitude,
+        gender: i % 2 === 0 ? 'Male' : 'Female',
         status,
         fortyHourCourseCompleted: i % 3 !== 0,
         scheduleCompleted: i % 2 === 0,
@@ -347,14 +382,7 @@ async function main() {
         artemisProviderName: `${lastName}, ${firstName}`,
         payrollName: `${lastName}, ${firstName}`,
         notes: '[SYNTHETIC] seed BT',
-        ethnicity: faker.helpers.arrayElement([
-          'WHITE',
-          'ASIAN',
-          'BLACK',
-          'HISPANIC',
-          'SOUTH_ASIAN',
-          'MIDDLE_EASTERN',
-        ]),
+        ethnicity: i % 2 === 0 ? 'SOUTH_ASIAN' : 'HISPANIC',
       },
     })
 
@@ -805,6 +833,26 @@ async function main() {
   ]
 
   const activeBts = bts.filter((_, i) => i >= 3)
+  const clientSeedAddresses = [
+    {
+      address: '1 Metrotech Center',
+      city: 'Brooklyn',
+      borough: 'Brooklyn',
+      zip: '11201',
+    },
+    {
+      address: '37-18 Northern Blvd',
+      city: 'Long Island City',
+      borough: 'Queens',
+      zip: '11101',
+    },
+    {
+      address: '1776 Eastchester Rd',
+      city: 'Bronx',
+      borough: 'Bronx',
+      zip: '10461',
+    },
+  ] as const
 
   function daysFromNow(days: number) {
     const d = new Date()
@@ -857,6 +905,7 @@ async function main() {
     const lastName = faker.person.lastName()
     const bt = activeBts[idx % activeBts.length]
     const borough = faker.helpers.arrayElement(BOROUGHS)
+    const seedAddress = clientSeedAddresses[idx % clientSeedAddresses.length]
     const ownerDept: ClientOwnerDept = STAGE_DEFAULT_OWNER_DEPT[plan.stage]
     const stageEnteredAt = faker.date.recent({ days: 14 })
     const nextActionDueAt = daysFromNow(faker.number.int({ min: -3, max: 10 }))
@@ -884,11 +933,19 @@ async function main() {
           ? faker.date.past({ years: 1 })
           : null,
         dateOfBirth: faker.date.birthdate({ min: 3, max: 12, mode: 'age' }),
-        addressLine: faker.location.streetAddress(),
-        city: borough,
-        borough,
+        addressLine: seedAddress.address,
+        city: seedAddress.city,
+        borough: seedAddress.borough,
         state: 'NY',
-        zip: faker.location.zipCode('1####'),
+        zip: seedAddress.zip,
+        preferredRbtGender:
+          idx % 3 === 0 ? 'MALE' : idx % 3 === 1 ? 'FEMALE' : 'ANY',
+        preferredRbtEthnicities:
+          idx % 3 === 0
+            ? ['SOUTH_ASIAN']
+            : idx % 3 === 1
+              ? ['HISPANIC', 'BLACK']
+              : [],
         insuranceProvider: faker.helpers.arrayElement(['Fidelis', 'Healthfirst', 'MetroPlus']),
         insuranceId: `SYNTH-${faker.string.alphanumeric(8).toUpperCase()}`,
         diagnosis: 'F84.0',
@@ -1188,6 +1245,11 @@ async function main() {
 
   console.log('🎉 Synthetic seed complete')
   console.table(counts)
+
+  const { bootstrapCrmSuperAdmins } = await import('@/lib/crm/bootstrapRoles')
+  const boot = await bootstrapCrmSuperAdmins(admin.id)
+  console.log('[crm-bootstrap]', boot)
+
   console.log(
     'Login hint: admin@example.com (set CLIENT_SERVICES_FULL_ACCESS_EMAILS + CLIENT_SERVICES_ACCESS_CODE + ADMIN_FALLBACK_EMAIL in .env.development)'
   )

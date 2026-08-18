@@ -1,7 +1,10 @@
 import {
-  CLIENT_STAGE_ORDER,
+  LINEAR_STAGE_ORDER,
   OWNER_DEPT_LABELS,
   STAGE_DEFAULT_OWNER_DEPT,
+  STAGE_DESCRIPTIONS,
+  STAGE_GROUP,
+  STAGE_GROUP_LABELS,
   STAGE_LABELS,
   type CanAdvanceResult,
 } from '@/lib/crm/stages'
@@ -14,6 +17,7 @@ const DEPT_CHIP: Record<ClientOwnerDept, string> = {
   CLINICAL: 'bg-[var(--green-bg)] text-[var(--green)]',
   AUTHORIZATION: 'bg-[var(--slate-bg)] text-[var(--slate)]',
   STAFFING: 'bg-[var(--urgent-bg)] text-brand',
+  BILLING: 'bg-[var(--stage-coord-bg)] text-[var(--stage-coord)]',
 }
 
 export function StageStepper({
@@ -35,7 +39,10 @@ export function StageStepper({
   fullAccess: boolean
   onSetStage: (to: ClientStage) => void
 }) {
-  const currentIdx = CLIENT_STAGE_ORDER.indexOf(stage)
+  const displayStage =
+    stage === 'TREATMENT_PLAN' ? ('ASSESSMENT' as ClientStage) : stage
+  const currentIdx = LINEAR_STAGE_ORDER.indexOf(displayStage)
+  const group = STAGE_GROUP[stage]
 
   return (
     <section className="rounded-xl border border-line bg-surface p-4 md:p-5">
@@ -45,7 +52,12 @@ export function StageStepper({
           <p className="mt-0.5 text-sm text-quiet">
             {STAGE_LABELS[stage]}
             <span className="text-faint"> · </span>
+            {STAGE_GROUP_LABELS[group]}
+            <span className="text-faint"> · </span>
             owned by {OWNER_DEPT_LABELS[STAGE_DEFAULT_OWNER_DEPT[stage]]}
+          </p>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-quiet">
+            {STAGE_DESCRIPTIONS[stage]}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -57,7 +69,7 @@ export function StageStepper({
                 value={stage}
                 onChange={(e) => onSetStage(e.target.value as ClientStage)}
               >
-                {CLIENT_STAGE_ORDER.map((s) => (
+                {LINEAR_STAGE_ORDER.map((s) => (
                   <option key={s} value={s}>
                     {STAGE_LABELS[s]}
                   </option>
@@ -65,7 +77,7 @@ export function StageStepper({
               </select>
             </label>
           )}
-          {canEdit && currentIdx < CLIENT_STAGE_ORDER.length - 1 && (
+          {canEdit && currentIdx < LINEAR_STAGE_ORDER.length - 1 && (
             <button
               type="button"
               disabled={advancing || !gate.ok}
@@ -84,7 +96,7 @@ export function StageStepper({
       </div>
 
       <ol className="flex gap-1 overflow-x-auto pb-1">
-        {CLIENT_STAGE_ORDER.map((s, i) => {
+        {LINEAR_STAGE_ORDER.map((s, i) => {
           const done = i < currentIdx
           const current = i === currentIdx
           const dept = STAGE_DEFAULT_OWNER_DEPT[s]
@@ -98,7 +110,7 @@ export function StageStepper({
                 done && 'border-line bg-line-2',
                 !done && !current && 'border-line bg-surface opacity-60'
               )}
-              title={`${STAGE_LABELS[s]} · ${OWNER_DEPT_LABELS[dept]}`}
+              title={`${STAGE_LABELS[s]} · ${OWNER_DEPT_LABELS[dept]}\n${STAGE_DESCRIPTIONS[s]}`}
             >
               <div
                 className={cn(

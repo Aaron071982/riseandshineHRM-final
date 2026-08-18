@@ -3,6 +3,16 @@
 // Content-Security-Policy is report-only until violations are reviewed in the browser console /
 // your CSP reporting endpoint. To enforce, rename the header key below from
 // Content-Security-Policy-Report-Only to Content-Security-Policy.
+//
+// TODO: flip to Content-Security-Policy after N days of clean reports in production/preview.
+// Before flipping, verify zero violations for:
+//   - Mapbox (api.mapbox.com, events, workers, styles, tiles)
+//   - Resend (api.resend.com — server-side only; should not appear in browser CSP)
+//   - Supabase (*.supabase.co storage/auth if any client SDK)
+//   - Next.js inline scripts / styles ('unsafe-inline' / 'unsafe-eval' currently required)
+//   - CDN assets (cdn.jsdelivr.net for Mapbox GL)
+// Go-live checklist: review Report-Only console noise for 7+ days, then flip deliberately —
+// do not auto-enforce in a phase change.
 const contentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com https://cdn.jsdelivr.net",

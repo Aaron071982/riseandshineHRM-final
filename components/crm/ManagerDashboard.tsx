@@ -1,6 +1,12 @@
 import Link from 'next/link'
 import type { ManagerDashboardData } from '@/lib/crm/dashboard'
-import { OWNER_DEPT_LABELS, STAGE_DEFAULT_OWNER_DEPT } from '@/lib/crm/stages'
+import {
+  OWNER_DEPT_LABELS,
+  STAGE_DESCRIPTIONS,
+  STAGE_GROUP,
+  STAGE_GROUP_LABELS,
+} from '@/lib/crm/stages'
+import { deptHref } from '@/lib/crm/departments'
 import { EXPIRY_TONE_CLASS } from '@/components/crm/ProfilePicker'
 import { cn } from '@/lib/utils'
 
@@ -9,12 +15,12 @@ function caseloadHref(params: Record<string, string>) {
   return `/client-services/clients?${sp.toString()}`
 }
 
-const DEPT_TONE: Record<string, string> = {
-  INTAKE: 'bg-[var(--blue-bg)] text-[var(--blue)]',
-  CASE_COORDINATION: 'bg-[var(--amber-bg)] text-[var(--amber)]',
-  CLINICAL: 'bg-[var(--green-bg)] text-[var(--green)]',
-  AUTHORIZATION: 'bg-[var(--slate-bg)] text-[var(--slate)]',
-  STAFFING: 'bg-[color-mix(in_srgb,var(--brand)_12%,white)] text-brand',
+const GROUP_BAR: Record<string, string> = {
+  INTAKE: 'bg-[var(--stage-intake)]',
+  CLINICAL_AUTH: 'bg-[var(--stage-clinical)]',
+  STAFFING: 'bg-[var(--stage-staffing)]',
+  COORDINATION: 'bg-[var(--stage-coord)]',
+  ACTIVE: 'bg-[var(--stage-active)]',
 }
 
 export default function ManagerDashboard({
@@ -75,18 +81,20 @@ export default function ManagerDashboard({
           <h2 className="font-display text-base font-semibold text-ink">
             Pipeline funnel
           </h2>
-          <p className="text-xs text-quiet">Click a stage to open the caseload filter</p>
+          <p className="text-xs text-quiet">
+            Hover a stage for what happens · click to filter caseload
+          </p>
         </div>
         <div className="flex gap-1 overflow-x-auto pb-1">
           {pipeline.byStage.map((s) => {
-            const dept = STAGE_DEFAULT_OWNER_DEPT[s.stage]
+            const group = STAGE_GROUP[s.stage]
             const h = Math.max(8, Math.round((s.count / maxFunnel) * 72))
             return (
               <Link
                 key={s.stage}
                 href={caseloadHref({ stage: s.stage })}
                 className="group flex min-w-[3.25rem] flex-1 flex-col items-center gap-1"
-                title={`${s.label}: ${s.count}${s.stalled ? ` · ${s.stalled} stalled` : ''}`}
+                title={`${s.label} · ${STAGE_GROUP_LABELS[group]}\n${STAGE_DESCRIPTIONS[s.stage]}${s.stalled ? `\n${s.stalled} stalled` : ''}`}
               >
                 <span className="text-xs font-semibold tabular-nums text-ink">
                   {s.count}
@@ -94,12 +102,15 @@ export default function ManagerDashboard({
                 <div
                   className={cn(
                     'w-full rounded-t-md transition-opacity group-hover:opacity-90',
-                    DEPT_TONE[dept]
+                    GROUP_BAR[group]
                   )}
                   style={{ height: h }}
                 />
-                <span className="max-w-full truncate text-[10px] text-quiet">
+                <span className="max-w-full truncate text-[10px] font-medium text-ink">
                   {s.label}
+                </span>
+                <span className="max-w-full truncate text-[9px] text-quiet">
+                  {STAGE_GROUP_LABELS[group]}
                 </span>
                 {s.stalled > 0 && (
                   <span className="rounded bg-[var(--amber-bg)] px-1 text-[9px] font-medium text-[var(--amber)]">
@@ -116,6 +127,7 @@ export default function ManagerDashboard({
       <section className="grid gap-3 lg:grid-cols-2">
         <QueueCard
           title="Intake"
+          href={deptHref('intake')}
           rows={[
             {
               label: 'New inquiries',
@@ -136,6 +148,7 @@ export default function ManagerDashboard({
         />
         <QueueCard
           title="Clinical"
+          href={deptHref('clinical')}
           rows={[
             {
               label: 'Waiting for assessment',
@@ -150,12 +163,13 @@ export default function ManagerDashboard({
             {
               label: 'Treatment plan pending',
               count: queues.clinical.treatmentPlanPending,
-              href: caseloadHref({ stage: 'TREATMENT_PLAN' }),
+              href: caseloadHref({ queue: 'clinical_treatment_plan_pending' }),
             },
           ]}
         />
         <QueueCard
           title="Authorization"
+          href={deptHref('authorization')}
           rows={[
             {
               label: 'Pending',
@@ -176,6 +190,7 @@ export default function ManagerDashboard({
         />
         <QueueCard
           title="Staffing"
+          href={deptHref('staffing')}
           rows={[
             {
               label: 'Ready for staffing',
@@ -195,7 +210,8 @@ export default function ManagerDashboard({
           ]}
         />
         <QueueCard
-          title="Scheduling"
+          title="Case coordination"
+          href={deptHref('case-coordination')}
           rows={[
             {
               label: 'Schedule pending',
@@ -211,6 +227,7 @@ export default function ManagerDashboard({
         />
         <QueueCard
           title="Active"
+          href={caseloadHref({ queue: 'active' })}
           rows={[
             {
               label: 'Active clients',
@@ -416,14 +433,24 @@ function KpiTile({
 
 function QueueCard({
   title,
+  href,
   rows,
 }: {
   title: string
+  href?: string
   rows: { label: string; count: number; href: string }[]
 }) {
   return (
     <div className="rounded-xl border border-line bg-surface p-4">
-      <h3 className="font-display text-base font-semibold text-ink">{title}</h3>
+      <h3 className="font-display text-base font-semibold text-ink">
+        {href ? (
+          <Link href={href} className="hover:text-brand hover:underline">
+            {title}
+          </Link>
+        ) : (
+          title
+        )}
+      </h3>
       <ul className="mt-2 divide-y divide-line">
         {rows.map((r) => (
           <li key={r.label}>

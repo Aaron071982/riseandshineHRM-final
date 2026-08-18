@@ -434,6 +434,9 @@ model User {
   clientTasksCreated           ClientTask[]              @relation("ClientTaskCreatedBy")
   clientCommunicationsSent     ClientCommunication[]     @relation("ClientCommunicationSentBy")
   clientAlertsResolved         ClientAlert[]             @relation("ClientAlertResolvedBy")
+  crmRoles                     UserCrmRole[]             @relation("UserCrmRoles")
+  crmRolesGranted              UserCrmRole[]             @relation("UserCrmRolesGrantedBy")
+  crmRolesRevoked              UserCrmRole[]             @relation("UserCrmRolesRevokedBy")
 
   @@map("users")
 }
@@ -2526,6 +2529,7 @@ enum ClientOwnerDept {
   CLINICAL
   AUTHORIZATION
   STAFFING
+  BILLING
 }
 
 enum ClientReferralSource {
@@ -2621,6 +2625,63 @@ enum AssignmentStage {
   ASSIGNED
 }
 
+/// CRM-only roles — separate axis from HRM UserRole. Never merge into UserRole.
+enum CrmRole {
+  SUPER_ADMIN
+  MANAGEMENT
+  INTAKE
+  CLINICAL
+  AUTHORIZATION
+  STAFFING
+  CASE_COORDINATION
+  BILLING
+}
+
+/// Active CRM role assignment. Revoke by setting revokedAt (never hard-delete).
+model UserCrmRole {
+  id              String    @id @default(cuid())
+  userId          String
+  role            CrmRole
+  grantedByUserId String?
+  grantedAt       DateTime  @default(now())
+  revokedAt       DateTime?
+  revokedByUserId String?
+
+  user      User  @relation("UserCrmRoles", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("UserCrmRolesGrantedBy", fields: [grantedByUserId], references: [id], onDelete: SetNull)
+  revokedBy User? @relation("UserCrmRolesRevokedBy", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, role])
+  @@index([role])
+  @@index([userId])
+  @@index([revokedAt])
+  @@map("user_crm_roles")
+}
+
+/// Parallel clinical milestone (treatment plan) — not a linear pipeline stage.
+enum MilestoneStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETE
+}
+
+/// Preferred RBT gender for staffing match (Phase 9 Therapist Search).
+enum GenderPreference {
+  MALE
+  FEMALE
+  ANY
+}
+
+/// Preferred RBT ethnicity checklist — mirrors Ethnicity / rbt_profiles.ethnicity.
+enum EthnicityPreference {
+  WHITE
+  ASIAN
+  BLACK
+  HISPANIC
+  SOUTH_ASIAN
+  MIDDLE_EASTERN
+}
+
 model ServiceClient {
   id                   String                @id @default(cuid())
   clientCode           String                @unique
@@ -2631,7 +2692,8 @@ model ServiceClient {
   stage                ClientStage           @default(INQUIRY)
   pipelineStatus       ClientPipelineStatus  @default(LIVE)
   stageEnteredAt       DateTime?
-  currentOwnerDept     ClientOwnerDept?
+  /// Owning department for queue visibility. Default INTAKE; always set on create/advance/handoff.
+  currentOwnerDept     ClientOwnerDept?  @default(INTAKE)
   currentOwnerUserId   String?
   caseCoordinatorUserId String?
   bcbaProfileId        String?
@@ -2641,6 +2703,13 @@ model ServiceClient {
   inquiryReceivedAt    DateTime?
   lastParentContactAt  DateTime?
   actualServiceStartDate DateTime?
+  /// Parallel clinical track — does not block staffing; must be COMPLETE before ACTIVE.
+  treatmentPlanStatus    MilestoneStatus       @default(NOT_STARTED)
+  treatmentPlanCompletedAt DateTime?
+  /// Target date to place an RBT (settable from Authorization onward).
+  rbtTargetDate          DateTime?             @db.Date
+  preferredRbtGender     GenderPreference?
+  preferredRbtEthnicities EthnicityPreference[]
   dateOfBirth          DateTime?             @db.Date
   addressLine          String?
   city                 String?
@@ -2768,12 +2837,13 @@ model ClientAccessLog {
 }
 
 model ClientServicesSession {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  ipAddress String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  expiresAt    DateTime
+  lastActiveAt DateTime @default(now())
+  ipAddress    String?
+  createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -7,6 +7,7 @@ import {
   recordSendOtpAttempt,
   assertVerifyOtpRateLimit,
   recordVerifyOtpFailure,
+  assertRateLimit,
 } from '@/lib/otp-rate-limit'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import {
@@ -18,7 +19,8 @@ import {
 import {
   clientServicesOtpEmailKey,
   CS_SESSION_COOKIE,
-  CS_SESSION_DURATION_MS,
+  CS_SESSION_IDLE_MS,
+  CS_SESSION_ABSOLUTE_MS,
 } from '@/lib/client-services/constants'
 import { logClientAccess } from '@/lib/client-services/audit'
 import { prisma } from '@/lib/prisma'
@@ -72,6 +74,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === 'unlock') {
+    const unlockLimited = await assertRateLimit(
+      `crm:unlock:user:${user.id}`,
+      10,
+      15 * 60 * 1000,
+      'Too many unlock attempts. Please wait before trying again.'
+    )
+    if (unlockLimited) return unlockLimited
+
     const expected = process.env.CLIENT_SERVICES_ACCESS_CODE?.trim()
     if (!expected) {
       return NextResponse.json({ error: 'Access code not configured' }, { status: 500 })
@@ -85,7 +95,8 @@ export async function POST(request: NextRequest) {
     const token = await createElevatedSession(user.id, ip)
     const res = NextResponse.json({
       success: true,
-      expiresInHours: CS_SESSION_DURATION_MS / (60 * 60 * 1000),
+      idleTimeoutMinutes: CS_SESSION_IDLE_MS / (60 * 1000),
+      absoluteMaxHours: CS_SESSION_ABSOLUTE_MS / (60 * 60 * 1000),
     })
     setElevatedSessionCookie(res, token)
     await logClientAccess({ userId: user.id, action: 'SECTION_ENTRY', ip })
@@ -130,7 +141,8 @@ export async function POST(request: NextRequest) {
     const token = await createElevatedSession(user.id, ip)
     const res = NextResponse.json({
       success: true,
-      expiresInHours: CS_SESSION_DURATION_MS / (60 * 60 * 1000),
+      idleTimeoutMinutes: CS_SESSION_IDLE_MS / (60 * 1000),
+      absoluteMaxHours: CS_SESSION_ABSOLUTE_MS / (60 * 60 * 1000),
     })
     setElevatedSessionCookie(res, token)
     await logClientAccess({ userId: user.id, action: 'SECTION_ENTRY', ip })

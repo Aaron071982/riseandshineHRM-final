@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
               userId: admin.id,
               type: 'SCHEDULING_EXCLUSION_EXPIRED',
               message: `${rbtName}'s scheduling exclusion has expired — they will now appear in proximity results again`,
-              linkUrl: makePublicUrl('/admin/scheduling-beta'),
+              linkUrl: makePublicUrl('/client-services/therapist-search'),
             },
           }).catch(() => {})
         }

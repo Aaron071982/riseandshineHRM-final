@@ -5,10 +5,14 @@ import type {
   AuthStatus,
   AuthType,
   ClientPipelineStatus,
+  ClientReferralSource,
   ClientStage,
   CommChannel,
   CommDirection,
   CommTemplate,
+  EthnicityPreference,
+  GenderPreference,
+  MilestoneStatus,
   RequirementStatus,
   ServiceBtAssignmentStatus,
   ServiceClientStatus,
@@ -24,10 +28,12 @@ import {
 } from '@/lib/crm/access'
 import {
   canAdvance,
+  canSetRbtTargetDate,
   nextStage,
   REQUIREMENT_KEY_LABELS,
   STAGE_DEFAULT_OWNER_DEPT,
   STAGE_GATE_REQUIREMENT_KEYS,
+  STANDARD_DOCUMENT_REQUIREMENT_KEYS,
 } from '@/lib/crm/stages'
 import { isValidCpt, cptLabel } from '@/lib/crm/cpt'
 import { syncStageRequirements } from '@/lib/crm/syncStageRequirements'
@@ -103,7 +109,13 @@ export async function advanceStage(clientId: string): Promise<
       include: { requirements: true },
     })
 
-    const gate = canAdvance(client, client.requirements)
+    const gate = canAdvance(
+      {
+        stage: client.stage,
+        treatmentPlanStatus: client.treatmentPlanStatus,
+      },
+      client.requirements
+    )
     if (!gate.ok) {
       return {
         ok: false,
@@ -179,7 +191,7 @@ export async function advanceStage(clientId: string): Promise<
       action: 'STAGE_ADVANCE',
     })
 
-    // Parent journey email (guarded — SKIPPED when CRM_EMAILS_ENABLED=false)
+    // Parent journey email (standby unless explicitly enabled).
     try {
       const { maybeSendJourneyEmail } = await import('@/lib/crm/emails/send')
       await maybeSendJourneyEmail(clientId, toStage, { actorUserId: user.id })
@@ -217,6 +229,18 @@ export async function setStage(
 
     if (client.stage === toStage) {
       return { ok: true, stage: toStage }
+    }
+
+    if (
+      toStage === 'ACTIVE' &&
+      client.treatmentPlanStatus !== 'COMPLETE'
+    ) {
+      return {
+        ok: false,
+        error: 'Treatment plan must be complete before Active',
+        blocked: true,
+        blockedBy: ['treatment_plan_complete'],
+      }
     }
 
     const now = new Date()
@@ -261,6 +285,270 @@ export async function setStage(
     })
     revalidateClient(clientId)
     return { ok: true, stage: toStage }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export type CreateServiceClientInput = {
+  clientCode?: string
+  firstName: string
+  lastName: string
+  dateOfBirth?: string | null
+  addressLine?: string | null
+  city?: string | null
+  borough?: string | null
+  state?: string | null
+  zip?: string | null
+  insuranceProvider?: string | null
+  parentName?: string | null
+  parentPhone?: string | null
+  parentEmail?: string | null
+  bcbaName?: string | null
+  bcbaProfileId?: string | null
+  referralSource?: ClientReferralSource | null
+  preferredRbtGender?: GenderPreference | null
+  preferredRbtEthnicities?: EthnicityPreference[]
+}
+
+/** Internal Add-Client — creates at INQUIRY with DOCUMENT requirements seeded. */
+export async function createServiceClient(
+  input: CreateServiceClientInput
+): Promise<ActionResult<{ id: string; clientCode: string }>> {
+  try {
+    const user = await getClientServicesUser()
+    if (!isFullAccess(user)) {
+      throw new CrmAccessError('Full access required to create clients', 403)
+    }
+
+    const firstName = input.firstName?.trim()
+    const lastName = input.lastName?.trim()
+    if (!firstName || !lastName) {
+      return { ok: false, error: 'First and last name are required' }
+    }
+
+    let clientCode = (input.clientCode ?? '').trim().toUpperCase()
+    if (!clientCode) {
+      const latest = await prisma.serviceClient.findMany({
+        where: { clientCode: { startsWith: 'CC-' } },
+        select: { clientCode: true },
+        orderBy: { clientCode: 'desc' },
+        take: 50,
+      })
+      let max = 0
+      for (const row of latest) {
+        const n = Number(row.clientCode.replace(/^CC-/i, ''))
+        if (Number.isFinite(n) && n > max) max = n
+      }
+      clientCode = `CC-${String(max + 1).padStart(3, '0')}`
+    }
+
+    const existing = await prisma.serviceClient.findUnique({
+      where: { clientCode },
+    })
+    if (existing) {
+      return { ok: false, error: `Client code ${clientCode} already exists` }
+    }
+
+    const parseDate = (v?: string | null) => {
+      if (!v) return null
+      const d = new Date(v)
+      return Number.isNaN(d.getTime()) ? null : d
+    }
+
+    const now = new Date()
+    const inquiryKeys = STAGE_GATE_REQUIREMENT_KEYS.INQUIRY
+
+    const client = await prisma.$transaction(async (tx) => {
+      const created = await tx.serviceClient.create({
+        data: {
+          clientCode,
+          firstName,
+          lastName,
+          stage: 'INQUIRY',
+          pipelineStatus: 'LIVE',
+          status: 'NEW',
+          stageEnteredAt: now,
+          currentOwnerDept: STAGE_DEFAULT_OWNER_DEPT.INQUIRY,
+          inquiryReceivedAt: now,
+          referralSource: input.referralSource ?? 'OTHER',
+          dateOfBirth: parseDate(input.dateOfBirth),
+          addressLine: input.addressLine?.trim() || null,
+          city: input.city?.trim() || null,
+          borough: input.borough?.trim() || null,
+          state: input.state?.trim() || null,
+          zip: input.zip?.trim() || null,
+          insuranceProvider: input.insuranceProvider?.trim() || null,
+          parentName: input.parentName?.trim() || null,
+          parentPhone: input.parentPhone?.trim() || null,
+          parentEmail: input.parentEmail?.trim() || null,
+          bcbaName: input.bcbaName?.trim() || null,
+          bcbaProfileId: input.bcbaProfileId || null,
+          preferredRbtGender: input.preferredRbtGender ?? null,
+          preferredRbtEthnicities: input.preferredRbtEthnicities ?? [],
+          treatmentPlanStatus: 'NOT_STARTED',
+          createdBy: user.id,
+        },
+      })
+
+      for (const key of STANDARD_DOCUMENT_REQUIREMENT_KEYS) {
+        await tx.clientRequirement.create({
+          data: {
+            serviceClientId: created.id,
+            stage: 'DOCUMENTS',
+            key,
+            label: REQUIREMENT_KEY_LABELS[key] ?? key,
+            type: 'DOCUMENT',
+            status: 'PENDING',
+            isRequiredToAdvance: [
+              'insurance_card',
+              'medicaid_card',
+              'diagnostic_eval',
+              'physician_referral',
+            ].includes(key),
+          },
+        })
+      }
+
+      for (const key of inquiryKeys) {
+        await tx.clientRequirement.create({
+          data: {
+            serviceClientId: created.id,
+            stage: 'INQUIRY',
+            key,
+            label: REQUIREMENT_KEY_LABELS[key] ?? key,
+            type: 'TASK',
+            status: 'PENDING',
+            isRequiredToAdvance: true,
+          },
+        })
+      }
+
+      await tx.serviceClientStatusHistory.create({
+        data: {
+          serviceClientId: created.id,
+          fromStage: null,
+          toStage: 'INQUIRY',
+          fromStatus: null,
+          toStatus: 'NEW',
+          reason: 'Client created',
+          changedBy: user.id,
+        },
+      })
+
+      return created
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: client.id,
+      action: 'CREATE',
+    })
+    revalidatePath('/client-services')
+    revalidatePath('/client-services/clients')
+    return { ok: true, id: client.id, clientCode: client.clientCode }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function updateTreatmentPlanStatus(
+  clientId: string,
+  status: MilestoneStatus
+): Promise<ActionResult<{ treatmentPlanStatus: MilestoneStatus }>> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+
+    const now = new Date()
+    await prisma.serviceClient.update({
+      where: { id: clientId },
+      data: {
+        treatmentPlanStatus: status,
+        treatmentPlanCompletedAt: status === 'COMPLETE' ? now : null,
+      },
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'TREATMENT_PLAN_UPDATE',
+    })
+    revalidateClient(clientId)
+    return { ok: true, treatmentPlanStatus: status }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function updateRbtTargetDate(
+  clientId: string,
+  date: string | null
+): Promise<ActionResult> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+
+    const client = await prisma.serviceClient.findUniqueOrThrow({
+      where: { id: clientId },
+      select: { stage: true },
+    })
+    if (date && !canSetRbtTargetDate(client.stage)) {
+      return {
+        ok: false,
+        error: 'RBT target date is available from Authorization onward',
+      }
+    }
+
+    await prisma.serviceClient.update({
+      where: { id: clientId },
+      data: {
+        rbtTargetDate: date ? new Date(date) : null,
+      },
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'RBT_TARGET_DATE_UPDATE',
+    })
+    revalidateClient(clientId)
+    return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function updateClientPreferences(
+  clientId: string,
+  input: {
+    preferredRbtGender?: GenderPreference | null
+    preferredRbtEthnicities?: EthnicityPreference[]
+  }
+): Promise<ActionResult> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+
+    await prisma.serviceClient.update({
+      where: { id: clientId },
+      data: {
+        ...(input.preferredRbtGender !== undefined
+          ? { preferredRbtGender: input.preferredRbtGender }
+          : {}),
+        ...(input.preferredRbtEthnicities !== undefined
+          ? { preferredRbtEthnicities: input.preferredRbtEthnicities }
+          : {}),
+      },
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'PREFERENCES_UPDATE',
+    })
+    revalidateClient(clientId)
+    return { ok: true }
   } catch (err) {
     return fail(err)
   }
@@ -1097,8 +1385,8 @@ export async function addScheduleEntry(
         isActive: true,
         source: 'MANUAL',
         clientBorough: client.borough,
-        periodStart: period.start,
-        periodEnd: period.end,
+        periodStart: period.startDate,
+        periodEnd: period.endDate,
         serviceClientId: clientId,
         serviceClientLinkManual: true,
         createdBy: user.id,

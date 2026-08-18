@@ -1,5 +1,5 @@
 import type { ClientStage } from '@prisma/client'
-import { CLIENT_STAGE_ORDER } from '@/lib/crm/stages'
+import { LINEAR_STAGE_ORDER } from '@/lib/crm/stages'
 
 /** Expected max days in each stage before the case is considered stalled. */
 export const STAGE_MAX_DAYS: Record<ClientStage, number> = {
@@ -44,6 +44,8 @@ export const SERVICE_GAP_GRACE_DAYS = 0
 export type StageAgingClient = {
   stage: ClientStage
   stageEnteredAt: Date | null | undefined
+  /** When set and past, staffing stages escalate as stalled. */
+  rbtTargetDate?: Date | null | undefined
 }
 
 /** Whole days spent in the current stage (0 if missing entered-at). */
@@ -53,10 +55,26 @@ export function daysInStage(client: StageAgingClient): number {
   return Math.max(0, Math.floor(ms / (24 * 60 * 60 * 1000)))
 }
 
-/** True when days in stage exceed the stage's configured max. */
-export function isStalled(client: StageAgingClient): boolean {
+/** Stages where a missed rbtTargetDate counts as staffing escalation. */
+const RBT_TARGET_STALL_STAGES: ReadonlySet<ClientStage> = new Set([
+  'AUTHORIZATION',
+  'APPROVED',
+  'READY_FOR_STAFFING',
+  'RBT_SEARCH',
+])
+
+/** True when days in stage exceed max, or RBT target date is past while still staffing. */
+export function isStalled(client: StageAgingClient, now = new Date()): boolean {
   if (client.stage === 'ACTIVE') return false
-  return daysInStage(client) > STAGE_MAX_DAYS[client.stage]
+  if (daysInStage(client) > STAGE_MAX_DAYS[client.stage]) return true
+  if (
+    client.rbtTargetDate &&
+    RBT_TARGET_STALL_STAGES.has(client.stage) &&
+    new Date(client.rbtTargetDate).getTime() < now.getTime()
+  ) {
+    return true
+  }
+  return false
 }
 
 export function stageStaleBefore(stage: ClientStage, now = new Date()): Date {
@@ -74,7 +92,6 @@ export function contactAgingBefore(now = new Date()): Date {
 }
 
 export function inquiryUncontactedBefore(now = new Date()): Date {
-  // 1 business day ≈ calendar day for seed/dev simplicity
   const d = new Date(now)
   d.setHours(0, 0, 0, 0)
   d.setDate(d.getDate() - 1)
@@ -95,7 +112,7 @@ export function taskOverdueBefore(now = new Date()): Date {
 }
 
 /** Pipeline stages before ACTIVE (still in journey). */
-export const PRE_ACTIVE_STAGES: ClientStage[] = CLIENT_STAGE_ORDER.filter(
+export const PRE_ACTIVE_STAGES: ClientStage[] = LINEAR_STAGE_ORDER.filter(
   (s) => s !== 'ACTIVE'
 )
 

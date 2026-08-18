@@ -40,6 +40,12 @@ function pathActive(pathname: string, href: string): boolean {
   if (href === '/client-services') {
     return pathname === '/client-services' || pathname === '/client-services/'
   }
+  if (href === '/client-services/admin') {
+    return pathname.startsWith('/client-services/admin')
+  }
+  if (href.startsWith('/client-services/dept/')) {
+    return pathname === href || pathname.startsWith(href + '/')
+  }
   if (href === '/client-services/clients') {
     return (
       pathname === '/client-services/clients' ||

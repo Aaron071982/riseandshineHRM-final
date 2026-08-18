@@ -28,6 +28,9 @@ import {
 import type { ServiceBoardBucket } from '@/lib/client-services/serviceStatus'
 import { NY_BOROUGHS } from '@/lib/client-services/constants'
 import { cn } from '@/lib/utils'
+import AddressAutocomplete, {
+  type StructuredAddress,
+} from '@/components/ui/AddressAutocomplete'
 
 type Doc = {
   id: string
@@ -1124,6 +1127,20 @@ export default function ClientDetailPage({
       <Card title="Address">
         {editing && f ? (
           <div className="space-y-2">
+            <AddressAutocomplete
+              id="client-detail-address"
+              label="Search address"
+              placeholder="Start typing an address..."
+              onAddressSelect={(selected: StructuredAddress) =>
+                setForm({
+                  ...f,
+                  addressLine: selected.addressLine1,
+                  city: selected.city,
+                  state: selected.state || f.state,
+                  zip: selected.zipCode,
+                })
+              }
+            />
             <Field label="Street">
               <input
                 className={inputCls}

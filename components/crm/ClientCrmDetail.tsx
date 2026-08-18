@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { ClientFiveFieldHeader } from '@/components/crm/ClientFiveFieldHeader'
 import { StageStepper } from '@/components/crm/StageStepper'
+import { TreatmentPlanTrack } from '@/components/crm/TreatmentPlanTrack'
 import { RequirementsPanel } from '@/components/crm/RequirementsPanel'
 import { NotesPanel, OverviewPanel } from '@/components/crm/NotesPanel'
 import { ActivityPanel } from '@/components/crm/ActivityPanel'
@@ -136,6 +137,11 @@ export default function ClientCrmDetail({
             : null
         }
         daysInStage={daysInStage}
+        rbtTargetDate={
+          client.rbtTargetDate
+            ? new Date(client.rbtTargetDate).toISOString()
+            : null
+        }
         canEdit={canEdit}
       />
 
@@ -148,6 +154,17 @@ export default function ClientCrmDetail({
         canEdit={canEdit}
         fullAccess={canOverrideStage}
         onSetStage={onSetStage}
+      />
+
+      <TreatmentPlanTrack
+        clientId={client.id}
+        status={client.treatmentPlanStatus}
+        completedAt={
+          client.treatmentPlanCompletedAt
+            ? new Date(client.treatmentPlanCompletedAt).toISOString()
+            : null
+        }
+        canEdit={canEdit}
       />
 
       <div className="flex gap-1 overflow-x-auto border-b border-line pb-px">
@@ -169,7 +186,9 @@ export default function ClientCrmDetail({
       </div>
 
       <div className="pt-2">
-        {tab === 'overview' && <OverviewPanel client={client} />}
+        {tab === 'overview' && (
+          <OverviewPanel client={client} canEdit={canEdit} />
+        )}
         {tab === 'requirements' && (
           <RequirementsPanel
             requirements={client.requirements}

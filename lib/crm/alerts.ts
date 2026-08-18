@@ -173,6 +173,7 @@ type ScanClient = Prisma.ServiceClientGetPayload<{
     pipelineStatus: true
     stageEnteredAt: true
     lastParentContactAt: true
+    rbtTargetDate: true
     authorizations: {
       select: {
         authType: true
@@ -262,15 +263,21 @@ function evaluateClient(client: ScanClient, now: Date): DesiredAlert[] {
     }
   }
 
-  // STAGE_STALLED
-  if (live && isStalled(client)) {
+  // STAGE_STALLED (stage max days and/or missed rbtTargetDate while staffing)
+  if (live && isStalled(client, now)) {
     const days = daysInStage(client)
     const max = STAGE_MAX_DAYS[client.stage]
+    const missedTarget =
+      !!client.rbtTargetDate &&
+      new Date(client.rbtTargetDate).getTime() < now.getTime() &&
+      days <= max
     desired.push({
       alertType: 'STAGE_STALLED',
       severity: stalledSeverity(days, max),
-      message: `${name} stalled in ${client.stage.replace(/_/g, ' ')} for ${days}d (max ${max}d)`,
-      dueAt: null,
+      message: missedTarget
+        ? `${name} past RBT target date (${new Date(client.rbtTargetDate!).toLocaleDateString()}) while in ${client.stage.replace(/_/g, ' ')}`
+        : `${name} stalled in ${client.stage.replace(/_/g, ' ')} for ${days}d (max ${max}d)`,
+      dueAt: client.rbtTargetDate ?? null,
     })
   }
 
@@ -406,6 +413,7 @@ export async function runAlertScan(now = new Date()): Promise<AlertScanStats> {
         pipelineStatus: true,
         stageEnteredAt: true,
         lastParentContactAt: true,
+        rbtTargetDate: true,
         authorizations: {
           where: {
             authType: 'TREATMENT',

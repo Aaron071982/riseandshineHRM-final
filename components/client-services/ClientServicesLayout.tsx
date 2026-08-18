@@ -2,28 +2,60 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Users } from 'lucide-react'
+import {
+  ClipboardList,
+  FolderOpen,
+  LayoutDashboard,
+  Network,
+  Search as SearchIcon,
+  Shield,
+  Users,
+} from 'lucide-react'
 import AppShell from '@/components/shell/AppShell'
 import type { ShellNavItem } from '@/components/shell/AppSidebar'
-
-const CS_NAV: ShellNavItem[] = [
-  { href: '/client-services', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/client-services/clients', label: 'Clients', icon: Users },
-]
 
 export default function ClientServicesLayout({
   children,
   userName,
   elevated,
+  showAdmin = false,
+  showTherapistSearch = false,
+  departmentNav = [],
 }: {
   children: React.ReactNode
   userName: string
   elevated: boolean
+  showAdmin?: boolean
+  showTherapistSearch?: boolean
+  departmentNav?: { href: string; label: string }[]
 }) {
   const pathname = usePathname()
   const router = useRouter()
   const [needsAction, setNeedsAction] = useState(0)
   const [search, setSearch] = useState('')
+
+  const CS_NAV: ShellNavItem[] = [
+    { href: '/client-services', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/client-services/clients', label: 'Clients', icon: Users },
+    ...departmentNav.map((d) => ({
+      href: d.href,
+      label: d.label,
+      icon: d.href.includes('case-coordination') ? ClipboardList : FolderOpen,
+    })),
+    ...(showTherapistSearch
+      ? [
+          {
+            href: '/client-services/therapist-search',
+            label: 'Therapist Search',
+            icon: SearchIcon,
+          },
+        ]
+      : []),
+    { href: '/client-services/process', label: 'Process map', icon: Network },
+    ...(showAdmin
+      ? ([{ href: '/client-services/admin', label: 'Admin', icon: Shield }] as ShellNavItem[])
+      : []),
+  ]
 
   useEffect(() => {
     if (!elevated) return
@@ -59,6 +91,16 @@ export default function ClientServicesLayout({
     pathname.startsWith('/client-services/clients/') &&
     pathname !== '/client-services/clients'
   const onCaseload = pathname === '/client-services/clients'
+  const onAdmin = pathname.startsWith('/client-services/admin')
+  const onDept = pathname.startsWith('/client-services/dept/')
+  const onTherapistSearch = pathname.startsWith(
+    '/client-services/therapist-search'
+  )
+  const onProcess = pathname.startsWith('/client-services/process')
+  const deptCrumb = onDept
+    ? departmentNav.find((d) => pathname.startsWith(d.href))?.label ?? 'Department'
+    : null
+
   const crumbs = onDetail
     ? [
         { label: 'Admin', href: '/admin/dashboard' },
@@ -72,10 +114,34 @@ export default function ClientServicesLayout({
           { label: 'Client Services', href: '/client-services' },
           { label: 'Clients' },
         ]
-      : [
-          { label: 'Admin', href: '/admin/dashboard' },
-          { label: 'Client Services' },
-        ]
+      : onAdmin
+        ? [
+            { label: 'Admin', href: '/admin/dashboard' },
+            { label: 'Client Services', href: '/client-services' },
+            { label: 'Admin Management' },
+          ]
+        : onTherapistSearch
+          ? [
+              { label: 'Admin', href: '/admin/dashboard' },
+              { label: 'Client Services', href: '/client-services' },
+              { label: 'Therapist Search' },
+            ]
+          : onProcess
+          ? [
+              { label: 'Admin', href: '/admin/dashboard' },
+              { label: 'Client Services', href: '/client-services' },
+              { label: 'Process map' },
+            ]
+          : onDept
+          ? [
+              { label: 'Admin', href: '/admin/dashboard' },
+              { label: 'Client Services', href: '/client-services' },
+              { label: deptCrumb ?? 'Department' },
+            ]
+          : [
+              { label: 'Admin', href: '/admin/dashboard' },
+              { label: 'Client Services' },
+            ]
 
   if (!elevated) {
     return (
@@ -108,7 +174,7 @@ export default function ClientServicesLayout({
           )
         }
       }}
-      showSearch={!onDetail}
+      showSearch={!onDetail && !onAdmin && !onProcess}
     >
       {children}
     </AppShell>

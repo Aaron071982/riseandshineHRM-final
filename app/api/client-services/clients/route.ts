@@ -297,6 +297,7 @@ export async function POST(request: NextRequest) {
   const { addClientTimelineNote, recordStatusChange } = await import(
     '@/lib/client-services/timeline'
   )
+  const { STAGE_DEFAULT_OWNER_DEPT } = await import('@/lib/crm/stages')
 
   const client = await prisma.serviceClient.create({
     data: {
@@ -304,6 +305,10 @@ export async function POST(request: NextRequest) {
       firstName,
       lastName,
       status,
+      stage: 'INQUIRY',
+      pipelineStatus: 'LIVE',
+      stageEnteredAt: new Date(),
+      currentOwnerDept: STAGE_DEFAULT_OWNER_DEPT.INQUIRY,
       dateOfBirth: parseDate(body.dateOfBirth),
       addressLine: body.addressLine ? String(body.addressLine) : null,
       city: body.city ? String(body.city) : null,
