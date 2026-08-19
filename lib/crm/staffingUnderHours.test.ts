@@ -3,7 +3,7 @@ import {
   hoursUtilizationPct,
   isReceivingUnderAuthorizedThreshold,
   STAFFING_HOURS_UTILIZATION_THRESHOLD,
-} from './staffingUnderHours'
+} from '@/lib/crm/staffingUnderHoursShared'
 
 describe('staffingUnderHours', () => {
   it('uses 70% threshold', () => {

@@ -17,7 +17,7 @@ import type { ClaimablePoolRow } from '@/lib/crm/claims'
 import { OWNER_DEPT_LABELS, STAGE_LABELS } from '@/lib/crm/stages'
 import { OwnerDeptBadge } from '@/components/crm/StageStepper'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
-import { STAFFING_HOURS_UTILIZATION_THRESHOLD } from '@/lib/crm/staffingUnderHours'
+import { STAFFING_HOURS_UTILIZATION_THRESHOLD } from '@/lib/crm/staffingUnderHoursShared'
 import { cn } from '@/lib/utils'
 
 const HANDOFF_DEPTS: ClientOwnerDept[] = [
