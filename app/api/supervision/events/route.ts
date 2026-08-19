@@ -3,6 +3,30 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { validateSession, isAdmin } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
+import {
+  assertCanViewClient,
+  CrmAccessError,
+  fetchUserCrmRoles,
+  isFullAccess,
+} from '@/lib/crm/access'
+
+async function assertSupervisionClientView(
+  user: NonNullable<Awaited<ReturnType<typeof validateSession>>>,
+  clientId: string
+): Promise<NextResponse | null> {
+  const crmRoles = await fetchUserCrmRoles(user.id)
+  const subject = { id: user.id, email: user.email, crmRoles }
+  if (isFullAccess(subject) || isAdmin(user)) return null
+  try {
+    await assertCanViewClient(subject, clientId)
+    return null
+  } catch (err) {
+    if (err instanceof CrmAccessError) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    throw err
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -110,6 +134,21 @@ export async function POST(request: NextRequest) {
     }
     if (!supervisionType) {
       return NextResponse.json({ error: 'supervisionType is required' }, { status: 400 })
+    }
+
+    if (user.role === 'BCBA') {
+      const employee = await prisma.employee.findFirst({
+        where: { userId: user.id, employeeType: 'BCBA' },
+        select: { id: true },
+      })
+      if (!employee || employee.id !== bcbaEmployeeId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    }
+
+    if (clientId) {
+      const clientDenied = await assertSupervisionClientView(user, clientId)
+      if (clientDenied) return clientDenied
     }
 
     const dateObj = new Date(date)

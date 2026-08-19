@@ -5,6 +5,7 @@ import {
   requireClientServicesSession,
   isClientServicesFullAccessEmail,
   enforceClientScope,
+  enforceClientScopeForEdit,
 } from '@/lib/client-services/access'
 import { getVisibleClientsWhere } from '@/lib/crm/access'
 import { logClientAccess } from '@/lib/client-services/audit'
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    const denied = await enforceClientScope(user, scope, serviceClientId, request)
+    const denied = await enforceClientScopeForEdit(user, scope, serviceClientId, request)
     if (denied) return denied
     const count = await manualLinkScheduleName(name, serviceClientId)
     if (count === 0) {
@@ -151,7 +152,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    const denied = await enforceClientScope(user, scope, serviceClientId, request)
+    const denied = await enforceClientScopeForEdit(user, scope, serviceClientId, request)
     if (denied) return denied
 
     try {
@@ -192,7 +193,7 @@ export async function POST(request: NextRequest) {
     if (!serviceClientId) {
       return NextResponse.json({ error: 'serviceClientId required' }, { status: 400 })
     }
-    const denied = await enforceClientScope(user, scope, serviceClientId, request)
+    const denied = await enforceClientScopeForEdit(user, scope, serviceClientId, request)
     if (denied) return denied
     const count = await unlinkServiceClientSchedule(serviceClientId)
     await logClientAccess({

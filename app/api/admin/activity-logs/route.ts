@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { validateSession, isSuperAdmin } from '@/lib/auth'
+import { requireAdminSession, isSuperAdmin } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -9,14 +8,9 @@ export const fetchCache = 'force-no-store'
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get('session')?.value
-
-    if (!sessionToken) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await validateSession(sessionToken)
+    const auth = await requireAdminSession()
+    if (auth.response) return auth.response
+    const user = auth.user
     if (!user || !isSuperAdmin(user.email)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }

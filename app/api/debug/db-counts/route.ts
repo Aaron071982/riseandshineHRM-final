@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 /**
@@ -7,6 +8,9 @@ import { prisma } from '@/lib/prisma'
  * If rawCount > 0 but prismaOk is false, the schema/columns don't match (run migration).
  */
 export async function GET() {
+  const auth = await requireAdminSession()
+  if (auth.response) return auth.response
+
   try {
     const raw = await prisma.$queryRaw<[{ count: bigint }]>`
       SELECT COUNT(*) as count FROM rbt_profiles

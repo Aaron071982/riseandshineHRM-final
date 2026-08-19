@@ -5,7 +5,7 @@ import { STORAGE_BUCKET } from '@/lib/constants'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import {
   requireClientServicesSession,
-  enforceClientScope,
+  enforceClientScopeForEdit,
 } from '@/lib/client-services/access'
 import { logClientAccess } from '@/lib/client-services/audit'
 
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest, context: Ctx) {
   const { user, scope } = auth
   const { id: clientId, documentId } = await context.params
 
-  const denied = await enforceClientScope(user, scope, clientId, request)
+  const denied = await enforceClientScopeForEdit(user, scope, clientId, request)
   if (denied) return denied
 
   const doc = await prisma.serviceClientDocument.findFirst({

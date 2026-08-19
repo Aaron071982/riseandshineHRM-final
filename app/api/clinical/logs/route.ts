@@ -4,6 +4,31 @@ import { prisma } from '@/lib/prisma'
 import { validateSession, isAdmin } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
 import { validateCptCode, validateMinutes, validateUnits } from '@/lib/validation/clinical'
+import {
+  assertCanViewClient,
+  CrmAccessError,
+  fetchUserCrmRoles,
+  isFullAccess,
+} from '@/lib/crm/access'
+
+async function assertClinicalClientView(
+  user: Awaited<ReturnType<typeof validateSession>>,
+  clientId: string
+): Promise<NextResponse | null> {
+  if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const crmRoles = await fetchUserCrmRoles(user.id)
+  const subject = { id: user.id, email: user.email, crmRoles }
+  if (isFullAccess(subject) || isAdmin(user)) return null
+  try {
+    await assertCanViewClient(subject, clientId)
+    return null
+  } catch (err) {
+    if (err instanceof CrmAccessError) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    throw err
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -45,6 +70,11 @@ export async function GET(request: NextRequest) {
       where.employeeId = employee.id
     } else if (!isAdmin(user)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (clientId) {
+      const clientDenied = await assertClinicalClientView(user, clientId)
+      if (clientDenied) return clientDenied
     }
 
     const logs = await prisma.clinicalServiceLog.findMany({
@@ -109,6 +139,20 @@ export async function POST(request: NextRequest) {
     if (!clientId) {
       return NextResponse.json({ error: 'clientId is required' }, { status: 400 })
     }
+
+    if (user.role === 'RBT' || user.role === 'BCBA') {
+      const employee = await prisma.employee.findFirst({
+        where: { userId: user.id },
+        select: { id: true },
+      })
+      if (!employee || employee.id !== employeeId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    }
+
+    const clientDenied = await assertClinicalClientView(user, clientId)
+    if (clientDenied) return clientDenied
+
     if (!serviceDate) {
       return NextResponse.json({ error: 'serviceDate is required' }, { status: 400 })
     }

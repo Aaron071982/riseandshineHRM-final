@@ -6,7 +6,11 @@ import { prisma } from '@/lib/prisma'
 import { namesMatch } from '@/lib/rbt-schedule/from-roster'
 import { matchScheduleNameToClient } from '@/lib/client-services/scheduleSync'
 import { CRM_SCHEDULE_PATH } from '@/lib/schedule/paths'
-import { canAccessCrmSchedule, getClientServicesUser } from '@/lib/crm/access'
+import { canAccessCrmSchedule, getClientServicesUser, isFullAccess, CrmAccessError } from '@/lib/crm/access'
+import {
+  assertScheduleAssignmentIdsEdit,
+  assertScheduleClientEdit,
+} from '@/lib/schedule/clientScope'
 import { softDeleteData } from '@/lib/crm/softDelete'
 import type { ScheduleDayOfWeek, ScheduleTherapistRole } from '@prisma/client'
 import { formatMinutes } from '@/lib/rbt-schedule/utils'
@@ -56,6 +60,11 @@ async function assertCrmScheduleUser() {
   const user = await getClientServicesUser()
   if (!canAccessCrmSchedule(user)) throw new Error('FORBIDDEN')
   return user
+}
+
+function rethrowScheduleAccess(err: unknown): never {
+  if (err instanceof CrmAccessError) throw new Error('FORBIDDEN')
+  throw err
 }
 
 function isSyntheticClientId(id: string): boolean {
@@ -199,6 +208,11 @@ export async function createSlot(input: unknown) {
 
   const rbtProfileId = await resolveRbtProfileId(data.therapistId)
   const resolved = await resolveClient(data.clientId)
+  try {
+    await assertScheduleClientEdit(user, resolved.serviceClientId)
+  } catch (err) {
+    rethrowScheduleAccess(err)
+  }
   const periodStart = parseIsoDate(data.periodStart ?? undefined)
   const periodEnd = parseIsoDate(data.periodEnd ?? undefined)
 
@@ -226,7 +240,7 @@ export async function createSlot(input: unknown) {
 }
 
 export async function updateSlot(id: string, input: unknown) {
-  await assertCrmScheduleUser()
+  const user = await assertCrmScheduleUser()
   const data = SlotInputBase.partial().parse(input)
 
   const assignment = await prisma.rbtScheduleAssignment.findFirst({
@@ -234,10 +248,21 @@ export async function updateSlot(id: string, input: unknown) {
   })
   if (!assignment) throw new Error('Session not found')
 
+  try {
+    await assertScheduleClientEdit(user, assignment.serviceClientId)
+  } catch (err) {
+    rethrowScheduleAccess(err)
+  }
+
   let clientName = assignment.clientName
   let serviceClientId = assignment.serviceClientId
   if (data.clientId) {
     const resolved = await resolveClient(data.clientId)
+    try {
+      await assertScheduleClientEdit(user, resolved.serviceClientId)
+    } catch (err) {
+      rethrowScheduleAccess(err)
+    }
     clientName = resolved.clientName
     serviceClientId = resolved.serviceClientId
   }
@@ -278,6 +303,12 @@ export async function deleteSlot(id: string) {
   })
   if (!assignment) throw new Error('Session not found')
 
+  try {
+    await assertScheduleClientEdit(user, assignment.serviceClientId)
+  } catch (err) {
+    rethrowScheduleAccess(err)
+  }
+
   await prisma.rbtScheduleAssignment.update({
     where: { id },
     data: { isActive: false, source: 'MANUAL', ...softDeleteData(user.id) },
@@ -304,6 +335,12 @@ export async function duplicateSlot(id: string, targetDay?: string) {
     where: { id, deletedAt: null },
   })
   if (!src) throw new Error('Session not found')
+
+  try {
+    await assertScheduleClientEdit(user, src.serviceClientId)
+  } catch (err) {
+    rethrowScheduleAccess(err)
+  }
 
   const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const
   const nextDayEnum = (targetDay as (typeof days)[number] | undefined) ?? days[(src.dayOfWeek + 1) % 7]
@@ -336,8 +373,13 @@ export async function bulkUpdateSlots(
   ids: string[],
   patch: { status?: string; therapistId?: string }
 ) {
-  await assertCrmScheduleUser()
+  const user = await assertCrmScheduleUser()
   if (ids.length === 0) return
+  try {
+    await assertScheduleAssignmentIdsEdit(user, ids)
+  } catch (err) {
+    rethrowScheduleAccess(err)
+  }
   const rbtProfileId = patch.therapistId
     ? await resolveRbtProfileId(patch.therapistId)
     : undefined
@@ -354,6 +396,11 @@ export async function bulkUpdateSlots(
 export async function bulkDeleteSlots(ids: string[]) {
   const user = await assertCrmScheduleUser()
   if (ids.length === 0) return
+  try {
+    await assertScheduleAssignmentIdsEdit(user, ids)
+  } catch (err) {
+    rethrowScheduleAccess(err)
+  }
   await prisma.rbtScheduleAssignment.updateMany({
     where: { id: { in: ids }, deletedAt: null },
     data: { isActive: false, source: 'MANUAL', ...softDeleteData(user.id) },
@@ -377,6 +424,23 @@ export async function upsertClient(input: unknown) {
   const data = ClientInput.parse(input)
   const name = data.name.trim()
   const borough = data.borough?.trim() || 'Unset'
+
+  if (data.authorizedHoursPerWeek != null) {
+    const scs = await prisma.serviceClient.findMany({
+      where: { deletedAt: null },
+      select: { id: true, firstName: true, lastName: true },
+    })
+    const match = matchScheduleNameToClient(name, scs)
+    if (match) {
+      try {
+        await assertScheduleClientEdit(user, match.id)
+      } catch (err) {
+        rethrowScheduleAccess(err)
+      }
+    } else if (!isFullAccess(user)) {
+      throw new Error('FORBIDDEN')
+    }
+  }
 
   await prisma.clientBorough.upsert({
     where: { clientName: name },
@@ -496,6 +560,15 @@ export async function updateClientMeta(
 ) {
   const user = await assertCrmScheduleUser()
   const resolved = await resolveClient(clientId)
+  if (resolved.serviceClientId) {
+    try {
+      await assertScheduleClientEdit(user, resolved.serviceClientId)
+    } catch (err) {
+      rethrowScheduleAccess(err)
+    }
+  } else if (!isFullAccess(user)) {
+    throw new Error('FORBIDDEN')
+  }
   if ('borough' in patch) {
     const borough =
       patch.borough == null || String(patch.borough).trim() === ''
@@ -548,7 +621,8 @@ export async function updateClientMeta(
 }
 
 export async function addAllowedUser(email: string) {
-  await assertCrmScheduleUser()
+  const user = await assertCrmScheduleUser()
+  if (!isFullAccess(user)) throw new Error('FORBIDDEN')
   const normalized = email.trim().toLowerCase()
   if (!normalized.includes('@')) throw new Error('Invalid email')
   await prisma.scheduleAllowedUser.upsert({
@@ -560,7 +634,8 @@ export async function addAllowedUser(email: string) {
 }
 
 export async function removeAllowedUser(id: string) {
-  await assertCrmScheduleUser()
+  const user = await assertCrmScheduleUser()
+  if (!isFullAccess(user)) throw new Error('FORBIDDEN')
   await prisma.scheduleAllowedUser.delete({ where: { id } })
   revalidate()
 }

@@ -4,6 +4,7 @@ import { getClientIpFromRequest } from '@/lib/client-ip'
 import {
   requireClientServicesSession,
   enforceClientScope,
+  enforceClientScopeForEdit,
 } from '@/lib/client-services/access'
 import { logClientAccess } from '@/lib/client-services/audit'
 import { breakTimerFromRow } from '@/lib/client-services/serviceStatus'
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest, context: Ctx) {
   const { user, scope } = auth
   const { id } = await context.params
 
-  const denied = await enforceClientScope(user, scope, id, request)
+  const denied = await enforceClientScopeForEdit(user, scope, id, request)
   if (denied) return denied
 
   let body: Record<string, unknown>
@@ -190,7 +191,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
   const { user, scope } = auth
   const { id } = await context.params
 
-  const denied = await enforceClientScope(user, scope, id, request)
+  const denied = await enforceClientScopeForEdit(user, scope, id, request)
   if (denied) return denied
 
   let body: Record<string, unknown>

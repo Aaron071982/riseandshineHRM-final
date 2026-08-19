@@ -259,19 +259,26 @@ export async function requireClientServicesEligibleSession(): Promise<
   return { user, response: null }
 }
 
+type CsScopedUser = SessionUser & {
+  crmRoles?: import('@prisma/client').CrmRole[]
+}
+
+async function crmSubject(user: CsScopedUser) {
+  const { fetchUserCrmRoles } = await import('@/lib/crm/access')
+  const crmRoles = user.crmRoles ?? (await fetchUserCrmRoles(user.id))
+  return { ...user, crmRoles }
+}
+
+/** Read guard: elevated CS session + claim-scoped view access for one client. */
 export async function enforceClientScope(
-  user: SessionUser,
+  user: CsScopedUser,
   _scope: ClientScope,
   clientId: string,
   request?: NextRequest
 ): Promise<NextResponse | null> {
-  // Delegate to CRM access seam (full-access vs department / coordinator scoping).
-  const { assertCanViewClient, CrmAccessError, fetchUserCrmRoles } = await import(
-    '@/lib/crm/access'
-  )
+  const { assertCanViewClient, CrmAccessError } = await import('@/lib/crm/access')
   try {
-    const crmRoles = await fetchUserCrmRoles(user.id)
-    await assertCanViewClient({ ...user, crmRoles }, clientId)
+    await assertCanViewClient(await crmSubject(user), clientId)
     return null
   } catch (err) {
     if (err instanceof CrmAccessError) {
@@ -283,6 +290,36 @@ export async function enforceClientScope(
         ip,
       })
       return NextResponse.json({ error: 'Forbidden — outside caseload' }, { status: 403 })
+    }
+    throw err
+  }
+}
+
+/** Write guard: elevated CS session + current-dept edit access for one client. */
+export async function enforceClientScopeForEdit(
+  user: CsScopedUser,
+  _scope: ClientScope,
+  clientId: string,
+  request?: NextRequest
+): Promise<NextResponse | null> {
+  const { assertCanEditClient, CrmAccessError } = await import('@/lib/crm/access')
+  try {
+    await assertCanEditClient(await crmSubject(user), clientId)
+    return null
+  } catch (err) {
+    if (err instanceof CrmAccessError) {
+      const ip = request ? getClientIpFromRequest(request) : null
+      await logClientAccess({
+        userId: user.id,
+        serviceClientId: clientId,
+        action: 'ACCESS_VIOLATION',
+        ip,
+      })
+      const message =
+        err.status === 403 && err.message.includes('View-only')
+          ? err.message
+          : 'Forbidden — outside caseload'
+      return NextResponse.json({ error: message }, { status: err.status })
     }
     throw err
   }
