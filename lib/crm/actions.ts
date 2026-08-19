@@ -711,6 +711,7 @@ export type UpdateClientOverviewInput = {
   referralSource?: ClientReferralSource | null
   inquiryReceivedAt?: string | null
   actualServiceStartDate?: string | null
+  authHours?: string | null
 }
 
 export async function updateClientOverview(
@@ -732,6 +733,20 @@ export async function updateClientOverview(
       !REFERRAL_SOURCES.has(input.referralSource)
     ) {
       return { ok: false, error: 'Invalid referral source' }
+    }
+
+    let authHours: number | null | undefined
+    if (input.authHours !== undefined) {
+      const raw = input.authHours?.trim() ?? ''
+      if (raw === '') {
+        authHours = null
+      } else {
+        const n = Number(raw)
+        if (!Number.isFinite(n) || n < 0 || n > 168) {
+          return { ok: false, error: 'Authorized hours must be between 0 and 168' }
+        }
+        authHours = n
+      }
     }
 
     await prisma.serviceClient.update({
@@ -787,6 +802,7 @@ export async function updateClientOverview(
               ),
             }
           : {}),
+        ...(authHours !== undefined ? { authHours } : {}),
       },
     })
 

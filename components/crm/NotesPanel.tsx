@@ -69,6 +69,7 @@ type OverviewClient = {
   actualServiceStartDate: string | Date | null
   preferredRbtGender: GenderPreference | null
   preferredRbtEthnicities: EthnicityPreference[]
+  authHours: number | null
 }
 
 type OverviewForm = {
@@ -90,6 +91,7 @@ type OverviewForm = {
   referralSource: ClientReferralSource
   inquiryReceivedAt: string
   actualServiceStartDate: string
+  authHours: string
 }
 
 function buildOverviewForm(client: OverviewClient): OverviewForm {
@@ -112,6 +114,7 @@ function buildOverviewForm(client: OverviewClient): OverviewForm {
     referralSource: (client.referralSource as ClientReferralSource) || 'OTHER',
     inquiryReceivedAt: toDateInputValue(client.inquiryReceivedAt),
     actualServiceStartDate: toDateInputValue(client.actualServiceStartDate),
+    authHours: client.authHours != null ? String(client.authHours) : '',
   }
 }
 
@@ -441,6 +444,10 @@ export function OverviewPanel({
     },
     { label: 'Insurance', value: client.insuranceProvider || '—' },
     { label: 'Member ID', value: client.insuranceId || '—' },
+    {
+      label: 'Authorized hours / week',
+      value: client.authHours != null ? `${client.authHours} hrs` : '—',
+    },
     { label: 'Diagnosis', value: client.diagnosis || '—' },
     { label: 'Parent', value: client.parentName || '—' },
     { label: 'Parent phone', value: client.parentPhone || '—' },
@@ -638,6 +645,21 @@ export function OverviewPanel({
               <input
                 value={form.insuranceId}
                 onChange={(e) => setField('insuranceId', e.target.value)}
+                className={inputCls}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Authorized hours / week
+              </span>
+              <input
+                type="number"
+                min={0}
+                max={168}
+                step={0.5}
+                value={form.authHours}
+                onChange={(e) => setField('authHours', e.target.value)}
+                placeholder="e.g. 20"
                 className={inputCls}
               />
             </label>
