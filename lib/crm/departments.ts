@@ -107,6 +107,8 @@ export type DepartmentQueueData = {
   label: string
   /** Name + current stage only. No other PHI. */
   unclaimed: ClaimablePoolRow[]
+  /** Full queue rows for managers — open profiles without claiming. */
+  unclaimedFull: DepartmentQueueRow[] | null
   claimed: DepartmentQueueRow[]
   upcoming: DepartmentQueueRow[] | null
   ready: DepartmentQueueRow[] | null
@@ -243,12 +245,26 @@ function canAssignCc(user: CrmAccessSubject): boolean {
   return isFullAccess(user) || isSuperAdmin(user)
 }
 
+async function loadCaseCoordinatorsList(): Promise<
+  NonNullable<DepartmentQueueData['caseCoordinators']>
+> {
+  return prisma.user.findMany({
+    where: {
+      isActive: true,
+      crmRoles: { some: { revokedAt: null, role: 'CASE_COORDINATION' } },
+    },
+    select: { id: true, name: true, email: true },
+    orderBy: [{ name: 'asc' }, { email: 'asc' }],
+    take: 100,
+  })
+}
+
 export async function loadDepartmentQueue(
   user: CrmAccessSubject & { id: string },
   slug: DeptSlug
 ): Promise<DepartmentQueueData> {
   const dept = DEPT_SLUG_TO_OWNER[slug]
-  const manage = isFullAccess(user)
+  const manage = isFullAccess(user) || isSuperAdmin(user)
   const assignCc = canAssignCc(user)
 
   const empty: DepartmentQueueData = {
@@ -256,6 +272,7 @@ export async function loadDepartmentQueue(
     slug,
     label: deptLabel(slug),
     unclaimed: [],
+    unclaimedFull: null,
     claimed: [],
     upcoming: null,
     ready: null,
@@ -272,9 +289,16 @@ export async function loadDepartmentQueue(
   }
 
   const membership = getDepartmentQueueMembershipWhere(dept)
-  const unclaimed = await loadClaimablePool({
+  const unclaimedWhere: Prisma.ServiceClientWhereInput = {
     AND: [{ ...NOT_DELETED }, membership, { currentOwnerUserId: null }, noActiveDeptClaimWhere()],
-  })
+  }
+  const unclaimed = await loadClaimablePool(unclaimedWhere)
+  const unclaimedFull = manage ? await loadRows(unclaimedWhere) : null
+
+  let caseCoordinators: DepartmentQueueData['caseCoordinators'] = null
+  if (assignCc) {
+    caseCoordinators = await loadCaseCoordinatorsList()
+  }
 
   const claimedWhere: Prisma.ServiceClientWhereInput = manage
     ? { AND: [{ ...NOT_DELETED }, membership, { currentOwnerUserId: { not: null } }] }
@@ -293,7 +317,7 @@ export async function loadDepartmentQueue(
     action: `DEPT_QUEUE_VIEW:${dept}`,
   })
 
-  return { ...empty, unclaimed, claimed }
+  return { ...empty, unclaimed, unclaimedFull, claimed, caseCoordinators }
 }
 
 async function loadCaseCoordinationQueue(
@@ -344,15 +368,7 @@ async function loadCaseCoordinationQueue(
       ],
     })
 
-    caseCoordinators = await prisma.user.findMany({
-      where: {
-        isActive: true,
-        crmRoles: { some: { revokedAt: null, role: 'CASE_COORDINATION' } },
-      },
-      select: { id: true, name: true, email: true },
-      orderBy: [{ name: 'asc' }, { email: 'asc' }],
-      take: 100,
-    })
+    caseCoordinators = await loadCaseCoordinatorsList()
   }
 
   await auditClientAction({

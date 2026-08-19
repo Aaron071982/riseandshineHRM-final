@@ -217,7 +217,7 @@ export function canViewClientRecord(
   user: CrmAccessSubject,
   client: ClientAccessSnapshot
 ): boolean {
-  if (isFullAccess(user)) return true
+  if (isFullAccess(user) || isSuperAdmin(user)) return true
   return client.hasClaimGrant === true
 }
 
@@ -229,7 +229,7 @@ export function canEditClientRecord(
   user: CrmAccessSubject,
   client: ClientAccessSnapshot
 ): boolean {
-  if (isFullAccess(user)) return true
+  if (isFullAccess(user) || isSuperAdmin(user)) return true
   if (!canViewClientRecord(user, client)) return false
   if (
     getUserCrmRoles(user).includes('CASE_COORDINATION') &&
