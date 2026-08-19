@@ -81,12 +81,18 @@ export function RequirementsPanel({
 
   const grouped = useMemo(() => {
     const docs = requirements.filter((r) => !!DOCUMENT_BY_KEY[r.key])
+    const legacyDocs = requirements.filter(
+      (r) => !DOCUMENT_BY_KEY[r.key] && r.type === 'DOCUMENT'
+    )
     const tasks = requirements.filter((r) => !DOCUMENT_BY_KEY[r.key] && r.type !== 'DOCUMENT')
+    const docGroup = (r: Req) =>
+      DOCUMENT_BY_KEY[r.key]?.group ??
+      (r.group !== 'STAGE' && r.group !== 'CONSENT' ? r.group : 'INTAKE')
     const byGroup = DOCUMENT_GROUP_ORDER.map((group) => ({
       group,
-      items: docs.filter((r) => (r.group || DOCUMENT_BY_KEY[r.key]?.group) === group),
+      items: docs.filter((r) => docGroup(r) === group),
     })).filter((g) => g.items.length > 0)
-    return { byGroup, tasks }
+    return { byGroup, tasks, legacyDocs }
   }, [requirements])
 
   if (requirements.length === 0) {
@@ -243,6 +249,52 @@ export function RequirementsPanel({
           </ul>
         </section>
       ))}
+
+      {grouped.legacyDocs.length > 0 && (
+        <section>
+          <h3 className="mb-2 font-display text-base font-semibold text-ink">
+            Other documents
+          </h3>
+          <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+            {grouped.legacyDocs.map((req) => (
+              <li
+                key={req.id}
+                className="flex flex-wrap items-center gap-3 px-3 py-2.5"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-ink">{req.label}</div>
+                  <div className="text-xs text-quiet">{STAGE_LABELS[req.stage]}</div>
+                </div>
+                <span
+                  className={cn(
+                    'rounded-md px-2 py-0.5 text-[11px] font-medium',
+                    STATUS_CHIP[req.status]
+                  )}
+                >
+                  {req.status.replace(/_/g, ' ')}
+                </span>
+                {canEdit && (
+                  <select
+                    disabled={pending}
+                    value={req.status}
+                    onChange={(e) => {
+                      const status = e.target.value as RequirementStatus
+                      run(() => updateRequirement(req.id, { status }))
+                    }}
+                    className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-ink"
+                  >
+                    {STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {s.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {grouped.tasks.length > 0 && (
         <section>

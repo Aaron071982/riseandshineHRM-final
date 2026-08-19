@@ -159,6 +159,7 @@ export const LEGACY_DOCUMENT_KEY_MAP: Record<string, string> = {
   custody_guardian: 'intake_form',
   prior_aba_records: 'prior_aba',
   consent_form_signed: 'consent_form',
+  medicaid_card: 'insurance_card',
 }
 
 export const DOCUMENT_GROUP_ORDER: RequirementGroup[] = [

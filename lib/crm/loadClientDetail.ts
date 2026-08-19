@@ -15,10 +15,12 @@ import { hoursBetween } from '@/lib/rbt-schedule/utils'
 import { allowedTemplatesForUser } from '@/lib/crm/emails/templatePolicy'
 import { graphEmailEnabled } from '@/lib/crm/emails/graphSend'
 import { hasRiseAndShineMailbox, mailboxBlockedReason } from '@/lib/crm/emails/mailbox'
+import { ensureClientRequirements } from '@/lib/crm/ensureRequirements'
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
   await assertCanViewClient(user, clientId)
+  await ensureClientRequirements(clientId)
 
   const client = await prisma.serviceClient.findFirst({
     where: { id: clientId, ...getVisibleClientsWhere(user) },
