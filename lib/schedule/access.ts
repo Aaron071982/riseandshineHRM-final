@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { validateSession, isAdmin, isSuperAdmin, type SessionUser } from '@/lib/auth'
+import { requireClientServicesSession } from '@/lib/client-services/access'
+import { canAccessCrmSchedule } from '@/lib/crm/access'
 import { PLATFORM_OWNER_EMAIL } from '@/lib/constants'
 import { prisma } from '@/lib/prisma'
 
@@ -85,34 +87,30 @@ export async function assertScheduleAccess(): Promise<string> {
   return email!
 }
 
+/** CRM elevated session + staffing / case-coordination / full-access. */
 export async function requireScheduleSession(): Promise<
   | { user: SessionUser; email: string; response: null }
   | { user: null; email: null; response: NextResponse }
 > {
-  const cookieStore = await cookies()
-  const sessionToken = cookieStore.get('session')?.value
-  if (!sessionToken) {
-    return {
-      user: null,
-      email: null,
-      response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-    }
+  const auth = await requireClientServicesSession()
+  if (auth.response) {
+    return { user: null, email: null, response: auth.response }
   }
-  const user = await validateSession(sessionToken)
-  if (!user) {
-    return {
-      user: null,
-      email: null,
-      response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-    }
+  const subject = {
+    id: auth.user.id,
+    email: auth.user.email,
+    crmRoles: auth.user.crmRoles,
   }
-  const email = user.email?.trim().toLowerCase() ?? null
-  if (!(await canAccessSchedule(user))) {
+  if (!canAccessCrmSchedule(subject)) {
     return {
       user: null,
       email: null,
       response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
     }
   }
-  return { user, email: email ?? user.email ?? 'user', response: null }
+  return {
+    user: auth.user,
+    email: auth.user.email?.trim().toLowerCase() ?? auth.user.email ?? 'user',
+    response: null,
+  }
 }

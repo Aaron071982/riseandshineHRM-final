@@ -9,7 +9,7 @@ import {
   isJourneyLockedStatus,
   resolveCrmEmailRecipient,
 } from '@/lib/crm/emails/safety'
-import { renderJourneyEmail } from '@/lib/crm/emails/templates'
+import { renderJourneyEmail } from '@/lib/crm/emails/journeyTemplates'
 
 const emailFrom = process.env.EMAIL_FROM || 'noreply@riseandshineaba.com'
 

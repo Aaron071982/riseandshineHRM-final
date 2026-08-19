@@ -8,6 +8,7 @@ import {
   revokeCrmRole,
 } from '@/lib/crm/roleActions'
 import { CRM_DEPARTMENT_ROLES } from '@/lib/crm/roleConstants'
+import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { cn } from '@/lib/utils'
 
 const ROLE_OPTIONS: { value: CrmRole; label: string }[] = [
@@ -40,6 +41,11 @@ export default function AdminManagementClient() {
   const [pending, startTransition] = useTransition()
   const [grantUserId, setGrantUserId] = useState('')
   const [grantRole, setGrantRole] = useState<CrmRole>('INTAKE')
+  const [revokeTarget, setRevokeTarget] = useState<{
+    userId: string
+    role: CrmRole
+    name: string
+  } | null>(null)
 
   const load = useCallback((query?: string) => {
     startTransition(async () => {
@@ -76,15 +82,13 @@ export default function AdminManagementClient() {
     })
   }
 
-  const onRevoke = (userId: string, role: CrmRole) => {
-    const label = ROLE_OPTIONS.find((r) => r.value === role)?.label ?? role
-    if (
-      !window.confirm(
-        `Revoke ${label}? This keeps history (sets revokedAt) and writes an audit log.`
-      )
-    ) {
-      return
-    }
+  const onRevoke = (userId: string, role: CrmRole, name: string) => {
+    setRevokeTarget({ userId, role, name })
+  }
+
+  const confirmRevoke = () => {
+    if (!revokeTarget) return
+    const { userId, role } = revokeTarget
     startTransition(async () => {
       setError('')
       setMessage('')
@@ -95,6 +99,7 @@ export default function AdminManagementClient() {
       }
       if (res.warned) setMessage(res.warned)
       else setMessage(`Revoked ${role}`)
+      setRevokeTarget(null)
       load(q)
     })
   }
@@ -106,7 +111,8 @@ export default function AdminManagementClient() {
           Admin Management
         </h1>
         <p className="mt-0.5 text-sm text-quiet">
-          Grant and revoke CRM roles. Super-admin only. HRM UserRole is unchanged.
+          Grant and revoke CRM roles for HRM admin users only. Super-admin only.
+          Therapist and other non-admin accounts are not listed.
         </p>
       </div>
 
@@ -124,7 +130,7 @@ export default function AdminManagementClient() {
       <section className="rounded-xl border border-line bg-surface p-4">
         <h2 className="font-display text-sm font-semibold text-ink">Grant role</h2>
         <p className="mt-0.5 text-xs text-quiet">
-          User must already exist in users (must log in once first).
+          Pick an HRM admin who has logged in at least once.
         </p>
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <label className="min-w-[14rem] flex-1">
@@ -206,7 +212,7 @@ export default function AdminManagementClient() {
               {users.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-3 py-8 text-center text-quiet">
-                    {pending ? 'Loading…' : 'No users found'}
+                    {pending ? 'Loading…' : 'No admin users found'}
                   </td>
                 </tr>
               ) : (
@@ -228,7 +234,9 @@ export default function AdminManagementClient() {
                             key={role}
                             type="button"
                             title="Click to revoke"
-                            onClick={() => onRevoke(u.id, role)}
+                            onClick={() =>
+                              onRevoke(u.id, role, u.name || u.email || u.id)
+                            }
                             className={cn(
                               'rounded-md border px-2 py-0.5 text-[11px] font-medium',
                               role === 'SUPER_ADMIN'
@@ -277,6 +285,21 @@ export default function AdminManagementClient() {
           Click a role chip to revoke (soft). Last SUPER_ADMIN cannot be removed.
         </p>
       </section>
+      <ConfirmDestructiveDialog
+        open={!!revokeTarget}
+        onOpenChange={(o) => {
+          if (!o) setRevokeTarget(null)
+        }}
+        title="Revoke CRM role?"
+        description={
+          revokeTarget
+            ? `Revoke ${ROLE_OPTIONS.find((r) => r.value === revokeTarget.role)?.label ?? revokeTarget.role} from ${revokeTarget.name}.\n\nHistory is kept (revokedAt is set). An audit log is written.`
+            : ''
+        }
+        confirmLabel="Revoke role"
+        pending={pending}
+        onConfirm={confirmRevoke}
+      />
     </div>
   )
 }

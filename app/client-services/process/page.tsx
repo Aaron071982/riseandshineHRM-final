@@ -1,4 +1,4 @@
-import { getClientServicesUser } from '@/lib/crm/access'
+import { getClientServicesPageUser } from '@/lib/crm/access'
 import { loadProcessMap } from '@/lib/crm/processMap'
 import ProcessMapCanvas from '@/components/crm/process-map/ProcessMapCanvas'
 
@@ -22,7 +22,8 @@ const LEGEND = [
 ]
 
 export default async function ProcessMapPage() {
-  const user = await getClientServicesUser()
+  const user = await getClientServicesPageUser()
+  if (!user) return null
   const data = await loadProcessMap(user)
 
   return (

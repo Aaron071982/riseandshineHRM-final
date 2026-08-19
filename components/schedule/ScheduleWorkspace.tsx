@@ -119,7 +119,7 @@ export default function ScheduleWorkspace({
     setPeriodStart(next.periodStart)
     setPeriodEnd(next.periodEnd)
     router.push(
-      `/schedule?periodStart=${next.periodStart}&periodEnd=${next.periodEnd}${borough ? `&borough=${encodeURIComponent(borough)}` : ''}`
+      `/client-services/schedule?periodStart=${next.periodStart}&periodEnd=${next.periodEnd}${borough ? `&borough=${encodeURIComponent(borough)}` : ''}`
     )
   }
 
@@ -171,7 +171,7 @@ export default function ScheduleWorkspace({
           if (nextData.periods) setPeriodList(nextData.periods)
         }
         router.push(
-          `/schedule?periodStart=${ps}&periodEnd=${pe}${borough ? `&borough=${encodeURIComponent(borough)}` : ''}`
+          `/client-services/schedule?periodStart=${ps}&periodEnd=${pe}${borough ? `&borough=${encodeURIComponent(borough)}` : ''}`
         )
       } else {
         setPeriodStart(null)
@@ -180,7 +180,7 @@ export default function ScheduleWorkspace({
         setTherapists([])
         setClients([])
         setPeriodList([])
-        router.push('/schedule')
+        router.push('/client-services/schedule')
       }
       router.refresh()
     } catch {
@@ -260,7 +260,7 @@ export default function ScheduleWorkspace({
                   const [ps, pe] = e.target.value.split('|')
                   if (!ps || !pe) return
                   router.push(
-                    `/schedule?periodStart=${ps}&periodEnd=${pe}${borough ? `&borough=${encodeURIComponent(borough)}` : ''}`
+                    `/client-services/schedule?periodStart=${ps}&periodEnd=${pe}${borough ? `&borough=${encodeURIComponent(borough)}` : ''}`
                   )
                 }}
               >
@@ -309,7 +309,7 @@ export default function ScheduleWorkspace({
                 if (periodStart) q.set('periodStart', periodStart)
                 if (periodEnd) q.set('periodEnd', periodEnd)
                 if (v) q.set('borough', v)
-                router.push(`/schedule?${q}`)
+                router.push(`/client-services/schedule?${q}`)
               }}
             >
               <option value="">All</option>
@@ -322,14 +322,14 @@ export default function ScheduleWorkspace({
           </label>
           {unsetClientCount > 0 && (
             <Link
-              href="/schedule/import"
+              href="/client-services/schedule/import"
               className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1"
             >
               Unset boroughs: {unsetClientCount} clients
             </Link>
           )}
           <Button size="sm" className="bg-[#0D9488] hover:bg-teal-700" asChild>
-            <Link href="/schedule/import">
+            <Link href="/client-services/schedule/import">
               <Upload className="w-4 h-4 mr-1" />
               Import Artemis
             </Link>

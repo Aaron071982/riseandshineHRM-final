@@ -159,7 +159,7 @@ function buildDigestHtml(
       ${row('Intake · inquiries', queues.intake.newInquiries)}
       ${row('Intake · uncontacted', queues.intake.uncontacted)}
       ${row('Clinical · assessment overdue', queues.clinical.assessmentOverdue)}
-      ${row('Auth · pending', queues.authorization.pending)}
+      ${row('Billing · pending PA', queues.billing.pending)}
       ${row('Staffing · RBT search', queues.staffing.rbtSearch)}
       ${row('Active · RBT replacement', queues.active.rbtReplacement)}
       ${row('Active · service gaps', queues.active.serviceGaps)}

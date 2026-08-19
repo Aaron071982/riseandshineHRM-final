@@ -20,7 +20,13 @@ import DownloadReuploadFlow from '@/components/onboarding/DownloadReuploadFlow'
 import HRInitiatedDocFlow from '@/components/onboarding/HRInitiatedDocFlow'
 import DocumentUploadFlow from '@/components/onboarding/DocumentUploadFlow'
 import SexualHarassmentQuizFlow from '@/components/onboarding/SexualHarassmentQuizFlow'
-import { RBT_VISIBLE_STEPS, TOTAL_ONBOARDING_STEPS, FORTY_HOUR_RBT_CERTIFICATE_SLUG, FORTY_HOUR_RBT_COURSE_URL } from '@/lib/onboarding/catalog'
+import FortyHourTrainingPanel from '@/components/rbt/FortyHourTrainingPanel'
+import {
+  RBT_VISIBLE_STEPS,
+  TOTAL_ONBOARDING_STEPS,
+  FORTY_HOUR_RBT_CERTIFICATE_SLUG,
+  sortRbtOnboardingSteps,
+} from '@/lib/onboarding/catalog'
 
 type StepRow = {
   documentId: string
@@ -91,6 +97,7 @@ export default function OnboardingWizard({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const confettiFired = useRef(false)
+  const restoredStep = useRef(false)
 
   const docById = useMemo(() => new Map(initialDocuments.map((d) => [d.id, d])), [initialDocuments])
 
@@ -102,17 +109,19 @@ export default function OnboardingWizard({
     }
     setLoadError(null)
     const data = await res.json()
-    const steps: StepRow[] = (data.steps as StepRow[]).map((s) => {
-      const doc = docById.get(s.documentId)
-      const hr = hrDocumentTasks.find((t) => t.documentType === s.slug)
-      return {
-        ...s,
-        pdfUrl: doc?.pdfUrl ?? null,
-        hrTask: hr
-          ? { id: hr.id, status: hr.status, hrFileUrl: hr.hrFileUrl, btFileUrl: hr.btFileUrl }
-          : undefined,
-      }
-    })
+    const steps: StepRow[] = sortRbtOnboardingSteps(
+      (data.steps as StepRow[]).map((s) => {
+        const doc = docById.get(s.documentId)
+        const hr = hrDocumentTasks.find((t) => t.documentType === s.slug)
+        return {
+          ...s,
+          pdfUrl: doc?.pdfUrl ?? null,
+          hrTask: hr
+            ? { id: hr.id, status: hr.status, hrFileUrl: hr.hrFileUrl, btFileUrl: hr.btFileUrl }
+            : undefined,
+        }
+      })
+    )
     setProgress({
       completedCount: data.completedCount,
       totalRbtSteps: data.totalRbtSteps,
@@ -125,10 +134,6 @@ export default function OnboardingWizard({
       fullyActivated: data.fullyActivated,
       steps,
     })
-    if (data.nextStep != null) {
-      const idx = steps.findIndex((s) => s.stepNumber === data.nextStep)
-      if (idx >= 0) setCurrentIndex(idx)
-    }
   }, [docById, hrDocumentTasks])
 
   useEffect(() => {
@@ -136,24 +141,39 @@ export default function OnboardingWizard({
   }, [refresh])
 
   useEffect(() => {
+    if (!progress || restoredStep.current) return
+    restoredStep.current = true
     try {
       const saved = localStorage.getItem(`onboarding-step:${rbtProfileId}`)
-      if (saved && progress) {
-        const n = parseInt(saved, 10)
-        if (n >= 0 && n < progress.steps.length) setCurrentIndex(n)
+      const n = saved ? parseInt(saved, 10) : NaN
+      const savedIdx = progress.steps.findIndex((s) => s.stepNumber === n)
+      if (savedIdx >= 0) {
+        setCurrentIndex(savedIdx)
+        return
       }
     } catch {
       /* ignore */
     }
-  }, [rbtProfileId, progress?.steps.length])
+    const fortyIdx = progress.steps.findIndex(
+      (s) => s.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG && !s.isComplete
+    )
+    if (fortyIdx >= 0) {
+      setCurrentIndex(fortyIdx)
+      return
+    }
+    const nextIdx = progress.steps.findIndex((s) => !s.isComplete && !s.isLocked)
+    if (nextIdx >= 0) setCurrentIndex(nextIdx)
+  }, [rbtProfileId, progress])
 
   useEffect(() => {
+    const step = progress?.steps[currentIndex]
+    if (!step) return
     try {
-      localStorage.setItem(`onboarding-step:${rbtProfileId}`, String(currentIndex))
+      localStorage.setItem(`onboarding-step:${rbtProfileId}`, String(step.stepNumber))
     } catch {
       /* ignore */
     }
-  }, [currentIndex, rbtProfileId])
+  }, [currentIndex, rbtProfileId, progress])
 
   const onStepComplete = useCallback(async () => {
     await refresh()
@@ -222,6 +242,10 @@ export default function OnboardingWizard({
   const safeIndex = Math.min(Math.max(0, currentIndex), progress.steps.length - 1)
   const current = progress.steps[safeIndex]
   const pct = Math.round((progress.completedCount / RBT_VISIBLE_STEPS) * 100)
+  const fortyHourIncomplete = progress.steps.some(
+    (s) => s.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG && !s.isComplete
+  )
+  const isFortyHourStep = current.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 px-4 sm:px-0">
@@ -239,6 +263,32 @@ export default function OnboardingWizard({
       <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
         <div className="h-full bg-[#e36f1e] transition-all" style={{ width: `${pct}%` }} />
       </div>
+
+      {fortyHourIncomplete && (
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-600 dark:bg-amber-950/30 dark:text-amber-100">
+          <p className="font-semibold">Required first step: 40-hour RBT course</p>
+          <p className="mt-1">
+            This training is mandatory. You cannot finish onboarding, sit for the RBT exam, or work
+            independently with clients until you complete it and upload your certificate. You may
+            continue later steps now and come back — onboarding is not complete without it.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              className="bg-[#e36f1e] hover:bg-[#c95e18]"
+              onClick={() => {
+                const idx = progress.steps.findIndex((s) => s.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG)
+                if (idx >= 0) setCurrentIndex(idx)
+              }}
+            >
+              Open 40-hour course step
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/rbt/training">Open 40-Hour tab</Link>
+            </Button>
+          </div>
+        </div>
+      )}
 
       {progress.tierAComplete && !progress.tierBComplete && (
         <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-900">
@@ -265,7 +315,7 @@ export default function OnboardingWizard({
             }`}
           >
             {s.isLocked ? <Lock className="w-3 h-3 inline mr-0.5" /> : null}
-            {s.stepNumber}
+            {s.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG ? '40hr' : s.stepNumber}
           </button>
         ))}
       </div>
@@ -274,14 +324,26 @@ export default function OnboardingWizard({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 flex-wrap">
             <span>
-              Step {current.stepNumber} of {TOTAL_ONBOARDING_STEPS}: {current.title}
+              {isFortyHourStep
+                ? `First step: ${current.title}`
+                : `Step ${current.stepNumber} of ${TOTAL_ONBOARDING_STEPS}: ${current.title}`}
             </span>
+            {isFortyHourStep && !current.isComplete && (
+              <Badge className="bg-amber-600">Required</Badge>
+            )}
             {current.isComplete && <Badge className="bg-green-600">Done</Badge>}
             {current.isLocked && <Badge variant="outline">Locked</Badge>}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {current.isLocked ? (
+          {isFortyHourStep ? (
+            <FortyHourTrainingPanel
+              documentId={current.documentId}
+              alreadyComplete={current.isComplete}
+              showContinueLink={false}
+              onComplete={onStepComplete}
+            />
+          ) : current.isLocked ? (
             <p className="text-gray-600">Complete earlier steps to unlock this task.</p>
           ) : current.isComplete ? (
             <p className="text-green-700">This step is complete.</p>
@@ -300,7 +362,8 @@ export default function OnboardingWizard({
           disabled={currentIndex >= progress.steps.length - 1}
           onClick={() => setCurrentIndex((i) => i + 1)}
         >
-          Next <ChevronRight className="w-4 h-4 ml-1" />
+          {isFortyHourStep && fortyHourIncomplete ? 'Continue other tasks' : 'Next'}{' '}
+          <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
     </div>
@@ -380,18 +443,10 @@ function StepFlow({ current, onComplete }: { current: StepRow; onComplete: () =>
   }
 
   if (current.flowType === 'UPLOAD') {
-    const isFortyHour = current.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG
     return (
       <DocumentUploadFlow
         documentId={current.documentId}
         title={current.title}
-        description={
-          isFortyHour
-            ? 'Complete the 40-hour RBT training, then upload your certificate of completion.'
-            : undefined
-        }
-        externalCourseUrl={isFortyHour ? FORTY_HOUR_RBT_COURSE_URL : undefined}
-        externalCourseLabel="Start 40-Hour RBT Course (Free)"
         onComplete={onComplete}
       />
     )

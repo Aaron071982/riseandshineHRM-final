@@ -13,10 +13,16 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "tsx prisma/seed.ts --confirm",
     "db:push:dev": "bash scripts/dev-db-push.sh",
     "db:rls:dev": "bash scripts/dev-apply-rls.sh",
     "db:seed:dev": "dotenv -e .env.development -- prisma db seed",
+    "db:rls:audit": "dotenv -e .env.development -- tsx scripts/audit-rls.ts",
+    "db:family-counts": "dotenv -e .env.development -- tsx scripts/family-row-counts.ts",
+    "db:migrate-board-slots": "dotenv -e .env.development -- tsx scripts/migrate-board-slots.ts",
+    "db:migrate-requirement-keys": "dotenv -e .env.development -- tsx scripts/migrate-requirement-keys.ts",
+    "db:migrate-client-claims": "dotenv -e .env.development -- tsx scripts/migrate-client-claims.ts",
+    "db:seed-phase17-users": "dotenv -e .env.development -- tsx scripts/seed-phase17-role-users.ts",
     "db:reset:dev": "bash scripts/dev-reset.sh",
     "dev:setup": "bash scripts/dev-setup.sh",
     "clients:scrub": "tsx scripts/scrub-clients-csv.ts",
@@ -106,6 +112,6 @@
     "vitest": "^4.1.9"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts --confirm"
   }
 }

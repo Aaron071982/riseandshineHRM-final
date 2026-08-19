@@ -110,7 +110,7 @@ export type DepartmentQueues = {
     assessmentOverdue: number
     treatmentPlanPending: number
   }
-  authorization: {
+  billing: {
     pending: number
     denied: number
     expiring60: number
@@ -182,7 +182,7 @@ export async function getDepartmentQueues(
       where: {
         type: 'DOCUMENT',
         status: { in: ['PENDING', 'MISSING', 'EXPIRED'] },
-        serviceClient: live,
+        serviceClient: { is: live },
       },
     }).then((rows) => rows.length),
     prisma.serviceClient.count({
@@ -232,7 +232,7 @@ export async function getDepartmentQueues(
       by: ['serviceClientId'],
       where: {
         status: 'DENIED',
-        serviceClient: live,
+        serviceClient: { is: live },
       },
     }).then((rows) => rows.length),
     prisma.clientAuthorization.groupBy({
@@ -241,7 +241,7 @@ export async function getDepartmentQueues(
         authType: 'TREATMENT',
         status: 'APPROVED',
         expirationDate: { lte: exp60, gte: now },
-        serviceClient: { ...live, stage: 'ACTIVE' },
+        serviceClient: { is: { ...live, stage: 'ACTIVE' } },
       },
     }).then((rows) => rows.length),
     prisma.serviceClient.count({
@@ -270,7 +270,7 @@ export async function getDepartmentQueues(
       where: {
         alertType: 'RBT_REPLACEMENT_NEEDED',
         resolvedAt: null,
-        serviceClient: live,
+        serviceClient: { is: live },
       },
     }),
     prisma.serviceClient.count({
@@ -314,7 +314,7 @@ export async function getDepartmentQueues(
       assessmentOverdue,
       treatmentPlanPending,
     },
-    authorization: {
+    billing: {
       pending: authPending,
       denied: authDenied,
       expiring60: authExpiring,
@@ -379,7 +379,7 @@ export async function getActiveHealth(user: DashUser): Promise<ActiveHealth> {
           authType: 'TREATMENT',
           status: 'APPROVED',
           expirationDate: { lte: exp60, gte: now },
-          serviceClient: { ...live, stage: 'ACTIVE' },
+          serviceClient: { is: { ...live, stage: 'ACTIVE' } },
         },
         select: {
           payerName: true,
@@ -400,7 +400,7 @@ export async function getActiveHealth(user: DashUser): Promise<ActiveHealth> {
         where: {
           alertType: 'RBT_REPLACEMENT_NEEDED',
           resolvedAt: null,
-          serviceClient: live,
+          serviceClient: { is: live },
         },
         select: {
           id: true,
@@ -429,7 +429,7 @@ export async function getActiveHealth(user: DashUser): Promise<ActiveHealth> {
         take: 40,
       }),
       prisma.clientServiceBreak.findMany({
-        where: { status: 'ON_BREAK', serviceClient: base },
+        where: { status: 'ON_BREAK', serviceClient: { is: base } },
         select: {
           expectedReturnDate: true,
           reason: true,
@@ -445,7 +445,7 @@ export async function getActiveHealth(user: DashUser): Promise<ActiveHealth> {
         take: 40,
       }),
       prisma.clientRbtBreak.findMany({
-        where: { status: 'ON_BREAK', serviceClient: base },
+        where: { status: 'ON_BREAK', serviceClient: { is: base } },
         select: {
           btName: true,
           expectedReturnDate: true,
@@ -596,7 +596,7 @@ export async function getPerformance(user: DashUser): Promise<PerformanceRow[]> 
           status: 'OPEN',
           dueAt: { lt: overdueAt },
           assignedToUserId: { in: coordIds },
-          serviceClient: base,
+          serviceClient: { is: base },
         },
         _count: { _all: true },
       }),
@@ -605,7 +605,7 @@ export async function getPerformance(user: DashUser): Promise<PerformanceRow[]> 
         where: {
           changedBy: { in: coordIds },
           durationSeconds: { not: null },
-          serviceClient: base,
+          serviceClient: { is: base },
         },
         _avg: { durationSeconds: true },
       }),
@@ -711,13 +711,13 @@ export async function getDashboardKpis(user: DashUser): Promise<DashboardKpis> {
         )
       ).then((ns) => ns.reduce((a, b) => a + b, 0)),
       prisma.clientAlert.count({
-        where: { resolvedAt: null, serviceClient: live },
+        where: { resolvedAt: null, serviceClient: { is: live } },
       }),
       prisma.clientTask.count({
         where: {
           status: 'OPEN',
           dueAt: { lt: overdueAt },
-          serviceClient: base,
+          serviceClient: { is: base },
         },
       }),
       prisma.clientAuthorization.groupBy({
@@ -726,7 +726,7 @@ export async function getDashboardKpis(user: DashUser): Promise<DashboardKpis> {
           authType: 'TREATMENT',
           status: 'APPROVED',
           expirationDate: { lte: exp60, gte: now },
-          serviceClient: { ...live, stage: 'ACTIVE' },
+          serviceClient: { is: { ...live, stage: 'ACTIVE' } },
         },
       }).then((rows) => rows.length),
     ])
@@ -774,13 +774,13 @@ export async function loadManagerDashboard(
         )
       ).then((ns) => ns.reduce((a, b) => a + b, 0)),
       prisma.clientAlert.count({
-        where: { resolvedAt: null, serviceClient: live },
+        where: { resolvedAt: null, serviceClient: { is: live } },
       }),
       prisma.clientTask.count({
         where: {
           status: 'OPEN',
           dueAt: { lt: overdueAt },
-          serviceClient: base,
+          serviceClient: { is: base },
         },
       }),
       prisma.clientAuthorization
@@ -790,7 +790,7 @@ export async function loadManagerDashboard(
             authType: 'TREATMENT',
             status: 'APPROVED',
             expirationDate: { lte: exp60, gte: now },
-            serviceClient: { ...live, stage: 'ACTIVE' },
+            serviceClient: { is: { ...live, stage: 'ACTIVE' } },
           },
         })
         .then((rows) => rows.length),

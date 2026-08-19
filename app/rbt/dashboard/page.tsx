@@ -6,6 +6,11 @@ import ScheduleSetupWrapper from './ScheduleSetupWrapper'
 import RBTDashboardHome from '@/components/rbt/RBTDashboardHome'
 import { PrismaClientKnownRequestError, PrismaClientInitializationError } from '@prisma/client/runtime/library'
 import { ensureSocialSecurityOnboardingTask } from '@/lib/onboarding/socialSecurityTask'
+import {
+  FORTY_HOUR_RBT_CERTIFICATE_SLUG,
+  FORTY_HOUR_RBT_COURSE_URL,
+  sortRbtOnboardingSteps,
+} from '@/lib/onboarding/catalog'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -188,7 +193,7 @@ async function RBTDashboardPageInner() {
     { taskType: 'DOWNLOAD_DOC' as const, title: 'HIPAA Patient Security', description: 'Review HIPAA patient safety guidelines from HHS', documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/patient-safety/index.html', sortOrder: 3 },
     { taskType: 'DOWNLOAD_DOC' as const, title: 'HIPAA Basics PDF', description: 'Download and review the HIPAA Basics for Providers document from CMS', documentDownloadUrl: 'https://www.cms.gov/files/document/mln909001-hipaa-basics-providers-privacy-security-breach-notification-rules.pdf', sortOrder: 4 },
     { taskType: 'DOWNLOAD_DOC' as const, title: 'HIPAA IT Security Guide', description: 'Review the Guide to Privacy and Security of Electronic Health Information', documentDownloadUrl: 'https://www.healthit.gov/topic/health-it-resources/guide-privacy-security-electronic-health-information', sortOrder: 5 },
-    ...(needsFortyHourCourse ? [{ taskType: 'FORTY_HOUR_COURSE_CERTIFICATE' as const, title: 'Complete 40-Hour RBT Course & Upload Certificate', description: 'Complete the 40-hour RBT training course and upload your certificate of completion', documentDownloadUrl: 'https://courses.autismpartnershipfoundation.org/offers/it285gs6/checkout', sortOrder: 6 }] : []),
+    ...(needsFortyHourCourse ? [{ taskType: 'FORTY_HOUR_COURSE_CERTIFICATE' as const, title: 'Complete 40-Hour RBT Course & Upload Certificate', description: 'Complete the 40-hour RBT training course and upload your certificate of completion', documentDownloadUrl: FORTY_HOUR_RBT_COURSE_URL, sortOrder: 6 }] : []),
     {
       taskType: 'SOCIAL_SECURITY_DOCUMENT' as const,
       title: 'Upload Social Security card',
@@ -271,7 +276,7 @@ async function RBTDashboardPageInner() {
   }
 
   // Load profile, documents, completions, shifts, time entries for unified dashboard
-  let rbtProfile: { firstName: string; scheduleCompleted?: boolean } | null = null
+  let rbtProfile: { firstName: string; scheduleCompleted?: boolean; fortyHourCourseCompleted?: boolean } | null = null
   let onboardingDocuments: Awaited<ReturnType<typeof prisma.onboardingDocument.findMany>> = []
   let completions: Awaited<ReturnType<typeof prisma.onboardingCompletion.findMany>> = []
   let todayShifts: Awaited<ReturnType<typeof prisma.shift.findMany>> = []
@@ -281,7 +286,7 @@ async function RBTDashboardPageInner() {
     const [profileResult, docsResult, completionsResult, todayResult, upcomingResult] = await Promise.all([
       prisma.rBTProfile.findUnique({
         where: { id: user.rbtProfileId },
-        select: { firstName: true, scheduleCompleted: true },
+        select: { firstName: true, scheduleCompleted: true, fortyHourCourseCompleted: true },
       }),
       prisma.onboardingDocument.findMany({
         where: { isActive: true },
@@ -357,9 +362,26 @@ async function RBTDashboardPageInner() {
   const completedSteps = completedDocCount
   const onboardingPercent = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0
 
-  const remainingTasks = catalogDocs
-    .filter((d) => completions.find((c) => c.documentId === d.id)?.status !== 'COMPLETED')
-    .map((d) => ({ id: d.id, title: d.title, isCompleted: false }))
+  const remainingTasks = sortRbtOnboardingSteps(
+    catalogDocs
+      .filter((d) => {
+        if (
+          d.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG &&
+          rbtProfile?.fortyHourCourseCompleted === true
+        ) {
+          return false
+        }
+        return completions.find((c) => c.documentId === d.id)?.status !== 'COMPLETED'
+      })
+      .map((d) => ({
+        id: d.id,
+        title: d.title,
+        slug: d.slug,
+        stepNumber: (d as { stepNumber?: number | null }).stepNumber ?? 99,
+        isCompleted: false,
+      }))
+  )
+  const fortyHourIncomplete = remainingTasks.some((t) => t.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG)
   const completedTasks = completions
     .filter((c) => c.status === 'COMPLETED')
     .map((c) => ({
@@ -392,6 +414,7 @@ async function RBTDashboardPageInner() {
         upcomingShifts={upcomingShifts}
         upcomingShiftsCount={upcomingShifts.length}
         pendingUploadTitles={pendingUploadTitles}
+        fortyHourIncomplete={fortyHourIncomplete}
       />
     )
   } catch (error) {

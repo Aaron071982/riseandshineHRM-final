@@ -3,6 +3,7 @@
 import type {
   AssignmentStage,
   AuthStatus,
+  AuthDenialClass,
   AuthType,
   ClientPipelineStatus,
   ClientReferralSource,
@@ -19,12 +20,15 @@ import type {
 } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { writeAuditLog } from '@/lib/audit'
 import {
   assertCanEditClient,
   auditClientAction,
   CrmAccessError,
   getClientServicesUser,
   isFullAccess,
+  getRequestIp,
+  rethrowIfNextControlFlow,
 } from '@/lib/crm/access'
 import {
   canAdvance,
@@ -33,11 +37,32 @@ import {
   REQUIREMENT_KEY_LABELS,
   STAGE_DEFAULT_OWNER_DEPT,
   STAGE_GATE_REQUIREMENT_KEYS,
-  STANDARD_DOCUMENT_REQUIREMENT_KEYS,
 } from '@/lib/crm/stages'
 import { isValidCpt, cptLabel } from '@/lib/crm/cpt'
+import {
+  CANONICAL_DOCUMENTS,
+  computeExpiresAt,
+  DOCUMENT_BY_KEY,
+  isDocumentRequired,
+  isMedicaidPayer,
+} from '@/lib/crm/documents'
+import {
+  computeConsentBillingReady,
+  consentExpiresAt,
+  parseConsentLines,
+  type ConsentLineKey,
+  type ConsentLinesMap,
+} from '@/lib/crm/consent'
+import { evaluateReferralValidity } from '@/lib/crm/referralValidity'
+import { PER_DOCUMENT_SIGNATURE_CONSENT_STATEMENT } from '@/lib/esign-constants'
 import { syncStageRequirements } from '@/lib/crm/syncStageRequirements'
 import { getClientSchedulePeriod } from '@/lib/client-services/schedulePeriod'
+import { restoreData, softDeleteData } from '@/lib/crm/softDelete'
+import { ownershipPatchOnDeptChange } from '@/lib/crm/claims'
+import { authorizedHoursWarning } from '@/lib/schedule/hoursCheck'
+import { computeSessionBillability } from '@/lib/schedule/billability'
+import { hoursBetween } from '@/lib/rbt-schedule/utils'
+import { CRM_SCHEDULE_PATH } from '@/lib/schedule/paths'
 
 function revalidateClient(clientId: string) {
   revalidatePath(`/client-services/clients/${clientId}`)
@@ -62,6 +87,7 @@ export type ActionResult<T extends object = object> =
   | { ok: false; error: string; blocked?: boolean; blockedBy?: string[]; status?: number }
 
 function fail(err: unknown): { ok: false; error: string; status?: number } {
+  rethrowIfNextControlFlow(err)
   if (err instanceof CrmAccessError) {
     return { ok: false, error: err.message, status: err.status }
   }
@@ -106,20 +132,39 @@ export async function advanceStage(clientId: string): Promise<
 
     const client = await prisma.serviceClient.findUniqueOrThrow({
       where: { id: clientId },
-      include: { requirements: true },
+      include: {
+        requirements: { where: { deletedAt: null } },
+        consent: true,
+        referralCheck: true,
+      },
     })
 
+    const consentLive =
+      client.consent && !client.consent.deletedAt ? client.consent : null
+    const referralLive =
+      client.referralCheck && !client.referralCheck.deletedAt
+        ? client.referralCheck
+        : null
+    const referralEval = evaluateReferralValidity(referralLive)
     const gate = canAdvance(
       {
         stage: client.stage,
         treatmentPlanStatus: client.treatmentPlanStatus,
+        consentBillingReady: consentLive?.billingReady ?? false,
+        referralValid: referralEval.ok,
+        requiresMedicaidReferral: isMedicaidPayer(client.insuranceProvider),
       },
       client.requirements
     )
     if (!gate.ok) {
+      const referralHint =
+        gate.blockedBy.includes('physician_referral_validity') &&
+        referralEval.missing.length > 0
+          ? ` Incomplete referral: ${referralEval.missing.join(', ')}.`
+          : ''
       return {
         ok: false,
-        error: 'Requirements incomplete',
+        error: `Requirements incomplete.${referralHint}`,
         blocked: true,
         blockedBy: gate.blockedBy,
       }
@@ -134,6 +179,11 @@ export async function advanceStage(clientId: string): Promise<
     const durationSeconds = client.stageEnteredAt
       ? Math.max(0, Math.floor((now.getTime() - client.stageEnteredAt.getTime()) / 1000))
       : null
+    const ownerPatch = ownershipPatchOnDeptChange({
+      fromDept: client.currentOwnerDept,
+      toDept: STAGE_DEFAULT_OWNER_DEPT[toStage],
+      caseCoordinatorUserId: client.caseCoordinatorUserId,
+    })
 
     await prisma.$transaction(async (tx) => {
       await tx.serviceClientStatusHistory.create({
@@ -156,15 +206,19 @@ export async function advanceStage(clientId: string): Promise<
       )
       for (const key of nextKeys) {
         if (existing.has(key)) continue
+        const catalog = DOCUMENT_BY_KEY[key]
         await tx.clientRequirement.create({
           data: {
             serviceClientId: clientId,
-            stage: toStage,
+            stage: catalog?.stage ?? toStage,
             key,
-            label: REQUIREMENT_KEY_LABELS[key] ?? key,
-            type: 'TASK',
+            label: catalog?.label ?? REQUIREMENT_KEY_LABELS[key] ?? key,
+            type: catalog?.type ?? 'TASK',
+            group: catalog?.group ?? 'STAGE',
             status: 'PENDING',
-            isRequiredToAdvance: true,
+            isRequiredToAdvance: catalog
+              ? isDocumentRequired(catalog, client.insuranceProvider)
+              : true,
           },
         })
       }
@@ -174,15 +228,28 @@ export async function advanceStage(clientId: string): Promise<
         data: {
           stage: toStage,
           stageEnteredAt: now,
-          currentOwnerDept: STAGE_DEFAULT_OWNER_DEPT[toStage],
+          currentOwnerDept: ownerPatch.currentOwnerDept,
           ...(toStage === 'ACTIVE'
             ? {
                 actualServiceStartDate: client.actualServiceStartDate ?? now,
                 status: 'ACTIVE',
               }
             : {}),
+          ...(ownerPatch.deptChanged
+            ? { currentOwnerUserId: ownerPatch.currentOwnerUserId ?? null }
+            : {}),
         },
       })
+      if (ownerPatch.shouldReleaseClaimGrants) {
+        await tx.clientClaim.updateMany({
+          where: {
+            serviceClientId: clientId,
+            releasedAt: null,
+            source: 'CLAIM',
+          },
+          data: { releasedAt: now, releasedByUserId: user.id },
+        })
+      }
     })
 
     await auditClientAction({
@@ -225,6 +292,7 @@ export async function setStage(
 
     const client = await prisma.serviceClient.findUniqueOrThrow({
       where: { id: clientId },
+      include: { consent: true },
     })
 
     if (client.stage === toStage) {
@@ -243,10 +311,27 @@ export async function setStage(
       }
     }
 
+    const consentLive =
+      client.consent && !client.consent.deletedAt ? client.consent : null
+    if (toStage === 'ACTIVE' && !consentLive?.billingReady) {
+      return {
+        ok: false,
+        error:
+          'Consent Form 02 billing gate: 97151 (assessment) and 97153 (direct therapy) must be initialed',
+        blocked: true,
+        blockedBy: ['consent_billing_ready'],
+      }
+    }
+
     const now = new Date()
     const durationSeconds = client.stageEnteredAt
       ? Math.max(0, Math.floor((now.getTime() - client.stageEnteredAt.getTime()) / 1000))
       : null
+    const ownerPatch = ownershipPatchOnDeptChange({
+      fromDept: client.currentOwnerDept,
+      toDept: STAGE_DEFAULT_OWNER_DEPT[toStage],
+      caseCoordinatorUserId: client.caseCoordinatorUserId,
+    })
 
     await prisma.$transaction(async (tx) => {
       await tx.serviceClientStatusHistory.create({
@@ -267,15 +352,28 @@ export async function setStage(
         data: {
           stage: toStage,
           stageEnteredAt: now,
-          currentOwnerDept: STAGE_DEFAULT_OWNER_DEPT[toStage],
+          currentOwnerDept: ownerPatch.currentOwnerDept,
           ...(toStage === 'ACTIVE'
             ? {
                 actualServiceStartDate: client.actualServiceStartDate ?? now,
                 status: client.pipelineStatus === 'LIVE' ? 'ACTIVE' : client.status,
               }
             : {}),
+          ...(ownerPatch.deptChanged
+            ? { currentOwnerUserId: ownerPatch.currentOwnerUserId ?? null }
+            : {}),
         },
       })
+      if (ownerPatch.shouldReleaseClaimGrants) {
+        await tx.clientClaim.updateMany({
+          where: {
+            serviceClientId: clientId,
+            releasedAt: null,
+            source: 'CLAIM',
+          },
+          data: { releasedAt: now, releasedByUserId: user.id },
+        })
+      }
     })
 
     await auditClientAction({
@@ -391,21 +489,20 @@ export async function createServiceClient(
         },
       })
 
-      for (const key of STANDARD_DOCUMENT_REQUIREMENT_KEYS) {
+      for (const doc of CANONICAL_DOCUMENTS) {
         await tx.clientRequirement.create({
           data: {
             serviceClientId: created.id,
-            stage: 'DOCUMENTS',
-            key,
-            label: REQUIREMENT_KEY_LABELS[key] ?? key,
-            type: 'DOCUMENT',
+            stage: doc.stage,
+            key: doc.key,
+            label: doc.label,
+            type: doc.type,
+            group: doc.group,
             status: 'PENDING',
-            isRequiredToAdvance: [
-              'insurance_card',
-              'medicaid_card',
-              'diagnostic_eval',
-              'physician_referral',
-            ].includes(key),
+            isRequiredToAdvance: isDocumentRequired(
+              doc,
+              created.insuranceProvider
+            ),
           },
         })
       }
@@ -684,8 +781,53 @@ export async function updateClientOverview(
 const SATISFIED: ReadonlySet<RequirementStatus> = new Set([
   'COMPLETE',
   'RECEIVED',
+  'ON_FILE',
   'NOT_APPLICABLE',
 ])
+
+function applyRequirementSatisfaction(opts: {
+  key: string
+  status: RequirementStatus
+  userId: string
+  now: Date
+  fileUrl?: string | null
+  expiresAtInput?: string | null
+}): {
+  status: RequirementStatus
+  completedAt: Date | null
+  completedByUserId: string | null
+  attestedAt?: Date | null
+  attestedByUserId?: string | null
+  expiresAt?: Date | null
+} {
+  const catalog = DOCUMENT_BY_KEY[opts.key]
+  if (opts.key === 'consent_form' && opts.status === 'ON_FILE') {
+    throw new CrmAccessError(
+      'Consent Form 02 cannot be marked on-file — upload or e-sign in-system',
+      400
+    )
+  }
+  if (opts.status === 'ON_FILE' && catalog && catalog.attestAllowed === false) {
+    throw new CrmAccessError('This requirement cannot be attested on-file', 400)
+  }
+
+  const satisfied = SATISFIED.has(opts.status) && opts.status !== 'NOT_APPLICABLE'
+  let expiresAt: Date | null | undefined
+  if (opts.expiresAtInput !== undefined) {
+    expiresAt = opts.expiresAtInput ? new Date(opts.expiresAtInput) : null
+  } else if (satisfied) {
+    expiresAt = computeExpiresAt(opts.key, opts.now) ?? undefined
+  }
+
+  return {
+    status: opts.status,
+    completedAt: SATISFIED.has(opts.status) ? opts.now : null,
+    completedByUserId: SATISFIED.has(opts.status) ? opts.userId : null,
+    attestedAt: opts.status === 'ON_FILE' ? opts.now : null,
+    attestedByUserId: opts.status === 'ON_FILE' ? opts.userId : null,
+    expiresAt,
+  }
+}
 
 export async function updateRequirement(
   requirementId: string,
@@ -700,32 +842,34 @@ export async function updateRequirement(
     const user = await getClientServicesUser()
     const existing = await prisma.clientRequirement.findUnique({
       where: { id: requirementId },
-      select: { id: true, serviceClientId: true, status: true },
+      select: { id: true, serviceClientId: true, status: true, key: true },
     })
     if (!existing) return { ok: false, error: 'Not found', status: 404 }
 
     await assertCanEditClient(user, existing.serviceClientId)
 
-    const satisfied = SATISFIED.has(input.status)
-    const wasSatisfied = SATISFIED.has(existing.status)
+    const now = new Date()
+    const sat = applyRequirementSatisfaction({
+      key: existing.key,
+      status: input.status,
+      userId: user.id,
+      now,
+      fileUrl: input.fileUrl,
+      expiresAtInput: input.expiresAt,
+    })
 
     await prisma.clientRequirement.update({
       where: { id: requirementId },
       data: {
-        status: input.status,
+        status: sat.status,
         fileUrl: input.fileUrl === undefined ? undefined : input.fileUrl,
-        expiresAt:
-          input.expiresAt === undefined
-            ? undefined
-            : input.expiresAt
-              ? new Date(input.expiresAt)
-              : null,
+        expiresAt: sat.expiresAt === undefined ? undefined : sat.expiresAt,
         notes: input.notes === undefined ? undefined : input.notes,
-        completedAt: satisfied ? new Date() : null,
-        completedByUserId: satisfied ? user.id : null,
-        ...(wasSatisfied && !satisfied
-          ? { completedAt: null, completedByUserId: null }
-          : {}),
+        completedAt: sat.completedAt,
+        completedByUserId: sat.completedByUserId,
+        attestedAt: sat.attestedAt === undefined ? undefined : sat.attestedAt,
+        attestedByUserId:
+          sat.attestedByUserId === undefined ? undefined : sat.attestedByUserId,
       },
     })
 
@@ -736,6 +880,214 @@ export async function updateRequirement(
     })
     revalidateClient(existing.serviceClientId)
     return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function attestRequirementOnFile(
+  requirementId: string
+): Promise<ActionResult> {
+  return updateRequirement(requirementId, { status: 'ON_FILE' })
+}
+
+export async function markRequirementReceived(
+  requirementId: string,
+  fileUrl?: string | null
+): Promise<ActionResult> {
+  return updateRequirement(requirementId, {
+    status: 'RECEIVED',
+    fileUrl: fileUrl ?? undefined,
+  })
+}
+
+async function upsertConsentRow(clientId: string) {
+  const existing = await prisma.clientConsent.findUnique({
+    where: { serviceClientId: clientId },
+  })
+  if (existing) return existing
+  return prisma.clientConsent.create({
+    data: {
+      serviceClientId: clientId,
+      lines: {},
+    },
+  })
+}
+
+export async function saveConsentInitials(
+  clientId: string,
+  linesPatch: Partial<Record<ConsentLineKey, boolean>>
+): Promise<ActionResult<{ billingReady: boolean }>> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+
+    const row = await upsertConsentRow(clientId)
+    const lines = parseConsentLines(row.lines)
+    const nowIso = new Date().toISOString()
+    for (const [key, on] of Object.entries(linesPatch) as [
+      ConsentLineKey,
+      boolean,
+    ][]) {
+      const prev = lines[key] ?? {
+        initialed: false,
+        initialedAt: null,
+        initialedBy: null,
+      }
+      lines[key] = on
+        ? {
+            initialed: true,
+            initialedAt: prev.initialedAt ?? nowIso,
+            initialedBy: prev.initialedBy ?? user.id,
+          }
+        : { initialed: false, initialedAt: null, initialedBy: null }
+    }
+    const billingReady = computeConsentBillingReady(lines)
+
+    await prisma.clientConsent.update({
+      where: { id: row.id },
+        data: {
+          lines: lines as object,
+          billingReady,
+        },
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'CONSENT_INITIALS_UPDATE',
+    })
+    revalidateClient(clientId)
+    return { ok: true, billingReady }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function signClientConsent(
+  clientId: string,
+  input: {
+    signedByName: string
+    uetaConsentGiven: boolean
+    secondParentRequired?: boolean
+    secondParentName?: string | null
+    witness: boolean
+  }
+): Promise<ActionResult<{ billingReady: boolean; expiresAt: string }>> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+
+    if (!input.uetaConsentGiven) {
+      throw new CrmAccessError('UETA / E-SIGN consent is required', 400)
+    }
+    const name = input.signedByName.trim()
+    if (!name) throw new CrmAccessError('Signer name is required', 400)
+
+    const row = await upsertConsentRow(clientId)
+    const lines = parseConsentLines(row.lines)
+    const billingReady = computeConsentBillingReady(lines)
+    const now = new Date()
+    const expiresAt = consentExpiresAt(now)
+    const ip = await getRequestIp().catch(() => null)
+
+    await prisma.$transaction(async (tx) => {
+      await tx.clientConsent.update({
+        where: { id: row.id },
+        data: {
+          signatureDate: now,
+          expiresAt,
+          signedByName: name,
+          uetaConsentGiven: true,
+          signatureMethod: 'TYPED_NAME',
+          signedIp: ip,
+          billingReady,
+          secondParentRequired: input.secondParentRequired ?? false,
+          secondParentName: input.secondParentName?.trim() || null,
+          secondParentSignedAt: input.secondParentName?.trim() ? now : null,
+          staffWitnessUserId: input.witness ? user.id : row.staffWitnessUserId,
+          staffWitnessedAt: input.witness ? now : row.staffWitnessedAt,
+        },
+      })
+
+      const consentReq = await tx.clientRequirement.findFirst({
+        where: {
+          serviceClientId: clientId,
+          key: 'consent_form',
+          deletedAt: null,
+        },
+      })
+      if (consentReq) {
+        await tx.clientRequirement.update({
+          where: { id: consentReq.id },
+          data: {
+            status: 'RECEIVED',
+            completedAt: now,
+            completedByUserId: user.id,
+            expiresAt,
+            notes: `E-signed (${PER_DOCUMENT_SIGNATURE_CONSENT_STATEMENT.slice(0, 48)}…)`,
+          },
+        })
+      }
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'CONSENT_ESIGN',
+    })
+    revalidateClient(clientId)
+    return {
+      ok: true,
+      billingReady,
+      expiresAt: expiresAt.toISOString(),
+    }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function saveReferralCheck(
+  clientId: string,
+  input: {
+    signedByRole: 'PHYSICIAN' | 'PSYCHOLOGIST' | 'PSYCH_NP' | 'PEDS_NP' | null
+    hasAsdDx: boolean
+    initialDxDate: string | null
+    severitySupportLevel: string | null
+    abaRequiredStatement: boolean
+    dsm5ChecklistAttached: boolean
+    notes?: string | null
+  }
+): Promise<ActionResult<{ okReferral: boolean; missing: string[] }>> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+
+    const payload = {
+      signedByRole: input.signedByRole,
+      hasAsdDx: input.hasAsdDx,
+      initialDxDate: input.initialDxDate ? new Date(input.initialDxDate) : null,
+      severitySupportLevel: input.severitySupportLevel?.trim() || null,
+      abaRequiredStatement: input.abaRequiredStatement,
+      dsm5ChecklistAttached: input.dsm5ChecklistAttached,
+      notes: input.notes?.trim() || null,
+      updatedByUserId: user.id,
+    }
+    const evalResult = evaluateReferralValidity(payload)
+
+    await prisma.clientReferralCheck.upsert({
+      where: { serviceClientId: clientId },
+      create: { serviceClientId: clientId, ...payload },
+      update: payload,
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'REFERRAL_CHECK_UPDATE',
+    })
+    revalidateClient(clientId)
+    return { ok: true, okReferral: evalResult.ok, missing: evalResult.missing }
   } catch (err) {
     return fail(err)
   }
@@ -891,6 +1243,20 @@ export async function setPipelineStatus(
       serviceClientId: clientId,
       action: 'STATUS_CHANGE',
     })
+    if (status === 'DISCHARGED' || status === 'LOST') {
+      await writeAuditLog({
+        actorUserId: user.id,
+        entityType: 'ServiceClient',
+        entityId: clientId,
+        action: 'UPDATE',
+        before: { pipelineStatus: client.pipelineStatus },
+        after: {
+          pipelineStatus: status,
+          reason: reasonText,
+          action: status === 'LOST' ? 'MARK_LOST' : 'DISCHARGE',
+        },
+      })
+    }
     revalidateClient(clientId)
     return { ok: true }
   } catch (err) {
@@ -987,34 +1353,52 @@ export async function createAuthorization(
   clientId: string,
   input: {
     authType: AuthType
-    payerName: string
+    payerPlan: string
+    payerName?: string
     authNumber?: string | null
     status?: AuthStatus
     effectiveDate?: string | null
     expirationDate?: string | null
+    serviceLocation?: string | null
+    renderingProviderId?: string | null
     renderingProvider?: string | null
+    submittedDate?: string | null
+    decisionDate?: string | null
+    denialReason?: string | null
+    denialClass?: AuthDenialClass | null
+    proofOfSubmissionDocId?: string | null
+    payerCallLogRef?: string | null
     notes?: string | null
   }
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const user = await getClientServicesUser()
     await assertCanEditClient(user, clientId)
-    const payerName = input.payerName.trim()
-    if (!payerName) return { ok: false, error: 'Payer name is required' }
+    const payerPlan = input.payerPlan.trim()
+    if (!payerPlan) return { ok: false, error: 'Payer plan is required' }
 
     const status = input.status ?? 'REQUESTED'
     const auth = await prisma.clientAuthorization.create({
       data: {
         serviceClientId: clientId,
         authType: input.authType,
-        payerName,
+        payerPlan,
+        payerName: input.payerName?.trim() || payerPlan,
         authNumber: input.authNumber?.trim() || null,
         status,
+        submittedDate: parseDate(input.submittedDate),
+        decisionDate: parseDate(input.decisionDate),
         requestedAt: new Date(),
         approvedAt: status === 'APPROVED' ? new Date() : null,
         effectiveDate: parseDate(input.effectiveDate),
         expirationDate: parseDate(input.expirationDate),
+        renderingProviderId: input.renderingProviderId?.trim() || null,
         renderingProvider: input.renderingProvider?.trim() || null,
+        serviceLocation: input.serviceLocation?.trim() || null,
+        denialReason: input.denialReason?.trim() || null,
+        denialClass: input.denialClass ?? null,
+        proofOfSubmissionDocId: input.proofOfSubmissionDocId?.trim() || null,
+        payerCallLogRef: input.payerCallLogRef?.trim() || null,
         notes: input.notes?.trim() || null,
       },
     })
@@ -1035,12 +1419,21 @@ export async function createAuthorization(
 export async function updateAuthorization(
   authorizationId: string,
   input: {
+    payerPlan?: string
     payerName?: string
     authNumber?: string | null
     status?: AuthStatus
     effectiveDate?: string | null
     expirationDate?: string | null
+    submittedDate?: string | null
+    decisionDate?: string | null
+    renderingProviderId?: string | null
     renderingProvider?: string | null
+    serviceLocation?: string | null
+    denialReason?: string | null
+    denialClass?: AuthDenialClass | null
+    proofOfSubmissionDocId?: string | null
+    payerCallLogRef?: string | null
     notes?: string | null
   }
 ): Promise<ActionResult> {
@@ -1059,6 +1452,9 @@ export async function updateAuthorization(
     await prisma.clientAuthorization.update({
       where: { id: authorizationId },
       data: {
+        ...(input.payerPlan !== undefined
+          ? { payerPlan: input.payerPlan.trim() || null }
+          : {}),
         ...(input.payerName !== undefined
           ? { payerName: input.payerName.trim() }
           : {}),
@@ -1067,14 +1463,38 @@ export async function updateAuthorization(
           : {}),
         ...(status !== undefined ? { status } : {}),
         ...(becomingApproved ? { approvedAt: new Date() } : {}),
+        ...(input.submittedDate !== undefined
+          ? { submittedDate: parseDate(input.submittedDate) }
+          : {}),
+        ...(input.decisionDate !== undefined
+          ? { decisionDate: parseDate(input.decisionDate) }
+          : {}),
         ...(input.effectiveDate !== undefined
           ? { effectiveDate: parseDate(input.effectiveDate) }
           : {}),
         ...(input.expirationDate !== undefined
           ? { expirationDate: parseDate(input.expirationDate) }
           : {}),
+        ...(input.renderingProviderId !== undefined
+          ? { renderingProviderId: input.renderingProviderId?.trim() || null }
+          : {}),
         ...(input.renderingProvider !== undefined
           ? { renderingProvider: input.renderingProvider?.trim() || null }
+          : {}),
+        ...(input.serviceLocation !== undefined
+          ? { serviceLocation: input.serviceLocation?.trim() || null }
+          : {}),
+        ...(input.denialReason !== undefined
+          ? { denialReason: input.denialReason?.trim() || null }
+          : {}),
+        ...(input.denialClass !== undefined
+          ? { denialClass: input.denialClass }
+          : {}),
+        ...(input.proofOfSubmissionDocId !== undefined
+          ? { proofOfSubmissionDocId: input.proofOfSubmissionDocId?.trim() || null }
+          : {}),
+        ...(input.payerCallLogRef !== undefined
+          ? { payerCallLogRef: input.payerCallLogRef?.trim() || null }
           : {}),
         ...(input.notes !== undefined
           ? { notes: input.notes?.trim() || null }
@@ -1099,6 +1519,9 @@ export async function addAuthorizationLine(
   authorizationId: string,
   input: {
     cptCode: string
+    authRequired?: boolean
+    unitsRequested?: number | null
+    unitsApproved?: number | null
     unitsAuthorized: number
     unitsUsed?: number
     description?: string | null
@@ -1116,12 +1539,24 @@ export async function addAuthorizationLine(
       return { ok: false, error: 'Invalid CPT code' }
     }
     const unitsAuthorized = Math.max(0, Math.floor(input.unitsAuthorized))
+    const unitsRequested =
+      input.unitsRequested == null ? null : Math.max(0, Math.floor(input.unitsRequested))
+    const unitsApproved =
+      input.unitsApproved == null ? null : Math.max(0, Math.floor(input.unitsApproved))
     const unitsUsed = Math.max(0, Math.floor(input.unitsUsed ?? 0))
+    const underApproved =
+      unitsRequested != null &&
+      unitsApproved != null &&
+      unitsApproved < unitsRequested
 
     const line = await prisma.clientAuthorizationLine.create({
       data: {
         authorizationId,
         cptCode: input.cptCode,
+        authRequired: input.authRequired ?? true,
+        unitsRequested,
+        unitsApproved,
+        isUnderApproved: underApproved,
         unitsAuthorized,
         unitsUsed,
         description: input.description?.trim() || cptLabel(input.cptCode),
@@ -1145,6 +1580,9 @@ export async function updateAuthorizationLine(
   lineId: string,
   input: {
     cptCode?: string
+    authRequired?: boolean | null
+    unitsRequested?: number | null
+    unitsApproved?: number | null
     unitsAuthorized?: number
     unitsUsed?: number
     description?: string | null
@@ -1163,10 +1601,29 @@ export async function updateAuthorizationLine(
       return { ok: false, error: 'Invalid CPT code' }
     }
 
+    const nextRequested =
+      input.unitsRequested !== undefined
+        ? input.unitsRequested == null
+          ? null
+          : Math.max(0, Math.floor(input.unitsRequested))
+        : line.unitsRequested
+    const nextApproved =
+      input.unitsApproved !== undefined
+        ? input.unitsApproved == null
+          ? null
+          : Math.max(0, Math.floor(input.unitsApproved))
+        : line.unitsApproved
+    const underApproved =
+      nextRequested != null && nextApproved != null && nextApproved < nextRequested
+
     await prisma.clientAuthorizationLine.update({
       where: { id: lineId },
       data: {
         ...(input.cptCode !== undefined ? { cptCode: input.cptCode } : {}),
+        ...(input.authRequired !== undefined ? { authRequired: input.authRequired } : {}),
+        ...(input.unitsRequested !== undefined ? { unitsRequested: nextRequested } : {}),
+        ...(input.unitsApproved !== undefined ? { unitsApproved: nextApproved } : {}),
+        isUnderApproved: underApproved,
         ...(input.unitsAuthorized !== undefined
           ? { unitsAuthorized: Math.max(0, Math.floor(input.unitsAuthorized)) }
           : {}),
@@ -1203,12 +1660,22 @@ export async function deleteAuthorizationLine(
     if (!line) return { ok: false, error: 'Not found', status: 404 }
     await assertCanEditClient(user, line.authorization.serviceClientId)
 
-    await prisma.clientAuthorizationLine.delete({ where: { id: lineId } })
+    await prisma.clientAuthorizationLine.update({
+      where: { id: lineId },
+      data: softDeleteData(user.id),
+    })
     await syncStageRequirements(line.authorization.serviceClientId, user.id)
     await auditClientAction({
       userId: user.id,
       serviceClientId: line.authorization.serviceClientId,
       action: 'AUTH_LINE_DELETE',
+    })
+    await writeAuditLog({
+      actorUserId: user.id,
+      entityType: 'ClientAuthorizationLine',
+      entityId: lineId,
+      action: 'DELETE',
+      after: { softDeleted: true, serviceClientId: line.authorization.serviceClientId },
     })
     revalidateClient(line.authorization.serviceClientId)
     return { ok: true }
@@ -1331,12 +1798,22 @@ export async function removeRbtAssignment(
     if (!existing) return { ok: false, error: 'Not found', status: 404 }
     await assertCanEditClient(user, existing.serviceClientId)
 
-    await prisma.serviceClientBtAssignment.delete({ where: { id: assignmentId } })
+    await prisma.serviceClientBtAssignment.update({
+      where: { id: assignmentId },
+      data: { ...softDeleteData(user.id), status: 'ENDED' },
+    })
     await syncStageRequirements(existing.serviceClientId, user.id)
     await auditClientAction({
       userId: user.id,
       serviceClientId: existing.serviceClientId,
       action: 'RBT_ASSIGNMENT_REMOVE',
+    })
+    await writeAuditLog({
+      actorUserId: user.id,
+      entityType: 'ServiceClientBtAssignment',
+      entityId: assignmentId,
+      action: 'DELETE',
+      after: { softDeleted: true, serviceClientId: existing.serviceClientId },
     })
     revalidateClient(existing.serviceClientId)
     return { ok: true }
@@ -1461,7 +1938,7 @@ export async function addScheduleEntry(
     location?: string | null
     notes?: string | null
   }
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string; warning?: string }>> {
   try {
     const user = await getClientServicesUser()
     await assertCanEditClient(user, clientId)
@@ -1496,9 +1973,54 @@ export async function addScheduleEntry(
 
     const client = await prisma.serviceClient.findUniqueOrThrow({
       where: { id: clientId },
-      select: { firstName: true, lastName: true, borough: true },
+      select: { firstName: true, lastName: true, borough: true, authHours: true },
     })
     const period = await getClientSchedulePeriod()
+    const treatmentAuths = await prisma.clientAuthorization.findMany({
+      where: {
+        serviceClientId: clientId,
+        deletedAt: null,
+        authType: 'TREATMENT',
+        status: 'APPROVED',
+      },
+      select: {
+        effectiveDate: true,
+        expirationDate: true,
+        renderingProviderId: true,
+        serviceLocation: true,
+        lines: {
+          where: { deletedAt: null },
+          select: { cptCode: true, authRequired: true },
+        },
+      },
+    })
+    const cptCode = '97153'
+    const billability = computeSessionBillability({
+      dateOfService: period.startDate,
+      cptCode,
+      serviceLocation: input.location ?? null,
+      authorizations: treatmentAuths,
+    })
+
+    const existingHours = await prisma.rbtScheduleAssignment.findMany({
+      where: {
+        serviceClientId: clientId,
+        isActive: true,
+        deletedAt: null,
+        reviewStatus: { in: ['NONE', 'CONFIRMED'] },
+      },
+      select: { startTime: true, endTime: true },
+    })
+    const currentHours = existingHours.reduce(
+      (sum, s) => sum + hoursBetween(s.startTime, s.endTime),
+      0
+    )
+    const addedHours = hoursBetween(input.startTime, input.endTime)
+    const hoursCheck = authorizedHoursWarning({
+      currentHours,
+      addedHours,
+      authHours: client.authHours,
+    })
 
     const row = await prisma.rbtScheduleAssignment.create({
       data: {
@@ -1515,6 +2037,10 @@ export async function addScheduleEntry(
         periodStart: period.startDate,
         periodEnd: period.endDate,
         serviceClientId: clientId,
+        cptCode,
+        serviceLocation: input.location?.trim() || null,
+        billabilityStatus: billability.status,
+        billabilityReason: billability.reason,
         serviceClientLinkManual: true,
         createdBy: user.id,
       },
@@ -1527,9 +2053,175 @@ export async function addScheduleEntry(
       action: 'SCHEDULE_ADD',
     })
     revalidateClient(clientId)
-    return { ok: true, id: row.id }
+    revalidatePath(CRM_SCHEDULE_PATH)
+    return { ok: true, id: row.id, warning: hoursCheck.warning }
   } catch (err) {
     return fail(err)
+  }
+}
+
+export async function addScheduleEntries(
+  clientId: string,
+  input: {
+    rbtProfileId: string
+    startTime: string
+    endTime: string
+    location?: string | null
+    notes?: string | null
+    days: { dayOfWeek: number; startTime?: string; endTime?: string }[]
+  }
+): Promise<
+  ActionResult<{
+    ids: string[]
+    warning?: string
+    projectedHours: number
+    authHours: number | null
+  }>
+> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+    if (!input.days.length) return { ok: false, error: 'Select at least one day' }
+
+    const rbt = await prisma.rBTProfile.findUnique({
+      where: { id: input.rbtProfileId },
+      select: { id: true },
+    })
+    if (!rbt) return { ok: false, error: 'RBT not found' }
+
+    const assigned = await prisma.serviceClientBtAssignment.findFirst({
+      where: {
+        serviceClientId: clientId,
+        rbtProfileId: input.rbtProfileId,
+        status: 'ACTIVE',
+      },
+    })
+    const anyAssigned = await prisma.serviceClientBtAssignment.count({
+      where: { serviceClientId: clientId, status: 'ACTIVE', rbtProfileId: { not: null } },
+    })
+    if (anyAssigned > 0 && !assigned) {
+      return {
+        ok: false,
+        error: 'Schedule RBT should be one of the assigned care-team RBTs',
+      }
+    }
+
+    for (const d of input.days) {
+      if (d.dayOfWeek < 0 || d.dayOfWeek > 6) {
+        return { ok: false, error: 'Invalid day of week' }
+      }
+    }
+
+    const client = await prisma.serviceClient.findUniqueOrThrow({
+      where: { id: clientId },
+      select: { firstName: true, lastName: true, borough: true, authHours: true },
+    })
+    const period = await getClientSchedulePeriod()
+    const treatmentAuths = await prisma.clientAuthorization.findMany({
+      where: {
+        serviceClientId: clientId,
+        deletedAt: null,
+        authType: 'TREATMENT',
+        status: 'APPROVED',
+      },
+      select: {
+        effectiveDate: true,
+        expirationDate: true,
+        renderingProviderId: true,
+        serviceLocation: true,
+        lines: {
+          where: { deletedAt: null },
+          select: { cptCode: true, authRequired: true },
+        },
+      },
+    })
+    const cptCode = '97153'
+    const billability = computeSessionBillability({
+      dateOfService: period.startDate,
+      cptCode,
+      serviceLocation: input.location ?? null,
+      authorizations: treatmentAuths,
+    })
+    const existingHours = await prisma.rbtScheduleAssignment.findMany({
+      where: {
+        serviceClientId: clientId,
+        isActive: true,
+        deletedAt: null,
+        reviewStatus: { in: ['NONE', 'CONFIRMED'] },
+      },
+      select: { startTime: true, endTime: true },
+    })
+    const currentHours = existingHours.reduce(
+      (sum, s) => sum + hoursBetween(s.startTime, s.endTime),
+      0
+    )
+    const addedHours = input.days.reduce((sum, d) => {
+      const start = d.startTime ?? input.startTime
+      const end = d.endTime ?? input.endTime
+      return sum + hoursBetween(start, end)
+    }, 0)
+    const hoursCheck = authorizedHoursWarning({
+      currentHours,
+      addedHours,
+      authHours: client.authHours,
+    })
+
+    const ids: string[] = []
+    for (const d of input.days) {
+      const startTime = d.startTime ?? input.startTime
+      const endTime = d.endTime ?? input.endTime
+      if (hoursBetween(startTime, endTime) <= 0) {
+        return { ok: false, error: 'End time must be after start time' }
+      }
+      const row = await prisma.rbtScheduleAssignment.create({
+        data: {
+          rbtProfileId: rbt.id,
+          clientName: `${client.firstName} ${client.lastName}`.trim(),
+          dayOfWeek: d.dayOfWeek,
+          startTime,
+          endTime,
+          location: input.location?.trim() || null,
+          notes: input.notes?.trim() || '[CRM] schedule entry',
+          isActive: true,
+          source: 'MANUAL',
+          reviewStatus: 'NONE',
+          clientBorough: client.borough,
+          periodStart: period.startDate,
+          periodEnd: period.endDate,
+          serviceClientId: clientId,
+          cptCode,
+          serviceLocation: input.location?.trim() || null,
+          billabilityStatus: billability.status,
+          billabilityReason: billability.reason,
+          serviceClientLinkManual: true,
+          createdBy: user.id,
+        },
+      })
+      ids.push(row.id)
+    }
+
+    await syncStageRequirements(clientId, user.id)
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'SCHEDULE_ADD',
+    })
+    revalidateClient(clientId)
+    revalidatePath(CRM_SCHEDULE_PATH)
+    return {
+      ok: true,
+      ids,
+      warning: hoursCheck.warning,
+      projectedHours: hoursCheck.projectedHours,
+      authHours: client.authHours,
+    }
+  } catch (err) {
+    return fail(err) as ActionResult<{
+      ids: string[]
+      warning?: string
+      projectedHours: number
+      authHours: number | null
+    }>
   }
 }
 
@@ -1602,7 +2294,7 @@ export async function removeScheduleEntry(entryId: string): Promise<ActionResult
 
     await prisma.rbtScheduleAssignment.update({
       where: { id: entryId },
-      data: { isActive: false },
+      data: { isActive: false, ...softDeleteData(user.id) },
     })
 
     await syncStageRequirements(existing.serviceClientId, user.id)
@@ -1610,6 +2302,17 @@ export async function removeScheduleEntry(entryId: string): Promise<ActionResult
       userId: user.id,
       serviceClientId: existing.serviceClientId,
       action: 'SCHEDULE_REMOVE',
+    })
+    await writeAuditLog({
+      actorUserId: user.id,
+      entityType: 'RbtScheduleAssignment',
+      entityId: entryId,
+      action: 'DELETE',
+      after: {
+        softDeleted: true,
+        serviceClientId: existing.serviceClientId,
+        clientName: existing.clientName,
+      },
     })
     revalidateClient(existing.serviceClientId)
     return { ok: true }
@@ -1666,6 +2369,57 @@ export async function logCommunication(
   }
 }
 
+export async function previewClientEmail(
+  clientId: string,
+  input: {
+    template: CommTemplate
+    subject?: string | null
+    bodyHtml?: string | null
+  }
+): Promise<ActionResult<{ subject: string; html: string; to: string | null }>> {
+  try {
+    const user = await getClientServicesUser()
+    const { previewStaffClientEmail } = await import('@/lib/crm/emails/staffSend')
+    const preview = await previewStaffClientEmail(user, clientId, input)
+    return {
+      ok: true,
+      subject: preview.subject,
+      html: preview.html,
+      to: preview.to,
+    }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function sendClientEmail(
+  clientId: string,
+  input: {
+    template: CommTemplate
+    subject?: string | null
+    bodyHtml?: string | null
+    cc?: string | null
+    force?: boolean
+  }
+): Promise<
+  ActionResult<{ status: string; communicationId: string; reason?: string }>
+> {
+  try {
+    const user = await getClientServicesUser()
+    const { sendStaffClientEmail } = await import('@/lib/crm/emails/staffSend')
+    const result = await sendStaffClientEmail(user, clientId, input)
+    revalidateClient(clientId)
+    return {
+      ok: true,
+      status: result.status,
+      communicationId: result.communicationId,
+      reason: result.reason,
+    }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 /** Full-access override: resend a journey template even if SENT/SKIPPED exists. */
 export async function resendJourneyEmail(
   clientId: string,
@@ -1695,6 +2449,314 @@ export async function resendJourneyEmail(
       status: result.status,
       communicationId: result.communicationId,
     }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/** Soft-delete a family record. Full-access only. Never hard-deletes. */
+export async function softDeleteServiceClient(
+  clientId: string
+): Promise<ActionResult<{ clientCode: string; name: string }>> {
+  try {
+    const user = await getClientServicesUser()
+    if (!isFullAccess(user)) {
+      throw new CrmAccessError('Full access required to delete a family record', 403)
+    }
+    await assertCanEditClient(user, clientId)
+
+    const existing = await prisma.serviceClient.findFirst({
+      where: { id: clientId, deletedAt: null },
+      select: { id: true, clientCode: true, firstName: true, lastName: true },
+    })
+    if (!existing) return { ok: false, error: 'Not found', status: 404 }
+
+    const name = `${existing.firstName} ${existing.lastName}`.trim()
+    await prisma.serviceClient.update({
+      where: { id: clientId },
+      data: softDeleteData(user.id),
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'CLIENT_SOFT_DELETE',
+    })
+    await writeAuditLog({
+      actorUserId: user.id,
+      entityType: 'ServiceClient',
+      entityId: clientId,
+      action: 'DELETE',
+      after: { softDeleted: true, clientCode: existing.clientCode, name },
+    })
+
+    revalidatePath('/client-services')
+    revalidatePath('/client-services/admin')
+    return { ok: true, clientCode: existing.clientCode, name }
+  } catch (err) {
+    return fail(err) as ActionResult<{ clientCode: string; name: string }>
+  }
+}
+
+/** Restore a soft-deleted family record. Full-access only. */
+export async function restoreServiceClient(
+  clientId: string
+): Promise<ActionResult<{ clientCode: string; name: string }>> {
+  try {
+    const user = await getClientServicesUser()
+    if (!isFullAccess(user)) {
+      throw new CrmAccessError('Full access required to restore a family record', 403)
+    }
+
+    const existing = await prisma.serviceClient.findFirst({
+      where: { id: clientId, deletedAt: { not: null } },
+      select: {
+        id: true,
+        clientCode: true,
+        firstName: true,
+        lastName: true,
+        deletedAt: true,
+      },
+    })
+    if (!existing) return { ok: false, error: 'Not found', status: 404 }
+
+    const name = `${existing.firstName} ${existing.lastName}`.trim()
+    await prisma.serviceClient.update({
+      where: { id: clientId },
+      data: restoreData(),
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'CLIENT_RESTORE',
+    })
+    await writeAuditLog({
+      actorUserId: user.id,
+      entityType: 'ServiceClient',
+      entityId: clientId,
+      action: 'UPDATE',
+      before: { deletedAt: existing.deletedAt?.toISOString() },
+      after: { restored: true, clientCode: existing.clientCode, name },
+    })
+
+    revalidateClient(clientId)
+    revalidatePath('/client-services/admin')
+    return { ok: true, clientCode: existing.clientCode, name }
+  } catch (err) {
+    return fail(err) as ActionResult<{ clientCode: string; name: string }>
+  }
+}
+
+export async function listDeletedServiceClients(): Promise<
+  ActionResult<{
+    clients: {
+      id: string
+      clientCode: string
+      firstName: string
+      lastName: string
+      deletedAt: string
+      deletedByUserId: string | null
+    }[]
+  }>
+> {
+  try {
+    const user = await getClientServicesUser()
+    if (!isFullAccess(user)) {
+      throw new CrmAccessError('Full access required to list deleted family records', 403)
+    }
+
+    const rows = await prisma.serviceClient.findMany({
+      where: { deletedAt: { not: null } },
+      select: {
+        id: true,
+        clientCode: true,
+        firstName: true,
+        lastName: true,
+        deletedAt: true,
+        deletedByUserId: true,
+      },
+      orderBy: { deletedAt: 'desc' },
+      take: 100,
+    })
+
+    return {
+      ok: true,
+      clients: rows.map((r) => ({
+        id: r.id,
+        clientCode: r.clientCode,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        deletedAt: r.deletedAt!.toISOString(),
+        deletedByUserId: r.deletedByUserId,
+      })),
+    }
+  } catch (err) {
+    return fail(err) as ActionResult<{ clients: never[] }>
+  }
+}
+
+export async function listBoardMigrationReview(): Promise<
+  ActionResult<{
+    rows: {
+      id: string
+      clientName: string
+      dayOfWeek: number
+      startTime: string
+      endTime: string
+      location: string | null
+      rbtName: string
+      rbtProfileId: string
+      serviceClientId: string | null
+      serviceClientLive: boolean | null
+      conflict: boolean
+      createdAt: string
+    }[]
+  }>
+> {
+  try {
+    const user = await getClientServicesUser()
+    if (!isFullAccess(user)) {
+      throw new CrmAccessError('Full access required to review migrated board slots', 403)
+    }
+
+    const pending = await prisma.rbtScheduleAssignment.findMany({
+      where: {
+        source: 'BOARD_MIGRATION',
+        reviewStatus: 'PENDING',
+        deletedAt: null,
+      },
+      include: {
+        rbtProfile: { select: { firstName: true, lastName: true } },
+        serviceClient: { select: { pipelineStatus: true, deletedAt: true } },
+      },
+      orderBy: [{ clientName: 'asc' }, { dayOfWeek: 'asc' }, { startTime: 'asc' }],
+    })
+
+    const liveForClients =
+      pending.length === 0
+        ? []
+        : await prisma.rbtScheduleAssignment.findMany({
+            where: {
+              isActive: true,
+              deletedAt: null,
+              reviewStatus: { in: ['NONE', 'CONFIRMED'] },
+              OR: pending.flatMap((p) => {
+                const ors: (
+                  | { serviceClientId: string }
+                  | { clientName: string }
+                )[] = [{ clientName: p.clientName }]
+                if (p.serviceClientId) {
+                  ors.push({ serviceClientId: p.serviceClientId })
+                }
+                return ors
+              }),
+            },
+            select: {
+              id: true,
+              rbtProfileId: true,
+              serviceClientId: true,
+              clientName: true,
+            },
+          })
+
+    return {
+      ok: true,
+      rows: pending.map((p) => {
+        const conflict = liveForClients.some(
+          (a) =>
+            a.rbtProfileId !== p.rbtProfileId &&
+            (a.serviceClientId
+              ? a.serviceClientId === p.serviceClientId
+              : a.clientName === p.clientName)
+        )
+        return {
+          id: p.id,
+          clientName: p.clientName,
+          dayOfWeek: p.dayOfWeek,
+          startTime: p.startTime,
+          endTime: p.endTime,
+          location: p.location,
+          rbtName: `${p.rbtProfile.firstName} ${p.rbtProfile.lastName}`.trim(),
+          rbtProfileId: p.rbtProfileId,
+          serviceClientId: p.serviceClientId,
+          serviceClientLive:
+            p.serviceClient && !p.serviceClient.deletedAt
+              ? p.serviceClient.pipelineStatus === 'LIVE'
+              : null,
+          conflict,
+          createdAt: p.createdAt.toISOString(),
+        }
+      }),
+    }
+  } catch (err) {
+    return fail(err) as ActionResult<{ rows: never[] }>
+  }
+}
+
+export async function confirmBoardMigrationRow(
+  id: string
+): Promise<ActionResult> {
+  try {
+    const user = await getClientServicesUser()
+    if (!isFullAccess(user)) {
+      throw new CrmAccessError('Full access required', 403)
+    }
+    const existing = await prisma.rbtScheduleAssignment.findFirst({
+      where: { id, reviewStatus: 'PENDING', deletedAt: null },
+    })
+    if (!existing) return { ok: false, error: 'Not found', status: 404 }
+
+    await prisma.rbtScheduleAssignment.update({
+      where: { id },
+      data: { isActive: true, reviewStatus: 'CONFIRMED' },
+    })
+    await writeAuditLog({
+      actorUserId: user.id,
+      entityType: 'RbtScheduleAssignment',
+      entityId: id,
+      action: 'UPDATE',
+      after: { reviewStatus: 'CONFIRMED', isActive: true },
+    })
+    revalidatePath(CRM_SCHEDULE_PATH)
+    revalidatePath('/client-services/admin')
+    if (existing.serviceClientId) revalidateClient(existing.serviceClientId)
+    return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function discardBoardMigrationRow(
+  id: string
+): Promise<ActionResult> {
+  try {
+    const user = await getClientServicesUser()
+    if (!isFullAccess(user)) {
+      throw new CrmAccessError('Full access required', 403)
+    }
+    const existing = await prisma.rbtScheduleAssignment.findFirst({
+      where: { id, reviewStatus: 'PENDING', deletedAt: null },
+    })
+    if (!existing) return { ok: false, error: 'Not found', status: 404 }
+
+    await prisma.rbtScheduleAssignment.update({
+      where: { id },
+      data: {
+        isActive: false,
+        reviewStatus: 'DISCARDED',
+        ...softDeleteData(user.id),
+      },
+    })
+    await writeAuditLog({
+      actorUserId: user.id,
+      entityType: 'RbtScheduleAssignment',
+      entityId: id,
+      action: 'DELETE',
+      after: { reviewStatus: 'DISCARDED', softDeleted: true },
+    })
+    revalidatePath('/client-services/admin')
+    return { ok: true }
   } catch (err) {
     return fail(err)
   }

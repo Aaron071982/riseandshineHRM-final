@@ -2,7 +2,7 @@ import {
   auditClientAction,
   canAccessDepartment,
   CrmAccessError,
-  getClientServicesUser,
+  getClientServicesPageUser,
 } from '@/lib/crm/access'
 import { loadTherapistSearchClient } from '@/lib/crm/therapistSearchData'
 import TherapistSearchClient from '@/components/crm/TherapistSearchClient'
@@ -14,7 +14,8 @@ export default async function TherapistSearchPage({
 }: {
   searchParams: Promise<{ clientId?: string }>
 }) {
-  const user = await getClientServicesUser()
+  const user = await getClientServicesPageUser()
+  if (!user) return null
   if (!canAccessDepartment(user, 'STAFFING')) {
     return (
       <div className="mx-auto max-w-lg rounded-xl border border-[var(--urgent)] bg-[var(--urgent-bg)] px-5 py-8 text-center">

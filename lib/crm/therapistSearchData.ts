@@ -1,8 +1,7 @@
-import type { CrmAccessSubject } from '@/lib/crm/access'
 import {
+  assertCanViewClient,
   auditClientAction,
-  CrmAccessError,
-  getVisibleClientsWhere,
+  type CrmAccessSubject,
 } from '@/lib/crm/access'
 import { prisma } from '@/lib/prisma'
 
@@ -10,8 +9,9 @@ export async function loadTherapistSearchClient(
   user: CrmAccessSubject,
   clientId: string
 ) {
+  await assertCanViewClient(user, clientId)
   const client = await prisma.serviceClient.findFirst({
-    where: { id: clientId, ...getVisibleClientsWhere(user) },
+    where: { id: clientId, deletedAt: null },
     select: {
       id: true,
       clientCode: true,
@@ -25,7 +25,7 @@ export async function loadTherapistSearchClient(
       preferredRbtEthnicities: true,
     },
   })
-  if (!client) throw new CrmAccessError('Forbidden', 403)
+  if (!client) throw new Error('Client not found')
 
   await auditClientAction({
     userId: user.id,

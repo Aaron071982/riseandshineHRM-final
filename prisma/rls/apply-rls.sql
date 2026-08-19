@@ -35,6 +35,7 @@ DECLARE
     'client_service_breaks', 'client_rbt_breaks', 'service_client_status_history',
     'client_requirements', 'client_authorizations', 'client_authorization_lines',
     'client_tasks', 'client_communications', 'client_alerts',
+    'client_consents', 'client_referral_checks',
     'schedule_import_batches', 'client_boroughs',
     'payroll_runs', 'payroll_run_entries',
     'company_documents', 'company_document_recipients',
@@ -50,7 +51,9 @@ DECLARE
     'clients', 'payer_authorizations', 'clinical_service_logs',
     'supervision_events', 'compliance_alerts', 'audit_logs',
     'oauth_clients', 'oauth_authorization_codes', 'oauth_access_tokens',
-    'schedule_allowed_user', 'therapist', 'schedule_client', 'session_slot'
+    'schedule_allowed_user', 'therapist', 'schedule_client', 'session_slot',
+    -- CRM roles (privilege-escalation surface; was missing from earlier lists)
+    'user_crm_roles'
   ];
 BEGIN
   FOREACH t IN ARRAY tables
@@ -92,8 +95,10 @@ DECLARE
     'client_service_breaks', 'client_rbt_breaks', 'service_client_status_history',
     'client_requirements', 'client_authorizations', 'client_authorization_lines',
     'client_tasks', 'client_communications', 'client_alerts',
+    'client_consents', 'client_referral_checks',
     'schedule_import_batches', 'client_boroughs', 'payroll_runs',
-    'payroll_run_entries', 'company_documents', 'company_document_recipients'
+    'payroll_run_entries', 'company_documents', 'company_document_recipients',
+    'user_crm_roles'
   ];
 BEGIN
   FOREACH t IN ARRAY tables
@@ -126,10 +131,12 @@ DECLARE
     'client_service_breaks', 'client_rbt_breaks', 'service_client_status_history',
     'client_requirements', 'client_authorizations', 'client_authorization_lines',
     'client_tasks', 'client_communications', 'client_alerts',
+    'client_consents', 'client_referral_checks',
     'rbt_schedule_assignments', 'schedule_import_batches', 'client_boroughs',
     'rbt_pay_statements', 'rbt_pay_statement_sessions',
     'payroll_runs', 'payroll_run_entries',
-    'company_documents', 'company_document_recipients'
+    'company_documents', 'company_document_recipients',
+    'user_crm_roles'
   ];
 BEGIN
   FOREACH t IN ARRAY tables
@@ -161,3 +168,85 @@ BEGIN
     );
   END LOOP;
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- 4) Catch-all: any remaining public table with RLS still off.
+--    Enables RLS + the standard 3-policy pattern so a new model cannot
+--    silently ship without policies (Supabase Security Advisor gap).
+--    Skip supabase/prisma internals that live in public.
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+  t text;
+  skip text[] := ARRAY['_prisma_migrations'];
+BEGIN
+  FOR t IN
+    SELECT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'r'
+      AND c.relrowsecurity = false
+      AND NOT (c.relname = ANY (skip))
+    ORDER BY c.relname
+  LOOP
+    RAISE NOTICE 'RLS catch-all: enabling on public.%', t;
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_service_role_all', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR ALL TO service_role USING (true) WITH CHECK (true)',
+      t || '_service_role_all', t
+    );
+
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_postgres_all', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR ALL TO postgres USING (true) WITH CHECK (true)',
+      t || '_postgres_all', t
+    );
+
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_block_anon', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR ALL TO anon USING (false) WITH CHECK (false)',
+      t || '_block_anon', t
+    );
+  END LOOP;
+
+  -- Tables that already have RLS but zero policies (deny-all for non-owners).
+  FOR t IN
+    SELECT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'r'
+      AND c.relrowsecurity = true
+      AND NOT (c.relname = ANY (skip))
+      AND NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)
+    ORDER BY c.relname
+  LOOP
+    RAISE NOTICE 'RLS catch-all: adding 3-policy pattern on public.%', t;
+
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_service_role_all', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR ALL TO service_role USING (true) WITH CHECK (true)',
+      t || '_service_role_all', t
+    );
+
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_postgres_all', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR ALL TO postgres USING (true) WITH CHECK (true)',
+      t || '_postgres_all', t
+    );
+
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_block_anon', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON public.%I FOR ALL TO anon USING (false) WITH CHECK (false)',
+      t || '_block_anon', t
+    );
+  END LOOP;
+END $$;
+
+-- GO-LIVE (prod): Aaron runs `psql "$PROD_DIRECT_URL" -v ON_ERROR_STOP=1 -f prisma/rls/apply-rls.sql`
+-- after a manual Supabase backup. Cursor must not apply this against prod.
+-- Verify: anon/publishable key SELECT on user_crm_roles returns 0 rows.
+

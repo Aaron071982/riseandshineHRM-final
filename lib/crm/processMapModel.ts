@@ -15,10 +15,9 @@ import {
 export const PROCESS_DEPT_ORDER: readonly ClientOwnerDept[] = [
   'INTAKE',
   'CLINICAL',
-  'AUTHORIZATION',
+  'BILLING',
   'STAFFING',
   'CASE_COORDINATION',
-  'BILLING',
 ] as const
 
 /** Stage-group accent tokens (Phase 6) reused per department. */
@@ -55,7 +54,7 @@ export const CRM_ROLE_LABELS: Record<CrmRole, string> = {
 export const PROCESS_DEPT_TO_ROLE: Record<ClientOwnerDept, CrmRole> = {
   INTAKE: 'INTAKE',
   CLINICAL: 'CLINICAL',
-  AUTHORIZATION: 'AUTHORIZATION',
+  AUTHORIZATION: 'BILLING',
   STAFFING: 'STAFFING',
   CASE_COORDINATION: 'CASE_COORDINATION',
   BILLING: 'BILLING',
@@ -116,8 +115,7 @@ export type ProcessMapData = {
 
 /**
  * Handoff path derived from stage config: every point in LINEAR_STAGE_ORDER
- * where the default owning department changes becomes an edge. Billing sits
- * after Active and owns no pipeline stage, so its hop is declared explicitly.
+ * where the default owning department changes becomes an edge.
  */
 export function buildHandoffs(): ProcessHandoff[] {
   const order = (dept: ClientOwnerDept) => PROCESS_DEPT_ORDER.indexOf(dept)
@@ -145,14 +143,6 @@ export function buildHandoffs(): ProcessHandoff[] {
       kind: order(to) > order(from) ? 'forward' : 'return',
     })
   }
-
-  byPair.set('CLINICAL->BILLING', {
-    id: 'handoff-CLINICAL-BILLING',
-    from: 'CLINICAL',
-    to: 'BILLING',
-    labels: ['Active services → claims'],
-    kind: 'implied',
-  })
 
   return [...byPair.values()]
 }

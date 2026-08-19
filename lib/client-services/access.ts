@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { prisma, isPrismaMissingSchemaError } from '@/lib/prisma'
-import { validateSession, type SessionUser } from '@/lib/auth'
+import { validateSession, type SessionUser, isAdmin } from '@/lib/auth'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import {
   CS_SESSION_ABSOLUTE_MS,
@@ -18,14 +18,12 @@ export type ClientScope = 'ALL' | { clientIds: string[] }
 
 /**
  * Whether the user may enter Client Services at all (before step-up).
- * Allowlist break-glass OR any active CRM role.
+ * HRM admins only, plus break-glass allowlist emails.
  */
 export async function canAccessClientServices(user: SessionUser | null): Promise<boolean> {
   if (!user) return false
   if (isClientServicesFullAccessEmail(user.email)) return true
-  const { fetchUserCrmRoles } = await import('@/lib/crm/access')
-  const roles = await fetchUserCrmRoles(user.id)
-  return roles.length > 0
+  return isAdmin(user)
 }
 
 /**
@@ -81,9 +79,23 @@ export async function createElevatedSession(
  * Each successful check slides lastActiveAt forward.
  */
 export async function validateElevatedSession(
-  token: string | undefined | null
+  token: string | undefined | null,
+  sessionUser?: SessionUser | null
 ): Promise<SessionUser | null> {
   if (!token) return null
+
+  let user = sessionUser ?? null
+  if (!user) {
+    // Read cookies before any other await. Server actions in Next 14 can lose
+    // request cookie context after Prisma/network I/O.
+    const cookieStore = await cookies()
+    const mainToken = cookieStore.get('session')?.value
+    if (!mainToken) return null
+    user = await validateSession(mainToken)
+    if (!user) return null
+  }
+  if (!(await canAccessClientServices(user))) return null
+
   let row: {
     id: string
     userId: string
@@ -107,6 +119,8 @@ export async function validateElevatedSession(
     throw error
   }
 
+  if (user.id !== row.userId) return null
+
   const now = Date.now()
   const expired = isElevatedSessionExpired({
     nowMs: now,
@@ -121,13 +135,6 @@ export async function validateElevatedSession(
     await prisma.clientServicesSession.delete({ where: { id: row.id } }).catch(() => {})
     return null
   }
-
-  const cookieStore = await cookies()
-  const mainToken = cookieStore.get('session')?.value
-  if (!mainToken) return null
-  const user = await validateSession(mainToken)
-  if (!user || user.id !== row.userId) return null
-  if (!(await canAccessClientServices(user))) return null
 
   // Sliding idle window — DB is the source of truth (not cookie maxAge).
   await prisma.clientServicesSession
@@ -164,8 +171,12 @@ export function clearElevatedSessionCookie(response: NextResponse): void {
 /** Sync check for layouts — returns user if elevated session is valid. */
 export async function getElevatedClientServicesUser(): Promise<SessionUser | null> {
   const cookieStore = await cookies()
+  const mainToken = cookieStore.get('session')?.value
   const csToken = cookieStore.get(CS_SESSION_COOKIE)?.value
-  return validateElevatedSession(csToken)
+  if (!mainToken || !csToken) return null
+  const user = await validateSession(mainToken)
+  if (!user) return null
+  return validateElevatedSession(csToken, user)
 }
 
 /**
@@ -206,7 +217,7 @@ export async function requireClientServicesSession(): Promise<
   }
 
   const csToken = cookieStore.get(CS_SESSION_COOKIE)?.value
-  const elevated = await validateElevatedSession(csToken)
+  const elevated = await validateElevatedSession(csToken, user)
   if (!elevated) {
     return {
       user: null,

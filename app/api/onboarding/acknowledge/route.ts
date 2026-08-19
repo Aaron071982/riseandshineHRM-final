@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
           artemisTrainingCompleted: true,
           backgroundCheckClearedAt: true,
           supervisionCountersignedAt: true,
+          fortyHourCourseCompleted: true,
         },
       })
       const done = completedStepNumbers(docs, completions, rbtFlags)

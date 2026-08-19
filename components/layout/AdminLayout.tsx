@@ -17,7 +17,6 @@ import {
   Moon,
   Monitor,
   CalendarClock,
-  CalendarDays,
   Settings,
   MessageCircle,
   Network,
@@ -55,7 +54,6 @@ const standardMainNav: NavItem[] = [
 const documentsNavItem: NavItem = { href: '/admin/documents', label: 'Documents', icon: FileText }
 
 const secondaryBaseWithoutDocs: NavItem[] = [
-  { href: '/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
@@ -137,7 +135,6 @@ export default function AdminLayout({
       top.push(payrollNavItem)
       top.push(billingNavItem)
     }
-    top.push({ href: '/schedule', label: 'Schedule', icon: CalendarDays })
     if (showDocumentsNav) {
       top.push(documentsNavItem)
     }

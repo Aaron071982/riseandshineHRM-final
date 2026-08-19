@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/auth'
 import { sendEmail, generateManualHireOnboardingEmail, EmailTemplateType } from '@/lib/email'
+import { FORTY_HOUR_RBT_COURSE_URL } from '@/lib/onboarding/catalog'
 
 /**
  * POST /api/admin/rbts/mark-hired-by-name
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
           { taskType: 'DOWNLOAD_DOC', title: 'HIPAA Patient Security', description: 'Review HIPAA patient safety guidelines from HHS', documentDownloadUrl: 'https://www.hhs.gov/hipaa/for-professionals/patient-safety/index.html', sortOrder: 3 },
           { taskType: 'DOWNLOAD_DOC', title: 'HIPAA Basics PDF', description: 'Download and review the HIPAA Basics for Providers document from CMS', documentDownloadUrl: 'https://www.cms.gov/files/document/mln909001-hipaa-basics-providers-privacy-security-breach-notification-rules.pdf', sortOrder: 4 },
           { taskType: 'DOWNLOAD_DOC', title: 'HIPAA IT Security Guide', description: 'Review the Guide to Privacy and Security of Electronic Health Information', documentDownloadUrl: 'https://www.healthit.gov/topic/health-it-resources/guide-privacy-security-electronic-health-information', sortOrder: 5 },
-          ...(needsFortyHourCourse ? [{ taskType: 'FORTY_HOUR_COURSE_CERTIFICATE', title: 'Complete 40-Hour RBT Course & Upload Certificate', description: 'Complete the 40-hour RBT training course and upload your certificate of completion', documentDownloadUrl: 'https://courses.autismpartnershipfoundation.org/offers/it285gs6/checkout', sortOrder: 6 }] : []),
+          ...(needsFortyHourCourse ? [{ taskType: 'FORTY_HOUR_COURSE_CERTIFICATE', title: 'Complete 40-Hour RBT Course & Upload Certificate', description: 'Complete the 40-hour RBT training course and upload your certificate of completion', documentDownloadUrl: FORTY_HOUR_RBT_COURSE_URL, sortOrder: 6 }] : []),
           {
             taskType: 'SOCIAL_SECURITY_DOCUMENT',
             title: 'Upload Social Security card',

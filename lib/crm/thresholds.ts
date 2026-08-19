@@ -27,8 +27,8 @@ export const TASK_OVERDUE_GRACE_HOURS = 0
 /** Days without parent contact before a LIVE client needs follow-up. */
 export const CONTACT_AGING_DAYS = 7
 
-/** Authorization expiry attention bands (days remaining), descending. */
-export const AUTH_EXPIRY_BANDS = [60, 30, 15, 7] as const
+/** Authorization/reassessment expiry attention bands (days remaining), descending. */
+export const AUTH_EXPIRY_BANDS = [45, 30, 14, 7, 0] as const
 
 export type AuthExpiryBand = (typeof AUTH_EXPIRY_BANDS)[number]
 

@@ -22,6 +22,8 @@ export const CS_SESSION_DURATION_MS = CS_SESSION_IDLE_MS
  */
 const DEFAULT_CLIENT_SERVICES_EMAILS = [
   PLATFORM_OWNER_EMAIL,
+  // CRM admin roster (does not require HRM ADMIN role)
+  'siyam@riseandshineaba.com',
   'kazi@siyam.nyc',
   'kazi@jamal.nyc',
   'kazi@riseandshineaba.com',
@@ -30,8 +32,8 @@ const DEFAULT_CLIENT_SERVICES_EMAILS = [
   'fadeen@riseandshineaba.com',
   'shazia@riseandshineaba.com',
   'afsana@riseandshineaba.com',
-  'afrin@riseandshineaba.com',
   'tisha@riseandshineaba.com',
+  'irsal@riseandshineaba.com',
 ] as const
 
 /** Any email containing these substrings also gets Client Services access. */

@@ -12,6 +12,7 @@ import {
   splitClientName,
 } from '@/lib/client-services/parse'
 import type { ServiceClientDocumentType } from '@prisma/client'
+import { softDeleteData } from '@/lib/crm/softDelete'
 
 export type ImportResult = {
   created: number
@@ -183,8 +184,9 @@ export async function importClientsMasterCsv(
         result.updated++
 
         // Replace BT assignments on re-import
-        await prisma.serviceClientBtAssignment.deleteMany({
-          where: { serviceClientId },
+        await prisma.serviceClientBtAssignment.updateMany({
+          where: { serviceClientId, deletedAt: null },
+          data: { ...softDeleteData(createdByUserId), status: 'ENDED' },
         })
       } else {
         const created = await prisma.serviceClient.create({

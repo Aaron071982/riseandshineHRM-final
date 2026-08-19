@@ -13,10 +13,12 @@ import { ActivityPanel } from '@/components/crm/ActivityPanel'
 import { AuthorizationPanel } from '@/components/crm/AuthorizationPanel'
 import { StaffingPanel } from '@/components/crm/StaffingPanel'
 import { SchedulePanel } from '@/components/crm/SchedulePanel'
-import { CommunicationsPanel } from '@/components/crm/CommunicationsPanel'
+import { EmailPanel } from '@/components/crm/EmailPanel'
 import { advanceStage, setStage } from '@/lib/crm/actions'
 import { REQUIREMENT_KEY_LABELS } from '@/lib/crm/stages'
+import type { CommTemplate } from '@prisma/client'
 import type { ClientCrmDetailData } from '@/lib/crm/loadClientDetail'
+import type { EmailSendContext } from '@/components/crm/EmailPanel'
 import type { ClientStage } from '@prisma/client'
 import { cn } from '@/lib/utils'
 
@@ -28,7 +30,7 @@ type TabId =
   | 'staffing'
   | 'authorization'
   | 'schedule'
-  | 'communications'
+  | 'email'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -38,10 +40,11 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'staffing', label: 'Staffing' },
   { id: 'authorization', label: 'Authorization' },
   { id: 'schedule', label: 'Schedule' },
-  { id: 'communications', label: 'Communications' },
+  { id: 'email', label: 'Email' },
 ]
 
 function resolveTab(value?: string | null): TabId {
+  if (value === 'communications') return 'email'
   if (value && TABS.some((t) => t.id === value)) return value as TabId
   return 'overview'
 }
@@ -68,9 +71,8 @@ export default function ClientCrmDetail({
     setTab(resolveTab(initialTab))
   }, [initialTab])
 
-  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours } =
+  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit } =
     data
-  const canEdit = true
 
   const blockedLabels = useMemo(
     () => gateError.map((k) => REQUIREMENT_KEY_LABELS[k] ?? k),
@@ -191,9 +193,12 @@ export default function ClientCrmDetail({
         )}
         {tab === 'requirements' && (
           <RequirementsPanel
+            clientId={client.id}
             requirements={client.requirements}
             currentStage={client.stage}
             canEdit={canEdit}
+            consent={client.consent}
+            referralCheck={client.referralCheck}
           />
         )}
         {tab === 'notes' && (
@@ -239,11 +244,13 @@ export default function ClientCrmDetail({
             canEdit={canEdit}
           />
         )}
-        {tab === 'communications' && (
-          <CommunicationsPanel
+        {tab === 'email' && (
+          <EmailPanel
             clientId={client.id}
+            parentEmail={client.parentEmail}
+            senderEmail={user.email}
             communications={client.communications}
-            canEdit={canEdit}
+            emailSend={emailSend}
           />
         )}
       </div>
@@ -253,12 +260,13 @@ export default function ClientCrmDetail({
   )
 }
 
-/** JSON-safe shape after server → client serialization. */
 export type SerializeClientDetail = {
   user: { id: string; email: string | null; fullAccess: boolean }
   daysInStage: number | null
   weeklyScheduleHours: number
   canOverrideStage: boolean
+  canEdit: boolean
   gate: { ok: boolean; blockedBy: string[] }
+  emailSend: EmailSendContext & { allowedTemplates: CommTemplate[] }
   client: ClientCrmDetailData['client']
 }

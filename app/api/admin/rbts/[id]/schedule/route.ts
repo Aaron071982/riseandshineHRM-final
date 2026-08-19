@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/auth'
-import { mergeAssignments, rosterAssignmentsForRbt } from '@/lib/rbt-schedule/from-roster'
 import { validateAssignmentTimes, type ScheduleAssignmentDTO } from '@/lib/rbt-schedule/utils'
 
 export const dynamic = 'force-dynamic'
@@ -32,30 +31,23 @@ export async function GET(
     orderBy: [{ periodEnd: 'desc' }, { createdAt: 'desc' }],
   })
 
-  const [nativeRows, roster] = await Promise.all([
-    prisma.rbtScheduleAssignment.findMany({
-      where: {
-        rbtProfileId: id,
-        isActive: true,
-        ...(latest
-          ? {
-              OR: [
-                { periodStart: latest.periodStart, periodEnd: latest.periodEnd },
-                { source: 'MANUAL', periodStart: null, periodEnd: null },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
-    }),
-    rosterAssignmentsForRbt({
-      id: profile.id,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      email: profile.email,
-      userEmail: profile.user?.email,
-    }),
-  ])
+  const nativeRows = await prisma.rbtScheduleAssignment.findMany({
+    where: {
+      rbtProfileId: id,
+      isActive: true,
+      deletedAt: null,
+      reviewStatus: { in: ['NONE', 'CONFIRMED'] },
+      ...(latest
+        ? {
+            OR: [
+              { periodStart: latest.periodStart, periodEnd: latest.periodEnd },
+              { source: 'MANUAL', periodStart: null, periodEnd: null },
+            ],
+          }
+        : {}),
+    },
+    orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+  })
 
   const native: ScheduleAssignmentDTO[] = nativeRows.map((a) => ({
     id: a.id,
@@ -69,7 +61,7 @@ export async function GET(
     isActive: a.isActive,
   }))
 
-  return NextResponse.json({ assignments: mergeAssignments(native, roster) })
+  return NextResponse.json({ assignments: native })
 }
 
 export async function POST(

@@ -42,7 +42,7 @@ export default async function AdminLayoutWrapper({
       showOperationsNav={isOperationsViewer(user)}
       showDocumentsNav={canAccessDocumentsEmail(user.email)}
       showClientServicesNav={await canAccessClientServices(user)}
-      showScheduleNav
+      showScheduleNav={false}
       isExecutive={isExecutiveAdmin(user)}
     >
       {children}

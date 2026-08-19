@@ -22,6 +22,7 @@ import {
   CRM_ROLE_TO_OWNER_DEPT,
   OWNER_DEPT_TO_CRM_ROLE,
 } from '@/lib/crm/roleConstants'
+import { NOT_DELETED } from '@/lib/crm/softDelete'
 
 export {
   CRM_DEPARTMENT_ROLES,
@@ -119,6 +120,26 @@ export function ownerDeptsForUser(
 }
 
 /**
+ * Next.js implements redirect()/notFound() as thrown errors. Catch-all
+ * `fail()` helpers in server actions must rethrow them or the UI shows
+ * "Something went wrong" instead of following the redirect.
+ */
+export function rethrowIfNextControlFlow(err: unknown): void {
+  if (
+    typeof err !== 'object' ||
+    err === null ||
+    !('digest' in err) ||
+    typeof (err as { digest: unknown }).digest !== 'string'
+  ) {
+    return
+  }
+  const digest = (err as { digest: string }).digest
+  if (digest.startsWith('NEXT_REDIRECT') || digest.startsWith('NEXT_NOT_FOUND')) {
+    throw err
+  }
+}
+
+/**
  * Resolves the current user from the Client Services elevated session.
  * Redirects to login / elevate gate when missing.
  */
@@ -131,8 +152,12 @@ export async function getClientServicesUser(): Promise<CrmUser> {
   if (!base) redirect('/login')
 
   const csToken = cookieStore.get(CS_SESSION_COOKIE)?.value
-  const elevated = await validateElevatedSession(csToken)
-  if (!elevated) redirect('/client-services')
+  const elevated = await validateElevatedSession(csToken, base)
+  // Never redirect to /client-services — this function is also called while
+  // rendering that route. A self-redirect loops HandleRedirect and blanks the page.
+  if (!elevated) {
+    throw new CrmAccessError('Client Services step-up required', 401)
+  }
 
   const crmRoles = await fetchUserCrmRoles(elevated.id)
   const subject: CrmAccessSubject = {
@@ -149,95 +174,70 @@ export async function getClientServicesUser(): Promise<CrmUser> {
   }
 }
 
+/** Pages under the CS layout: render nothing so ElevateGate can show. */
+export async function getClientServicesPageUser(): Promise<CrmUser | null> {
+  try {
+    return await getClientServicesUser()
+  } catch (err) {
+    if (err instanceof CrmAccessError && err.status === 401) return null
+    throw err
+  }
+}
+
 /**
- * Prisma `where` for every client list/detail query.
- * - full-access → {}
- * - department member → owned cases plus stage-based cross-listed work
- * - CASE_COORDINATION → own caseload as well
- * - no CRM role and not allowlisted → deny-all
+ * Prisma `where` for the Clients tab / caseload.
+ * - full-access → all live (not deleted) clients
+ * - everyone else → clients they have ever claimed (including released grants)
+ * - no grant + not full-access → deny-all
  */
 export function getVisibleClientsWhere(
   user: CrmAccessSubject
 ): Prisma.ServiceClientWhereInput {
-  if (isFullAccess(user)) return {}
-
-  const roles = getUserCrmRoles(user)
-  const depts = ownerDeptsForUser(user)
-  const hasCaseCoordination = roles.includes('CASE_COORDINATION')
-
-  if (depts.length === 0 && !hasCaseCoordination) {
-    // No department visibility and not full-access → see nothing.
-    // (Allowlist break-glass already returned {} above.)
-    return { id: { in: [] } }
+  if (isFullAccess(user)) return { ...NOT_DELETED }
+  if (!user.id) return { id: { in: [] } }
+  return {
+    AND: [{ ...NOT_DELETED }, { claims: { some: { userId: user.id } } }],
   }
-
-  const or: Prisma.ServiceClientWhereInput[] = []
-  if (depts.length > 0) {
-    or.push({ currentOwnerDept: { in: depts } })
-  }
-  if (roles.includes('STAFFING')) {
-    or.push({ stage: 'APPROVED', pipelineStatus: 'LIVE' })
-  }
-  if (hasCaseCoordination) {
-    or.push({ stage: 'RBT_SEARCH', pipelineStatus: 'LIVE' })
-    or.push({ caseCoordinatorUserId: user.id })
-  }
-
-  return or.length === 1 ? or[0]! : { OR: or }
 }
 
+export type ClientAccessSnapshot = {
+  caseCoordinatorUserId: string | null
+  currentOwnerDept?: ClientOwnerDept | null
+  stage?: ClientStage
+  pipelineStatus?: ClientPipelineStatus
+  /** Any client_claims row for this user (including released). */
+  hasClaimGrant?: boolean
+}
+
+/**
+ * View = full-visibility OR an ever-claim grant.
+ * A department role alone is not enough to open a profile.
+ */
 export function canViewClientRecord(
   user: CrmAccessSubject,
-  client: {
-    caseCoordinatorUserId: string | null
-    currentOwnerDept?: ClientOwnerDept | null
-    stage?: ClientStage
-    pipelineStatus?: ClientPipelineStatus
-  }
+  client: ClientAccessSnapshot
 ): boolean {
   if (isFullAccess(user)) return true
+  return client.hasClaimGrant === true
+}
 
-  const roles = getUserCrmRoles(user)
-  const depts = ownerDeptsForUser(user)
+/**
+ * Act = view access AND (full-visibility, assigned CC, or role for the
+ * department that currently owns the client).
+ */
+export function canEditClientRecord(
+  user: CrmAccessSubject,
+  client: ClientAccessSnapshot
+): boolean {
+  if (isFullAccess(user)) return true
+  if (!canViewClientRecord(user, client)) return false
   if (
-    client.currentOwnerDept &&
-    depts.includes(client.currentOwnerDept)
-  ) {
-    return true
-  }
-  if (
-    (client.pipelineStatus == null || client.pipelineStatus === 'LIVE') &&
-    roles.includes('STAFFING') &&
-    client.stage === 'APPROVED'
-  ) {
-    return true
-  }
-  if (
-    (client.pipelineStatus == null || client.pipelineStatus === 'LIVE') &&
-    roles.includes('CASE_COORDINATION') &&
-    client.stage === 'RBT_SEARCH'
-  ) {
-    return true
-  }
-  if (
-    roles.includes('CASE_COORDINATION') &&
+    getUserCrmRoles(user).includes('CASE_COORDINATION') &&
     client.caseCoordinatorUserId === user.id
   ) {
     return true
   }
-  return false
-}
-
-export function canEditClientRecord(
-  user: CrmAccessSubject,
-  client: {
-    caseCoordinatorUserId: string | null
-    currentOwnerDept?: ClientOwnerDept | null
-    stage?: ClientStage
-    pipelineStatus?: ClientPipelineStatus
-  }
-): boolean {
-  return canViewClientRecord(user, client)
+  return canActAsOwningDepartment(user, client.currentOwnerDept ?? null)
 }
 
 export async function assertCanViewClient(
@@ -249,17 +249,40 @@ export async function assertCanViewClient(
   currentOwnerDept: ClientOwnerDept | null
 }> {
   const client = await prisma.serviceClient.findFirst({
-    where: { id: clientId, ...getVisibleClientsWhere(user) },
+    where: { id: clientId, ...NOT_DELETED },
     select: {
       id: true,
       caseCoordinatorUserId: true,
       currentOwnerDept: true,
+      claims: {
+        where: { userId: user.id },
+        select: { id: true },
+        take: 1,
+      },
     },
   })
   if (!client) {
     throw new CrmAccessError('Forbidden', 403)
   }
-  return client
+  if (
+    !canViewClientRecord(user, {
+      caseCoordinatorUserId: client.caseCoordinatorUserId,
+      currentOwnerDept: client.currentOwnerDept,
+      hasClaimGrant: client.claims.length > 0,
+    })
+  ) {
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'PROFILE_DENIED',
+    })
+    throw new CrmAccessError('Forbidden', 403)
+  }
+  return {
+    id: client.id,
+    caseCoordinatorUserId: client.caseCoordinatorUserId,
+    currentOwnerDept: client.currentOwnerDept,
+  }
 }
 
 export async function assertCanEditClient(
@@ -270,7 +293,46 @@ export async function assertCanEditClient(
   caseCoordinatorUserId: string | null
   currentOwnerDept: ClientOwnerDept | null
 }> {
-  return assertCanViewClient(user, clientId)
+  const client = await prisma.serviceClient.findFirst({
+    where: { id: clientId, ...NOT_DELETED },
+    select: {
+      id: true,
+      caseCoordinatorUserId: true,
+      currentOwnerDept: true,
+      claims: {
+        where: { userId: user.id },
+        select: { id: true, releasedAt: true },
+        take: 5,
+      },
+    },
+  })
+  if (!client) {
+    throw new CrmAccessError('Forbidden', 403)
+  }
+  const snapshot: ClientAccessSnapshot = {
+    caseCoordinatorUserId: client.caseCoordinatorUserId,
+    currentOwnerDept: client.currentOwnerDept,
+    hasClaimGrant: client.claims.length > 0,
+  }
+  if (!canViewClientRecord(user, snapshot)) {
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'PROFILE_DENIED',
+    })
+    throw new CrmAccessError('Forbidden', 403)
+  }
+  if (!canEditClientRecord(user, snapshot)) {
+    throw new CrmAccessError(
+      'View-only — this client is not currently owned by your department',
+      403
+    )
+  }
+  return {
+    id: client.id,
+    caseCoordinatorUserId: client.caseCoordinatorUserId,
+    currentOwnerDept: client.currentOwnerDept,
+  }
 }
 
 /** Server-side guard for Admin Management — throws CrmAccessError. */
@@ -280,6 +342,16 @@ export async function assertCrmSuperAdmin(
   if (!isSuperAdmin(user)) {
     throw new CrmAccessError('Super-admin access required', 403)
   }
+}
+
+/**
+ * Weekly schedule board + import: staffing, case-coordination, or full-access.
+ * Intake/clinical/auth/billing do not get the board unless they also hold one of those.
+ */
+export function canAccessCrmSchedule(user: CrmAccessSubject): boolean {
+  if (isFullAccess(user)) return true
+  const roles = getUserCrmRoles(user)
+  return roles.includes('STAFFING') || roles.includes('CASE_COORDINATION')
 }
 
 /** True if user may open a department queue page for `dept`. */

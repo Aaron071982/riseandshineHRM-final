@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
+  CalendarDays,
   ClipboardList,
   FolderOpen,
   LayoutDashboard,
@@ -14,12 +15,15 @@ import {
 import AppShell from '@/components/shell/AppShell'
 import type { ShellNavItem } from '@/components/shell/AppSidebar'
 
+const EMPTY_MORE: ShellNavItem[] = []
+
 export default function ClientServicesLayout({
   children,
   userName,
   elevated,
   showAdmin = false,
   showTherapistSearch = false,
+  showScheduleNav = false,
   departmentNav = [],
 }: {
   children: React.ReactNode
@@ -27,6 +31,7 @@ export default function ClientServicesLayout({
   elevated: boolean
   showAdmin?: boolean
   showTherapistSearch?: boolean
+  showScheduleNav?: boolean
   departmentNav?: { href: string; label: string }[]
 }) {
   const pathname = usePathname()
@@ -34,28 +39,40 @@ export default function ClientServicesLayout({
   const [needsAction, setNeedsAction] = useState(0)
   const [search, setSearch] = useState('')
 
-  const CS_NAV: ShellNavItem[] = [
-    { href: '/client-services', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/client-services/clients', label: 'Clients', icon: Users },
-    ...departmentNav.map((d) => ({
-      href: d.href,
-      label: d.label,
-      icon: d.href.includes('case-coordination') ? ClipboardList : FolderOpen,
-    })),
-    ...(showTherapistSearch
-      ? [
-          {
-            href: '/client-services/therapist-search',
-            label: 'Therapist Search',
-            icon: SearchIcon,
-          },
-        ]
-      : []),
-    { href: '/client-services/process', label: 'Process map', icon: Network },
-    ...(showAdmin
-      ? ([{ href: '/client-services/admin', label: 'Admin', icon: Shield }] as ShellNavItem[])
-      : []),
-  ]
+  const CS_NAV: ShellNavItem[] = useMemo(
+    () => [
+      { href: '/client-services', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/client-services/clients', label: 'Clients', icon: Users },
+      ...departmentNav.map((d) => ({
+        href: d.href,
+        label: d.label,
+        icon: d.href.includes('case-coordination') ? ClipboardList : FolderOpen,
+      })),
+      ...(showTherapistSearch
+        ? [
+            {
+              href: '/client-services/therapist-search',
+              label: 'Therapist Search',
+              icon: SearchIcon,
+            },
+          ]
+        : []),
+      ...(showScheduleNav
+        ? [
+            {
+              href: '/client-services/schedule',
+              label: 'Schedule',
+              icon: CalendarDays,
+            },
+          ]
+        : []),
+      { href: '/client-services/process', label: 'Process map', icon: Network },
+      ...(showAdmin
+        ? ([{ href: '/client-services/admin', label: 'Admin', icon: Shield }] as ShellNavItem[])
+        : []),
+    ],
+    [departmentNav, showAdmin, showTherapistSearch, showScheduleNav]
+  )
 
   useEffect(() => {
     if (!elevated) return
@@ -75,7 +92,7 @@ export default function ClientServicesLayout({
     return () => {
       cancelled = true
     }
-  }, [elevated, pathname])
+  }, [elevated])
 
   const exitSection = async () => {
     await fetch('/api/client-services/auth/elevate', {
@@ -96,6 +113,7 @@ export default function ClientServicesLayout({
   const onTherapistSearch = pathname.startsWith(
     '/client-services/therapist-search'
   )
+  const onSchedule = pathname.startsWith('/client-services/schedule')
   const onProcess = pathname.startsWith('/client-services/process')
   const deptCrumb = onDept
     ? departmentNav.find((d) => pathname.startsWith(d.href))?.label ?? 'Department'
@@ -125,6 +143,12 @@ export default function ClientServicesLayout({
               { label: 'Admin', href: '/admin/dashboard' },
               { label: 'Client Services', href: '/client-services' },
               { label: 'Therapist Search' },
+            ]
+          : onSchedule
+          ? [
+              { label: 'Admin', href: '/admin/dashboard' },
+              { label: 'Client Services', href: '/client-services' },
+              { label: 'Schedule' },
             ]
           : onProcess
           ? [
@@ -158,7 +182,7 @@ export default function ClientServicesLayout({
       crumbs={crumbs}
       needsActionCount={needsAction}
       navItems={CS_NAV}
-      moreItems={[]}
+      moreItems={EMPTY_MORE}
       restricted
       onExit={exitSection}
       exitLabel="Back to Admin"

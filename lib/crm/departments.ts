@@ -4,11 +4,20 @@ import { prisma } from '@/lib/prisma'
 import {
   getVisibleClientsWhere,
   isFullAccess,
+  isSuperAdmin,
   auditClientAction,
   type CrmAccessSubject,
 } from '@/lib/crm/access'
 import { daysInStage, isStalled } from '@/lib/crm/thresholds'
 import { OWNER_DEPT_LABELS } from '@/lib/crm/stages'
+import {
+  CLAIMABLE_POOL_SELECT,
+  isReadyForCoordination,
+  noActiveDeptClaimWhere,
+  toClaimablePoolRow,
+  type ClaimablePoolRow,
+} from '@/lib/crm/claims'
+import { NOT_DELETED } from '@/lib/crm/softDelete'
 
 export type DeptSlug =
   | 'intake'
@@ -30,7 +39,7 @@ export const DEPT_SLUGS: readonly DeptSlug[] = [
 export const DEPT_SLUG_TO_OWNER: Record<DeptSlug, ClientOwnerDept> = {
   intake: 'INTAKE',
   clinical: 'CLINICAL',
-  authorization: 'AUTHORIZATION',
+  authorization: 'BILLING',
   staffing: 'STAFFING',
   'case-coordination': 'CASE_COORDINATION',
   billing: 'BILLING',
@@ -48,7 +57,7 @@ export const OWNER_TO_DEPT_SLUG: Record<ClientOwnerDept, DeptSlug> = {
 export const DEPT_SLUG_TO_CRM_ROLE: Record<DeptSlug, CrmRole> = {
   intake: 'INTAKE',
   clinical: 'CLINICAL',
-  authorization: 'AUTHORIZATION',
+  authorization: 'BILLING',
   staffing: 'STAFFING',
   'case-coordination': 'CASE_COORDINATION',
   billing: 'BILLING',
@@ -76,22 +85,36 @@ export type DepartmentQueueRow = {
   currentOwnerUserId: string | null
   caseCoordinatorUserId: string | null
   ownerName: string | null
+  coordinatorName: string | null
   nextAction: string | null
   nextActionDueAt: string | null
   daysInStage: number
   stalled: boolean
   rbtTargetDate: string | null
+  billingSubstep: string | null
+}
+
+export type CoordinatorGroup = {
+  userId: string
+  name: string
+  upcoming: DepartmentQueueRow[]
+  ready: DepartmentQueueRow[]
 }
 
 export type DepartmentQueueData = {
   dept: ClientOwnerDept
   slug: DeptSlug
   label: string
-  unclaimed: DepartmentQueueRow[]
+  /** Name + current stage only. No other PHI. */
+  unclaimed: ClaimablePoolRow[]
   claimed: DepartmentQueueRow[]
-  /** Case Coordination only — personal worklist. */
-  myCaseload: DepartmentQueueRow[] | null
+  upcoming: DepartmentQueueRow[] | null
+  ready: DepartmentQueueRow[] | null
+  unassignedCc: ClaimablePoolRow[] | null
+  coordinatorGroups: CoordinatorGroup[] | null
+  caseCoordinators: { id: string; name: string | null; email: string | null }[] | null
   canManage: boolean
+  canAssignCc: boolean
   viewerUserId: string
 }
 
@@ -110,6 +133,11 @@ function mapRow(
     nextActionDueAt: Date | null
     rbtTargetDate: Date | null
     currentOwnerUser: { name: string | null; email: string | null } | null
+    caseCoordinatorUser: { name: string | null; email: string | null } | null
+    authorizations: {
+      authType: 'ASSESSMENT' | 'TREATMENT'
+      status: 'REQUESTED' | 'PENDING' | 'APPROVED' | 'DENIED' | 'EXPIRED'
+    }[]
   }
 ): DepartmentQueueRow {
   const aging = {
@@ -117,6 +145,21 @@ function mapRow(
     stageEnteredAt: c.stageEnteredAt,
     rbtTargetDate: c.rbtTargetDate,
   }
+  const hasVob = Boolean(
+    c.authorizations.find((a) => a.authType === 'ASSESSMENT' && a.status === 'APPROVED')
+  )
+  const treatment = c.authorizations.find((a) => a.authType === 'TREATMENT')
+  let billingSubstep: string | null = null
+  if (c.currentOwnerDept === 'BILLING') {
+    if (!hasVob || c.stage === 'BENEFITS') billingSubstep = 'Needs VOB'
+    else if (!treatment && c.stage === 'AUTHORIZATION') billingSubstep = 'VOB done / needs PA'
+    else if (treatment?.status === 'REQUESTED' || treatment?.status === 'PENDING')
+      billingSubstep = 'PA submitted / waiting'
+    else if (treatment?.status === 'APPROVED') billingSubstep = 'PA approved'
+    else if (treatment?.status === 'DENIED' || treatment?.status === 'EXPIRED')
+      billingSubstep = 'Denied/problem'
+  }
+
   return {
     id: c.id,
     clientCode: c.clientCode,
@@ -128,11 +171,14 @@ function mapRow(
     caseCoordinatorUserId: c.caseCoordinatorUserId,
     ownerName:
       c.currentOwnerUser?.name ?? c.currentOwnerUser?.email ?? null,
+    coordinatorName:
+      c.caseCoordinatorUser?.name ?? c.caseCoordinatorUser?.email ?? null,
     nextAction: c.nextAction,
     nextActionDueAt: c.nextActionDueAt?.toISOString() ?? null,
     daysInStage: daysInStage(aging),
     stalled: isStalled(aging),
     rbtTargetDate: c.rbtTargetDate?.toISOString().slice(0, 10) ?? null,
+    billingSubstep,
   }
 }
 
@@ -150,6 +196,13 @@ const queueSelect = {
   nextActionDueAt: true,
   rbtTargetDate: true,
   currentOwnerUser: { select: { name: true, email: true } },
+  caseCoordinatorUser: { select: { name: true, email: true } },
+  authorizations: {
+    where: { deletedAt: null },
+    orderBy: { createdAt: 'desc' },
+    select: { authType: true, status: true },
+    take: 6,
+  },
 } as const
 
 async function loadRows(
@@ -164,34 +217,30 @@ async function loadRows(
   return clients.map(mapRow)
 }
 
+async function loadClaimablePool(
+  where: Prisma.ServiceClientWhereInput
+): Promise<ClaimablePoolRow[]> {
+  const rows = await prisma.serviceClient.findMany({
+    where,
+    select: CLAIMABLE_POOL_SELECT,
+    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    take: 500,
+  })
+  return rows.map(toClaimablePoolRow)
+}
+
 /**
- * A department keeps ownership of its normal queue while selected downstream
- * teams get an early, read-only view of work they can begin in parallel.
+ * Department work-surface membership: currently owned by this department.
+ * Phase-8 cross-listing (staffing seeing APPROVED, CC seeing RBT_SEARCH) is gone.
  */
 export function getDepartmentQueueMembershipWhere(
   dept: ClientOwnerDept
 ): Prisma.ServiceClientWhereInput {
-  if (dept === 'STAFFING') {
-    return {
-      pipelineStatus: 'LIVE',
-      OR: [
-        { currentOwnerDept: 'STAFFING' },
-        { currentOwnerDept: 'AUTHORIZATION', stage: 'APPROVED' },
-      ],
-    }
-  }
-
-  if (dept === 'CASE_COORDINATION') {
-    return {
-      pipelineStatus: 'LIVE',
-      OR: [
-        { currentOwnerDept: 'CASE_COORDINATION' },
-        { currentOwnerDept: 'STAFFING', stage: 'RBT_SEARCH' },
-      ],
-    }
-  }
-
   return { currentOwnerDept: dept, pipelineStatus: 'LIVE' }
+}
+
+function canAssignCc(user: CrmAccessSubject): boolean {
+  return isFullAccess(user) || isSuperAdmin(user)
 }
 
 export async function loadDepartmentQueue(
@@ -199,44 +248,127 @@ export async function loadDepartmentQueue(
   slug: DeptSlug
 ): Promise<DepartmentQueueData> {
   const dept = DEPT_SLUG_TO_OWNER[slug]
-  const scope = getVisibleClientsWhere(user)
+  const manage = isFullAccess(user)
+  const assignCc = canAssignCc(user)
 
-  const deptWhere: Prisma.ServiceClientWhereInput = {
-    AND: [scope, getDepartmentQueueMembershipWhere(dept)],
+  const empty: DepartmentQueueData = {
+    dept,
+    slug,
+    label: deptLabel(slug),
+    unclaimed: [],
+    claimed: [],
+    upcoming: null,
+    ready: null,
+    unassignedCc: null,
+    coordinatorGroups: null,
+    caseCoordinators: null,
+    canManage: manage,
+    canAssignCc: assignCc,
+    viewerUserId: user.id,
   }
 
-  const rows = await loadRows(deptWhere)
-  const unclaimed = rows.filter((r) => !r.currentOwnerUserId)
-  const claimed = rows.filter((r) => !!r.currentOwnerUserId)
-
-  let myCaseload: DepartmentQueueRow[] | null = null
   if (slug === 'case-coordination') {
-    myCaseload = await loadRows({
-      AND: [
-        scope,
-        {
-          OR: [
-            { caseCoordinatorUserId: user.id },
-            { currentOwnerUserId: user.id },
-          ],
-        },
-      ],
-    })
+    return loadCaseCoordinationQueue(user, empty)
   }
+
+  const membership = getDepartmentQueueMembershipWhere(dept)
+  const unclaimed = await loadClaimablePool({
+    AND: [{ ...NOT_DELETED }, membership, { currentOwnerUserId: null }, noActiveDeptClaimWhere()],
+  })
+
+  const claimedWhere: Prisma.ServiceClientWhereInput = manage
+    ? { AND: [{ ...NOT_DELETED }, membership, { currentOwnerUserId: { not: null } }] }
+    : {
+        AND: [
+          { ...NOT_DELETED },
+          membership,
+          { claims: { some: { userId: user.id, releasedAt: null } } },
+        ],
+      }
+
+  const claimed = await loadRows(claimedWhere)
 
   await auditClientAction({
     userId: user.id,
     action: `DEPT_QUEUE_VIEW:${dept}`,
   })
 
+  return { ...empty, unclaimed, claimed }
+}
+
+async function loadCaseCoordinationQueue(
+  user: CrmAccessSubject & { id: string },
+  base: DepartmentQueueData
+): Promise<DepartmentQueueData> {
+  const assignedWhere: Prisma.ServiceClientWhereInput = canAssignCc(user)
+    ? { AND: [{ ...NOT_DELETED }, { pipelineStatus: 'LIVE' }, { caseCoordinatorUserId: { not: null } }] }
+    : {
+        AND: [
+          { ...NOT_DELETED },
+          { pipelineStatus: 'LIVE' },
+          { caseCoordinatorUserId: user.id },
+        ],
+      }
+
+  const assigned = await loadRows(assignedWhere)
+  const upcoming = assigned.filter((r) => !isReadyForCoordination(r.stage))
+  const ready = assigned.filter((r) => isReadyForCoordination(r.stage))
+
+  let coordinatorGroups: CoordinatorGroup[] | null = null
+  let unassignedCc: ClaimablePoolRow[] | null = null
+  let caseCoordinators: DepartmentQueueData['caseCoordinators'] = null
+
+  if (canAssignCc(user)) {
+    const byCc = new Map<string, CoordinatorGroup>()
+    for (const row of assigned) {
+      const id = row.caseCoordinatorUserId ?? 'unknown'
+      const name = row.coordinatorName ?? 'Unnamed coordinator'
+      const group = byCc.get(id) ?? { userId: id, name, upcoming: [], ready: [] }
+      if (isReadyForCoordination(row.stage)) group.ready.push(row)
+      else group.upcoming.push(row)
+      byCc.set(id, group)
+    }
+    coordinatorGroups = [...byCc.values()].sort((a, b) => a.name.localeCompare(b.name))
+
+    unassignedCc = await loadClaimablePool({
+      AND: [
+        { ...NOT_DELETED },
+        { pipelineStatus: 'LIVE' },
+        { caseCoordinatorUserId: null },
+        {
+          OR: [
+            { currentOwnerDept: 'CASE_COORDINATION' },
+            { stage: { in: ['RBT_ASSIGNED', 'SCHEDULE_COORDINATION', 'SCHEDULE_CONFIRMED', 'PRE_START', 'ACTIVE'] } },
+          ],
+        },
+      ],
+    })
+
+    caseCoordinators = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        crmRoles: { some: { revokedAt: null, role: 'CASE_COORDINATION' } },
+      },
+      select: { id: true, name: true, email: true },
+      orderBy: [{ name: 'asc' }, { email: 'asc' }],
+      take: 100,
+    })
+  }
+
+  await auditClientAction({
+    userId: user.id,
+    action: 'DEPT_QUEUE_VIEW:CASE_COORDINATION',
+  })
+
   return {
-    dept,
-    slug,
-    label: deptLabel(slug),
-    unclaimed,
-    claimed,
-    myCaseload,
-    canManage: isFullAccess(user),
-    viewerUserId: user.id,
+    ...base,
+    upcoming,
+    ready,
+    unassignedCc,
+    coordinatorGroups,
+    caseCoordinators,
   }
 }
+
+/** Kept for callers that still compose with getVisibleClientsWhere. */
+export { getVisibleClientsWhere }

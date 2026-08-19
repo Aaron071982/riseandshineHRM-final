@@ -1,16 +1,19 @@
 import {
-  getClientServicesUser,
+  getClientServicesPageUser,
   isSuperAdmin,
 } from '@/lib/crm/access'
 import { bootstrapCrmSuperAdmins } from '@/lib/crm/bootstrapRoles'
 import AdminManagementClient from '@/components/crm/AdminManagementClient'
+import DeletedFamiliesPanel from '@/components/crm/DeletedFamiliesPanel'
+import BoardMigrationReviewPanel from '@/components/crm/BoardMigrationReviewPanel'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ClientServicesAdminPage() {
   await bootstrapCrmSuperAdmins()
 
-  const user = await getClientServicesUser()
+  const user = await getClientServicesPageUser()
+  if (!user) return null
   if (!isSuperAdmin(user)) {
     return (
       <div className="mx-auto max-w-lg rounded-xl border border-[var(--urgent)] bg-[var(--urgent-bg)] px-5 py-8 text-center">
@@ -26,5 +29,11 @@ export default async function ClientServicesAdminPage() {
     )
   }
 
-  return <AdminManagementClient />
+  return (
+    <div className="space-y-8">
+      <AdminManagementClient />
+      <BoardMigrationReviewPanel />
+      <DeletedFamiliesPanel />
+    </div>
+  )
 }

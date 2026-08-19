@@ -1,7 +1,7 @@
 import {
   assertCanAccessDepartment,
   CrmAccessError,
-  getClientServicesUser,
+  getClientServicesPageUser,
 } from '@/lib/crm/access'
 import {
   DEPT_SLUG_TO_OWNER,
@@ -21,7 +21,8 @@ export default async function DepartmentQueuePage({
   const { slug } = await params
   if (!isDeptSlug(slug)) notFound()
 
-  const user = await getClientServicesUser()
+  const user = await getClientServicesPageUser()
+  if (!user) return null
   const dept = DEPT_SLUG_TO_OWNER[slug]
 
   try {

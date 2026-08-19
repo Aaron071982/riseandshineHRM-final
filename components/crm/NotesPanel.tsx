@@ -18,6 +18,7 @@ import {
 } from '@/lib/crm/actions'
 import { NY_BOROUGHS } from '@/lib/client-services/constants'
 import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
+import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { cn } from '@/lib/utils'
 
 const REFERRAL_SOURCES: ClientReferralSource[] = [
@@ -140,6 +141,7 @@ export function NotesPanel({
   const [channel, setChannel] = useState<CommChannel>('PHONE')
   const [pipeline, setPipeline] = useState(pipelineStatus)
   const [reason, setReason] = useState('')
+  const [confirmPipeline, setConfirmPipeline] = useState(false)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState('')
 
@@ -178,6 +180,14 @@ export function NotesPanel({
   }
 
   const submitPipeline = () => {
+    if (pipeline === 'DISCHARGED' || pipeline === 'LOST') {
+      setConfirmPipeline(true)
+      return
+    }
+    runPipelineUpdate()
+  }
+
+  const runPipelineUpdate = () => {
     startTransition(async () => {
       setError('')
       const res = await setPipelineStatus(clientId, pipeline, reason)
@@ -186,6 +196,7 @@ export function NotesPanel({
         return
       }
       setReason('')
+      setConfirmPipeline(false)
       router.refresh()
     })
   }
@@ -235,6 +246,24 @@ export function NotesPanel({
           )}
         </div>
       </section>
+
+      <ConfirmDestructiveDialog
+        open={confirmPipeline}
+        onOpenChange={setConfirmPipeline}
+        title={
+          pipeline === 'LOST'
+            ? 'Mark this family LOST?'
+            : 'Discharge this family?'
+        }
+        description={
+          pipeline === 'LOST'
+            ? `Set pipeline status to LOST for this family record.\n\nThe journey stage is not reset. This writes an audit log (actor, action, family, time).`
+            : `Set pipeline status to DISCHARGED for this family record.\n\nThe journey stage is not reset. This writes an audit log (actor, action, family, time).`
+        }
+        confirmLabel={pipeline === 'LOST' ? 'Mark LOST' : 'Discharge'}
+        pending={pending}
+        onConfirm={runPipelineUpdate}
+      />
 
       <section className="rounded-xl border border-line bg-surface p-4">
         <h3 className="font-display text-base font-semibold text-ink">Log parent contact</h3>

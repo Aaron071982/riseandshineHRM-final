@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { NOT_DELETED } from '@/lib/crm/softDelete'
 import { namesMatch, normalizeName } from '@/lib/rbt-schedule/from-roster'
 import {
   getClientSchedulePeriod,
@@ -71,12 +72,14 @@ export async function resolveScheduleClientLinks(): Promise<{
   unmatchedNames: string[]
 }> {
   const clients = await prisma.serviceClient.findMany({
+    where: { ...NOT_DELETED },
     select: { id: true, firstName: true, lastName: true },
   })
 
   const names = await prisma.rbtScheduleAssignment.findMany({
     where: {
       isActive: true,
+      deletedAt: null,
       OR: [{ serviceClientId: null }, { serviceClientLinkManual: false }],
     },
     select: { clientName: true },

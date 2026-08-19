@@ -24,6 +24,9 @@ export type CaseloadRow = {
   rbtName: string | null
   rbtProfileId: string | null
   authExpirationDate: string | null
+  scheduledHoursPerWeek: number | null
+  authHours: number | null
+  insuranceProvider: string | null
 }
 
 const STAGE_TONE: Record<string, string> = {
@@ -143,8 +146,9 @@ export default function CaseloadTable({
                 <th className="px-3 py-2.5 font-medium">Owner</th>
                 <th className="px-3 py-2.5 font-medium">Next action</th>
                 <th className="px-3 py-2.5 font-medium">Due</th>
-                <th className="px-3 py-2.5 font-medium tabular-nums">Days</th>
+                <th className="px-3 py-2.5 font-medium">Insurance</th>
                 <th className="px-3 py-2.5 font-medium">RBT</th>
+                <th className="px-3 py-2.5 font-medium">Hours</th>
                 <th className="px-3 py-2.5 font-medium">Auth</th>
               </tr>
             </thead>
@@ -201,8 +205,8 @@ export default function CaseloadTable({
                         ? new Date(r.nextActionDueAt).toLocaleDateString()
                         : '—'}
                     </td>
-                    <td className="px-3 py-2.5 font-medium tabular-nums text-ink">
-                      {r.daysInStage}
+                    <td className="px-3 py-2.5 text-quiet">
+                      {r.insuranceProvider || '—'}
                     </td>
                     <td className="px-3 py-2.5">
                       {r.rbtProfileId ? (
@@ -215,6 +219,12 @@ export default function CaseloadTable({
                       ) : (
                         <span className="text-quiet">{r.rbtName || '—'}</span>
                       )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <HoursBar
+                        scheduled={r.scheduledHoursPerWeek}
+                        authorized={r.authHours}
+                      />
                     </td>
                     <td className="px-3 py-2.5">
                       {r.authExpirationDate ? (
@@ -262,6 +272,36 @@ export default function CaseloadTable({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function HoursBar({
+  scheduled,
+  authorized,
+}: {
+  scheduled: number | null
+  authorized: number | null
+}) {
+  const rec = scheduled ?? 0
+  const need = authorized
+  if (need == null && !scheduled) {
+    return <span className="text-quiet">—</span>
+  }
+  const pct = need && need > 0 ? Math.min(100, Math.round((rec / need) * 100)) : 0
+  const over = need != null && rec > need + 0.05
+  return (
+    <div className="min-w-[7rem]">
+      <div className="flex justify-between text-[11px] tabular-nums text-quiet">
+        <span>{rec.toFixed(1)}h</span>
+        <span>{need != null ? `/ ${need}h` : ''}</span>
+      </div>
+      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-line">
+        <div
+          className={cn('h-full rounded-full', over ? 'bg-[var(--urgent)]' : 'bg-brand')}
+          style={{ width: `${need ? pct : rec > 0 ? 100 : 0}%` }}
+        />
+      </div>
     </div>
   )
 }

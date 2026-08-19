@@ -21,12 +21,13 @@ import {
   type ServiceClientDocumentType,
   type ServiceClientStatus,
 } from '@prisma/client'
-import { assertDevTarget } from './seed-guard'
+import { assertWriteTarget } from './seed-guard'
 import {
   REQUIREMENT_KEY_LABELS,
   STAGE_DEFAULT_OWNER_DEPT,
   STAGE_GATE_REQUIREMENT_KEYS,
 } from '../lib/crm/stages'
+import { CANONICAL_DOCUMENTS, isDocumentRequired } from '../lib/crm/documents'
 
 faker.seed(20260813)
 
@@ -158,7 +159,12 @@ async function clearSynthetic() {
 }
 
 async function main() {
-  assertDevTarget()
+  const target = assertWriteTarget({ allowProd: false })
+  if (target.dryRun) {
+    console.log('Dry run — would clear SYNTH- / @example.com rows and re-seed.')
+    console.log('Pass --confirm to write (prisma db seed already does).')
+    return
+  }
   console.log('🌱 Synthetic seed starting (PHI-free)…')
 
   await clearSynthetic()
@@ -186,6 +192,21 @@ async function main() {
       isActive: true,
     },
   })
+
+  const { PHASE17_ROLE_TEST_USERS } = await import('../lib/crm/phase17TestUsers')
+  for (const u of PHASE17_ROLE_TEST_USERS) {
+    const row = await prisma.user.create({
+      data: {
+        name: u.name,
+        email: u.email,
+        role: 'ADMIN',
+        isActive: true,
+      },
+    })
+    await prisma.userCrmRole.create({
+      data: { userId: row.id, role: u.crmRole, grantedByUserId: admin.id },
+    })
+  }
 
   const bcbaUser = await prisma.user.create({
     data: {
@@ -971,19 +992,41 @@ async function main() {
     const gateKeys = STAGE_GATE_REQUIREMENT_KEYS[plan.stage]
     const reqRows = requirementStatusesForStage(plan.stage, gateKeys)
     for (const req of reqRows) {
+      const catalog = CANONICAL_DOCUMENTS.find((d) => d.key === req.key)
       const done = req.status === 'COMPLETE' || req.status === 'RECEIVED'
       await prisma.clientRequirement.create({
         data: {
           serviceClientId: client.id,
-          stage: plan.stage,
+          stage: catalog?.stage ?? plan.stage,
           key: req.key,
-          label: REQUIREMENT_KEY_LABELS[req.key] ?? req.key,
-          type: req.type,
+          label: catalog?.label ?? REQUIREMENT_KEY_LABELS[req.key] ?? req.key,
+          type: catalog?.type ?? req.type,
+          group: catalog?.group ?? 'STAGE',
           status: req.status,
-          isRequiredToAdvance: true,
+          isRequiredToAdvance: catalog
+            ? isDocumentRequired(catalog, client.insuranceProvider)
+            : true,
           completedAt: done ? faker.date.recent({ days: 30 }) : null,
           completedByUserId: done ? admin.id : null,
           notes: '[SYNTHETIC] gate requirement',
+        },
+      })
+    }
+
+    const existingKeys = new Set(reqRows.map((r) => r.key))
+    for (const doc of CANONICAL_DOCUMENTS) {
+      if (existingKeys.has(doc.key)) continue
+      await prisma.clientRequirement.create({
+        data: {
+          serviceClientId: client.id,
+          stage: doc.stage,
+          key: doc.key,
+          label: doc.label,
+          type: doc.type,
+          group: doc.group,
+          status: 'PENDING',
+          isRequiredToAdvance: isDocumentRequired(doc, client.insuranceProvider),
+          notes: '[SYNTHETIC] canonical document',
         },
       })
     }
@@ -1251,7 +1294,7 @@ async function main() {
   console.log('[crm-bootstrap]', boot)
 
   console.log(
-    'Login hint: admin@example.com (set CLIENT_SERVICES_FULL_ACCESS_EMAILS + CLIENT_SERVICES_ACCESS_CODE + ADMIN_FALLBACK_EMAIL in .env.development)'
+    'Login hint: admin@example.com, intake-only@example.com, clinical-only@example.com, cc-only@example.com, full-visibility@example.com — localhost OTP 123456. See docs/PHASE17_VERIFICATION.md'
   )
 }
 

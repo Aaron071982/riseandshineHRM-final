@@ -3,12 +3,18 @@ import { prisma } from '@/lib/prisma'
 import {
   assertCanViewClient,
   auditClientAction,
+  canEditClientRecord,
   getClientServicesUser,
   getVisibleClientsWhere,
   type CrmUser,
 } from '@/lib/crm/access'
 import { canAdvance, stageIndex } from '@/lib/crm/stages'
+import { isMedicaidPayer } from '@/lib/crm/documents'
+import { evaluateReferralValidity } from '@/lib/crm/referralValidity'
 import { hoursBetween } from '@/lib/rbt-schedule/utils'
+import { allowedTemplatesForUser } from '@/lib/crm/emails/templatePolicy'
+import { graphEmailEnabled } from '@/lib/crm/emails/graphSend'
+import { hasRiseAndShineMailbox, mailboxBlockedReason } from '@/lib/crm/emails/mailbox'
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
@@ -17,7 +23,15 @@ export async function loadClientCrmDetail(clientId: string) {
   const client = await prisma.serviceClient.findFirst({
     where: { id: clientId, ...getVisibleClientsWhere(user) },
     include: {
-      requirements: { orderBy: [{ stage: 'asc' }, { key: 'asc' }] },
+      requirements: {
+        where: { deletedAt: null },
+        orderBy: [{ stage: 'asc' }, { key: 'asc' }],
+        include: {
+          attestedByUser: { select: { id: true, name: true, email: true } },
+        },
+      },
+      consent: true,
+      referralCheck: true,
       statusHistory: {
         orderBy: { createdAt: 'desc' },
         take: 100,
@@ -26,6 +40,7 @@ export async function loadClientCrmDetail(clientId: string) {
         },
       },
       clientNotes: {
+        where: { deletedAt: null },
         orderBy: { createdAt: 'desc' },
         take: 100,
         include: {
@@ -43,10 +58,12 @@ export async function loadClientCrmDetail(clientId: string) {
         },
       },
       authorizations: {
+        where: { deletedAt: null },
         orderBy: { createdAt: 'desc' },
-        include: { lines: { orderBy: { cptCode: 'asc' } } },
+        include: { lines: { where: { deletedAt: null }, orderBy: { cptCode: 'asc' } } },
       },
       btAssignments: {
+        where: { deletedAt: null },
         orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
         include: {
           rbtProfile: {
@@ -61,7 +78,11 @@ export async function loadClientCrmDetail(clientId: string) {
         },
       },
       scheduleAssignments: {
-        where: { isActive: true },
+        where: {
+          isActive: true,
+          deletedAt: null,
+          reviewStatus: { in: ['NONE', 'CONFIRMED'] },
+        },
         orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
         include: {
           rbtProfile: {
@@ -70,6 +91,7 @@ export async function loadClientCrmDetail(clientId: string) {
         },
       },
       communications: {
+        where: { deletedAt: null },
         orderBy: { sentAt: 'desc' },
         take: 100,
         include: {
@@ -81,7 +103,7 @@ export async function loadClientCrmDetail(clientId: string) {
         orderBy: { createdAt: 'desc' },
       },
       alerts: {
-        where: { resolvedAt: null },
+        where: { resolvedAt: null, deletedAt: null },
         orderBy: { createdAt: 'desc' },
         take: 20,
       },
@@ -96,10 +118,20 @@ export async function loadClientCrmDetail(clientId: string) {
     action: 'VIEW',
   })
 
+  const consentLive =
+    client.consent && !client.consent.deletedAt ? client.consent : null
+  const referralLive =
+    client.referralCheck && !client.referralCheck.deletedAt
+      ? client.referralCheck
+      : null
+  const referralEval = evaluateReferralValidity(referralLive)
   const gate = canAdvance(
     {
       stage: client.stage,
       treatmentPlanStatus: client.treatmentPlanStatus,
+      consentBillingReady: consentLive?.billingReady ?? false,
+      referralValid: referralEval.ok,
+      requiresMedicaidReferral: isMedicaidPayer(client.insuranceProvider),
     },
     client.requirements
   )
@@ -109,14 +141,38 @@ export async function loadClientCrmDetail(clientId: string) {
     0
   )
 
+  const claimed =
+    user.fullAccess ||
+    client.currentOwnerUserId === user.id ||
+    client.caseCoordinatorUserId === user.id
+  const canEdit = canEditClientRecord(user, {
+    caseCoordinatorUserId: client.caseCoordinatorUserId,
+    currentOwnerDept: client.currentOwnerDept,
+    hasClaimGrant: true,
+  })
+  const mailboxReason = mailboxBlockedReason(user.email)
+  const canSendEmail = claimed && !mailboxReason && !!client.parentEmail?.trim()
+
   return {
     user,
     client,
     gate,
     daysInStage,
     weeklyScheduleHours,
+    canEdit,
     canOverrideStage: user.fullAccess,
     stageNumber: stageIndex(client.stage) + 1,
+    emailSend: {
+      allowedTemplates: allowedTemplatesForUser(user),
+      canSend: canSendEmail,
+      blockedReason: !claimed
+        ? 'Claim this client or be assigned as case coordinator to send email.'
+        : mailboxReason ?? (!client.parentEmail?.trim()
+            ? 'No parent email on file for this client.'
+            : null),
+      graphEnabled: graphEmailEnabled(),
+      hasMailbox: hasRiseAndShineMailbox(user.email),
+    },
   }
 }
 

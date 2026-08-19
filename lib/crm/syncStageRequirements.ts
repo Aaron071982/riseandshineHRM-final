@@ -22,29 +22,37 @@ export async function syncStageRequirements(
   const client = await prisma.serviceClient.findUnique({
     where: { id: clientId },
     include: {
-      authorizations: { include: { lines: true } },
-      btAssignments: { where: { status: 'ACTIVE' } },
-      scheduleAssignments: { where: { isActive: true } },
-      requirements: true,
+      authorizations: { where: { deletedAt: null }, include: { lines: { where: { deletedAt: null } } } },
+      btAssignments: { where: { status: 'ACTIVE', deletedAt: null } },
+      scheduleAssignments: { where: { isActive: true, deletedAt: null } },
+      requirements: { where: { deletedAt: null } },
     },
   })
   if (!client) return
 
   const keysToComplete = new Set<string>()
 
+  const treatmentSubmitted = client.authorizations.find(
+    (a) =>
+      a.authType === 'TREATMENT' &&
+      (a.status === 'REQUESTED' || a.status === 'PENDING' || a.status === 'APPROVED') &&
+      !!a.authNumber?.trim() &&
+      a.lines.length > 0
+  )
+  if (treatmentSubmitted) {
+    keysToComplete.add('auth_packet_complete')
+    keysToComplete.add('auth_submitted')
+  }
+
   const treatmentApproved = client.authorizations.find(
     (a) =>
       a.authType === 'TREATMENT' &&
       a.status === 'APPROVED' &&
-      !!a.authNumber?.trim() &&
-      a.lines.length > 0 &&
       !!a.effectiveDate &&
       !!a.expirationDate
   )
   if (treatmentApproved) {
     keysToComplete.add('auth_approved')
-    keysToComplete.add('auth_packet_complete')
-    keysToComplete.add('auth_submitted')
     if (treatmentApproved.renderingProvider?.trim()) {
       keysToComplete.add('rendering_provider_set')
     }
@@ -99,6 +107,7 @@ export async function syncStageRequirements(
       if (
         existing.status === 'COMPLETE' ||
         existing.status === 'RECEIVED' ||
+        existing.status === 'ON_FILE' ||
         existing.status === 'NOT_APPLICABLE'
       ) {
         continue

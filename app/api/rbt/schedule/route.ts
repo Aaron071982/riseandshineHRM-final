@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRbtSession } from '@/lib/auth'
-import { mergeAssignments, rosterAssignmentsForRbt } from '@/lib/rbt-schedule/from-roster'
 import type { ScheduleAssignmentDTO } from '@/lib/rbt-schedule/utils'
 
 export const dynamic = 'force-dynamic'
@@ -9,7 +8,7 @@ export const dynamic = 'force-dynamic'
 /**
  * Returns schedule assignments for the logged-in RBT only.
  * Ownership is enforced via session.rbtProfileId — never accept an RBT id from the client.
- * Also overlays weekly-roster session slots matched by therapist name/email.
+ * Ownership is enforced via session.rbtProfileId — never accept an RBT id from the client.
  */
 export async function GET() {
   try {
@@ -38,47 +37,40 @@ export async function GET() {
       orderBy: [{ periodEnd: 'desc' }, { createdAt: 'desc' }],
     })
 
-    const [nativeRows, roster] = await Promise.all([
-      prisma.rbtScheduleAssignment.findMany({
-        where: {
-          rbtProfileId,
-          isActive: true,
-          ...(latest
-            ? {
-                OR: [
-                  { periodStart: latest.periodStart, periodEnd: latest.periodEnd },
-                  { source: 'MANUAL', periodStart: null, periodEnd: null },
-                ],
-              }
-            : {}),
-        },
-        orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
-        select: {
-          id: true,
-          rbtProfileId: true,
-          clientName: true,
-          dayOfWeek: true,
-          startTime: true,
-          endTime: true,
-          location: true,
-          notes: true,
-          isActive: true,
-        },
-      }),
-      rosterAssignmentsForRbt({
-        id: profile.id,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        email: profile.email,
-        userEmail: profile.user?.email,
-      }),
-    ])
+    const nativeRows = await prisma.rbtScheduleAssignment.findMany({
+      where: {
+        rbtProfileId,
+        isActive: true,
+        deletedAt: null,
+        reviewStatus: { in: ['NONE', 'CONFIRMED'] },
+        ...(latest
+          ? {
+              OR: [
+                { periodStart: latest.periodStart, periodEnd: latest.periodEnd },
+                { source: 'MANUAL', periodStart: null, periodEnd: null },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+      select: {
+        id: true,
+        rbtProfileId: true,
+        clientName: true,
+        dayOfWeek: true,
+        startTime: true,
+        endTime: true,
+        location: true,
+        notes: true,
+        isActive: true,
+      },
+    })
 
-    // Defense in depth: never return another RBT's rows
-    const native: ScheduleAssignmentDTO[] = nativeRows.filter((a) => a.rbtProfileId === rbtProfileId)
-    const assignments = mergeAssignments(native, roster)
+    const native: ScheduleAssignmentDTO[] = nativeRows.filter(
+      (a) => a.rbtProfileId === rbtProfileId
+    )
 
-    return NextResponse.json({ assignments })
+    return NextResponse.json({ assignments: native })
   } catch (error) {
     console.error('[rbt/schedule GET]', error)
     return NextResponse.json({ error: 'Failed to load schedule' }, { status: 500 })

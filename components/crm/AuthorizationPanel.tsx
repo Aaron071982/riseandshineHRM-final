@@ -11,6 +11,7 @@ import {
   updateAuthorizationLine,
 } from '@/lib/crm/actions'
 import { CPT_CODES } from '@/lib/crm/cpt'
+import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import {
   EXPIRY_TONE_CLASS,
   UnitsBar,
@@ -21,6 +22,9 @@ import { cn } from '@/lib/utils'
 type Line = {
   id: string
   cptCode: string
+  unitsRequested: number | null
+  unitsApproved: number | null
+  isUnderApproved: boolean
   unitsAuthorized: number
   unitsUsed: number
   description: string | null
@@ -29,6 +33,7 @@ type Line = {
 type Auth = {
   id: string
   authType: AuthType
+  payerPlan: string | null
   payerName: string
   authNumber: string | null
   status: AuthStatus
@@ -62,6 +67,7 @@ export function AuthorizationPanel({
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     authType: 'TREATMENT' as AuthType,
+    payerPlan: '',
     payerName: '',
     authNumber: '',
     status: 'REQUESTED' as AuthStatus,
@@ -78,7 +84,8 @@ export function AuthorizationPanel({
       setError('')
       const res = await createAuthorization(clientId, {
         authType: form.authType,
-        payerName: form.payerName,
+        payerPlan: form.payerPlan,
+        payerName: form.payerName || form.payerPlan,
         authNumber: form.authNumber || null,
         status: form.status,
         effectiveDate: form.effectiveDate || null,
@@ -92,6 +99,7 @@ export function AuthorizationPanel({
       setShowForm(false)
       setForm({
         authType: 'TREATMENT',
+        payerPlan: '',
         payerName: '',
         authNumber: '',
         status: 'REQUESTED',
@@ -147,7 +155,12 @@ export function AuthorizationPanel({
             }))}
           />
           <Field
-            label="Payer"
+            label="Payer plan"
+            value={form.payerPlan}
+            onChange={(v) => setForm((f) => ({ ...f, payerPlan: v }))}
+          />
+          <Field
+            label="Payer (optional display)"
             value={form.payerName}
             onChange={(v) => setForm((f) => ({ ...f, payerName: v }))}
           />
@@ -177,7 +190,7 @@ export function AuthorizationPanel({
           <div className="sm:col-span-2 flex justify-end">
             <button
               type="button"
-              disabled={pending || !form.payerName.trim()}
+              disabled={pending || !form.payerPlan.trim()}
               onClick={create}
               className="h-9 rounded-lg bg-brand px-3.5 text-sm font-medium text-white hover:bg-brand-2 disabled:opacity-50"
             >
@@ -267,13 +280,14 @@ function AuthCard({
   const band = expiryBand(auth.expirationDate)
   const [cpt, setCpt] = useState('97153')
   const [units, setUnits] = useState('100')
+  const [removeLineId, setRemoveLineId] = useState<string | null>(null)
 
   return (
     <article className="rounded-xl border border-line bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-medium text-ink">{auth.payerName}</h4>
+            <h4 className="font-medium text-ink">{auth.payerPlan || auth.payerName}</h4>
             <span className="rounded-md bg-line-2 px-2 py-0.5 text-[11px] font-medium text-quiet">
               {auth.status.replace(/_/g, ' ')}
             </span>
@@ -345,6 +359,11 @@ function AuthCard({
               </div>
             </div>
             <UnitsBar used={line.unitsUsed} authorized={line.unitsAuthorized} />
+            {line.isUnderApproved && (
+              <span className="rounded bg-[var(--urgent-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--urgent)]">
+                Under-approved
+              </span>
+            )}
             {canEdit && (
               <>
                 <input
@@ -367,12 +386,7 @@ function AuthCard({
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => {
-                    startTransition(async () => {
-                      await deleteAuthorizationLine(line.id)
-                      onDone()
-                    })
-                  }}
+                  onClick={() => setRemoveLineId(line.id)}
                   className="text-xs text-[var(--urgent)] hover:underline"
                 >
                   Remove
@@ -413,6 +427,8 @@ function AuthCard({
                 const res = await addAuthorizationLine(auth.id, {
                   cptCode: cpt,
                   unitsAuthorized: Number(units) || 0,
+                  unitsRequested: Number(units) || 0,
+                  unitsApproved: Number(units) || 0,
                 })
                 if (!res.ok) setError(res.error)
                 onDone()
@@ -425,8 +441,29 @@ function AuthCard({
         </div>
       )}
       <p className="mt-2 text-[11px] text-faint">
-        Units used are editable manually this phase; auto-derive from sessions later.
+        Units used are editable manually this phase; lines auto-flag when approved units are below requested.
       </p>
+      <ConfirmDestructiveDialog
+        open={!!removeLineId}
+        onOpenChange={(o) => {
+          if (!o) setRemoveLineId(null)
+        }}
+        title="Remove this authorization line?"
+        description={(() => {
+          const line = auth.lines.find((l) => l.id === removeLineId)
+          return `Soft-delete CPT ${line?.cptCode ?? 'line'} (${line?.unitsAuthorized ?? 0} units authorized) on ${auth.payerName}.\n\nThe line stays in the table and an audit log is written.`
+        })()}
+        confirmLabel="Remove line"
+        pending={pending}
+        onConfirm={() => {
+          if (!removeLineId) return
+          startTransition(async () => {
+            await deleteAuthorizationLine(removeLineId)
+            setRemoveLineId(null)
+            onDone()
+          })
+        }}
+      />
     </article>
   )
 }

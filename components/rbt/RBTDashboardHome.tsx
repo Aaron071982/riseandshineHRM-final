@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { Calendar, CheckCircle2, Circle, ClipboardList, DollarSign } from 'lucide-react'
+import { FORTY_HOUR_RBT_CERTIFICATE_SLUG } from '@/lib/onboarding/catalog'
 
 function getTimeBasedGreeting(): string {
   const h = new Date().getHours()
@@ -32,6 +33,7 @@ type Shift = {
 type TaskItem = {
   id: string
   title: string
+  slug?: string
   isCompleted: boolean
 }
 
@@ -47,6 +49,7 @@ interface RBTDashboardHomeProps {
   upcomingShiftsCount: number
   /** Fillable PDFs that were downloaded but not yet uploaded (for reminder banner) */
   pendingUploadTitles?: string[]
+  fortyHourIncomplete?: boolean
 }
 
 export default function RBTDashboardHome({
@@ -60,6 +63,7 @@ export default function RBTDashboardHome({
   upcomingShifts,
   upcomingShiftsCount,
   pendingUploadTitles = [],
+  fortyHourIncomplete = false,
 }: RBTDashboardHomeProps) {
   const greeting = getTimeBasedGreeting()
   const showOnboarding = onboardingPercent < 100
@@ -76,6 +80,27 @@ export default function RBTDashboardHome({
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
         {greeting}, {firstName}!
       </h1>
+
+      {fortyHourIncomplete && (
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 dark:border-amber-600 dark:bg-amber-950/30">
+          <p className="font-semibold text-amber-950 dark:text-amber-100">
+            Required first step: complete the 40-hour RBT course
+          </p>
+          <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
+            This training is mandatory. You cannot finish onboarding, sit for the RBT exam, or work
+            independently with clients until it is done. You can continue other tasks and come back
+            — onboarding is not complete without this course.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button asChild size="sm" className="bg-[#e36f1e] hover:bg-[#c95e18] text-white">
+              <Link href="/rbt/training">Start the 40-hour course</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/rbt/tasks">Continue other tasks</Link>
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Fillable PDF upload reminder: downloaded but not yet uploaded */}
       {showUploadReminder && (
@@ -96,7 +121,9 @@ export default function RBTDashboardHome({
             Your onboarding is {Math.round(onboardingPercent)}% complete — finish to get started!
           </p>
           <Button asChild size="sm" className="bg-[#e36f1e] hover:bg-[#c95e18] text-white shrink-0">
-            <Link href="/rbt/tasks">Continue Onboarding</Link>
+            <Link href={fortyHourIncomplete ? '/rbt/training' : '/rbt/tasks'}>
+              {fortyHourIncomplete ? 'Start 40-hour course' : 'Continue Onboarding'}
+            </Link>
           </Button>
         </div>
       )}
@@ -150,7 +177,11 @@ export default function RBTDashboardHome({
                     {remainingTasks.map((t) => (
                       <li key={t.id}>
                         <Link
-                          href={`/rbt/tasks#step-${t.id}`}
+                          href={
+                            t.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG
+                              ? '/rbt/training'
+                              : `/rbt/tasks#step-${t.id}`
+                          }
                           className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-[var(--text-secondary)] hover:text-[#e36f1e] dark:hover:text-[var(--orange-primary)]"
                         >
                           <Circle className="w-4 h-4 shrink-0 text-gray-400" />

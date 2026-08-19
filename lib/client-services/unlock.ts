@@ -123,7 +123,7 @@ export async function requireClientServicesSessionOrRedirect(): Promise<void> {
 
   const csToken = cookieStore.get(CS_SESSION_COOKIE)?.value
   const { validateElevatedSession } = await import('@/lib/client-services/access')
-  const elevated = await validateElevatedSession(csToken)
+  const elevated = await validateElevatedSession(csToken, user)
   if (!elevated) {
     redirect('/client-services')
   }

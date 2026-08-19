@@ -6,6 +6,7 @@ import {
   getElevatedClientServicesUser,
 } from '@/lib/client-services/access'
 import {
+  canAccessCrmSchedule,
   canAccessDepartment,
   fetchUserCrmRoles,
   isFullAccess,
@@ -42,6 +43,7 @@ export default async function ClientServicesSectionLayout({
 
   let showAdmin = false
   let showTherapistSearch = false
+  let showScheduleNav = false
   let departmentNav: { href: string; label: string }[] = []
   if (elevated && elevatedUser) {
     try {
@@ -57,6 +59,7 @@ export default async function ClientServicesSectionLayout({
     }
     showAdmin = isSuperAdmin(subject)
     showTherapistSearch = canAccessDepartment(subject, 'STAFFING')
+    showScheduleNav = canAccessCrmSchedule(subject)
     const full = isFullAccess(subject)
     departmentNav = DEPT_SLUGS.filter((slug) =>
       full ? true : canAccessDepartment(subject, DEPT_SLUG_TO_OWNER[slug])
@@ -72,6 +75,7 @@ export default async function ClientServicesSectionLayout({
       elevated={elevated}
       showAdmin={showAdmin}
       showTherapistSearch={showTherapistSearch}
+      showScheduleNav={showScheduleNav}
       departmentNav={departmentNav}
     >
       {elevated ? children : <ElevateGate userEmail={user.email ?? ''} />}

@@ -2,6 +2,7 @@ import type { OnboardingCompletion, OnboardingDocument, RBTProfile } from '@pris
 import { prisma } from '@/lib/prisma'
 import {
   ESIGN_CONSENT_SLUG,
+  FORTY_HOUR_RBT_CERTIFICATE_SLUG,
   ONBOARDING_CATALOG,
   RBT_VISIBLE_STEPS,
   TIER_A_LAST_STEP,
@@ -66,12 +67,21 @@ export type OnboardingProgressSnapshot = {
 function isDocComplete(
   doc: Pick<OnboardingDocument, 'flowType' | 'slug'>,
   completion: Pick<OnboardingCompletion, 'status'> | undefined | null,
-  profile: Pick<RBTProfile, 'artemisTrainingCompleted' | 'backgroundCheckClearedAt' | 'supervisionCountersignedAt'>
+  profile: Pick<
+    RBTProfile,
+    | 'artemisTrainingCompleted'
+    | 'backgroundCheckClearedAt'
+    | 'supervisionCountersignedAt'
+    | 'fortyHourCourseCompleted'
+  >
 ): boolean {
   if (doc.flowType === 'ADMIN_ONLY') {
     if (doc.slug === 'background-check-cleared') return !!profile.backgroundCheckClearedAt
     if (doc.slug === 'supervision-countersigned') return !!profile.supervisionCountersignedAt
     return false
+  }
+  if (doc.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG) {
+    return profile.fortyHourCourseCompleted === true || completion?.status === 'COMPLETED'
   }
   if (doc.flowType === 'BOOKING' && doc.slug === 'artemis-training') {
     return profile.artemisTrainingCompleted === true || completion?.status === 'COMPLETED'
@@ -82,7 +92,13 @@ function isDocComplete(
 export function completedStepNumbers(
   documents: Array<Pick<OnboardingDocument, 'id' | 'stepNumber' | 'flowType' | 'slug'>>,
   completions: Array<Pick<OnboardingCompletion, 'documentId' | 'status'>>,
-  profile: Pick<RBTProfile, 'artemisTrainingCompleted' | 'backgroundCheckClearedAt' | 'supervisionCountersignedAt'>
+  profile: Pick<
+    RBTProfile,
+    | 'artemisTrainingCompleted'
+    | 'backgroundCheckClearedAt'
+    | 'supervisionCountersignedAt'
+    | 'fortyHourCourseCompleted'
+  >
 ): Set<number> {
   const byDoc = new Map(completions.map((c) => [c.documentId, c]))
   const done = new Set<number>()
@@ -100,6 +116,10 @@ export function canUnlockStep(
 ): boolean {
   const entry = catalog.find((e) => e.stepNumber === stepNumber)
   if (!entry || entry.flowType === 'ADMIN_ONLY') return false
+
+  // 40-hour course is available from day one so RBTs can start it first
+  // and still work through later onboarding steps in parallel.
+  if (entry.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG) return true
 
   if (stepNumber === 1) return true
   if (!done.has(1)) return false
@@ -197,6 +217,7 @@ export async function getOnboardingProgress(rbtProfileId: string): Promise<Onboa
         supervisionCountersignedAt: true,
         supervisionContractStatus: true,
         artemisTrainingCompleted: true,
+        fortyHourCourseCompleted: true,
       },
     }),
   ])
@@ -298,6 +319,10 @@ export function firstIncompleteStep(progress: OnboardingProgressSnapshot): numbe
   const done = new Set(
     progress.steps.filter((s) => s.isComplete).map((s) => s.document.stepNumber!)
   )
+  const fortyHour = visible.find((e) => e.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG)
+  if (fortyHour && !done.has(fortyHour.stepNumber)) {
+    return fortyHour.stepNumber
+  }
   for (const entry of visible) {
     if (!done.has(entry.stepNumber) && canUnlockStep(entry.stepNumber, done)) {
       return entry.stepNumber

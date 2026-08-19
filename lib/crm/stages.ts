@@ -99,18 +99,18 @@ export const STAGE_DEFAULT_OWNER_DEPT: Record<ClientStage, ClientOwnerDept> = {
   INTAKE: 'INTAKE',
   CONSENT: 'INTAKE',
   DOCUMENTS: 'INTAKE',
-  BENEFITS: 'CASE_COORDINATION',
+  BENEFITS: 'BILLING',
   ASSESSMENT: 'CLINICAL',
   TREATMENT_PLAN: 'CLINICAL',
-  AUTHORIZATION: 'AUTHORIZATION',
-  APPROVED: 'AUTHORIZATION',
+  AUTHORIZATION: 'BILLING',
+  APPROVED: 'BILLING',
   READY_FOR_STAFFING: 'STAFFING',
   RBT_SEARCH: 'STAFFING',
   RBT_ASSIGNED: 'STAFFING',
   SCHEDULE_COORDINATION: 'CASE_COORDINATION',
   SCHEDULE_CONFIRMED: 'CASE_COORDINATION',
   PRE_START: 'CASE_COORDINATION',
-  ACTIVE: 'CLINICAL',
+  ACTIVE: 'CASE_COORDINATION',
 }
 
 /**
@@ -121,18 +121,22 @@ export const STAGE_DEFAULT_OWNER_DEPT: Record<ClientStage, ClientOwnerDept> = {
 export const STAGE_GATE_REQUIREMENT_KEYS: Record<ClientStage, readonly string[]> = {
   INQUIRY: ['parent_contacted', 'inquiry_ack_sent'],
   INTAKE: ['intake_packet_complete', 'demographics_complete'],
-  CONSENT: ['consent_form_signed', 'hipaa_ack'],
-  DOCUMENTS: [
-    'insurance_card',
-    'medicaid_card',
-    'diagnostic_eval',
-    'physician_referral',
-  ],
-  BENEFITS: ['benefits_verified', 'eligibility_confirmed'],
+  CONSENT: ['consent_form', 'hipaa_ack'],
+  DOCUMENTS: [],
+  BENEFITS: ['benefits_verified', 'eligibility_confirmed', 'insurance_card'],
   ASSESSMENT: ['assessment_scheduled', 'assessment_completed'],
   TREATMENT_PLAN: ['treatment_plan_drafted', 'treatment_plan_signed'],
-  AUTHORIZATION: ['auth_packet_complete', 'auth_submitted'],
-  APPROVED: ['auth_approved', 'rendering_provider_set'],
+  AUTHORIZATION: [
+    'auth_packet_complete',
+    'auth_submitted',
+    'diagnostic_eval',
+    'dsm5_checklist',
+    'physician_referral',
+    'vineland',
+    'fast_assessment',
+    'eligibility_vob',
+  ],
+  APPROVED: [],
   READY_FOR_STAFFING: ['staffing_packet_ready', 'preferred_schedule_captured'],
   RBT_SEARCH: ['candidates_identified'],
   RBT_ASSIGNED: ['rbt_assigned', 'match_approved'],
@@ -147,15 +151,7 @@ export const STAGE_GATE_REQUIREMENT_KEYS: Record<ClientStage, readonly string[]>
 }
 
 /** Standard DOCUMENT requirements seeded on create (PENDING). */
-export const STANDARD_DOCUMENT_REQUIREMENT_KEYS = [
-  'insurance_card',
-  'medicaid_card',
-  'diagnostic_eval',
-  'physician_referral',
-  'iep_ifsp',
-  'custody_guardian',
-  'prior_aba_records',
-] as const
+export { STANDARD_DOCUMENT_REQUIREMENT_KEYS } from '@/lib/crm/documents'
 
 /** Display labels for pipeline stages. */
 export const STAGE_LABELS: Record<ClientStage, string> = {
@@ -184,19 +180,19 @@ export const STAGE_DESCRIPTIONS: Record<ClientStage, string> = {
   INTAKE:
     'Gather demographics and the intake packet. Intake completes the packet so consent and documents can start.',
   CONSENT:
-    'Collect signed consent and HIPAA acknowledgment. Intake owns this gate before document collection.',
+    'Collect signed Consent Form 02 (per-line initials; 97151 + 97153 are the billing hard-gate) and HIPAA acknowledgment.',
   DOCUMENTS:
-    'Collect insurance, Medicaid, diagnostic eval, and physician referral. Missing docs block benefits verification.',
+    'Collect family documents (IDs, insurance, clinical packets). Shared docs are one record; they gate VOB / authorization rather than this stage.',
   BENEFITS:
-    'Verify insurance eligibility and benefits. Case coordination confirms coverage before clinical assessment.',
+    'Verify insurance eligibility and benefits (VOB). Billing/Plutus owns this step before and during authorization work.',
   ASSESSMENT:
     'Schedule and complete the clinical assessment. Clinical owns this stage; completion unlocks authorization work.',
   TREATMENT_PLAN:
     'Clinical drafts and signs the treatment plan in parallel with auth and staffing — it does not block RBT placement, but must be complete before Active.',
   AUTHORIZATION:
-    'Build and submit the auth packet. Authorization owns this stage; set an RBT target date so staffing has a deadline.',
+    'Build and submit prior authorization. Billing/Plutus owns this stage while staffing can run in parallel once assessment is underway.',
   APPROVED:
-    'Auth is approved and the rendering provider is set. Ready to hand off to staffing with a Case Coordinator assigned at the next stage.',
+    'Treatment authorization is approved and rendering details are set. Client can continue staffing/scheduling readiness.',
   READY_FOR_STAFFING:
     'Case Coordinator is assigned and the staffing packet is ready. Staffing begins the RBT search from here.',
   RBT_SEARCH:
@@ -229,14 +225,23 @@ export const REQUIREMENT_KEY_LABELS: Record<string, string> = {
   intake_packet_complete: 'Intake packet complete',
   demographics_complete: 'Demographics complete',
   consent_form_signed: 'Consent form signed',
+  consent_form: 'Parent consent form',
   hipaa_ack: 'HIPAA acknowledgment',
-  insurance_card: 'Insurance card',
-  medicaid_card: 'Medicaid card',
-  diagnostic_eval: 'Diagnostic evaluation',
-  physician_referral: 'Physician referral',
-  iep_ifsp: 'IEP / IFSP',
-  custody_guardian: 'Custody / guardian docs',
+  insurance_card: 'Insurance card (front+back)',
+  parent_id: 'Parent/guardian photo ID',
+  family_packet: 'Family packet',
+  intake_form: 'Intake form',
+  diagnostic_eval: 'Psychological evaluation',
+  dsm5_checklist: 'DSM-5 checklist',
+  physician_referral: 'Doctor referral / prescription',
+  iep_ifsp: 'IEP/IFSP',
   prior_aba_records: 'Prior ABA records',
+  prior_aba: 'Transfer letter (if coming from another company)',
+  vineland: 'Vineland',
+  fast_assessment: 'FAST',
+  eligibility_vob: 'Insurance eligibility (VOB)',
+  consent_billing_ready: 'Consent 97151 + 97153 initials (billing gate)',
+  physician_referral_validity: 'NY Medicaid referral completeness',
   benefits_verified: 'Benefits verified',
   eligibility_confirmed: 'Eligibility confirmed',
   assessment_scheduled: 'Assessment scheduled',
@@ -264,12 +269,44 @@ export const REQUIREMENT_KEY_LABELS: Record<string, string> = {
 const SATISFIED_REQUIREMENT_STATUSES: ReadonlySet<RequirementStatus> = new Set([
   'COMPLETE',
   'RECEIVED',
+  'ON_FILE',
   'NOT_APPLICABLE',
 ])
+
+export function isSatisfyingRequirementStatus(
+  status: RequirementStatus
+): boolean {
+  return SATISFIED_REQUIREMENT_STATUSES.has(status)
+}
+
+/** Consent Form 02 cannot be ON_FILE-only — upload or in-system e-sign required. */
+export function requirementStatusSatisfies(
+  key: string,
+  status: RequirementStatus,
+  expiresAt?: Date | string | null,
+  now: Date = new Date()
+): boolean {
+  if (status === 'NOT_APPLICABLE') return true
+  if (key === 'consent_form' && status === 'ON_FILE') return false
+  if (status === 'EXPIRED') return false
+  if (!SATISFIED_REQUIREMENT_STATUSES.has(status)) return false
+  if (expiresAt) {
+    const exp = expiresAt instanceof Date ? expiresAt : new Date(expiresAt)
+    if (!Number.isNaN(exp.getTime()) && exp.getTime() < now.getTime()) {
+      return false
+    }
+  }
+  return true
+}
 
 export type AdvanceClientInput = {
   stage: ClientStage
   treatmentPlanStatus?: MilestoneStatus | null
+  /** When set, entering ACTIVE requires 97151 + 97153 initials. */
+  consentBillingReady?: boolean | null
+  /** When set and stage is INTAKE, NY Medicaid referral must be complete. */
+  referralValid?: boolean | null
+  requiresMedicaidReferral?: boolean
 }
 
 export type AdvanceRequirementInput = {
@@ -277,6 +314,7 @@ export type AdvanceRequirementInput = {
   stage: ClientStage
   status: RequirementStatus
   isRequiredToAdvance: boolean
+  expiresAt?: Date | string | null
 }
 
 export type CanAdvanceResult = {
@@ -286,21 +324,32 @@ export type CanAdvanceResult = {
 
 /**
  * Pure gate check: every `isRequiredToAdvance` requirement for the client's
- * current stage must be COMPLETE, RECEIVED, or NOT_APPLICABLE.
- * Entering ACTIVE also requires treatmentPlanStatus === COMPLETE.
+ * current stage must be COMPLETE, RECEIVED, ON_FILE, or NOT_APPLICABLE
+ * (consent_form cannot be ON_FILE; expired windows fail).
+ * Entering ACTIVE also requires treatmentPlanStatus === COMPLETE and
+ * consentBillingReady when provided.
  */
 export function canAdvance(
   client: AdvanceClientInput,
-  requirements: AdvanceRequirementInput[]
+  requirements: AdvanceRequirementInput[],
+  now: Date = new Date()
 ): CanAdvanceResult {
   const blockedBy = requirements
     .filter(
       (r) =>
         r.stage === client.stage &&
         r.isRequiredToAdvance &&
-        !SATISFIED_REQUIREMENT_STATUSES.has(r.status)
+        !requirementStatusSatisfies(r.key, r.status, r.expiresAt, now)
     )
     .map((r) => r.key)
+
+  if (
+    client.stage === 'INTAKE' &&
+    client.requiresMedicaidReferral === true &&
+    client.referralValid === false
+  ) {
+    blockedBy.push('physician_referral_validity')
+  }
 
   const upcoming = nextStage(client.stage)
   if (
@@ -308,6 +357,9 @@ export function canAdvance(
     client.treatmentPlanStatus !== 'COMPLETE'
   ) {
     blockedBy.push('treatment_plan_complete')
+  }
+  if (upcoming === 'ACTIVE' && client.consentBillingReady === false) {
+    blockedBy.push('consent_billing_ready')
   }
 
   return { ok: blockedBy.length === 0, blockedBy }

@@ -20,6 +20,7 @@ import path from 'path'
 import { PrismaClient, type ClientStage, type ClientPipelineStatus, type RequirementStatus, type ServiceClientStatus } from '@prisma/client'
 import { STAGE_DEFAULT_OWNER_DEPT, REQUIREMENT_KEY_LABELS } from '../lib/crm/stages'
 import { parseCsv, toCsv } from './lib/csv'
+import { assertWriteTarget } from '../lib/scripts/guard'
 
 const prisma = new PrismaClient()
 
@@ -29,8 +30,8 @@ const DOC_COLUMNS: { csv: string; key: string }[] = [
   { csv: 'Diagnostic Eval', key: 'diagnostic_eval' },
   { csv: 'Physician Referral', key: 'physician_referral' },
   { csv: 'IEP/IFSP', key: 'iep_ifsp' },
-  { csv: 'Custody/Guardian', key: 'custody_guardian' },
-  { csv: 'Prior ABA Records', key: 'prior_aba_records' },
+  { csv: 'Custody/Guardian', key: 'custody_order' },
+  { csv: 'Prior ABA Records', key: 'prior_aba' },
 ]
 
 const BOROUGHS = [
@@ -66,19 +67,12 @@ function argFlag(name: string): boolean {
 function csvPathArg(): string {
   const a = process.argv.slice(2).find((x) => !x.startsWith('--'))
   if (!a) {
-    console.error('Usage: tsx scripts/import-clients.ts <csv> [--confirm] [--force] [--allow-prod]')
+    console.error(
+      'Usage: tsx scripts/import-clients.ts <csv> [--confirm] [--force] [--prod-confirm]'
+    )
     process.exit(1)
   }
   return path.resolve(a)
-}
-
-function dbHost(url: string): string {
-  return url.split('@')[1]?.split('/')[0] ?? 'unknown'
-}
-
-function isDevTarget(url: string): boolean {
-  const ref = process.env.DEV_SUPABASE_REF?.trim()
-  return !!ref && url.includes(ref)
 }
 
 function get(row: Record<string, string>, key: string): string {
@@ -114,6 +108,13 @@ function mapStatus(raw: string): {
       stage: 'ACTIVE',
       pipelineStatus: 'ON_HOLD',
       legacyStatus: 'ON_HOLD',
+    }
+  }
+  if (s === 'waitlist') {
+    return {
+      stage: 'INQUIRY',
+      pipelineStatus: 'LIVE',
+      legacyStatus: 'NEW',
     }
   }
   return {
@@ -359,29 +360,18 @@ async function resolveSystemActorId(): Promise<string | null> {
 
 async function main() {
   const filePath = csvPathArg()
-  const confirm = argFlag('--confirm')
   const force = argFlag('--force')
-  const allowProd = argFlag('--allow-prod')
+  const target = assertWriteTarget({ allowProd: true })
+  const confirm = target.confirm
 
   if (!fs.existsSync(filePath)) {
     console.error(`✋ CSV not found: ${filePath}`)
     process.exit(1)
   }
 
-  const dbUrl = process.env.DATABASE_URL ?? ''
-  if (!dbUrl) {
-    console.error('✋ DATABASE_URL is unset')
-    process.exit(1)
-  }
-  const host = dbHost(dbUrl)
-  const onDev = isDevTarget(dbUrl)
-
   console.log('═══ Client CSV import ═══')
   console.log(`  CSV:     ${filePath}`)
-  console.log(`  Target:  ${host}`)
-  console.log(`  Mode:    ${confirm ? 'WRITE' : 'DRY RUN (no writes)'}`)
   console.log(`  Merge:   ${force ? 'FORCE overwrite' : 'fill-nulls only'}`)
-  console.log(`  Project: ${onDev ? 'DEV (ref match)' : 'NON-DEV'}`)
 
   const [clientCount, reqCount, btCount] = await Promise.all([
     prisma.serviceClient.count(),
@@ -391,13 +381,6 @@ async function main() {
   console.log(
     `  Counts:  service_clients=${clientCount}  requirements=${reqCount}  bt_assignments=${btCount}`
   )
-
-  if (confirm && !onDev && !allowProd) {
-    console.error(
-      '✋ Refusing to write to a non-dev database without --allow-prod'
-    )
-    process.exit(1)
-  }
 
   const buf = fs.readFileSync(filePath)
   // Scrubbed output is utf8; real master is latin1 — try utf8 first, fall back.

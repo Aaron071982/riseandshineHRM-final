@@ -11,10 +11,9 @@ describe('lib/crm/processMap Phase 11', () => {
     expect(PROCESS_DEPT_ORDER).toEqual([
       'INTAKE',
       'CLINICAL',
-      'AUTHORIZATION',
+      'BILLING',
       'STAFFING',
       'CASE_COORDINATION',
-      'BILLING',
     ])
   })
 
@@ -34,34 +33,28 @@ describe('lib/crm/processMap Phase 11', () => {
     const handoffs = buildHandoffs()
     const pairs = handoffs.map((h) => `${h.from}->${h.to}`)
 
-    expect(pairs).toContain('INTAKE->CASE_COORDINATION')
-    expect(pairs).toContain('CASE_COORDINATION->CLINICAL')
-    expect(pairs).toContain('CLINICAL->AUTHORIZATION')
-    expect(pairs).toContain('AUTHORIZATION->STAFFING')
+    expect(pairs).toContain('INTAKE->BILLING')
+    expect(pairs).toContain('BILLING->CLINICAL')
+    expect(pairs).toContain('CLINICAL->BILLING')
+    expect(pairs).toContain('BILLING->STAFFING')
     expect(pairs).toContain('STAFFING->CASE_COORDINATION')
     expect(new Set(pairs).size).toBe(pairs.length)
   })
 
   it('merges repeated hops and marks direction', () => {
     const handoffs = buildHandoffs()
-    const back = handoffs.find(
-      (h) => h.from === 'CASE_COORDINATION' && h.to === 'CLINICAL'
-    )
+    const back = handoffs.find((h) => h.from === 'BILLING' && h.to === 'CLINICAL')
     expect(back?.kind).toBe('return')
-    // Benefits → Assessment and Pre-start → Active share this hop.
-    expect(back?.labels.length).toBe(2)
+    // Benefits → Assessment
+    expect(back?.labels).toEqual(['Benefits → Assessment'])
 
-    const forward = handoffs.find(
-      (h) => h.from === 'AUTHORIZATION' && h.to === 'STAFFING'
-    )
+    const forward = handoffs.find((h) => h.from === 'BILLING' && h.to === 'STAFFING')
     expect(forward?.kind).toBe('forward')
     expect(forward?.labels).toEqual(['Approved → Ready for staffing'])
   })
 
-  it('keeps Billing connected even though it owns no pipeline stage', () => {
-    expect(stagesByDept().BILLING).toEqual([])
-    const billingEdge = buildHandoffs().find((h) => h.to === 'BILLING')
-    expect(billingEdge?.from).toBe('CLINICAL')
-    expect(billingEdge?.kind).toBe('implied')
+  it('assigns Benefits/Authorization/Approved to Billing', () => {
+    const billingStages = stagesByDept().BILLING.map((s) => s.stage)
+    expect(billingStages).toEqual(['BENEFITS', 'AUTHORIZATION', 'APPROVED'])
   })
 })

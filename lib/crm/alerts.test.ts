@@ -15,11 +15,11 @@ import { sendJourneyTemplate } from '@/lib/crm/emails/send'
 
 describe('alertRules', () => {
   it('maps auth days into tightest band and severity', () => {
-    expect(authBandForDaysLeft(55)).toBe(60)
-    expect(authSeverityForBand(60)).toBe('INFO')
+    expect(authBandForDaysLeft(44)).toBe(45)
+    expect(authSeverityForBand(45)).toBe('INFO')
     expect(authBandForDaysLeft(30)).toBe(30)
     expect(authSeverityForBand(30)).toBe('WARNING')
-    expect(authBandForDaysLeft(10)).toBe(15)
+    expect(authBandForDaysLeft(10)).toBe(14)
     expect(authBandForDaysLeft(3)).toBe(7)
     expect(authSeverityForBand(7)).toBe('URGENT')
     expect(authBandForDaysLeft(90)).toBeNull()

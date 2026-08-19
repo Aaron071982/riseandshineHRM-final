@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/auth'
 import { ensureSocialSecurityOnboardingTask } from '@/lib/onboarding/socialSecurityTask'
+import { FORTY_HOUR_RBT_COURSE_URL } from '@/lib/onboarding/catalog'
 
 /** Canonical onboarding task list: 5 HIPAA + optional 40-hour + SSN + signature = 7 or 8 tasks (must match hire route and RBT dashboard). */
 function buildCanonicalTasks(needsFortyHourCourse: boolean) {
@@ -47,7 +48,7 @@ function buildCanonicalTasks(needsFortyHourCourse: boolean) {
             taskType: 'FORTY_HOUR_COURSE_CERTIFICATE' as const,
             title: 'Complete 40-Hour RBT Course & Upload Certificate',
             description: 'Complete the 40-hour RBT training course and upload your certificate of completion',
-            documentDownloadUrl: 'https://courses.autismpartnershipfoundation.org/offers/it285gs6/checkout',
+            documentDownloadUrl: FORTY_HOUR_RBT_COURSE_URL,
             sortOrder: 6,
           },
         ]

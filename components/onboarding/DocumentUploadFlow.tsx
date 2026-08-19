@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ExternalLink, Loader2, Upload } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
+import { FORTY_HOUR_RBT_COURSE_PROVIDER } from '@/lib/onboarding/catalog'
 
 export default function DocumentUploadFlow({
   documentId,
@@ -72,7 +73,8 @@ export default function DocumentUploadFlow({
             </a>
           </Button>
           <p className="text-xs text-gray-500 dark:text-[var(--text-tertiary)]">
-            Opens Autism Partnership Foundation&apos;s free RBT Training 2.0 in a new tab.
+            Opens {FORTY_HOUR_RBT_COURSE_PROVIDER}&apos;s free 40-hour RBT training in a new tab.
+            This course is required to finish onboarding.
           </p>
         </div>
       )}

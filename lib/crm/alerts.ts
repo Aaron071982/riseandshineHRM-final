@@ -159,6 +159,7 @@ const ALERT_TYPES: ClientAlertType[] = [
   'UNCONTACTED_INQUIRY',
   'STAGE_STALLED',
   'DOCS_MISSING',
+  'DOC_EXPIRING',
   'RBT_REPLACEMENT_NEEDED',
   'SERVICE_GAP',
 ]
@@ -183,7 +184,15 @@ type ScanClient = Prisma.ServiceClientGetPayload<{
       }
     }
     requirements: {
-      select: { type: true; status: true; createdAt: true; label: true }
+      select: {
+        id: true
+        type: true
+        status: true
+        createdAt: true
+        label: true
+        key: true
+        expiresAt: true
+      }
     }
     alerts: {
       select: {
@@ -307,6 +316,40 @@ function evaluateClient(client: ScanClient, now: Date): DesiredAlert[] {
     }
   }
 
+  // DOC_EXPIRING — clinical eval / referral / consent within auth-style bands
+  if (live) {
+    let best: DesiredAlert | null = null
+    for (const r of client.requirements) {
+      if (r.type !== 'DOCUMENT' || !r.expiresAt) continue
+      if (
+        r.status !== 'RECEIVED' &&
+        r.status !== 'ON_FILE' &&
+        r.status !== 'COMPLETE' &&
+        r.status !== 'EXPIRED'
+      ) {
+        continue
+      }
+      const daysLeft = Math.ceil(
+        (r.expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)
+      )
+      const band = authBandForDaysLeft(daysLeft)
+      if (!band) continue
+      const candidate: DesiredAlert = {
+        alertType: 'DOC_EXPIRING',
+        severity: authSeverityForBand(band),
+        message:
+          daysLeft < 0
+            ? `${r.label} expired ${Math.abs(daysLeft)}d ago`
+            : `${r.label} expires in ${daysLeft}d (≤${band}d band)`,
+        dueAt: r.expiresAt,
+      }
+      if (!best || (best.dueAt && r.expiresAt < best.dueAt)) {
+        best = candidate
+      }
+    }
+    if (best) desired.push(best)
+  }
+
   // RBT_REPLACEMENT_NEEDED — uncovered RBT break, or flagged with no active RBT
   const openUncoveredBreaks = client.rbtBreaks.filter(
     (b) => b.status === 'ON_BREAK' && !b.hasCoverage
@@ -404,6 +447,7 @@ export async function runAlertScan(now = new Date()): Promise<AlertScanStats> {
       take: pageSize,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       orderBy: { id: 'asc' },
+      where: { deletedAt: null },
       select: {
         id: true,
         clientCode: true,
@@ -416,6 +460,7 @@ export async function runAlertScan(now = new Date()): Promise<AlertScanStats> {
         rbtTargetDate: true,
         authorizations: {
           where: {
+            deletedAt: null,
             authType: 'TREATMENT',
             status: 'APPROVED',
             expirationDate: { not: null },
@@ -429,14 +474,17 @@ export async function runAlertScan(now = new Date()): Promise<AlertScanStats> {
         },
         requirements: {
           where: {
+            deletedAt: null,
             type: 'DOCUMENT',
-            status: { in: ['PENDING', 'MISSING', 'EXPIRED'] },
           },
           select: {
+            id: true,
             type: true,
             status: true,
             createdAt: true,
             label: true,
+            key: true,
+            expiresAt: true,
           },
         },
         alerts: {
@@ -474,6 +522,22 @@ export async function runAlertScan(now = new Date()): Promise<AlertScanStats> {
     if (clients.length === 0) break
 
     for (const client of clients) {
+      for (const r of client.requirements) {
+        if (
+          r.expiresAt &&
+          r.expiresAt.getTime() < now.getTime() &&
+          (r.status === 'RECEIVED' ||
+            r.status === 'ON_FILE' ||
+            r.status === 'COMPLETE')
+        ) {
+          await prisma.clientRequirement.update({
+            where: { id: r.id },
+            data: { status: 'EXPIRED' },
+          })
+          r.status = 'EXPIRED'
+        }
+      }
+
       const clientName = `${client.firstName} ${client.lastName}`.trim()
       const desired = evaluateClient(client, now)
       const desiredTypes = new Set(desired.map((d) => d.alertType))

@@ -71,6 +71,15 @@ export default function CaseloadPageClient({
               authExpirationDate: c.authExpirationDate
                 ? String(c.authExpirationDate)
                 : null,
+              scheduledHoursPerWeek:
+                typeof c.scheduledHoursPerWeek === 'number'
+                  ? c.scheduledHoursPerWeek
+                  : null,
+              authHours: typeof c.authHours === 'number' ? c.authHours : null,
+              insuranceProvider:
+                typeof c.insuranceProvider === 'string'
+                  ? c.insuranceProvider
+                  : null,
             })
           )
         )

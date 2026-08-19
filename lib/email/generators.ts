@@ -1,6 +1,6 @@
 import { makePublicUrl } from '../baseUrl'
 import { formatPhoneNumber } from '../sms'
-import { FORTY_HOUR_RBT_COURSE_URL } from '../onboarding/catalog'
+import { FORTY_HOUR_RBT_COURSE_PROVIDER, FORTY_HOUR_RBT_COURSE_URL } from '../onboarding/catalog'
 
 export function generateApplicationReviewedEmail(firstName: string): { subject: string; html: string } {
   const subject = "We've reviewed your application - Rise and Shine"
@@ -601,7 +601,7 @@ export function generateManualHireOnboardingEmail(
   const loginUrl = makePublicUrl('/login')
   const subject = "Welcome to Rise and Shine – You're Hired!"
   const fortyHourParagraph = !fortyHourCourseCompleted
-    ? `<p><strong>40-Hour RBT Course:</strong> If you have not yet completed the 40-hour RBT course, start the free training here: <a href="${FORTY_HOUR_RBT_COURSE_URL}" style="color:#E4893D;">Autism Partnership Foundation RBT Training</a>. When finished, log in to My Tasks and upload your certificate.</p>`
+    ? `<p><strong>Required first step — 40-hour RBT course:</strong> You must complete this training before you can finish onboarding, sit for the RBT exam, or work independently with clients. Start the free ${FORTY_HOUR_RBT_COURSE_PROVIDER} course here: <a href="${FORTY_HOUR_RBT_COURSE_URL}" style="color:#E4893D;">${FORTY_HOUR_RBT_COURSE_PROVIDER} 40-hour RBT training</a>. You can work on other onboarding tasks in parallel, then upload your certificate from the 40-Hour tab.</p>`
     : ''
   const html = `
     <!DOCTYPE html>
@@ -633,10 +633,14 @@ export function generateManualHireOnboardingEmail(
           <div class="steps-box">
             <p style="margin-top: 0;"><strong>Next steps:</strong></p>
             <ul style="margin-bottom: 0;">
+              ${
+                !fortyHourCourseCompleted
+                  ? `<li><strong>Start the required 40-hour RBT course</strong> (${FORTY_HOUR_RBT_COURSE_PROVIDER}) — this is your first onboarding step</li>`
+                  : ''
+              }
               <li>Log in to the Rise and Shine HRM portal (link below)</li>
-              <li>Complete all onboarding tasks (HIPAA materials, Social Security card upload, digital signature)</li>
+              <li>Complete remaining onboarding tasks (HIPAA materials, Social Security card upload, digital signature)</li>
               <li>Upload a clear photo or scan of your Social Security card where prompted (My Tasks / onboarding)</li>
-              <li>If you have not completed the 40-hour RBT course, you will see it in your onboarding—complete it and upload your certificate</li>
             </ul>
           </div>
           <p><strong>Log in to start onboarding:</strong></p>

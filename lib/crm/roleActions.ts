@@ -13,6 +13,7 @@ import {
   isSuperAdmin,
   CRM_DEPARTMENT_ROLES,
   ownerDeptsForUser,
+  rethrowIfNextControlFlow,
 } from '@/lib/crm/access'
 
 export type RoleActionResult<T extends object = object> =
@@ -31,6 +32,7 @@ const ALL_CRM_ROLES: CrmRole[] = [
 ]
 
 function fail(err: unknown): RoleActionResult {
+  rethrowIfNextControlFlow(err)
   if (err instanceof CrmAccessError) {
     return { ok: false, error: err.message, status: err.status }
   }
@@ -58,14 +60,17 @@ export async function listCrmUsersWithRoles(query?: string): Promise<
 
     const q = query?.trim()
     const users = await prisma.user.findMany({
-      where: q
-        ? {
-            OR: [
-              { name: { contains: q, mode: 'insensitive' } },
-              { email: { contains: q, mode: 'insensitive' } },
-            ],
-          }
-        : { isActive: true },
+      where: {
+        role: 'ADMIN',
+        ...(q
+          ? {
+              OR: [
+                { name: { contains: q, mode: 'insensitive' } },
+                { email: { contains: q, mode: 'insensitive' } },
+              ],
+            }
+          : { isActive: true }),
+      },
       select: {
         id: true,
         name: true,
@@ -117,12 +122,18 @@ export async function grantCrmRole(
 
     const target = await prisma.user.findUnique({
       where: { id: targetUserId },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, role: true },
     })
     if (!target) {
       return {
         ok: false,
         error: 'User must exist first — ask them to log in, then grant the role',
+      }
+    }
+    if (target.role !== 'ADMIN') {
+      return {
+        ok: false,
+        error: 'CRM roles can only be granted to HRM admin users',
       }
     }
 

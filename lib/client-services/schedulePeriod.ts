@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { LIVE_REVIEW_STATUSES } from '@/lib/schedule/live'
 
 /**
  * Active Client Services ↔ schedule period.
@@ -67,6 +68,8 @@ export function buildPeriod(start: string, end: string): ClientSchedulePeriod | 
 export function schedulePeriodWhere(period: ClientSchedulePeriod) {
   return {
     isActive: true as const,
+    deletedAt: null,
+    reviewStatus: { in: LIVE_REVIEW_STATUSES },
     OR: [
       { periodStart: period.startDate, periodEnd: period.endDate },
       { source: 'MANUAL' as const, periodStart: null, periodEnd: null },
@@ -79,6 +82,8 @@ export async function getLatestActiveSchedulePeriod(): Promise<ClientSchedulePer
   const row = await prisma.rbtScheduleAssignment.findFirst({
     where: {
       isActive: true,
+      deletedAt: null,
+      reviewStatus: { in: LIVE_REVIEW_STATUSES },
       periodStart: { not: null },
       periodEnd: { not: null },
     },

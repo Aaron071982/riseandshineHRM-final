@@ -4,6 +4,7 @@ import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
 import { syncTierMilestones, canUnlockStep, completedStepNumbers } from '@/lib/onboarding/progress'
+import { FORTY_HOUR_RBT_CERTIFICATE_SLUG } from '@/lib/onboarding/catalog'
 import {
   ONBOARDING_UPLOAD_SLUG_TO_DOC_TYPE,
   mimeTypeFromFileName,
@@ -59,6 +60,7 @@ export async function POST(
         artemisTrainingCompleted: true,
         backgroundCheckClearedAt: true,
         supervisionCountersignedAt: true,
+        fortyHourCourseCompleted: true,
       },
     })
     const done = completedStepNumbers(docs, completions, profile)
@@ -85,7 +87,7 @@ export async function POST(
     const now = new Date()
     const folderType = SLUG_FOLDER[document.slug] ?? 'PERSONAL_DOCUMENTS'
 
-    await prisma.$transaction([
+    const tx = [
       prisma.onboardingCompletion.upsert({
         where: {
           rbtProfileId_documentId: { rbtProfileId: user.rbtProfileId, documentId },
@@ -114,7 +116,17 @@ export async function POST(
           uploadedBy: user.id,
         },
       }),
-    ])
+      ...(document.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG
+        ? [
+            prisma.rBTProfile.update({
+              where: { id: user.rbtProfileId },
+              data: { fortyHourCourseCompleted: true },
+            }),
+          ]
+        : []),
+    ]
+
+    await prisma.$transaction(tx)
 
     // Mirror into rbt_documents so admin Documents + RBT Document Center show the file
     const docType = ONBOARDING_UPLOAD_SLUG_TO_DOC_TYPE[document.slug]

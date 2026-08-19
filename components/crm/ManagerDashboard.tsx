@@ -39,7 +39,7 @@ export default function ManagerDashboard({
             Case coordination
           </h1>
           <p className="mt-0.5 text-sm text-quiet">
-            Pipeline health across intake, clinical, auth, staffing, and active care.
+            Pipeline health across intake, clinical, billing/plutus, staffing, and active care.
           </p>
         </div>
         <Link
@@ -168,22 +168,22 @@ export default function ManagerDashboard({
           ]}
         />
         <QueueCard
-          title="Authorization"
-          href={deptHref('authorization')}
+          title="Billing / Plutus"
+          href={deptHref('billing')}
           rows={[
             {
               label: 'Pending',
-              count: queues.authorization.pending,
+              count: queues.billing.pending,
               href: caseloadHref({ queue: 'auth_pending' }),
             },
             {
               label: 'Denied / problem',
-              count: queues.authorization.denied,
+              count: queues.billing.denied,
               href: caseloadHref({ queue: 'auth_denied' }),
             },
             {
               label: 'Expiring ≤60d',
-              count: queues.authorization.expiring60,
+              count: queues.billing.expiring60,
               href: caseloadHref({ queue: 'auth_expiring' }),
             },
           ]}

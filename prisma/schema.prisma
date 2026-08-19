@@ -429,6 +429,9 @@ model User {
   payrollRunsUploaded           PayrollRun[]             @relation("PayrollRunUploadedBy")
   companyDocumentsUploaded      CompanyDocument[]        @relation("CompanyDocumentUploadedBy")
   clientRequirementsCompleted  ClientRequirement[]       @relation("ClientRequirementCompletedBy")
+  clientRequirementsAttested   ClientRequirement[]       @relation("ClientRequirementAttestedBy")
+  clientConsentsWitnessed      ClientConsent[]           @relation("ClientConsentWitnessedBy")
+  clientReferralChecksUpdated  ClientReferralCheck[]     @relation("ClientReferralCheckUpdatedBy")
   clientTasksAssigned          ClientTask[]              @relation("ClientTaskAssignedTo")
   clientTasksCompleted         ClientTask[]              @relation("ClientTaskCompletedBy")
   clientTasksCreated           ClientTask[]              @relation("ClientTaskCreatedBy")
@@ -437,6 +440,19 @@ model User {
   crmRoles                     UserCrmRole[]             @relation("UserCrmRoles")
   crmRolesGranted              UserCrmRole[]             @relation("UserCrmRolesGrantedBy")
   crmRolesRevoked              UserCrmRole[]             @relation("UserCrmRolesRevokedBy")
+  serviceClientsDeleted        ServiceClient[]           @relation("ServiceClientDeletedBy")
+  clientRequirementsDeleted    ClientRequirement[]       @relation("ClientRequirementDeletedBy")
+  clientAuthorizationsDeleted  ClientAuthorization[]     @relation("ClientAuthorizationDeletedBy")
+  clientAuthorizationLinesDeleted ClientAuthorizationLine[] @relation("ClientAuthorizationLineDeletedBy")
+  clientTasksDeleted           ClientTask[]              @relation("ClientTaskDeletedBy")
+  clientCommunicationsDeleted  ClientCommunication[]     @relation("ClientCommunicationDeletedBy")
+  clientAlertsDeleted          ClientAlert[]             @relation("ClientAlertDeletedBy")
+  serviceClientNotesDeleted    ServiceClientNote[]       @relation("ServiceClientNoteDeletedBy")
+  serviceClientBtAssignmentsDeleted ServiceClientBtAssignment[] @relation("ServiceClientBtAssignmentDeletedBy")
+  rbtScheduleAssignmentsDeleted RbtScheduleAssignment[]  @relation("RbtScheduleAssignmentDeletedBy")
+  clientClaims                  ClientClaim[]            @relation("ClientClaimUser")
+  clientClaimsOpened            ClientClaim[]            @relation("ClientClaimClaimedBy")
+  clientClaimsReleased          ClientClaim[]            @relation("ClientClaimReleasedBy")
 
   @@map("users")
 }
@@ -1429,8 +1445,12 @@ model RbtScheduleAssignment {
   location       String?
   notes          String?                  @db.Text
   isActive       Boolean                  @default(true)
-  /// ARTEMIS_IMPORT | MANUAL — re-imports never overwrite MANUAL
+  /// ARTEMIS_IMPORT | MANUAL | BOARD_MIGRATION — re-imports never overwrite MANUAL
   source         RbtScheduleSource        @default(MANUAL)
+  /// NONE for live rows; PENDING board-migrated rows need full-access confirm
+  reviewStatus   RbtScheduleReviewStatus  @default(NONE)
+  /// Original session_slot id when migrated from the legacy board (idempotent)
+  boardSlotId    String?                  @unique
   /// Denormalized client borough for fast calendar filtering
   clientBorough  String?
   importBatchId  String?
@@ -1438,16 +1458,24 @@ model RbtScheduleAssignment {
   periodEnd      DateTime?                @db.Date
   /// Optional link to Client Services PHI record (name-matched or manual)
   serviceClientId String?
+  cptCode         String?
+  renderingProviderId String?
+  serviceLocation String?
+  billabilityStatus SessionBillabilityStatus @default(UNKNOWN)
+  billabilityReason String?
   /// When true, auto-resolve on import will not change serviceClientId
   serviceClientLinkManual Boolean         @default(false)
   createdBy      String
   createdAt      DateTime                 @default(now())
   updatedAt      DateTime                 @updatedAt
+  deletedAt      DateTime?
+  deletedByUserId String?
 
   rbtProfile    RBTProfile          @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
   createdByUser User                @relation("RbtScheduleAssignmentCreatedBy", fields: [createdBy], references: [id])
   importBatch   ScheduleImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   serviceClient ServiceClient?       @relation(fields: [serviceClientId], references: [id], onDelete: SetNull)
+  deletedByUser User?               @relation("RbtScheduleAssignmentDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
 
   @@index([rbtProfileId, isActive])
   @@index([rbtProfileId, dayOfWeek])
@@ -1455,13 +1483,23 @@ model RbtScheduleAssignment {
   @@index([periodStart, periodEnd])
   @@index([clientBorough])
   @@index([source])
+  @@index([reviewStatus])
   @@index([serviceClientId])
+  @@index([deletedAt])
   @@map("rbt_schedule_assignments")
 }
 
 enum RbtScheduleSource {
   ARTEMIS_IMPORT
   MANUAL
+  BOARD_MIGRATION
+}
+
+enum RbtScheduleReviewStatus {
+  NONE
+  PENDING
+  CONFIRMED
+  DISCARDED
 }
 
 model ScheduleImportBatch {
@@ -2552,10 +2590,26 @@ enum RequirementType {
 enum RequirementStatus {
   PENDING
   RECEIVED
+  ON_FILE
   MISSING
   EXPIRED
   NOT_APPLICABLE
   COMPLETE
+}
+
+enum RequirementGroup {
+  INTAKE
+  CLINICAL
+  BILLING
+  CONSENT
+  STAGE
+}
+
+enum ReferralSignerRole {
+  PHYSICIAN
+  PSYCHOLOGIST
+  PSYCH_NP
+  PEDS_NP
 }
 
 enum AuthType {
@@ -2571,6 +2625,17 @@ enum AuthStatus {
   EXPIRED
 }
 
+enum AuthDenialClass {
+  CLERICAL
+  CLINICAL
+}
+
+enum SessionBillabilityStatus {
+  COVERED
+  NOT_COVERED
+  UNKNOWN
+}
+
 enum TaskStatus {
   OPEN
   DONE
@@ -2579,6 +2644,7 @@ enum TaskStatus {
 
 enum CommTemplate {
   INQUIRY_ACK
+  WELCOME
   CONSENT_REQUEST
   DOCS_NEEDED
   BENEFITS_UPDATE
@@ -2588,6 +2654,8 @@ enum CommTemplate {
   RBT_ASSIGNED
   SCHEDULE_CONFIRMED
   SERVICES_STARTED
+  MEET_AND_GREET
+  CASE_COORDINATION_FORM
   MANUAL
 }
 
@@ -2606,6 +2674,7 @@ enum ClientAlertType {
   AUTH_EXPIRING
   UNCONTACTED_INQUIRY
   DOCS_MISSING
+  DOC_EXPIRING
   STAGE_STALLED
   RBT_REPLACEMENT_NEEDED
   SERVICE_GAP
@@ -2615,6 +2684,34 @@ enum AlertSeverity {
   INFO
   WARNING
   URGENT
+}
+
+enum ClaimSource {
+  CLAIM
+  ASSIGNED
+}
+
+/// Durable per-user access grant. releasedAt=null is the active exclusive claim.
+/// Released rows are kept so "ever claimed" view access survives hand-off.
+model ClientClaim {
+  id               String      @id @default(cuid())
+  serviceClientId  String
+  userId           String
+  source           ClaimSource
+  claimedByUserId  String?
+  claimedAt        DateTime    @default(now())
+  releasedAt       DateTime?
+  releasedByUserId String?
+
+  serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  user          User          @relation("ClientClaimUser", fields: [userId], references: [id], onDelete: Cascade)
+  claimedBy     User?         @relation("ClientClaimClaimedBy", fields: [claimedByUserId], references: [id], onDelete: SetNull)
+  releasedBy    User?         @relation("ClientClaimReleasedBy", fields: [releasedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([serviceClientId, releasedAt])
+  @@index([userId, releasedAt])
+  @@index([userId, serviceClientId])
+  @@map("client_claims")
 }
 
 enum AssignmentStage {
@@ -2717,6 +2814,7 @@ model ServiceClient {
   state                String?
   zip                  String?
   insuranceProvider    String?
+  vobResult            String?
   insuranceId          String?
   diagnosis            String?
   parentName           String?
@@ -2734,8 +2832,11 @@ model ServiceClient {
   createdBy            String?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  deletedAt            DateTime?
+  deletedByUserId      String?
 
   createdByUser       User?                        @relation("ServiceClientCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  deletedByUser       User?                        @relation("ServiceClientDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
   currentOwnerUser    User?                        @relation("ServiceClientCurrentOwner", fields: [currentOwnerUserId], references: [id], onDelete: SetNull)
   caseCoordinatorUser User?                        @relation("ServiceClientCaseCoordinator", fields: [caseCoordinatorUserId], references: [id], onDelete: SetNull)
   bcbaProfile         BCBAProfile?                 @relation("ServiceClientBcbaProfile", fields: [bcbaProfileId], references: [id], onDelete: SetNull)
@@ -2748,10 +2849,13 @@ model ServiceClient {
   rbtBreaks           ClientRbtBreak[]
   statusHistory       ServiceClientStatusHistory[]
   requirements        ClientRequirement[]
+  consent             ClientConsent?
+  referralCheck       ClientReferralCheck?
   authorizations      ClientAuthorization[]
   tasks               ClientTask[]
   communications      ClientCommunication[]
   alerts              ClientAlert[]
+  claims              ClientClaim[]
 
   @@index([status])
   @@index([stage])
@@ -2763,6 +2867,7 @@ model ServiceClient {
   @@index([currentOwnerUserId])
   @@index([caseCoordinatorUserId])
   @@index([bcbaProfileId])
+  @@index([deletedAt])
   @@map("service_clients")
 }
 
@@ -2776,12 +2881,16 @@ model ServiceClientBtAssignment {
   status          ServiceBtAssignmentStatus @default(ACTIVE)
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
+  deletedAt       DateTime?
+  deletedByUserId String?
 
   serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
   rbtProfile    RBTProfile?   @relation(fields: [rbtProfileId], references: [id], onDelete: SetNull)
+  deletedByUser User?         @relation("ServiceClientBtAssignmentDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
 
   @@index([serviceClientId, status])
   @@index([rbtProfileId])
+  @@index([deletedAt])
   @@map("service_client_bt_assignments")
 }
 
@@ -2811,11 +2920,15 @@ model ServiceClientNote {
   authorId        String
   content         String   @db.Text
   createdAt       DateTime @default(now())
+  deletedAt       DateTime?
+  deletedByUserId String?
 
   serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
   author        User          @relation("ServiceClientNoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  deletedByUser User?         @relation("ServiceClientNoteDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
 
   @@index([serviceClientId, createdAt])
+  @@index([deletedAt])
   @@map("service_client_notes")
 }
 
@@ -2936,57 +3049,145 @@ model ClientRequirement {
   label                String
   type                 RequirementType
   status               RequirementStatus @default(PENDING)
+  /// Team grouping for the Requirements tab (shared docs stay one row).
+  group                RequirementGroup  @default(STAGE)
   isRequiredToAdvance  Boolean           @default(true)
   fileUrl              String?
   expiresAt            DateTime?
   completedAt          DateTime?
   completedByUserId    String?
+  attestedAt           DateTime?
+  attestedByUserId     String?
   notes                String?           @db.Text
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
+  deletedAt            DateTime?
+  deletedByUserId      String?
 
   serviceClient   ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
   completedByUser User?         @relation("ClientRequirementCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  attestedByUser  User?         @relation("ClientRequirementAttestedBy", fields: [attestedByUserId], references: [id], onDelete: SetNull)
+  deletedByUser   User?         @relation("ClientRequirementDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
 
   @@index([serviceClientId, stage])
+  @@index([serviceClientId, key])
+  @@index([group])
+  @@index([deletedAt])
   @@map("client_requirements")
+}
+
+/// Consent Form 02 — per-line initials. Billing-ready only when 97151 + 97153 are initialed.
+model ClientConsent {
+  id                      String    @id @default(cuid())
+  serviceClientId         String    @unique
+  /// JSON map of line key → { initialed, initialedAt, initialedBy }
+  lines                   Json      @default("{}")
+  signatureDate           DateTime?
+  expiresAt               DateTime?
+  signedByName            String?
+  uetaConsentGiven        Boolean   @default(false)
+  signatureMethod         String?
+  signedIp                String?
+  secondParentRequired    Boolean   @default(false)
+  secondParentName        String?
+  secondParentSignedAt    DateTime?
+  staffWitnessUserId      String?
+  staffWitnessedAt        DateTime?
+  /// Derived: CPT 97151 + 97153 initials present.
+  billingReady            Boolean   @default(false)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  deletedAt               DateTime?
+  deletedByUserId         String?
+
+  serviceClient    ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  staffWitnessUser User?         @relation("ClientConsentWitnessedBy", fields: [staffWitnessUserId], references: [id], onDelete: SetNull)
+
+  @@index([billingReady])
+  @@index([deletedAt])
+  @@map("client_consents")
+}
+
+/// NY Medicaid physician referral completeness (hard intake gate).
+model ClientReferralCheck {
+  id                    String              @id @default(cuid())
+  serviceClientId       String              @unique
+  signedByRole          ReferralSignerRole?
+  hasAsdDx              Boolean             @default(false)
+  initialDxDate         DateTime?           @db.Date
+  severitySupportLevel  String?
+  abaRequiredStatement  Boolean             @default(false)
+  dsm5ChecklistAttached Boolean             @default(false)
+  notes                 String?             @db.Text
+  updatedByUserId       String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  deletedAt             DateTime?
+  deletedByUserId       String?
+
+  serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  updatedByUser User?         @relation("ClientReferralCheckUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([deletedAt])
+  @@map("client_referral_checks")
 }
 
 model ClientAuthorization {
   id                String     @id @default(cuid())
   serviceClientId   String
   authType          AuthType
+  payerPlan         String?
   payerName         String
   authNumber        String?
   status            AuthStatus @default(REQUESTED)
+  submittedDate     DateTime?
+  decisionDate      DateTime?
   requestedAt       DateTime?
   approvedAt        DateTime?
   effectiveDate     DateTime?
   expirationDate    DateTime?
+  renderingProviderId String?
   renderingProvider String?
+  serviceLocation   String?
+  denialReason      String?    @db.Text
+  denialClass       AuthDenialClass?
+  proofOfSubmissionDocId String?
+  payerCallLogRef   String?
   notes             String?    @db.Text
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
+  deletedAt         DateTime?
+  deletedByUserId   String?
 
   serviceClient ServiceClient             @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
   lines         ClientAuthorizationLine[]
+  deletedByUser User?                     @relation("ClientAuthorizationDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
 
   @@index([serviceClientId])
   @@index([expirationDate])
+  @@index([deletedAt])
   @@map("client_authorizations")
 }
 
 model ClientAuthorizationLine {
-  id              String @id @default(cuid())
+  id              String    @id @default(cuid())
   authorizationId String
   cptCode         String
+  authRequired    Boolean? @default(true)
+  unitsRequested  Int?
+  unitsApproved   Int?
+  isUnderApproved Boolean   @default(false)
   unitsAuthorized Int
-  unitsUsed       Int    @default(0)
+  unitsUsed       Int       @default(0)
   description     String?
+  deletedAt       DateTime?
+  deletedByUserId String?
 
   authorization ClientAuthorization @relation(fields: [authorizationId], references: [id], onDelete: Cascade)
+  deletedByUser User?               @relation("ClientAuthorizationLineDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
 
   @@index([authorizationId])
+  @@index([deletedAt])
   @@map("client_authorization_lines")
 }
 
@@ -3004,14 +3205,18 @@ model ClientTask {
   createdByUserId  String
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
+  deletedAt        DateTime?
+  deletedByUserId  String?
 
   serviceClient   ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
   assignedToUser  User?         @relation("ClientTaskAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
   completedByUser User?         @relation("ClientTaskCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
   createdByUser   User          @relation("ClientTaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  deletedByUser   User?         @relation("ClientTaskDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
 
   @@index([serviceClientId, status])
   @@index([assignedToUserId, status])
+  @@index([deletedAt])
   @@map("client_tasks")
 }
 
@@ -3023,15 +3228,21 @@ model ClientCommunication {
   direction       CommDirection
   subject         String?
   body            String?       @db.Text
+  /// Comma-separated CC addresses for outbound email sends.
+  ccRecipients    String?
   sentByUserId    String?
   sentAt          DateTime      @default(now())
   status          String?
   createdAt       DateTime      @default(now())
+  deletedAt       DateTime?
+  deletedByUserId String?
 
   serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
   sentByUser    User?         @relation("ClientCommunicationSentBy", fields: [sentByUserId], references: [id], onDelete: SetNull)
+  deletedByUser User?         @relation("ClientCommunicationDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
 
   @@index([serviceClientId, sentAt])
+  @@index([deletedAt])
   @@map("client_communications")
 }
 
@@ -3045,12 +3256,16 @@ model ClientAlert {
   resolvedAt      DateTime?
   resolvedByUserId String?
   createdAt       DateTime        @default(now())
+  deletedAt       DateTime?
+  deletedByUserId String?
 
   serviceClient   ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
   resolvedByUser  User?         @relation("ClientAlertResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  deletedByUser   User?         @relation("ClientAlertDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
 
   @@index([serviceClientId])
   @@index([resolvedAt])
+  @@index([deletedAt])
   @@map("client_alerts")
 }
 

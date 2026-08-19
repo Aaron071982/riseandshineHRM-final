@@ -1,44 +1,26 @@
 /**
  * Backfill service_clients.currentOwnerDept from STAGE_DEFAULT_OWNER_DEPT[stage]
- * wherever the column is null. Dev-first — refuse prod unless --allow-prod.
+ * wherever the column is null. Dry-run by default; refuse prod without --prod-confirm.
  *
  *   npm run crm:backfill-owner-dept
- *   npm run crm:backfill-owner-dept -- --dry-run
+ *   npm run crm:backfill-owner-dept -- --confirm
  */
 import { PrismaClient, type ClientStage } from '@prisma/client'
 import { STAGE_DEFAULT_OWNER_DEPT } from '../lib/crm/stages'
+import { assertWriteTarget } from '../lib/scripts/guard'
 
 const prisma = new PrismaClient()
 
-function isProdDatabaseUrl(url: string | undefined): boolean {
-  if (!url) return false
-  const lower = url.toLowerCase()
-  return (
-    lower.includes('yhxcqxivimjulxpchmxu') ||
-    lower.includes('prod') ||
-    process.env.VERCEL_ENV === 'production'
-  )
-}
-
 async function main() {
-  const dryRun = process.argv.includes('--dry-run')
-  const allowProd = process.argv.includes('--allow-prod')
-  const dbUrl = process.env.DATABASE_URL
-
-  if (isProdDatabaseUrl(dbUrl) && !allowProd) {
-    console.error(
-      '[backfill-owner-dept] Refusing to run against a production-looking DB. Pass --allow-prod to override.'
-    )
-    process.exit(1)
-  }
+  const target = assertWriteTarget({ allowProd: true })
 
   const nullRows = await prisma.serviceClient.findMany({
-    where: { currentOwnerDept: null },
+    where: { currentOwnerDept: null, deletedAt: null },
     select: { id: true, clientCode: true, stage: true },
   })
 
   console.log(
-    `[backfill-owner-dept] ${nullRows.length} client(s) with null currentOwnerDept${dryRun ? ' (dry-run)' : ''}`
+    `[backfill-owner-dept] ${nullRows.length} client(s) with null currentOwnerDept${target.dryRun ? ' (dry-run)' : ''}`
   )
 
   let updated = 0
@@ -49,7 +31,7 @@ async function main() {
       continue
     }
     console.log(`  ${row.clientCode} ${row.stage} → ${dept}`)
-    if (!dryRun) {
+    if (!target.dryRun) {
       await prisma.serviceClient.update({
         where: { id: row.id },
         data: { currentOwnerDept: dept },
@@ -58,7 +40,7 @@ async function main() {
     updated++
   }
 
-  console.log(`[backfill-owner-dept] ${dryRun ? 'Would update' : 'Updated'}: ${updated}`)
+  console.log(`[backfill-owner-dept] ${target.dryRun ? 'Would update' : 'Updated'}: ${updated}`)
 }
 
 main()

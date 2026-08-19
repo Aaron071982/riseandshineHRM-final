@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   LayoutDashboard,
   Users,
-  CalendarDays,
   FileCheck,
   Shield,
   LineChart,
@@ -30,7 +29,6 @@ const DEFAULT_NAV: ShellNavItem[] = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/client-services', label: 'Clients', icon: Users },
   { href: '/admin/employees', label: 'Therapists', icon: ClipboardList },
-  { href: '/schedule', label: 'Schedule', icon: CalendarDays },
   { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
   { href: '/admin/documents', label: 'Compliance', icon: Shield },
   { href: '/operations', label: 'Reports', icon: LineChart },
@@ -54,6 +52,12 @@ function pathActive(pathname: string, href: string): boolean {
   }
   if (href === '/admin/employees') {
     return pathname.startsWith('/admin/employees') || pathname.startsWith('/admin/rbts')
+  }
+  if (href === '/client-services/therapist-search') {
+    return pathname.startsWith('/client-services/therapist-search')
+  }
+  if (href === '/client-services/schedule') {
+    return pathname.startsWith('/client-services/schedule')
   }
   if (href === '/schedule') return pathname.startsWith('/schedule')
   if (href === '/operations') return pathname.startsWith('/operations')

@@ -1,28 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { getDepartmentQueueMembershipWhere } from './departments'
+import { STAGE_DEFAULT_OWNER_DEPT } from './stages'
 
-describe('department queue cross-listing', () => {
-  it('shows approved work in both Authorization and Staffing', () => {
-    expect(getDepartmentQueueMembershipWhere('AUTHORIZATION')).toEqual({
-      currentOwnerDept: 'AUTHORIZATION',
+describe('department queue membership (claim-scoped)', () => {
+  it('is current owner dept only — no Phase-8 cross-listing', () => {
+    expect(getDepartmentQueueMembershipWhere('BILLING')).toEqual({
+      currentOwnerDept: 'BILLING',
       pipelineStatus: 'LIVE',
     })
     expect(getDepartmentQueueMembershipWhere('STAFFING')).toEqual({
+      currentOwnerDept: 'STAFFING',
       pipelineStatus: 'LIVE',
-      OR: [
-        { currentOwnerDept: 'STAFFING' },
-        { currentOwnerDept: 'AUTHORIZATION', stage: 'APPROVED' },
-      ],
+    })
+    expect(getDepartmentQueueMembershipWhere('CASE_COORDINATION')).toEqual({
+      currentOwnerDept: 'CASE_COORDINATION',
+      pipelineStatus: 'LIVE',
     })
   })
 
-  it('shows RBT-search work in both Staffing and Case Coordination', () => {
-    expect(getDepartmentQueueMembershipWhere('CASE_COORDINATION')).toEqual({
-      pipelineStatus: 'LIVE',
-      OR: [
-        { currentOwnerDept: 'CASE_COORDINATION' },
-        { currentOwnerDept: 'STAFFING', stage: 'RBT_SEARCH' },
-      ],
-    })
+  it('ACTIVE default owner is Case Coordination', () => {
+    expect(STAGE_DEFAULT_OWNER_DEPT.ACTIVE).toBe('CASE_COORDINATION')
   })
 })

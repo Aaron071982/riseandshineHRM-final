@@ -15,6 +15,7 @@ import {
   LogOut,
   User,
   MessageCircle,
+  GraduationCap,
 } from 'lucide-react'
 import { useState, useEffect, createContext, useContext } from 'react'
 import Image from 'next/image'
@@ -28,6 +29,7 @@ export function useRBTMessageModal() {
 }
 
 const baseNavItems = [
+  { href: '/rbt/training', label: '40-Hour', icon: GraduationCap },
   { href: '/rbt/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/rbt/tasks', label: 'My Tasks', icon: ClipboardList },
   { href: '/rbt/schedule', label: 'Schedule', icon: Calendar },
@@ -69,7 +71,11 @@ export default function RBTLayout({
 
   const messageContextValue = { openMessageModal: () => setMessageModalOpen(true) }
   const navItems = canAccessSessions
-    ? [...baseNavItems.slice(0, 3), { href: '/rbt/sessions', label: 'Pay', icon: Timer }, ...baseNavItems.slice(3)]
+    ? [
+        ...baseNavItems.slice(0, 4),
+        { href: '/rbt/sessions', label: 'Pay', icon: Timer },
+        ...baseNavItems.slice(4),
+      ]
     : baseNavItems
 
   return (
@@ -102,7 +108,9 @@ export default function RBTLayout({
         <nav className="flex-1 py-4 px-2 space-y-0.5">
           {navItems.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href
+            const isActive =
+              pathname === item.href ||
+              (item.href !== '/rbt/dashboard' && pathname.startsWith(`${item.href}/`))
             return (
               <Link
                 key={item.href}
@@ -183,14 +191,22 @@ export default function RBTLayout({
           className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-[var(--bg-elevated)] border-t border-orange-200/70 dark:border-[var(--border-subtle)] safe-area-pb"
           aria-label="Main navigation"
         >
-          <div className={cn('h-14', navItems.length === 6 ? 'grid grid-cols-6' : 'grid grid-cols-5')}>
+          <div
+            className="grid h-14"
+            style={{
+              gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))`,
+            }}
+          >
             {navItems.map((item) => {
               const Icon = item.icon
-              const isActive = pathname === item.href
+              const isActive =
+              pathname === item.href ||
+              (item.href !== '/rbt/dashboard' && pathname.startsWith(`${item.href}/`))
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-label={item.label === '40-Hour' ? '40-hour RBT course' : item.label}
                   className={cn(
                     'flex flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors',
                     isActive
@@ -201,7 +217,9 @@ export default function RBTLayout({
                   <div className="relative">
                     <Icon className="w-5 h-5" />
                   </div>
-                  <span>{item.label}</span>
+                  <span className="truncate px-0.5 text-[10px] sm:text-xs">
+                    {item.href === '/rbt/training' ? '40hr' : item.label}
+                  </span>
                 </Link>
               )
             })}

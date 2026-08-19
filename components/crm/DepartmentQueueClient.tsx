@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { ClientOwnerDept } from '@prisma/client'
 import {
+  assignCaseCoordinator,
   assignClient,
   claimClient,
   listDepartmentAssignees,
@@ -12,8 +13,10 @@ import {
   releaseClient,
 } from '@/lib/crm/ownershipActions'
 import type { DepartmentQueueData, DepartmentQueueRow } from '@/lib/crm/departments'
+import type { ClaimablePoolRow } from '@/lib/crm/claims'
 import { OWNER_DEPT_LABELS, STAGE_LABELS } from '@/lib/crm/stages'
 import { OwnerDeptBadge } from '@/components/crm/StageStepper'
+import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { cn } from '@/lib/utils'
 
 const HANDOFF_DEPTS: ClientOwnerDept[] = [
@@ -72,67 +75,77 @@ function FiveFieldSummary({ row }: { row: DepartmentQueueRow }) {
           {row.stalled ? ' · stalled' : ''}
         </span>
       </div>
+      {row.billingSubstep && (
+        <div className="sm:col-span-5">
+          <span className="block text-[10px] uppercase tracking-wide text-quiet">
+            Billing sub-step
+          </span>
+          <span className="font-medium text-ink">{row.billingSubstep}</span>
+        </div>
+      )}
     </div>
   )
 }
 
-function DeptActions({
+function PoolCard({
   row,
-  dept,
-  canManage,
-  viewerUserId,
+  onClaim,
+  pending,
+  assignOptions,
+  onAssign,
 }: {
-  row: DepartmentQueueRow
-  dept: ClientOwnerDept
-  canManage: boolean
-  viewerUserId: string
+  row: ClaimablePoolRow
+  onClaim?: () => void
+  pending: boolean
+  assignOptions?: { id: string; name: string | null; email: string | null }[]
+  onAssign?: (userId: string) => void
 }) {
-  const detailHref = `/client-services/clients/${row.id}`
-  const tab =
-    dept === 'AUTHORIZATION'
-      ? 'authorization'
-      : dept === 'STAFFING'
-        ? 'staffing'
-        : dept === 'CLINICAL'
-          ? 'clinical'
-          : null
-
+  const [assignTo, setAssignTo] = useState(assignOptions?.[0]?.id ?? '')
   return (
-    <div className="mt-2 flex flex-wrap gap-2">
-      <Link
-        href={tab ? `${detailHref}?tab=${tab}` : detailHref}
-        className="inline-flex h-8 items-center rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink hover:bg-line-2"
-      >
-        Open case
-      </Link>
-      {dept === 'INTAKE' && (
-        <Link
-          href={`${detailHref}?tab=requirements`}
-          className="inline-flex h-8 items-center rounded-lg border border-line px-2.5 text-xs font-medium text-ink hover:bg-line-2"
+    <li className="rounded-xl border border-line bg-surface px-3 py-3">
+      <p className="font-display text-sm font-semibold text-ink">
+        {row.firstName} {row.lastName}
+      </p>
+      <p className="mt-1 text-xs text-quiet">
+        Stage: <span className="font-medium text-ink">{STAGE_LABELS[row.stage]}</span>
+      </p>
+      {onClaim && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onClaim}
+          className="mt-2 inline-flex h-8 items-center rounded-lg bg-[var(--sunrise)] px-2.5 text-xs font-semibold text-[var(--espresso)] hover:opacity-90 disabled:opacity-50"
         >
-          Requirements
-        </Link>
+          Claim
+        </button>
       )}
-      {dept === 'AUTHORIZATION' && (
-        <Link
-          href={`${detailHref}?tab=authorization`}
-          className="inline-flex h-8 items-center rounded-lg border border-line px-2.5 text-xs font-medium text-ink hover:bg-line-2"
-        >
-          Auth + RBT target
-        </Link>
+      {onAssign && assignOptions && assignOptions.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <label className="text-xs text-quiet">
+            Assign coordinator
+            <select
+              className="mt-1 block h-8 rounded-md border border-line bg-surface px-2 text-sm text-ink"
+              value={assignTo}
+              onChange={(e) => setAssignTo(e.target.value)}
+            >
+              {assignOptions.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name ?? u.email ?? u.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={pending || !assignTo}
+            onClick={() => onAssign(assignTo)}
+            className="h-8 rounded-lg bg-[var(--sunrise)] px-2.5 text-xs font-semibold text-[var(--espresso)] disabled:opacity-50"
+          >
+            Assign
+          </button>
+        </div>
       )}
-      {dept === 'STAFFING' && (
-        <Link
-          href={`/client-services/therapist-search?clientId=${encodeURIComponent(row.id)}`}
-          className="inline-flex h-8 items-center rounded-lg bg-[var(--sunrise)] px-2.5 text-xs font-semibold text-[var(--espresso)] hover:opacity-90"
-        >
-          Take to Therapist Search
-        </Link>
-      )}
-      {(canManage || row.currentOwnerUserId === viewerUserId) && (
-        <span className="sr-only">claim actions below</span>
-      )}
-    </div>
+    </li>
   )
 }
 
@@ -147,7 +160,7 @@ function CaseCard({
   dept: ClientOwnerDept
   canManage: boolean
   viewerUserId: string
-  mode: 'unclaimed' | 'claimed' | 'mine'
+  mode: 'claimed' | 'mine'
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -157,13 +170,14 @@ function CaseCard({
     HANDOFF_DEPTS.find((d) => d !== dept) ?? 'STAFFING'
   )
   const [handoffReason, setHandoffReason] = useState('')
+  const [confirmHandoff, setConfirmHandoff] = useState(false)
   const [showAssign, setShowAssign] = useState(false)
   const [assignees, setAssignees] = useState<
     { id: string; name: string | null; email: string | null }[]
   >([])
   const [assignTo, setAssignTo] = useState('')
-  const canActOnOwnership =
-    canManage || row.currentOwnerDept === dept
+  const canActOnOwnership = canManage || row.currentOwnerDept === dept
+  const detailHref = `/client-services/clients/${row.id}`
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null)
@@ -191,7 +205,7 @@ function CaseCard({
     <li className="rounded-xl border border-line bg-surface px-3 py-3">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
         <Link
-          href={`/client-services/clients/${row.id}`}
+          href={detailHref}
           className="font-display text-sm font-semibold text-ink hover:underline"
         >
           {row.firstName} {row.lastName}{' '}
@@ -199,39 +213,19 @@ function CaseCard({
             {row.clientCode}
           </span>
         </Link>
-        {mode === 'claimed' && row.ownerName && (
+        {row.ownerName && (
           <span className="text-xs text-quiet">Claimed by {row.ownerName}</span>
         )}
       </div>
       <FiveFieldSummary row={row} />
-      {!canActOnOwnership && (
-        <p className="mt-2 text-xs text-quiet">
-          Shared with {OWNER_DEPT_LABELS[dept]} for parallel work. Ownership
-          actions remain with{' '}
-          {row.currentOwnerDept
-            ? OWNER_DEPT_LABELS[row.currentOwnerDept]
-            : 'the owning department'}.
-        </p>
-      )}
-      <DeptActions
-        row={row}
-        dept={dept}
-        canManage={canManage}
-        viewerUserId={viewerUserId}
-      />
       <div className="mt-2 flex flex-wrap gap-2">
-        {canActOnOwnership && mode === 'unclaimed' && (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => run(() => claimClient(row.id))}
-            className="inline-flex h-8 items-center rounded-lg bg-[var(--sunrise)] px-2.5 text-xs font-semibold text-[var(--espresso)] hover:opacity-90 disabled:opacity-50"
-          >
-            Claim
-          </button>
-        )}
+        <Link
+          href={detailHref}
+          className="inline-flex h-8 items-center rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink hover:bg-line-2"
+        >
+          Open case
+        </Link>
         {canActOnOwnership &&
-          (mode === 'claimed' || mode === 'mine') &&
           (row.currentOwnerUserId === viewerUserId || canManage) && (
             <button
               type="button"
@@ -242,7 +236,7 @@ function CaseCard({
               Release
             </button>
           )}
-        {canActOnOwnership && mode === 'claimed' && canManage && (
+        {canActOnOwnership && canManage && (
           <button
             type="button"
             disabled={pending}
@@ -321,26 +315,13 @@ function CaseCard({
               className="mt-1 block h-8 w-full rounded-md border border-line bg-surface px-2 text-sm text-ink"
               value={handoffReason}
               onChange={(e) => setHandoffReason(e.target.value)}
-              placeholder="e.g. Ready for RBT search"
+              placeholder="e.g. Auth renewal — stage stays Active"
             />
           </label>
           <button
             type="button"
             disabled={pending || !handoffReason.trim()}
-            onClick={() =>
-              run(async () => {
-                const res = await reassignOwnerDept(
-                  row.id,
-                  handoffDept,
-                  handoffReason
-                )
-                if (res.ok) {
-                  setShowHandoff(false)
-                  setHandoffReason('')
-                }
-                return res
-              })
-            }
+            onClick={() => setConfirmHandoff(true)}
             className="h-8 rounded-lg bg-[var(--espresso)] px-2.5 text-xs font-semibold text-white disabled:opacity-50"
           >
             Confirm hand-off
@@ -353,7 +334,68 @@ function CaseCard({
           {error}
         </p>
       )}
+      <ConfirmDestructiveDialog
+        open={confirmHandoff}
+        onOpenChange={setConfirmHandoff}
+        title="Hand off this family?"
+        description={`Move ownership of ${row.firstName} ${row.lastName} (${row.clientCode}) from ${OWNER_DEPT_LABELS[dept]} to ${OWNER_DEPT_LABELS[handoffDept]}.\n\nReason: ${handoffReason.trim()}\n\nStage does not change. Claim history is kept; the receiving department sees this client in their unclaimed pool.`}
+        confirmLabel="Confirm hand-off"
+        pending={pending}
+        onConfirm={() => {
+          run(async () => {
+            const res = await reassignOwnerDept(row.id, handoffDept, handoffReason)
+            if (res.ok) {
+              setShowHandoff(false)
+              setConfirmHandoff(false)
+              setHandoffReason('')
+            }
+            return res
+          })
+        }}
+      />
     </li>
+  )
+}
+
+function AssignedPile({
+  title,
+  rows,
+  dept,
+  canManage,
+  viewerUserId,
+  empty,
+}: {
+  title: string
+  rows: DepartmentQueueRow[]
+  dept: ClientOwnerDept
+  canManage: boolean
+  viewerUserId: string
+  empty: string
+}) {
+  return (
+    <section>
+      <h2 className="mb-2 font-display text-base font-semibold text-ink">
+        {title} ({rows.length})
+      </h2>
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
+          {empty}
+        </p>
+      ) : (
+        <ul className="space-y-3">
+          {rows.map((row) => (
+            <CaseCard
+              key={row.id}
+              row={row}
+              dept={row.currentOwnerDept ?? dept}
+              canManage={canManage}
+              viewerUserId={viewerUserId}
+              mode="mine"
+            />
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 
@@ -362,7 +404,9 @@ export default function DepartmentQueueClient({
 }: {
   data: DepartmentQueueData
 }) {
-  const [ccTab, setCcTab] = useState<'dept' | 'mine'>('dept')
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
   const isCc = data.slug === 'case-coordination'
 
   const claimedByOwner = useMemo(() => {
@@ -376,6 +420,35 @@ export default function DepartmentQueueClient({
     return [...map.entries()]
   }, [data.claimed])
 
+  const billingBuckets = useMemo(() => {
+    if (data.slug !== 'billing' && data.slug !== 'authorization') return null
+    const order = [
+      'Needs VOB',
+      'VOB done / needs PA',
+      'PA submitted / waiting',
+      'PA approved',
+      'Denied/problem',
+    ] as const
+    const map = new Map<string, DepartmentQueueRow[]>()
+    for (const key of order) map.set(key, [])
+    for (const row of data.claimed) {
+      const key = row.billingSubstep ?? 'Needs VOB'
+      const list = map.get(key) ?? []
+      list.push(row)
+      map.set(key, list)
+    }
+    return order.map((key) => ({ key, rows: map.get(key) ?? [] }))
+  }, [data.slug, data.claimed])
+
+  const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
+    setError(null)
+    startTransition(async () => {
+      const res = await fn()
+      if (!res.ok) setError(res.error ?? 'Failed')
+      else router.refresh()
+    })
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-16">
       <div>
@@ -383,46 +456,104 @@ export default function DepartmentQueueClient({
           {data.label} queue
         </h1>
         <p className="mt-0.5 text-sm text-quiet">
-          Cases this department owns or is ready to work in parallel. Claiming
-          is available only to the owning department.
+          {isCc
+            ? 'Case coordinators are assigned by a manager. Upcoming is before therapist found; Ready starts at RBT assigned.'
+            : 'Claim a name from the pool to open the profile. You only see cases you have claimed.'}
         </p>
       </div>
 
-      {isCc && (
-        <div className="flex gap-1 rounded-lg border border-line bg-surface p-1">
-          <button
-            type="button"
-            onClick={() => setCcTab('dept')}
-            className={cn(
-              'flex-1 rounded-md px-3 py-1.5 text-sm font-medium',
-              ccTab === 'dept'
-                ? 'bg-[var(--sunrise)] text-[var(--espresso)]'
-                : 'text-quiet hover:text-ink'
-            )}
-          >
-            Department queue ({data.unclaimed.length + data.claimed.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setCcTab('mine')}
-            className={cn(
-              'flex-1 rounded-md px-3 py-1.5 text-sm font-medium',
-              ccTab === 'mine'
-                ? 'bg-[var(--sunrise)] text-[var(--espresso)]'
-                : 'text-quiet hover:text-ink'
-            )}
-          >
-            My caseload ({data.myCaseload?.length ?? 0})
-          </button>
-        </div>
+      {error && (
+        <p className="rounded-lg bg-[var(--urgent-bg)] px-3 py-2 text-sm text-[var(--urgent)]">
+          {error}
+        </p>
       )}
 
-      {(!isCc || ccTab === 'dept') && (
+      {isCc ? (
+        <>
+          {data.canAssignCc && data.unassignedCc && (
+            <section>
+              <h2 className="mb-2 font-display text-base font-semibold text-ink">
+                Unassigned ({data.unassignedCc.length})
+              </h2>
+              <p className="mb-2 text-xs text-quiet">
+                Name and stage only. Assign a case coordinator — they cannot self-claim.
+              </p>
+              {data.unassignedCc.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
+                  No unassigned coordination cases.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {data.unassignedCc.map((row) => (
+                    <PoolCard
+                      key={row.id}
+                      row={row}
+                      pending={pending}
+                      assignOptions={data.caseCoordinators ?? []}
+                      onAssign={(userId) =>
+                        run(() => assignCaseCoordinator(row.id, userId))
+                      }
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {data.canAssignCc && data.coordinatorGroups ? (
+            data.coordinatorGroups.map((group) => (
+              <div key={group.userId} className="space-y-4">
+                <h2 className="font-display text-lg font-semibold text-ink">
+                  {group.name}
+                </h2>
+                <AssignedPile
+                  title="Upcoming"
+                  rows={group.upcoming}
+                  dept={data.dept}
+                  canManage={data.canManage}
+                  viewerUserId={data.viewerUserId}
+                  empty="No assigned clients before RBT assigned."
+                />
+                <AssignedPile
+                  title="Ready"
+                  rows={group.ready}
+                  dept={data.dept}
+                  canManage={data.canManage}
+                  viewerUserId={data.viewerUserId}
+                  empty="No assigned clients at RBT assigned or later."
+                />
+              </div>
+            ))
+          ) : (
+            <>
+              <AssignedPile
+                title="Upcoming"
+                rows={data.upcoming ?? []}
+                dept={data.dept}
+                canManage={data.canManage}
+                viewerUserId={data.viewerUserId}
+                empty="No assigned clients before RBT assigned."
+              />
+              <AssignedPile
+                title="Ready"
+                rows={data.ready ?? []}
+                dept={data.dept}
+                canManage={data.canManage}
+                viewerUserId={data.viewerUserId}
+                empty="No assigned clients at RBT assigned or later."
+              />
+            </>
+          )}
+        </>
+      ) : (
         <>
           <section>
             <h2 className="mb-2 font-display text-base font-semibold text-ink">
               Unclaimed ({data.unclaimed.length})
             </h2>
+            <p className="mb-2 text-xs text-quiet">
+              Name and current stage only. Claim to open the profile.
+            </p>
             {data.unclaimed.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
                 No unclaimed cases in this department.
@@ -430,13 +561,11 @@ export default function DepartmentQueueClient({
             ) : (
               <ul className="space-y-3">
                 {data.unclaimed.map((row) => (
-                  <CaseCard
+                  <PoolCard
                     key={row.id}
                     row={row}
-                    dept={data.dept}
-                    canManage={data.canManage}
-                    viewerUserId={data.viewerUserId}
-                    mode="unclaimed"
+                    pending={pending}
+                    onClaim={() => run(() => claimClient(row.id))}
                   />
                 ))}
               </ul>
@@ -445,19 +574,41 @@ export default function DepartmentQueueClient({
 
           <section>
             <h2 className="mb-2 font-display text-base font-semibold text-ink">
-              Claimed ({data.claimed.length})
+              My claimed work ({data.claimed.length})
             </h2>
             {data.claimed.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
-                No claimed cases yet.
+                No claimed cases in this department. Claim from the pool to start work.
               </p>
             ) : (
               <div className="space-y-4">
-                {claimedByOwner.map(([owner, rows]) => (
-                  <div key={owner}>
+                {billingBuckets?.map((bucket) => (
+                  <div key={bucket.key}>
                     <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-quiet">
-                      {owner}
+                      {bucket.key} ({bucket.rows.length})
                     </h3>
+                    <ul className="space-y-3">
+                      {bucket.rows.map((row) => (
+                        <CaseCard
+                          key={row.id}
+                          row={row}
+                          dept={data.dept}
+                          canManage={data.canManage}
+                          viewerUserId={data.viewerUserId}
+                          mode="claimed"
+                        />
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                {!billingBuckets &&
+                  claimedByOwner.map(([owner, rows]) => (
+                  <div key={owner}>
+                    {data.canManage && (
+                      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-quiet">
+                        {owner}
+                      </h3>
+                    )}
                     <ul className="space-y-3">
                       {rows.map((row) => (
                         <CaseCard
@@ -471,38 +622,11 @@ export default function DepartmentQueueClient({
                       ))}
                     </ul>
                   </div>
-                ))}
+                  ))}
               </div>
             )}
           </section>
         </>
-      )}
-
-      {isCc && ccTab === 'mine' && (
-        <section>
-          <h2 className="mb-2 font-display text-base font-semibold text-ink">
-            My caseload ({data.myCaseload?.length ?? 0})
-          </h2>
-          {!data.myCaseload?.length ? (
-            <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
-              You have not claimed any cases yet. Use the department queue to
-              claim work.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {data.myCaseload.map((row) => (
-                <CaseCard
-                  key={row.id}
-                  row={row}
-                  dept={row.currentOwnerDept ?? data.dept}
-                  canManage={data.canManage}
-                  viewerUserId={data.viewerUserId}
-                  mode="mine"
-                />
-              ))}
-            </ul>
-          )}
-        </section>
       )}
     </div>
   )

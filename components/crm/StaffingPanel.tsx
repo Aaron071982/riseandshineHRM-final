@@ -14,6 +14,7 @@ import {
   updateRbtAssignment,
 } from '@/lib/crm/actions'
 import { ProfilePicker } from '@/components/crm/ProfilePicker'
+import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { cn } from '@/lib/utils'
 
 type RbtProfile = {
@@ -60,6 +61,7 @@ export function StaffingPanel({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState('')
+  const [removeAssignmentId, setRemoveAssignmentId] = useState<string | null>(null)
   const [pickedRbt, setPickedRbt] = useState<{ id: string; name: string } | null>(
     null
   )
@@ -286,12 +288,7 @@ export function StaffingPanel({
                     <button
                       type="button"
                       disabled={pending}
-                      onClick={() => {
-                        startTransition(async () => {
-                          await removeRbtAssignment(a.id)
-                          router.refresh()
-                        })
-                      }}
+                      onClick={() => setRemoveAssignmentId(a.id)}
                       className="text-xs text-[var(--urgent)] hover:underline"
                     >
                       Remove
@@ -303,6 +300,30 @@ export function StaffingPanel({
           })}
         </ul>
       </section>
+      <ConfirmDestructiveDialog
+        open={!!removeAssignmentId}
+        onOpenChange={(o) => {
+          if (!o) setRemoveAssignmentId(null)
+        }}
+        title="Remove this RBT assignment?"
+        description={(() => {
+          const a = assignments.find((x) => x.id === removeAssignmentId)
+          const name = a?.rbtProfile
+            ? `${a.rbtProfile.firstName} ${a.rbtProfile.lastName}`.trim()
+            : a?.btName ?? 'this RBT'
+          return `Soft-delete the assignment for ${name} on this family.\n\nThe row stays in the table (status ENDED) and an audit log is written.`
+        })()}
+        confirmLabel="Remove assignment"
+        pending={pending}
+        onConfirm={() => {
+          if (!removeAssignmentId) return
+          startTransition(async () => {
+            await removeRbtAssignment(removeAssignmentId)
+            setRemoveAssignmentId(null)
+            router.refresh()
+          })
+        }}
+      />
     </div>
   )
 }

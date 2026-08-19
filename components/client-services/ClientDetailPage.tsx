@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils'
 import AddressAutocomplete, {
   type StructuredAddress,
 } from '@/components/ui/AddressAutocomplete'
+import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 
 type Doc = {
   id: string
@@ -185,6 +186,7 @@ export default function ClientDetailPage({
   const [form, setForm] = useState<EditForm | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [notesOpen, setNotesOpen] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [expandedNoteIds, setExpandedNoteIds] = useState<Record<string, boolean>>({})
@@ -405,11 +407,6 @@ export default function ClientDetailPage({
 
   const deleteClient = async () => {
     if (!client || !canEditPhi || deleting) return
-    const label = `${client.firstName} ${client.lastName}`.trim()
-    const ok = window.confirm(
-      `Delete ${label} (${client.clientCode}) permanently?\n\nThis cannot be undone. Schedule links will be unlinked; notes, documents, and breaks for this client will be removed.`
-    )
-    if (!ok) return
     setDeleting(true)
     setError('')
     try {
@@ -428,6 +425,7 @@ export default function ClientDetailPage({
       setError('Failed to delete client')
     } finally {
       setDeleting(false)
+      setConfirmDelete(false)
     }
   }
 
@@ -732,7 +730,7 @@ export default function ClientDetailPage({
                   size="sm"
                   variant="destructive"
                   disabled={deleting}
-                  onClick={deleteClient}
+                  onClick={() => setConfirmDelete(true)}
                 >
                   <Trash2 className="w-3.5 h-3.5 mr-1" />
                   {deleting ? 'Deleting…' : 'Delete client'}
@@ -1581,20 +1579,35 @@ export default function ClientDetailPage({
       {canEditPhi && (
         <Card title="Delete client">
           <p className="text-sm text-[#5F6B7A] mb-3">
-            Permanently remove this client and their notes, documents, and breaks. Schedule
-            assignments will be unlinked. This cannot be undone.
+            Permanently hide this family from caseloads. The row stays in the
+            database and can be restored by a full-access admin. An audit log is
+            written.
           </p>
           <Button
             type="button"
             variant="destructive"
             disabled={deleting}
-            onClick={deleteClient}
+            onClick={() => setConfirmDelete(true)}
           >
             <Trash2 className="w-4 h-4 mr-1.5" />
             {deleting ? 'Deleting…' : 'Delete this client'}
           </Button>
         </Card>
       )}
+
+      <ConfirmDestructiveDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Soft-delete this family record?"
+        description={
+          client
+            ? `Hide ${client.firstName} ${client.lastName} (${client.clientCode}) from every caseload and queue.\n\nThe row is not destroyed — it stays in the database with deletedAt set, and a full-access admin can restore it. An audit log is written.`
+            : 'Hide this family from caseloads. The row stays in the database.'
+        }
+        confirmLabel="Soft-delete family"
+        pending={deleting}
+        onConfirm={deleteClient}
+      />
     </div>
   )
 }

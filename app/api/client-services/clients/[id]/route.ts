@@ -12,6 +12,7 @@ import {
   getVisibleClientsWhere,
 } from '@/lib/crm/access'
 import { logClientAccess } from '@/lib/client-services/audit'
+import { writeAuditLog } from '@/lib/audit'
 import { ageFromDob } from '@/lib/client-services/parse'
 import { SERVICE_CLIENT_DOCUMENT_LABELS } from '@/lib/client-services/constants'
 import {
@@ -22,6 +23,7 @@ import {
   getClientSchedulePeriod,
   schedulePeriodWhere,
 } from '@/lib/client-services/schedulePeriod'
+import { softDeleteData } from '@/lib/crm/softDelete'
 import type { ServiceClientStatus } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -269,7 +271,7 @@ export async function PATCH(request: NextRequest, context: Ctx) {
   return NextResponse.json({ client: updated })
 }
 
-/** Permanently delete a service client (full-access allowlist only). */
+/** Soft-delete a service client (full-access only). Row stays in the table. */
 export async function DELETE(request: NextRequest, context: Ctx) {
   const auth = await requireClientServicesSession()
   if (auth.response) return auth.response
@@ -289,8 +291,8 @@ export async function DELETE(request: NextRequest, context: Ctx) {
     return NextResponse.json({ error: 'Forbidden — delete requires full access' }, { status: 403 })
   }
 
-  const existing = await prisma.serviceClient.findUnique({
-    where: { id },
+  const existing = await prisma.serviceClient.findFirst({
+    where: { id, deletedAt: null },
     select: { id: true, firstName: true, lastName: true, clientCode: true },
   })
   if (!existing) {
@@ -298,22 +300,32 @@ export async function DELETE(request: NextRequest, context: Ctx) {
   }
 
   const ip = getClientIpFromRequest(request)
+  const name = `${existing.firstName} ${existing.lastName}`.trim()
   await logClientAccess({
     userId: user.id,
     serviceClientId: id,
-    action: 'CLIENT_DELETE',
+    action: 'CLIENT_SOFT_DELETE',
     ip,
   })
+  await writeAuditLog({
+    actorUserId: user.id,
+    entityType: 'ServiceClient',
+    entityId: id,
+    action: 'DELETE',
+    after: { softDeleted: true, clientCode: existing.clientCode, name },
+  })
 
-  // Schedule links use onDelete: SetNull; child PHI rows cascade.
-  await prisma.serviceClient.delete({ where: { id } })
+  await prisma.serviceClient.update({
+    where: { id },
+    data: softDeleteData(user.id),
+  })
 
   return NextResponse.json({
     ok: true,
     deleted: {
       id: existing.id,
       clientCode: existing.clientCode,
-      name: `${existing.firstName} ${existing.lastName}`.trim(),
+      name,
     },
   })
 }

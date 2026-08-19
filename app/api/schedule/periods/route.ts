@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireScheduleSession } from '@/lib/schedule/access'
 import {
+  fetchUserCrmRoles,
+  getVisibleClientsWhere,
+  isFullAccess,
+} from '@/lib/crm/access'
+import { prisma } from '@/lib/prisma'
+import {
   deleteSchedulePeriod,
   getLatestPeriodRange,
   listSchedulePeriods,
@@ -14,6 +20,17 @@ function parseDate(s: string | null): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim())
   if (!m) return null
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+}
+
+async function liveClientScope(user: { id: string; email?: string | null; crmRoles?: import('@prisma/client').CrmRole[] }) {
+  const crmRoles = user.crmRoles ?? (await fetchUserCrmRoles(user.id))
+  const subject = { id: user.id, email: user.email, crmRoles }
+  if (isFullAccess(subject)) return 'ALL' as const
+  const visible = await prisma.serviceClient.findMany({
+    where: { ...getVisibleClientsWhere(subject), pipelineStatus: 'LIVE' },
+    select: { id: true },
+  })
+  return visible.map((c) => c.id)
 }
 
 export async function GET(request: NextRequest) {
@@ -35,10 +52,13 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const liveClientIds = await liveClientScope(auth.user)
+
   const data = await loadPeriodWorkspaceData({
     periodStart,
     periodEnd,
     boroughFilter: borough,
+    liveClientIds,
   })
 
   return NextResponse.json({ ...data, periods })

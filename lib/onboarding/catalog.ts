@@ -12,9 +12,10 @@ export const TIER_A_LAST_STEP = 25
 export const TIER_B_FIRST_STEP = 26
 export const TIER_B_LAST_STEP = 30
 
-/** Free 40-hour RBT training (Autism Partnership Foundation). */
-export const FORTY_HOUR_RBT_COURSE_URL =
-  'https://courses.autismpartnershipfoundation.org/offers/it285gs6/checkout'
+/** Free 40-hour RBT training (Soar Autism Center — 2026 BACB-aligned). */
+export const FORTY_HOUR_RBT_COURSE_URL = 'https://soarautismcenter.com/free-training/'
+export const FORTY_HOUR_RBT_COURSE_PROVIDER = 'Soar Autism Center'
+export const FORTY_HOUR_RBT_COURSE_LABEL = 'Start the 40-hour RBT course (required)'
 
 export const FORTY_HOUR_RBT_CERTIFICATE_SLUG = 'forty-hour-rbt-certificate'
 
@@ -74,4 +75,14 @@ export function getCatalogEntry(stepNumber: number): CatalogEntry | undefined {
 
 export function getRbtVisibleCatalog(): CatalogEntry[] {
   return ONBOARDING_CATALOG.filter((e) => e.flowType !== 'ADMIN_ONLY')
+}
+
+/** Surface the 40-hour course first in the RBT UI without changing catalog step numbers. */
+export function sortRbtOnboardingSteps<T extends { slug: string; stepNumber: number }>(steps: T[]): T[] {
+  return [...steps].sort((a, b) => {
+    const aFirst = a.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG ? 0 : 1
+    const bFirst = b.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG ? 0 : 1
+    if (aFirst !== bFirst) return aFirst - bFirst
+    return a.stepNumber - b.stepNumber
+  })
 }

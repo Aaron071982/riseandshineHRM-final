@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import type { ApplicationData } from './types'
+import { FORTY_HOUR_RBT_COURSE_PROVIDER, FORTY_HOUR_RBT_COURSE_URL } from '@/lib/onboarding/catalog'
 
 interface ApplicationStepRBTReadinessProps {
   data: ApplicationData
@@ -35,7 +36,17 @@ export default function ApplicationStepRBTReadiness({ data, setData }: Applicati
           </Select>
           {data.fortyHourCourseCompleted === 'false' && (
             <p className="text-sm text-gray-500 mt-2">
-              If &quot;No&quot;, you will need to complete the 40-hour course and upload the certificate during onboarding.
+              If you have not completed it, the{' '}
+              <a
+                href={FORTY_HOUR_RBT_COURSE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-[#e36f1e] hover:underline"
+              >
+                {FORTY_HOUR_RBT_COURSE_PROVIDER} 40-hour RBT course
+              </a>{' '}
+              is required during onboarding. You cannot finish onboarding, sit for the RBT exam, or
+              work independently with clients until it is done.
             </p>
           )}
         </div>

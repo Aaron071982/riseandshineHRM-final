@@ -6,6 +6,8 @@ import {
   enforceClientScope,
 } from '@/lib/client-services/access'
 import { logClientAccess } from '@/lib/client-services/audit'
+import { softDeleteData } from '@/lib/crm/softDelete'
+import { assertCanEditClient, fetchUserCrmRoles } from '@/lib/crm/access'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +22,12 @@ export async function POST(request: NextRequest, context: Ctx) {
 
   const denied = await enforceClientScope(user, scope, id, request)
   if (denied) return denied
+  try {
+    const crmRoles = await fetchUserCrmRoles(user.id)
+    await assertCanEditClient({ ...user, crmRoles }, id)
+  } catch {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   let body: {
     bcbaName?: string | null
@@ -43,8 +51,9 @@ export async function POST(request: NextRequest, context: Ctx) {
   }
 
   if (Array.isArray(body.btNames)) {
-    await prisma.serviceClientBtAssignment.deleteMany({
-      where: { serviceClientId: id },
+    await prisma.serviceClientBtAssignment.updateMany({
+      where: { serviceClientId: id, deletedAt: null },
+      data: { ...softDeleteData(user.id), status: 'ENDED' },
     })
     const names = body.btNames.map((n) => n.trim()).filter(Boolean)
     if (names.length > 0) {
@@ -77,7 +86,7 @@ export async function POST(request: NextRequest, context: Ctx) {
 
   const client = await prisma.serviceClient.findUnique({
     where: { id },
-    include: { btAssignments: { where: { status: 'ACTIVE' } } },
+        include: { btAssignments: { where: { status: 'ACTIVE', deletedAt: null } } },
   })
 
   return NextResponse.json({ client })

@@ -39,7 +39,9 @@ export default async function ClientServicesClientPage({
             daysInStage: serialized.daysInStage,
             weeklyScheduleHours: serialized.weeklyScheduleHours,
             canOverrideStage: serialized.canOverrideStage,
+            canEdit: serialized.canEdit,
             gate: serialized.gate,
+            emailSend: serialized.emailSend,
             client: serialized.client,
           }}
         />
@@ -56,6 +58,7 @@ export default async function ClientServicesClientPage({
         </div>
       )
     }
+    if (err instanceof CrmAccessError && err.status === 401) return null
     throw err
   }
 }
