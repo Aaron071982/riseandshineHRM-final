@@ -1903,6 +1903,53 @@ export async function assignBcba(
   }
 }
 
+export async function updateStaffingCoverageNeeds(
+  clientId: string,
+  input: { needsMoreHours: boolean; highPriority?: boolean }
+): Promise<ActionResult> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+
+    const client = await prisma.serviceClient.findUnique({
+      where: { id: clientId },
+      select: { stage: true },
+    })
+    if (!client) return { ok: false, error: 'Not found', status: 404 }
+    if (client.stage !== 'ACTIVE') {
+      return {
+        ok: false,
+        error: 'Only active clients can be flagged for staffing coverage',
+      }
+    }
+
+    const needsMoreHours = input.needsMoreHours
+    const highPriority = needsMoreHours ? (input.highPriority ?? false) : false
+
+    await prisma.serviceClient.update({
+      where: { id: clientId },
+      data: {
+        staffingNeedsMoreHours: needsMoreHours,
+        staffingHighPriority: highPriority,
+      },
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: needsMoreHours
+        ? highPriority
+          ? 'STAFFING_NEEDS_HOURS_HIGH_PRIORITY'
+          : 'STAFFING_NEEDS_HOURS'
+        : 'STAFFING_NEEDS_HOURS_CLEARED',
+    })
+    revalidateClient(clientId)
+    return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 export async function flagRbtReplacement(
   clientId: string,
   input: {

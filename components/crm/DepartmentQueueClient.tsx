@@ -251,6 +251,18 @@ function CaseCard({
             {row.clientCode}
           </span>
         </Link>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {row.staffingHighPriority && (
+            <span className="rounded-md bg-[var(--urgent-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--urgent)]">
+              High priority
+            </span>
+          )}
+          {row.staffingNeedsMoreHours && (
+            <span className="rounded-md bg-[var(--amber-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--espresso)]">
+              Needs more hours
+            </span>
+          )}
+        </div>
         {row.ownerName && (
           <span className="text-xs text-quiet">Claimed by {row.ownerName}</span>
         )}
@@ -594,7 +606,7 @@ export default function DepartmentQueueClient({
             : data.canManage
               ? 'Full access — open any case without claiming. On Intake you can assign a case coordinator early.'
               : isStaffing
-                ? 'Claim cases in the staffing pipeline. Active clients under authorized hours appear in a separate section below.'
+                ? 'Claim cases in the staffing pipeline. Flagged active clients and those under authorized hours appear in separate sections below.'
                 : 'Claim a name from the pool to open the profile. You only see cases you have claimed.'}
         </p>
       </div>
@@ -757,6 +769,36 @@ export default function DepartmentQueueClient({
               </ul>
             )}
           </section>
+
+          {isStaffing && data.needsMoreHoursActive && (
+            <section>
+              <h2 className="mb-2 font-display text-base font-semibold text-ink">
+                Needs more hours ({data.needsMoreHoursActive.length})
+              </h2>
+              <p className="mb-2 text-xs text-quiet">
+                Active clients flagged on the Staffing tab — assign additional
+                therapist hours or replacement coverage without changing stage.
+              </p>
+              {data.needsMoreHoursActive.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
+                  No active clients flagged for additional coverage.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {data.needsMoreHoursActive.map((row) => (
+                    <CaseCard
+                      key={row.id}
+                      row={row}
+                      dept={data.dept}
+                      canManage={data.canManage}
+                      viewerUserId={data.viewerUserId}
+                      mode="claimed"
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           {isStaffing && data.underHoursActive && (
             <section>

@@ -101,6 +101,8 @@ export type DepartmentQueueRow = {
   scheduledHoursPerWeek?: number | null
   authHours?: number | null
   hoursUtilizationPct?: number | null
+  staffingNeedsMoreHours?: boolean
+  staffingHighPriority?: boolean
 }
 
 export type CoordinatorGroup = {
@@ -129,6 +131,8 @@ export type DepartmentQueueData = {
   viewerUserId: string
   /** ACTIVE clients scheduled below authorized-hours threshold (staffing only). */
   underHoursActive: DepartmentQueueRow[] | null
+  /** ACTIVE clients manually flagged as needing more therapist hours (staffing only). */
+  needsMoreHoursActive: DepartmentQueueRow[] | null
 }
 
 function mapRow(
@@ -294,6 +298,7 @@ export async function loadDepartmentQueue(
     canAssignCc: assignCc,
     viewerUserId: user.id,
     underHoursActive: null,
+    needsMoreHoursActive: null,
   }
 
   if (slug === 'case-coordination') {
@@ -334,6 +339,65 @@ export async function loadDepartmentQueue(
   })
 
   return { ...empty, unclaimed, unclaimedFull, claimed, caseCoordinators }
+}
+
+async function loadStaffingNeedsMoreHoursActive(
+  excludeIds: Set<string>
+): Promise<DepartmentQueueRow[]> {
+  const clients = await prisma.serviceClient.findMany({
+    where: {
+      ...NOT_DELETED,
+      pipelineStatus: 'LIVE',
+      stage: 'ACTIVE',
+      staffingNeedsMoreHours: true,
+    },
+    select: {
+      ...queueSelect,
+      staffingNeedsMoreHours: true,
+      staffingHighPriority: true,
+      authHours: true,
+      status: true,
+      btAssignments: {
+        where: { deletedAt: null, status: 'ACTIVE' },
+        select: { btName: true },
+      },
+    },
+    orderBy: [
+      { staffingHighPriority: 'desc' },
+      { nextActionDueAt: 'asc' },
+      { stageEnteredAt: 'asc' },
+    ],
+    take: 500,
+  })
+
+  if (clients.length === 0) return []
+
+  const metrics = await deriveMetricsForClients(
+    clients.map((c) => ({
+      id: c.id,
+      status: c.status,
+      authHours: c.authHours,
+      btAssignments: c.btAssignments,
+    }))
+  )
+
+  return clients
+    .filter((c) => !excludeIds.has(c.id))
+    .map((c) => {
+      const m = metrics.get(c.id)
+      const pct =
+        m && c.authHours
+          ? hoursUtilizationPct(m.scheduledHoursPerWeek, c.authHours)
+          : null
+      return {
+        ...mapRow(c),
+        scheduledHoursPerWeek: m?.scheduledHoursPerWeek ?? null,
+        authHours: c.authHours,
+        hoursUtilizationPct: pct,
+        staffingNeedsMoreHours: c.staffingNeedsMoreHours,
+        staffingHighPriority: c.staffingHighPriority,
+      }
+    })
 }
 
 async function loadStaffingUnderHoursActive(
@@ -428,6 +492,10 @@ async function loadStaffingQueue(
     ...unclaimed.map((r) => r.id),
     ...claimed.map((r) => r.id),
   ])
+  const needsMoreHoursActive = await loadStaffingNeedsMoreHoursActive(excludeIds)
+  for (const row of needsMoreHoursActive) {
+    excludeIds.add(row.id)
+  }
   const underHoursActive = await loadStaffingUnderHoursActive(excludeIds)
 
   await auditClientAction({
@@ -441,6 +509,7 @@ async function loadStaffingQueue(
     unclaimedFull,
     claimed,
     caseCoordinators,
+    needsMoreHoursActive,
     underHoursActive,
   }
 }
@@ -509,6 +578,7 @@ async function loadCaseCoordinationQueue(
     coordinatorGroups,
     caseCoordinators,
     underHoursActive: null,
+    needsMoreHoursActive: null,
   }
 }
 

@@ -34,7 +34,9 @@ ALTER TYPE "CommTemplate" ADD VALUE IF NOT EXISTS 'CASE_COORDINATION_FORM';
 -- ── Columns ──────────────────────────────────────────────────────────────────
 
 ALTER TABLE "service_clients"
-  ADD COLUMN IF NOT EXISTS "vobResult" TEXT;
+  ADD COLUMN IF NOT EXISTS "vobResult" TEXT,
+  ADD COLUMN IF NOT EXISTS "staffingNeedsMoreHours" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "staffingHighPriority" BOOLEAN NOT NULL DEFAULT false;
 
 ALTER TABLE "client_authorizations"
   ADD COLUMN IF NOT EXISTS "decisionDate" TIMESTAMP(3),

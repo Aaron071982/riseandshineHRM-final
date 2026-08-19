@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState, useTransition } from 'react'
+import { useCallback, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { AssignmentStage, ServiceBtAssignmentStatus } from '@prisma/client'
@@ -12,6 +12,7 @@ import {
   searchBcbaProfiles,
   searchRbtProfiles,
   updateRbtAssignment,
+  updateStaffingCoverageNeeds,
 } from '@/lib/crm/actions'
 import { ProfilePicker } from '@/components/crm/ProfilePicker'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
@@ -47,12 +48,18 @@ const STAGES: AssignmentStage[] = [
 
 export function StaffingPanel({
   clientId,
+  stage,
+  staffingNeedsMoreHours,
+  staffingHighPriority,
   assignments,
   bcbaProfile,
   bcbaProfileId,
   canEdit,
 }: {
   clientId: string
+  stage: string
+  staffingNeedsMoreHours: boolean
+  staffingHighPriority: boolean
   assignments: Assignment[]
   bcbaProfile: Bcba
   bcbaProfileId: string | null
@@ -73,6 +80,14 @@ export function StaffingPanel({
       ? { id: bcbaProfile.id, name: bcbaProfile.fullName }
       : null
   )
+  const [needsMoreHours, setNeedsMoreHours] = useState(staffingNeedsMoreHours)
+  const [highPriority, setHighPriority] = useState(staffingHighPriority)
+  const isActive = stage === 'ACTIVE'
+
+  useEffect(() => {
+    setNeedsMoreHours(staffingNeedsMoreHours)
+    setHighPriority(staffingHighPriority)
+  }, [staffingNeedsMoreHours, staffingHighPriority])
 
   const searchRbt = useCallback(async (q: string) => {
     const res = await searchRbtProfiles(q)
@@ -92,6 +107,90 @@ export function StaffingPanel({
         <p className="rounded-lg bg-[var(--urgent-bg)] px-3 py-2 text-sm text-[var(--urgent)]">
           {error}
         </p>
+      )}
+
+      {isActive && (
+        <section className="rounded-xl border border-line bg-surface p-4">
+          <h3 className="font-display text-base font-semibold text-ink">
+            Active coverage needs
+          </h3>
+          <p className="mt-0.5 text-sm text-quiet">
+            Flag this client to appear in the Staffing department queue while
+            staying Active — for additional therapist hours or replacement
+            coverage.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {canEdit ? (
+              <>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    const next = !needsMoreHours
+                    startTransition(async () => {
+                      setError('')
+                      const res = await updateStaffingCoverageNeeds(clientId, {
+                        needsMoreHours: next,
+                        highPriority: next ? highPriority : false,
+                      })
+                      if (!res.ok) {
+                        setError(res.error)
+                        return
+                      }
+                      setNeedsMoreHours(next)
+                      if (!next) setHighPriority(false)
+                      router.refresh()
+                    })
+                  }}
+                  className={cn(
+                    'h-9 rounded-lg border px-3 text-sm font-medium disabled:opacity-50',
+                    needsMoreHours
+                      ? 'border-[var(--amber)] bg-[var(--amber-bg)] text-[var(--espresso)]'
+                      : 'border-line bg-surface text-ink hover:bg-line-2'
+                  )}
+                >
+                  {needsMoreHours ? 'Needs more hours ✓' : 'Needs more hours'}
+                </button>
+                <button
+                  type="button"
+                  disabled={pending || !needsMoreHours}
+                  onClick={() => {
+                    const next = !highPriority
+                    startTransition(async () => {
+                      setError('')
+                      const res = await updateStaffingCoverageNeeds(clientId, {
+                        needsMoreHours: true,
+                        highPriority: next,
+                      })
+                      if (!res.ok) {
+                        setError(res.error)
+                        return
+                      }
+                      setHighPriority(next)
+                      router.refresh()
+                    })
+                  }}
+                  className={cn(
+                    'h-9 rounded-lg border px-3 text-sm font-medium disabled:opacity-50',
+                    highPriority
+                      ? 'border-[var(--urgent)] bg-[var(--urgent-bg)] text-[var(--urgent)]'
+                      : 'border-line bg-surface text-ink hover:bg-line-2'
+                  )}
+                >
+                  {highPriority ? 'High priority ✓' : 'High priority'}
+                </button>
+              </>
+            ) : (
+              <p className="text-sm text-ink">
+                {needsMoreHours
+                  ? highPriority
+                    ? 'Flagged — needs more hours (high priority)'
+                    : 'Flagged — needs more hours'
+                  : 'Not flagged for additional coverage'}
+              </p>
+            )}
+          </div>
+        </section>
       )}
 
       {/* BCBA */}

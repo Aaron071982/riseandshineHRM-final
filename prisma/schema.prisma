@@ -2828,6 +2828,9 @@ model ServiceClient {
   authLengthMonths     Int?
   authHours            Float?
   currentHoursPerWeek  Float?
+  /// Manual flag — ACTIVE client needs more therapist hours; stays Active but appears in Staffing queue.
+  staffingNeedsMoreHours Boolean               @default(false)
+  staffingHighPriority   Boolean               @default(false)
   notes                String?               @db.Text
   createdBy            String?
   createdAt            DateTime              @default(now())

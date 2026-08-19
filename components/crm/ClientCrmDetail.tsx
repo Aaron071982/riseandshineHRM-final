@@ -219,6 +219,9 @@ export default function ClientCrmDetail({
         {tab === 'staffing' && (
           <StaffingPanel
             clientId={client.id}
+            stage={client.stage}
+            staffingNeedsMoreHours={client.staffingNeedsMoreHours}
+            staffingHighPriority={client.staffingHighPriority}
             assignments={client.btAssignments}
             bcbaProfile={client.bcbaProfile}
             bcbaProfileId={client.bcbaProfileId}
