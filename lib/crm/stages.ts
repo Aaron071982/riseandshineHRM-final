@@ -113,6 +113,15 @@ export const STAGE_DEFAULT_OWNER_DEPT: Record<ClientStage, ClientOwnerDept> = {
   ACTIVE: 'CASE_COORDINATION',
 }
 
+/** Owner shown in UI — ACTIVE is always case coordination. */
+export function canonicalOwnerDeptForStage(
+  stage: ClientStage,
+  currentOwnerDept: ClientOwnerDept | null | undefined
+): ClientOwnerDept | null {
+  if (stage === 'ACTIVE') return 'CASE_COORDINATION'
+  return currentOwnerDept ?? STAGE_DEFAULT_OWNER_DEPT[stage] ?? null
+}
+
 /**
  * Gate requirement keys that must be satisfied before advancing past a stage.
  * Keys are seeded on `client_requirements.key` and checked by `canAdvance`.
@@ -206,7 +215,7 @@ export const STAGE_DESCRIPTIONS: Record<ClientStage, string> = {
   PRE_START:
     'Meet-and-greet done and service start date set. Final checks before services begin.',
   ACTIVE:
-    'Services are live. Clinical owns ongoing care; treatment plan must already be complete to enter this stage.',
+    'Services are live. Case coordination owns ongoing care; treatment plan must already be complete to enter this stage.',
 }
 
 export const OWNER_DEPT_LABELS: Record<ClientOwnerDept, string> = {

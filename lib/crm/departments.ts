@@ -9,7 +9,7 @@ import {
   type CrmAccessSubject,
 } from '@/lib/crm/access'
 import { daysInStage, isStalled } from '@/lib/crm/thresholds'
-import { OWNER_DEPT_LABELS } from '@/lib/crm/stages'
+import { OWNER_DEPT_LABELS, canonicalOwnerDeptForStage } from '@/lib/crm/stages'
 import {
   CLAIMABLE_POOL_SELECT,
   isReadyForCoordination,
@@ -18,6 +18,12 @@ import {
   type ClaimablePoolRow,
 } from '@/lib/crm/claims'
 import { NOT_DELETED } from '@/lib/crm/softDelete'
+import { deriveMetricsForClients } from '@/lib/client-services/serviceStatus'
+import {
+  hoursUtilizationPct,
+  isReceivingUnderAuthorizedThreshold,
+  STAFFING_HOURS_UTILIZATION_THRESHOLD,
+} from '@/lib/crm/staffingUnderHours'
 
 export type DeptSlug =
   | 'intake'
@@ -92,6 +98,9 @@ export type DepartmentQueueRow = {
   stalled: boolean
   rbtTargetDate: string | null
   billingSubstep: string | null
+  scheduledHoursPerWeek?: number | null
+  authHours?: number | null
+  hoursUtilizationPct?: number | null
 }
 
 export type CoordinatorGroup = {
@@ -118,6 +127,8 @@ export type DepartmentQueueData = {
   canManage: boolean
   canAssignCc: boolean
   viewerUserId: string
+  /** ACTIVE clients scheduled below authorized-hours threshold (staffing only). */
+  underHoursActive: DepartmentQueueRow[] | null
 }
 
 function mapRow(
@@ -168,7 +179,7 @@ function mapRow(
     firstName: c.firstName,
     lastName: c.lastName,
     stage: c.stage,
-    currentOwnerDept: c.currentOwnerDept,
+    currentOwnerDept: canonicalOwnerDeptForStage(c.stage, c.currentOwnerDept),
     currentOwnerUserId: c.currentOwnerUserId,
     caseCoordinatorUserId: c.caseCoordinatorUserId,
     ownerName:
@@ -282,10 +293,15 @@ export async function loadDepartmentQueue(
     canManage: manage,
     canAssignCc: assignCc,
     viewerUserId: user.id,
+    underHoursActive: null,
   }
 
   if (slug === 'case-coordination') {
     return loadCaseCoordinationQueue(user, empty)
+  }
+
+  if (slug === 'staffing') {
+    return loadStaffingQueue(user, empty)
   }
 
   const membership = getDepartmentQueueMembershipWhere(dept)
@@ -318,6 +334,115 @@ export async function loadDepartmentQueue(
   })
 
   return { ...empty, unclaimed, unclaimedFull, claimed, caseCoordinators }
+}
+
+async function loadStaffingUnderHoursActive(
+  excludeIds: Set<string>
+): Promise<DepartmentQueueRow[]> {
+  const candidates = await prisma.serviceClient.findMany({
+    where: {
+      ...NOT_DELETED,
+      pipelineStatus: 'LIVE',
+      stage: 'ACTIVE',
+      authHours: { gt: 0 },
+    },
+    select: {
+      ...queueSelect,
+      status: true,
+      authHours: true,
+      btAssignments: {
+        where: { deletedAt: null, status: 'ACTIVE' },
+        select: { btName: true },
+      },
+    },
+    orderBy: [{ nextActionDueAt: 'asc' }, { stageEnteredAt: 'asc' }],
+    take: 500,
+  })
+
+  if (candidates.length === 0) return []
+
+  const metrics = await deriveMetricsForClients(
+    candidates.map((c) => ({
+      id: c.id,
+      status: c.status,
+      authHours: c.authHours,
+      btAssignments: c.btAssignments,
+    }))
+  )
+
+  return candidates
+    .filter((c) => {
+      if (excludeIds.has(c.id)) return false
+      const m = metrics.get(c.id)
+      if (!m) return false
+      return isReceivingUnderAuthorizedThreshold(
+        m.scheduledHoursPerWeek,
+        c.authHours
+      )
+    })
+    .map((c) => {
+      const m = metrics.get(c.id)!
+      const pct = hoursUtilizationPct(m.scheduledHoursPerWeek, c.authHours)
+      return {
+        ...mapRow(c),
+        scheduledHoursPerWeek: m.scheduledHoursPerWeek,
+        authHours: c.authHours,
+        hoursUtilizationPct: pct,
+      }
+    })
+}
+
+async function loadStaffingQueue(
+  user: CrmAccessSubject & { id: string },
+  empty: DepartmentQueueData
+): Promise<DepartmentQueueData> {
+  const dept = empty.dept
+  const manage = empty.canManage
+  const assignCc = empty.canAssignCc
+
+  const membership = getDepartmentQueueMembershipWhere(dept)
+  const unclaimedWhere: Prisma.ServiceClientWhereInput = {
+    AND: [{ ...NOT_DELETED }, membership, { currentOwnerUserId: null }, noActiveDeptClaimWhere()],
+  }
+  const unclaimed = await loadClaimablePool(unclaimedWhere)
+  const unclaimedFull = manage ? await loadRows(unclaimedWhere) : null
+
+  let caseCoordinators: DepartmentQueueData['caseCoordinators'] = null
+  if (assignCc) {
+    caseCoordinators = await loadCaseCoordinatorsList()
+  }
+
+  const claimedWhere: Prisma.ServiceClientWhereInput = manage
+    ? { AND: [{ ...NOT_DELETED }, membership, { currentOwnerUserId: { not: null } }] }
+    : {
+        AND: [
+          { ...NOT_DELETED },
+          membership,
+          { claims: { some: { userId: user.id, releasedAt: null } } },
+        ],
+      }
+
+  const claimed = await loadRows(claimedWhere)
+
+  const excludeIds = new Set<string>([
+    ...unclaimed.map((r) => r.id),
+    ...claimed.map((r) => r.id),
+  ])
+  const underHoursActive = await loadStaffingUnderHoursActive(excludeIds)
+
+  await auditClientAction({
+    userId: user.id,
+    action: `DEPT_QUEUE_VIEW:${dept}`,
+  })
+
+  return {
+    ...empty,
+    unclaimed,
+    unclaimedFull,
+    claimed,
+    caseCoordinators,
+    underHoursActive,
+  }
 }
 
 async function loadCaseCoordinationQueue(
@@ -383,6 +508,7 @@ async function loadCaseCoordinationQueue(
     unassignedCc,
     coordinatorGroups,
     caseCoordinators,
+    underHoursActive: null,
   }
 }
 

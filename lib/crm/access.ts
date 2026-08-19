@@ -23,6 +23,7 @@ import {
   OWNER_DEPT_TO_CRM_ROLE,
 } from '@/lib/crm/roleConstants'
 import { NOT_DELETED } from '@/lib/crm/softDelete'
+import { isActiveStaffingUnderHoursClient } from '@/lib/crm/staffingUnderHours'
 
 export {
   CRM_DEPARTMENT_ROLES,
@@ -271,12 +272,17 @@ export async function assertCanViewClient(
       hasClaimGrant: client.claims.length > 0,
     })
   ) {
-    await auditClientAction({
-      userId: user.id,
-      serviceClientId: clientId,
-      action: 'PROFILE_DENIED',
-    })
-    throw new CrmAccessError('Forbidden', 403)
+    const staffingCrossList =
+      getUserCrmRoles(user).includes('STAFFING') &&
+      (await isActiveStaffingUnderHoursClient(clientId))
+    if (!staffingCrossList) {
+      await auditClientAction({
+        userId: user.id,
+        serviceClientId: clientId,
+        action: 'PROFILE_DENIED',
+      })
+      throw new CrmAccessError('Forbidden', 403)
+    }
   }
   return {
     id: client.id,
@@ -323,10 +329,15 @@ export async function assertCanEditClient(
     throw new CrmAccessError('Forbidden', 403)
   }
   if (!canEditClientRecord(user, snapshot)) {
-    throw new CrmAccessError(
-      'View-only — this client is not currently owned by your department',
-      403
-    )
+    const staffingCrossList =
+      getUserCrmRoles(user).includes('STAFFING') &&
+      (await isActiveStaffingUnderHoursClient(clientId))
+    if (!staffingCrossList) {
+      throw new CrmAccessError(
+        'View-only — this client is not currently owned by your department',
+        403
+      )
+    }
   }
   return {
     id: client.id,

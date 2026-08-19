@@ -16,6 +16,7 @@ import { allowedTemplatesForUser } from '@/lib/crm/emails/templatePolicy'
 import { graphEmailEnabled } from '@/lib/crm/emails/graphSend'
 import { hasRiseAndShineMailbox, mailboxBlockedReason } from '@/lib/crm/emails/mailbox'
 import { ensureClientRequirements } from '@/lib/crm/ensureRequirements'
+import { ensureCanonicalOwnerDept } from '@/lib/crm/ensureOwnerDept'
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
@@ -113,6 +114,12 @@ export async function loadClientCrmDetail(clientId: string) {
   })
 
   if (!client) notFound()
+
+  client.currentOwnerDept = await ensureCanonicalOwnerDept(
+    client.id,
+    client.stage,
+    client.currentOwnerDept
+  )
 
   await auditClientAction({
     userId: user.id,

@@ -19,8 +19,16 @@ async function main() {
     select: { id: true, clientCode: true, stage: true },
   })
 
+  const driftRows = await prisma.serviceClient.findMany({
+    where: { deletedAt: null, stage: 'ACTIVE', currentOwnerDept: { not: 'CASE_COORDINATION' } },
+    select: { id: true, clientCode: true, stage: true, currentOwnerDept: true },
+  })
+
   console.log(
     `[backfill-owner-dept] ${nullRows.length} client(s) with null currentOwnerDept${target.dryRun ? ' (dry-run)' : ''}`
+  )
+  console.log(
+    `[backfill-owner-dept] ${driftRows.length} ACTIVE client(s) not owned by CASE_COORDINATION${target.dryRun ? ' (dry-run)' : ''}`
   )
 
   let updated = 0
@@ -31,6 +39,19 @@ async function main() {
       continue
     }
     console.log(`  ${row.clientCode} ${row.stage} → ${dept}`)
+    if (!target.dryRun) {
+      await prisma.$executeRaw`
+        UPDATE service_clients
+        SET "currentOwnerDept" = ${dept}::"ClientOwnerDept"
+        WHERE id = ${row.id}
+      `
+    }
+    updated++
+  }
+
+  for (const row of driftRows) {
+    const dept = STAGE_DEFAULT_OWNER_DEPT.ACTIVE
+    console.log(`  ${row.clientCode} ACTIVE ${row.currentOwnerDept} → ${dept}`)
     if (!target.dryRun) {
       await prisma.$executeRaw`
         UPDATE service_clients

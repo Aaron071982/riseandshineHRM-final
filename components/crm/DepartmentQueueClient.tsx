@@ -17,6 +17,7 @@ import type { ClaimablePoolRow } from '@/lib/crm/claims'
 import { OWNER_DEPT_LABELS, STAGE_LABELS } from '@/lib/crm/stages'
 import { OwnerDeptBadge } from '@/components/crm/StageStepper'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
+import { STAFFING_HOURS_UTILIZATION_THRESHOLD } from '@/lib/crm/staffingUnderHours'
 import { cn } from '@/lib/utils'
 
 const HANDOFF_DEPTS: ClientOwnerDept[] = [
@@ -81,6 +82,22 @@ function FiveFieldSummary({ row }: { row: DepartmentQueueRow }) {
             Billing sub-step
           </span>
           <span className="font-medium text-ink">{row.billingSubstep}</span>
+        </div>
+      )}
+      {row.hoursUtilizationPct != null && row.authHours != null && (
+        <div className="sm:col-span-5">
+          <span className="block text-[10px] uppercase tracking-wide text-quiet">
+            Scheduled vs authorized
+          </span>
+          <span
+            className={cn(
+              'font-medium tabular-nums',
+              row.hoursUtilizationPct < 70 ? 'text-[var(--urgent)]' : 'text-ink'
+            )}
+          >
+            {(row.scheduledHoursPerWeek ?? 0).toFixed(1)} / {row.authHours} hrs (
+            {row.hoursUtilizationPct}%)
+          </span>
         </div>
       )}
     </div>
@@ -557,6 +574,9 @@ export default function DepartmentQueueClient({
     data.canAssignCc &&
     (data.caseCoordinators?.length ?? 0) > 0
 
+  const isStaffing = data.slug === 'staffing'
+  const underHoursPct = Math.round(STAFFING_HOURS_UTILIZATION_THRESHOLD * 100)
+
   const unclaimedCount =
     data.canManage && data.unclaimedFull
       ? data.unclaimedFull.length
@@ -573,7 +593,9 @@ export default function DepartmentQueueClient({
             ? 'Case coordinators are assigned by a manager. Upcoming is before therapist found; Ready starts at RBT assigned.'
             : data.canManage
               ? 'Full access — open any case without claiming. On Intake you can assign a case coordinator early.'
-              : 'Claim a name from the pool to open the profile. You only see cases you have claimed.'}
+              : isStaffing
+                ? 'Claim cases in the staffing pipeline. Active clients under authorized hours appear in a separate section below.'
+                : 'Claim a name from the pool to open the profile. You only see cases you have claimed.'}
         </p>
       </div>
 
@@ -735,6 +757,37 @@ export default function DepartmentQueueClient({
               </ul>
             )}
           </section>
+
+          {isStaffing && data.underHoursActive && (
+            <section>
+              <h2 className="mb-2 font-display text-base font-semibold text-ink">
+                Under authorized hours ({data.underHoursActive.length})
+              </h2>
+              <p className="mb-2 text-xs text-quiet">
+                Active clients receiving less than {underHoursPct}% of authorized weekly
+                hours — add RBT coverage or schedule time even if another department
+                owns the case.
+              </p>
+              {data.underHoursActive.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
+                  No active clients below {underHoursPct}% utilization.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {data.underHoursActive.map((row) => (
+                    <CaseCard
+                      key={row.id}
+                      row={row}
+                      dept={data.dept}
+                      canManage={data.canManage}
+                      viewerUserId={data.viewerUserId}
+                      mode="claimed"
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           <section>
             <h2 className="mb-2 font-display text-base font-semibold text-ink">

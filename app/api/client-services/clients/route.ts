@@ -12,6 +12,7 @@ import {
 import { getUnlinkedScheduleClientNames } from '@/lib/client-services/scheduleSync'
 import { getClientSchedulePeriod } from '@/lib/client-services/schedulePeriod'
 import { caseloadQueueWhere, isClientStage } from '@/lib/crm/caseloadFilters'
+import { canonicalOwnerDeptForStage } from '@/lib/crm/stages'
 import { daysInStage, isStalled } from '@/lib/crm/thresholds'
 import type { Prisma, ServiceClientStatus } from '@prisma/client'
 
@@ -148,7 +149,7 @@ export async function GET(request: NextRequest) {
       status: c.status,
       stage: c.stage,
       pipelineStatus: c.pipelineStatus,
-      currentOwnerDept: c.currentOwnerDept,
+      currentOwnerDept: canonicalOwnerDeptForStage(c.stage, c.currentOwnerDept),
       nextAction: c.nextAction,
       nextActionDueAt: c.nextActionDueAt,
       stageEnteredAt: c.stageEnteredAt,
