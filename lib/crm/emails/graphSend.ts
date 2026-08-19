@@ -1,6 +1,5 @@
 import { cookies } from 'next/headers'
-
-const GRAPH_TOKEN_COOKIE = 'ms_graph_delegated_token'
+import { MICROSOFT_GRAPH_TOKEN_COOKIE } from '@/lib/auth/microsoft'
 
 /** Whether real Microsoft Graph sendMail is enabled (M365 admin consent). */
 export function graphEmailEnabled(): boolean {
@@ -32,7 +31,7 @@ export async function resolveDelegatedGraphToken(
   if (envToken) return envToken
 
   const cookieStore = await cookies()
-  const fromCookie = cookieStore.get(GRAPH_TOKEN_COOKIE)?.value?.trim()
+  const fromCookie = cookieStore.get(MICROSOFT_GRAPH_TOKEN_COOKIE)?.value?.trim()
   if (fromCookie) return fromCookie
 
   // Future: load from user-linked token store keyed by userId

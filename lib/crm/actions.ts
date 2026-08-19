@@ -18,6 +18,7 @@ import type {
   ServiceBtAssignmentStatus,
   ServiceClientStatus,
 } from '@prisma/client'
+import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit'
@@ -91,9 +92,32 @@ function fail(err: unknown): { ok: false; error: string; status?: number } {
   if (err instanceof CrmAccessError) {
     return { ok: false, error: err.message, status: err.status }
   }
+  if (err instanceof z.ZodError) {
+    return { ok: false, error: err.issues[0]?.message ?? 'Invalid input', status: 400 }
+  }
   console.error('[crm] action failed', err)
   return { ok: false, error: 'Something went wrong' }
 }
+
+const ConsentLinesPatchSchema = z
+  .record(z.string().min(1), z.boolean())
+  .refine((obj) => Object.keys(obj).length > 0, {
+    message: 'At least one consent line is required',
+  })
+
+const ScheduleEntryUpdateSchema = z
+  .object({
+    rbtProfileId: z.string().min(1).optional(),
+    dayOfWeek: z.number().int().min(0).max(6).optional(),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    location: z.string().max(120).nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+  })
+  .refine((v) => {
+    if (!v.startTime || !v.endTime) return true
+    return v.startTime < v.endTime
+  }, 'endTime must be after startTime')
 
 export async function updateClientNextAction(
   clientId: string,
@@ -924,11 +948,13 @@ export async function saveConsentInitials(
 
     const row = await upsertConsentRow(clientId)
     const lines = parseConsentLines(row.lines)
+    const parsedPatch = ConsentLinesPatchSchema.parse(linesPatch)
     const nowIso = new Date().toISOString()
-    for (const [key, on] of Object.entries(linesPatch) as [
-      ConsentLineKey,
-      boolean,
-    ][]) {
+    for (const [rawKey, on] of Object.entries(parsedPatch)) {
+      if (!(rawKey in lines)) {
+        return { ok: false, error: `Invalid consent line key: ${rawKey}`, status: 400 }
+      }
+      const key = rawKey as ConsentLineKey
       const prev = lines[key] ?? {
         initialed: false,
         initialedAt: null,
@@ -2237,6 +2263,7 @@ export async function updateScheduleEntry(
   }
 ): Promise<ActionResult> {
   try {
+    const parsedInput = ScheduleEntryUpdateSchema.parse(input)
     const user = await getClientServicesUser()
     const existing = await prisma.rbtScheduleAssignment.findUnique({
       where: { id: entryId },
@@ -2246,24 +2273,20 @@ export async function updateScheduleEntry(
     }
     await assertCanEditClient(user, existing.serviceClientId)
 
-    if (input.dayOfWeek !== undefined && (input.dayOfWeek < 0 || input.dayOfWeek > 6)) {
-      return { ok: false, error: 'Invalid day of week' }
-    }
-
     await prisma.rbtScheduleAssignment.update({
       where: { id: entryId },
       data: {
-        ...(input.rbtProfileId !== undefined
-          ? { rbtProfileId: input.rbtProfileId }
+        ...(parsedInput.rbtProfileId !== undefined
+          ? { rbtProfileId: parsedInput.rbtProfileId }
           : {}),
-        ...(input.dayOfWeek !== undefined ? { dayOfWeek: input.dayOfWeek } : {}),
-        ...(input.startTime !== undefined ? { startTime: input.startTime } : {}),
-        ...(input.endTime !== undefined ? { endTime: input.endTime } : {}),
-        ...(input.location !== undefined
-          ? { location: input.location?.trim() || null }
+        ...(parsedInput.dayOfWeek !== undefined ? { dayOfWeek: parsedInput.dayOfWeek } : {}),
+        ...(parsedInput.startTime !== undefined ? { startTime: parsedInput.startTime } : {}),
+        ...(parsedInput.endTime !== undefined ? { endTime: parsedInput.endTime } : {}),
+        ...(parsedInput.location !== undefined
+          ? { location: parsedInput.location?.trim() || null }
           : {}),
-        ...(input.notes !== undefined
-          ? { notes: input.notes?.trim() || null }
+        ...(parsedInput.notes !== undefined
+          ? { notes: parsedInput.notes?.trim() || null }
           : {}),
       },
     })

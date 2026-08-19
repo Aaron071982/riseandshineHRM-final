@@ -25,7 +25,9 @@ export default function LoginPage() {
 
   const sessionError = searchParams.get('session_error')
   const sessionExpired = searchParams.get('session_expired')
+  const sessionReason = searchParams.get('reason')
   const returnUrl = searchParams.get('returnUrl')
+  const microsoftEnabled = process.env.NEXT_PUBLIC_MICROSOFT_AUTH_ENABLED === 'true'
 
   useEffect(() => {
     if (returnUrl && isSafeOAuthReturnUrl(returnUrl)) {
@@ -34,11 +36,11 @@ export default function LoginPage() {
   }, [returnUrl])
   useEffect(() => {
     if (sessionError === '1') {
-      setError('Your session expired or could not be verified. Please log in again.')
+      setError(sessionReason || 'Your session expired or could not be verified. Please log in again.')
     } else if (sessionExpired === '1') {
       setError('Your session expired. Please log in again.')
     }
-  }, [sessionError, sessionExpired])
+  }, [sessionError, sessionExpired, sessionReason])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -178,20 +180,37 @@ export default function LoginPage() {
                   Access your HRM portal with your work email
                 </p>
                 {!showLoginForm ? (
-                  <motion.div
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={() => setShowLoginForm(true)}
-                      className="w-full border-2 border-gray-300 dark:border-[var(--border-medium)] rounded-button px-8 py-6 text-lg font-semibold bg-white dark:bg-[var(--bg-input)] hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)] dark:text-[var(--text-primary)] transition-all duration-200"
+                  <div className="w-full space-y-3">
+                    {microsoftEnabled && (
+                      <motion.a
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        href="/api/auth/microsoft/start"
+                        className="block"
+                      >
+                        <Button
+                          size="lg"
+                          className="w-full rounded-button px-8 py-6 text-lg font-semibold"
+                        >
+                          Sign in with Microsoft
+                        </Button>
+                      </motion.a>
+                    )}
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                     >
-                      <LogIn className="mr-2 h-5 w-5" />
-                      Log In
-                    </Button>
-                  </motion.div>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={() => setShowLoginForm(true)}
+                        className="w-full border-2 border-gray-300 dark:border-[var(--border-medium)] rounded-button px-8 py-6 text-lg font-semibold bg-white dark:bg-[var(--bg-input)] hover:bg-gray-50 dark:hover:bg-[var(--bg-elevated-hover)] dark:text-[var(--text-primary)] transition-all duration-200"
+                      >
+                        <LogIn className="mr-2 h-5 w-5" />
+                        Log In with OTP
+                      </Button>
+                    </motion.div>
+                  </div>
                 ) : (
                   <div className="w-full space-y-4">
                     <form onSubmit={handleSubmit} className="space-y-4">

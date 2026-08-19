@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { randomUUID } from 'crypto'
+import { Prisma } from '@prisma/client'
 
 const VALID_TYPES = new Set(['BLOCKED', 'CUSTOM'])
 
@@ -42,7 +43,7 @@ export async function GET() {
   const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
 
   if (!prismaAny.adminAvailabilityOverride?.findMany) {
-    const overrides = await prisma.$queryRawUnsafe<
+    const overrides = await prisma.$queryRaw<
       Array<{
         id: string
         userId: string
@@ -57,12 +58,10 @@ export async function GET() {
         updatedAt: Date
       }>
     >(
-      `SELECT id, "userId", "date", "overrideType", "startHour", "startMinute", "endHour", "endMinute", reason, "createdAt", "updatedAt"
+      Prisma.sql`SELECT id, "userId", "date", "overrideType", "startHour", "startMinute", "endHour", "endMinute", reason, "createdAt", "updatedAt"
        FROM admin_availability_overrides
-       WHERE "userId" = $1 AND "date" >= $2::date
-       ORDER BY "date" ASC, "createdAt" ASC`,
-      auth.user.id,
-      start.toISOString().slice(0, 10)
+       WHERE "userId" = ${auth.user.id} AND "date" >= ${start.toISOString().slice(0, 10)}::date
+       ORDER BY "date" ASC, "createdAt" ASC`
     ).catch(() => [])
     return NextResponse.json({ overrides })
   }
@@ -141,23 +140,7 @@ export async function POST(request: NextRequest) {
   if (!prismaAny.adminAvailabilityOverride?.upsert) {
     const id = randomUUID()
     const dateStr = date.toISOString().slice(0, 10)
-    const sql = `
-      INSERT INTO admin_availability_overrides
-        (id, "userId", "date", "overrideType", "startHour", "startMinute", "endHour", "endMinute", reason, "createdAt", "updatedAt")
-      VALUES
-        ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-      ON CONFLICT ("userId", "date")
-      DO UPDATE SET
-        "overrideType" = EXCLUDED."overrideType",
-        "startHour" = EXCLUDED."startHour",
-        "startMinute" = EXCLUDED."startMinute",
-        "endHour" = EXCLUDED."endHour",
-        "endMinute" = EXCLUDED."endMinute",
-        reason = EXCLUDED.reason,
-        "updatedAt" = NOW()
-      RETURNING id, "userId", "date", "overrideType", "startHour", "startMinute", "endHour", "endMinute", reason, "createdAt", "updatedAt"
-    `
-    const rows = await prisma.$queryRawUnsafe<
+    const rows = await prisma.$queryRaw<
       Array<{
         id: string
         userId: string
@@ -172,16 +155,20 @@ export async function POST(request: NextRequest) {
         updatedAt: Date
       }>
     >(
-      sql,
-      id,
-      auth.user.id,
-      dateStr,
-      overrideType,
-      overrideType === 'CUSTOM' ? startHour : null,
-      overrideType === 'CUSTOM' ? startMinute : null,
-      overrideType === 'CUSTOM' ? endHour : null,
-      overrideType === 'CUSTOM' ? endMinute : null,
-      reason || null
+      Prisma.sql`INSERT INTO admin_availability_overrides
+        (id, "userId", "date", "overrideType", "startHour", "startMinute", "endHour", "endMinute", reason, "createdAt", "updatedAt")
+      VALUES
+        (${id}, ${auth.user.id}, ${dateStr}::date, ${overrideType}, ${overrideType === 'CUSTOM' ? startHour : null}, ${overrideType === 'CUSTOM' ? startMinute : null}, ${overrideType === 'CUSTOM' ? endHour : null}, ${overrideType === 'CUSTOM' ? endMinute : null}, ${reason || null}, NOW(), NOW())
+      ON CONFLICT ("userId", "date")
+      DO UPDATE SET
+        "overrideType" = EXCLUDED."overrideType",
+        "startHour" = EXCLUDED."startHour",
+        "startMinute" = EXCLUDED."startMinute",
+        "endHour" = EXCLUDED."endHour",
+        "endMinute" = EXCLUDED."endMinute",
+        reason = EXCLUDED.reason,
+        "updatedAt" = NOW()
+      RETURNING id, "userId", "date", "overrideType", "startHour", "startMinute", "endHour", "endMinute", reason, "createdAt", "updatedAt"`
     ).catch(() => [])
     if (!rows.length) {
       return NextResponse.json(

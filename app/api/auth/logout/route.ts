@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { deleteSession, validateSession } from '@/lib/auth'
+import { MICROSOFT_GRAPH_TOKEN_COOKIE } from '@/lib/auth/microsoft'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     cookieStore.delete('session')
+    cookieStore.delete(MICROSOFT_GRAPH_TOKEN_COOKIE)
 
     return NextResponse.json({ success: true })
   } catch (error) {

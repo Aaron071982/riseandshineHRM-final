@@ -89,6 +89,109 @@ Consider default-deny on `/api/*` in `middleware.ts` with an explicit public all
 - `npx vitest run lib/crm/access.test.ts lib/crm/claims.test.ts lib/client-services/access.test.ts lib/schedule/clientScope.test.ts` ✅ (28/28)
 - Billing guard sanity check: all billing handlers still reference `requireBillingManagerSession` (16 route files).
 
+## Stage 2 Batch 3 — RBT self-service owner scope (completed)
+
+### Split before fixes (Bucket C)
+- Bucket C triage rows reviewed: **40 endpoint-methods** across **37 route files**.
+- **Already owner-scoped / self-scoped:** **39 endpoint-methods**
+  - RBT pay (`stubs`, `statements`, `summary`) checks `stub.rbtProfileId === auth.user.rbtProfileId` or queries by current `rbtProfileId`.
+  - RBT messages/documents/onboarding/availability/schedule routes bind queries to current `user.rbtProfileId`.
+  - Profile/session routes bind to `user.id` for session/profile mutations.
+- **Session-only with cross-RBT IDOR risk:** **0 endpoint-methods**.
+
+### Reclassifications discovered during manual review
+- `app/api/mobile/sync/time-entry/route.ts` is **system-token guarded** (`Authorization` bearer / `x-hrm-sync-key`) and should be treated as a system actor route (Bucket E/system), not an RBT owner-scoped endpoint.
+- `app/api/rbt/onboarding/documents/[documentId]/pdf/route.ts` is session-gated and returns shared active onboarding forms (not per-RBT private rows), so it is not a cross-RBT data path.
+
+### Batch 3 code changes
+- No code changes required for cross-RBT owner-scope hardening in this batch; high-risk routes were already enforcing ownership.
+
+## Stage 2 Batch 4 — Remaining authenticated + hygiene (completed)
+
+### Split before fixes (Bucket D)
+- Bucket D triage rows reviewed: **11 endpoint-methods**.
+- **Already guarded (session / token / system guard): 9**
+  - `activity/track` validates session.
+  - `onboarding/acknowledge`, `onboarding/notice-receipt`, `onboarding/pdf/upload` validate session + role.
+  - `mcp` route methods (`GET/POST/DELETE/OPTIONS`) enforce `assertMcpAuth` token auth.
+  - `auth/me` is treated as an auth-state probe endpoint (returns `authenticated: false` when no session).
+- **No guard at all (real fixes): 2**
+  - `mapbox/autocomplete` GET
+  - `mapbox/details` GET
+
+### Real fixes applied
+- Added authenticated-session guard to:
+  - `app/api/mapbox/autocomplete/route.ts`
+  - `app/api/mapbox/details/route.ts`
+
+### Mandatory raw SQL hardening (applied regardless of route auth)
+- Removed unsafe raw SQL in availability override endpoints:
+  - `app/api/admin/team/availability/override/route.ts`
+  - `app/api/admin/team/availability/override/[id]/route.ts`
+- Replaced `$queryRawUnsafe`/`$executeRawUnsafe` with parameterized `$queryRaw`/`$executeRaw` using `Prisma.sql`.
+
+### Error-leakage hardening
+- Payroll import/parse/upload now return generic external errors while logging details server-side:
+  - `app/api/admin/payroll/upload/route.ts`
+  - `app/api/admin/payroll/ytd/import/route.ts`
+  - `app/api/admin/payroll/ytd/parse/route.ts`
+
+### Validation hardening (LOW)
+- `lib/crm/actions.ts`
+  - `saveConsentInitials`: schema-validated patch payload + invalid key rejection.
+  - `updateScheduleEntry`: schema validation + cross-field check (`endTime` after `startTime`).
+
+## Stage 2 Batch 5 — Public / token routes (completed)
+
+### Company-docs magic-link routes (primary scrutiny)
+
+| Control | Status | Evidence |
+|---------|--------|----------|
+| **Token unguessable + scoped** | ✅ Pass | `mintCompanyDocAccessToken()` uses `randomBytes(32)` (256-bit); stored as SHA-256 hash; `findUnique({ accessTokenHash })` resolves exactly one `CompanyDocumentRecipient` — token A cannot return document B. |
+| **Token expiry** | ✅ Pass | `COMPANY_DOC_TOKEN_TTL_DAYS = 90`; `resolveCompanyDocAccessToken` rejects when `accessTokenExpiresAt < now`. |
+| **Rate limiting** | ✅ Fixed | Added DB-backed `assertCompanyDocPublicRateLimit` on all four routes: meta (60/15m), file (40/15m), view (40/15m), sign (20/15m) per IP. |
+| **No over-return** | ✅ Pass | `[token]/file` streams only `row.companyDocument.fileUrl` from resolved recipient; metadata routes return recipient-scoped fields only. |
+
+**Additional scope gates in `resolveCompanyDocAccessToken`:**
+- Document must be `isActive`
+- Document type must be `ACKNOWLEDGMENT` or `VIEW_ONLY` (not `DOWNLOAD_UPLOAD` via email link)
+
+### Other Bucket E routes verified
+
+| Route group | Token / auth | Expiry | Rate limit | Over-return |
+|-------------|--------------|--------|------------|-------------|
+| `public/apply/*` | Draft token in body | Draft TTL in handler | In-memory IP limits ✅ | Scoped to draft row |
+| `public/validate-scheduling-token`, `schedule-interview`, `calendar/ics` | `rbtId` + `schedulingToken` composite lookup | Rotates on resend (no fixed TTL) | Added DB-backed scheduling rate limits ✅ | ICS scoped to matching interview |
+| `public/interviewers`, `interviewer-slots` | None (public scheduling UI) | n/a | Not added (admin first names + slots only — no PHI) | No client/family data |
+| `oauth/*` | PKCE + admin consent + one-time auth codes | Auth code + access token TTL ✅ | OAuth standard flow | MCP scope only |
+| `auth/send-otp`, `verify-otp` | Email OTP | OTP TTL in store | DB rate limits ✅ | Session only to verified email |
+| `cron/*`, `mcp`, `mobile/sync` | Secret / API key / bearer | n/a | System actors | System-scoped |
+
+### Batch 5 code changes
+- `lib/company-documents/publicRateLimit.ts` — DB-backed IP rate limits for company-doc public routes
+- `lib/public/schedulingRateLimit.ts` — DB-backed IP rate limits for scheduling token routes
+- Wired rate limits into all four `public/company-docs/[token]/*` handlers
+- Wired rate limits into `validate-scheduling-token`, `schedule-interview`, `calendar/ics`
+
+## Final audit re-run (post Batch 5)
+
+Script: `scripts/security-audit-rerun.mjs` (expanded guard recognition vs Stage 1 heuristic).
+
+| Metric | Stage 1 | Post-remediation |
+|--------|---------|------------------|
+| Total handlers | 309 | 309 |
+| FLAG / REAL_GAP | 153 FLAG → 114 REAL GAP | **0 REAL_GAP** |
+| PHI REAL_GAP | 59 | **0** |
+| INTENTIONALLY_PUBLIC (confirmed) | 21 (planned) | **39** |
+| OK (guarded) | 156 | **270** |
+
+**Security pass criterion met:** PHI real-gap count → **0**, with public document routes confirmed token-scoped, expiring, and rate-limited.
+
+### Batch 5 verification
+- `npx tsc --noEmit` ✅
+- `npx vitest run …` ✅ (28/28)
+- `node scripts/security-audit-rerun.mjs` ✅ (PHI REAL_GAP: 0)
+
 ## CRITICAL Candidates (REAL GAP + PHI)
 
 These are unauth/insufficiently guarded PHI-sensitive handlers pending confirmation/fix:

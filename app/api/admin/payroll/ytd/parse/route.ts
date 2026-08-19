@@ -33,9 +33,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ preview })
   } catch (e) {
     console.error('[admin/payroll/ytd/parse]', e)
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Parse failed' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Parse failed' }, { status: 500 })
   }
 }

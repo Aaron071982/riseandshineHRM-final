@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { assertSchedulingPublicRateLimit } from '@/lib/public/schedulingRateLimit'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const fetchCache = 'force-no-store'
 
 export async function GET(request: NextRequest) {
+  const rateLimited = await assertSchedulingPublicRateLimit(request, 'validate')
+  if (rateLimited) return rateLimited
+
   try {
     const searchParams = request.nextUrl.searchParams
     const token = searchParams.get('token')
@@ -57,7 +61,7 @@ export async function GET(request: NextRequest) {
       valid: true,
       rbtName: `${rbtProfile.firstName} ${rbtProfile.lastName}`,
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error validating scheduling token:', error)
     return NextResponse.json(
       { valid: false, error: 'An error occurred while validating the token' },

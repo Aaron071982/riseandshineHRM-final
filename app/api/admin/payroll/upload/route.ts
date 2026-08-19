@@ -19,9 +19,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result)
   } catch (error) {
     console.error('[payroll/upload]', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to parse payroll register' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Failed to parse payroll register' }, { status: 400 })
   }
 }

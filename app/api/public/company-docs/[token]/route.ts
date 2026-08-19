@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveCompanyDocAccessToken } from '@/lib/company-documents/accessToken'
+import { assertCompanyDocPublicRateLimit } from '@/lib/company-documents/publicRateLimit'
 
 export const dynamic = 'force-dynamic'
 
 type Ctx = { params: Promise<{ token: string }> }
 
 /** Public metadata for a company-doc magic link. */
-export async function GET(_request: NextRequest, context: Ctx) {
+export async function GET(request: NextRequest, context: Ctx) {
+  const rateLimited = await assertCompanyDocPublicRateLimit(request, 'meta')
+  if (rateLimited) return rateLimited
+
   const { token } = await context.params
   const row = await resolveCompanyDocAccessToken(token)
   if (!row) {

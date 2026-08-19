@@ -4,6 +4,7 @@ import {
   companyDocFileResponse,
   downloadCompanyDocFile,
 } from '@/lib/company-documents/fileResponse'
+import { assertCompanyDocPublicRateLimit } from '@/lib/company-documents/publicRateLimit'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,9 @@ type Ctx = { params: Promise<{ token: string }> }
 
 /** Stream or download the document via magic link (no login). */
 export async function GET(request: NextRequest, context: Ctx) {
+  const rateLimited = await assertCompanyDocPublicRateLimit(request, 'file')
+  if (rateLimited) return rateLimited
+
   const { token } = await context.params
   const row = await resolveCompanyDocAccessToken(token)
   if (!row) {

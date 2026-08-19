@@ -47,9 +47,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, ...result })
   } catch (e) {
     console.error('[admin/payroll/ytd/import]', e)
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Import failed' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Import failed' }, { status: 400 })
   }
 }

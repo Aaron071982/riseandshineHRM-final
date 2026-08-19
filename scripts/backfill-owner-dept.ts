@@ -32,10 +32,11 @@ async function main() {
     }
     console.log(`  ${row.clientCode} ${row.stage} → ${dept}`)
     if (!target.dryRun) {
-      await prisma.serviceClient.update({
-        where: { id: row.id },
-        data: { currentOwnerDept: dept },
-      })
+      await prisma.$executeRaw`
+        UPDATE service_clients
+        SET "currentOwnerDept" = ${dept}::"ClientOwnerDept"
+        WHERE id = ${row.id}
+      `
     }
     updated++
   }

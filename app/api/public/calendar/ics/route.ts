@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { assertSchedulingPublicRateLimit } from '@/lib/public/schedulingRateLimit'
 
 function formatIcsUtcDate(d: Date): string {
   return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
@@ -30,6 +31,9 @@ function foldIcsLine(line: string): string {
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const rateLimited = await assertSchedulingPublicRateLimit(request, 'calendar')
+  if (rateLimited) return rateLimited
+
   try {
     const searchParams = request.nextUrl.searchParams
     const token = searchParams.get('token')

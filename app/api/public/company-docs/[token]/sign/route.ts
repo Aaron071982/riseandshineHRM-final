@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveCompanyDocAccessToken } from '@/lib/company-documents/accessToken'
+import { assertCompanyDocPublicRateLimit } from '@/lib/company-documents/publicRateLimit'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import { prisma } from '@/lib/prisma'
 
@@ -9,6 +10,9 @@ type Ctx = { params: Promise<{ token: string }> }
 
 /** Typed e-sign acknowledgment via magic link (no login). */
 export async function POST(request: NextRequest, context: Ctx) {
+  const rateLimited = await assertCompanyDocPublicRateLimit(request, 'sign')
+  if (rateLimited) return rateLimited
+
   const { token } = await context.params
   const row = await resolveCompanyDocAccessToken(token)
   if (!row) {

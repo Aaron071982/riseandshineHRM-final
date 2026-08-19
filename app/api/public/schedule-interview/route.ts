@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { assertSchedulingPublicRateLimit } from '@/lib/public/schedulingRateLimit'
 import {
   sendEmail,
   generateInterviewInviteEmail,
@@ -15,6 +16,9 @@ function intervalsOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): b
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimited = await assertSchedulingPublicRateLimit(request, 'schedule')
+  if (rateLimited) return rateLimited
+
   try {
     const body = await request.json()
     const { token, rbtId, slotId, scheduledAt, durationMinutes } = body

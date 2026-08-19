@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export async function DELETE(
   _request: NextRequest,
@@ -22,9 +23,8 @@ export async function DELETE(
   }
 
   if (!prismaAny.adminAvailabilityOverride?.findUnique || !prismaAny.adminAvailabilityOverride?.delete) {
-    const rows = await prisma.$queryRawUnsafe<Array<{ id: string; userId: string }>>(
-      `SELECT id, "userId" FROM admin_availability_overrides WHERE id = $1 LIMIT 1`,
-      id
+    const rows = await prisma.$queryRaw<Array<{ id: string; userId: string }>>(
+      Prisma.sql`SELECT id, "userId" FROM admin_availability_overrides WHERE id = ${id} LIMIT 1`
     ).catch(() => [])
     const row = rows[0] ?? null
     if (!row) {
@@ -33,9 +33,8 @@ export async function DELETE(
     if (row.userId !== auth.user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-    const deleted = await prisma.$executeRawUnsafe(
-      `DELETE FROM admin_availability_overrides WHERE id = $1`,
-      id
+    const deleted = await prisma.$executeRaw(
+      Prisma.sql`DELETE FROM admin_availability_overrides WHERE id = ${id}`
     ).catch(() => 0)
     if (!deleted) {
       return NextResponse.json(

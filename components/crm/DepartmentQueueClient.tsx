@@ -408,6 +408,7 @@ export default function DepartmentQueueClient({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const isCc = data.slug === 'case-coordination'
+  const [ccTab, setCcTab] = useState<'ready' | 'upcoming'>('ready')
 
   const claimedByOwner = useMemo(() => {
     const map = new Map<string, DepartmentQueueRow[]>()
@@ -439,6 +440,24 @@ export default function DepartmentQueueClient({
     }
     return order.map((key) => ({ key, rows: map.get(key) ?? [] }))
   }, [data.slug, data.claimed])
+
+  const ccCounts = useMemo(() => {
+    if (!isCc) return { ready: 0, upcoming: 0 }
+    if (data.canAssignCc && data.coordinatorGroups) {
+      return data.coordinatorGroups.reduce(
+        (acc, group) => {
+          acc.ready += group.ready.length
+          acc.upcoming += group.upcoming.length
+          return acc
+        },
+        { ready: 0, upcoming: 0 }
+      )
+    }
+    return {
+      ready: data.ready?.length ?? 0,
+      upcoming: data.upcoming?.length ?? 0,
+    }
+  }, [isCc, data.canAssignCc, data.coordinatorGroups, data.ready, data.upcoming])
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null)
@@ -500,49 +519,75 @@ export default function DepartmentQueueClient({
             </section>
           )}
 
+          <div className="rounded-xl border border-line bg-surface p-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setCcTab('ready')}
+                className={cn(
+                  'h-9 rounded-lg border px-3 text-sm font-semibold transition',
+                  ccTab === 'ready'
+                    ? 'border-[var(--sunrise)] bg-[var(--sunrise)] text-[var(--espresso)]'
+                    : 'border-line bg-surface text-ink hover:bg-line-2'
+                )}
+              >
+                Ready Clients ({ccCounts.ready})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCcTab('upcoming')}
+                className={cn(
+                  'h-9 rounded-lg border px-3 text-sm font-semibold transition',
+                  ccTab === 'upcoming'
+                    ? 'border-[var(--sunrise)] bg-[var(--sunrise)] text-[var(--espresso)]'
+                    : 'border-line bg-surface text-ink hover:bg-line-2'
+                )}
+              >
+                Upcoming Clients ({ccCounts.upcoming})
+              </button>
+            </div>
+          </div>
+
           {data.canAssignCc && data.coordinatorGroups ? (
             data.coordinatorGroups.map((group) => (
               <div key={group.userId} className="space-y-4">
                 <h2 className="font-display text-lg font-semibold text-ink">
                   {group.name}
                 </h2>
-                <AssignedPile
-                  title="Upcoming"
-                  rows={group.upcoming}
-                  dept={data.dept}
-                  canManage={data.canManage}
-                  viewerUserId={data.viewerUserId}
-                  empty="No assigned clients before RBT assigned."
-                />
-                <AssignedPile
-                  title="Ready"
-                  rows={group.ready}
-                  dept={data.dept}
-                  canManage={data.canManage}
-                  viewerUserId={data.viewerUserId}
-                  empty="No assigned clients at RBT assigned or later."
-                />
+                {ccTab === 'upcoming' ? (
+                  <AssignedPile
+                    title="Upcoming"
+                    rows={group.upcoming}
+                    dept={data.dept}
+                    canManage={data.canManage}
+                    viewerUserId={data.viewerUserId}
+                    empty="No assigned clients before RBT assigned."
+                  />
+                ) : (
+                  <AssignedPile
+                    title="Ready"
+                    rows={group.ready}
+                    dept={data.dept}
+                    canManage={data.canManage}
+                    viewerUserId={data.viewerUserId}
+                    empty="No assigned clients at RBT assigned or later."
+                  />
+                )}
               </div>
             ))
           ) : (
-            <>
-              <AssignedPile
-                title="Upcoming"
-                rows={data.upcoming ?? []}
-                dept={data.dept}
-                canManage={data.canManage}
-                viewerUserId={data.viewerUserId}
-                empty="No assigned clients before RBT assigned."
-              />
-              <AssignedPile
-                title="Ready"
-                rows={data.ready ?? []}
-                dept={data.dept}
-                canManage={data.canManage}
-                viewerUserId={data.viewerUserId}
-                empty="No assigned clients at RBT assigned or later."
-              />
-            </>
+            <AssignedPile
+              title={ccTab === 'upcoming' ? 'Upcoming' : 'Ready'}
+              rows={ccTab === 'upcoming' ? (data.upcoming ?? []) : (data.ready ?? [])}
+              dept={data.dept}
+              canManage={data.canManage}
+              viewerUserId={data.viewerUserId}
+              empty={
+                ccTab === 'upcoming'
+                  ? 'No assigned clients before RBT assigned.'
+                  : 'No assigned clients at RBT assigned or later.'
+              }
+            />
           )}
         </>
       ) : (

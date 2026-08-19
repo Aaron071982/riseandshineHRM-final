@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveCompanyDocAccessToken } from '@/lib/company-documents/accessToken'
+import { assertCompanyDocPublicRateLimit } from '@/lib/company-documents/publicRateLimit'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -7,7 +8,10 @@ export const dynamic = 'force-dynamic'
 type Ctx = { params: Promise<{ token: string }> }
 
 /** Mark document viewed via magic link. */
-export async function POST(_request: NextRequest, context: Ctx) {
+export async function POST(request: NextRequest, context: Ctx) {
+  const rateLimited = await assertCompanyDocPublicRateLimit(request, 'view')
+  if (rateLimited) return rateLimited
+
   const { token } = await context.params
   const row = await resolveCompanyDocAccessToken(token)
   if (!row) {
