@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTPEmail, isActiveOtpLocked } from '@/lib/email-otp'
 import { createSession } from '@/lib/auth'
-import { getOtpTestCode, isOtpTestAccount, isSuperAdminEmail } from '@/lib/constants'
+import { getOtpTestCode, isOtpTestAccount, isFullAdminLoginEmail } from '@/lib/constants'
 import { isOtpBypassEnvironment } from '@/lib/auth/otpBypass'
 import {
   assertVerifyOtpRateLimit,
@@ -238,8 +238,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Super-admins (Aaron, Kazi, Fardeen, …): always land as full ADMIN — never billing-only.
-    if (isSuperAdminEmail(email) && normalizeLoginRole(user.role) !== 'ADMIN') {
+    // Full admins (super + executive): always land as ADMIN — never billing-only.
+    if (isFullAdminLoginEmail(email) && normalizeLoginRole(user.role) !== 'ADMIN') {
       const adminPatch: { role: 'ADMIN'; isActive: true; name?: string } = {
         role: 'ADMIN',
         isActive: true,
@@ -256,7 +256,7 @@ export async function POST(request: NextRequest) {
 
     // Billing portal: never block as CANDIDATE — upgrade role if mis-assigned.
     if (
-      !isSuperAdminEmail(email) &&
+      !isFullAdminLoginEmail(email) &&
       user.role === 'CANDIDATE' &&
       (await shouldProvisionBillingLogin(email))
     ) {

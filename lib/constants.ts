@@ -93,6 +93,12 @@ export function isExecutiveAdminEmail(email: string | null | undefined): boolean
   return getExecutiveAdminEmails().includes(email.trim().toLowerCase())
 }
 
+/** Full admin portal login — never billing-only portal (super-admin + executive admin). */
+export function isFullAdminLoginEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  return isSuperAdminEmail(email) || isExecutiveAdminEmail(email)
+}
+
 /**
  * HR admins who should NOT see Billing, Payroll, Operations, or Documents.
  * They still get full ADMIN access to everything else (schedule, employees, etc.).

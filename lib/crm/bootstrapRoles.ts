@@ -6,6 +6,7 @@ export const CRM_SUPER_ADMIN_BOOTSTRAP_EMAILS = [
   'aaronsiam21@gmail.com',
   'kazi@jamal.nyc',
   'kazi@siyam.nyc',
+  'kazi@riseandshineaba.com',
   'irsal@riseandshineaba.com',
 ] as const
 

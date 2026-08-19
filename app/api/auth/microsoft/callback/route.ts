@@ -17,6 +17,7 @@ import {
   normalizeMicrosoftEmail,
 } from '@/lib/auth/microsoft'
 import { bootstrapCrmSuperAdmins } from '@/lib/crm/bootstrapRoles'
+import { isFullAdminLoginEmail } from '@/lib/constants'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -119,6 +120,14 @@ export async function GET(request: NextRequest) {
     await prisma.user.update({
       where: { id: user.id },
       data: { name: displayName },
+    })
+  }
+
+  if (isFullAdminLoginEmail(email) && user.role !== 'ADMIN') {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { role: 'ADMIN', isActive: true },
+      select: { id: true, role: true, isActive: true },
     })
   }
 
