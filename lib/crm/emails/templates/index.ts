@@ -1,6 +1,6 @@
 import type { CommTemplate } from '@prisma/client'
 import { renderDocsNeeded } from './docsNeeded'
-import { htmlToPlainText, wrapStaffEmail } from './shell'
+import { htmlToPlainText, wrapStaffEmail, type EmailAttachmentMeta } from './shell'
 import { STUB_RENDERERS } from './stubs'
 import type { RenderedStaffEmail, StaffMergeFields } from './types'
 import { renderWelcome } from './welcome'
@@ -16,7 +16,11 @@ const RENDERERS: Partial<
 export function renderStaffEmail(
   template: CommTemplate,
   fields: StaffMergeFields,
-  overrides?: { subject?: string; bodyHtml?: string }
+  overrides?: {
+    subject?: string
+    bodyHtml?: string
+    attachments?: EmailAttachmentMeta[]
+  }
 ): RenderedStaffEmail | null {
   const base = RENDERERS[template]
   if (!base && template !== 'MANUAL') return null
@@ -35,7 +39,9 @@ export function renderStaffEmail(
     return null
   }
 
-  const html = wrapStaffEmail(innerHtml)
+  const html = wrapStaffEmail(innerHtml, {
+    attachments: overrides?.attachments,
+  })
   return {
     template,
     subject,
@@ -65,3 +71,5 @@ export function staffTemplateLabel(template: CommTemplate): string {
 }
 
 export type { StaffMergeFields, RenderedStaffEmail } from './types'
+export type { EmailAttachmentMeta } from './shell'
+export { EMAIL_LOGO_URL } from './shell'

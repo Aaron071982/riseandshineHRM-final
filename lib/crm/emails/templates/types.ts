@@ -4,6 +4,8 @@ export type StaffMergeFields = {
   childFirstName: string
   childLastName: string
   parentName: string | null
+  /** First name only for greetings — null when no parent name on file. */
+  parentFirstName: string | null
   parentEmail: string | null
   coordinatorName: string | null
   rbtName: string | null

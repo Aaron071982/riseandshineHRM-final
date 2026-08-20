@@ -1,21 +1,32 @@
 import type { StaffEmailContent, StaffMergeFields } from './types'
-import { childName, greeting, infoBlock, staffSignature } from './shell'
+import {
+  COMPANY_EMAIL,
+  childName,
+  ctaButton,
+  greeting,
+  infoBlock,
+  para,
+  staffSignature,
+} from './shell'
 
 export function renderWelcome(fields: StaffMergeFields): StaffEmailContent {
   const child = childName(fields)
+  const reply = `mailto:${fields.staffEmail || COMPANY_EMAIL}?subject=${encodeURIComponent(`Question about ${child}`)}`
   return {
-    subject: `Welcome to Rise & Shine ABA!`,
+    subject: `Welcome to Rise & Shine ABA`,
     bodyHtml: `
-      <p style="margin:0 0 16px;">${greeting(fields)}</p>
-      <p style="margin:0 0 16px;">Welcome to <strong>Rise & Shine ABA</strong>! We are so glad you chose us to support ${child} and your family. Our team is here to guide you through each step of getting started with ABA services.</p>
+      ${para(greeting(fields))}
+      ${para(`Welcome to <strong>Rise &amp; Shine ABA</strong>. We’re glad you’re here, and we’re ready to walk with you and ${child} through each step of getting started.`)}
+      ${para(`Here’s what to expect next — we’ll keep things clear and move at a pace that works for your family.`)}
       ${infoBlock('What happens next', [
-        'Complete the consent form we will send or share with you.',
-        'Send your insurance card, evaluation/diagnosis documents, and any related records.',
+        'We’ll share consent forms for you to review and sign.',
+        'Send insurance cards, evaluations, and any related records you already have.',
         'We verify benefits and submit authorization to your insurance.',
-        'We assign your clinical team and match a therapist for ${child}.',
-        'We confirm your schedule and service start date with you.',
+        `We match ${child} with a clinical team and therapist who fit your schedule.`,
+        'We confirm the schedule and start date with you before services begin.',
       ])}
-      <p style="margin:16px 0 0;">If you have questions at any point, reply to this email or call us — we are happy to help.</p>
+      ${ctaButton('Reply with questions', reply)}
+      ${para(`If anything feels unclear, just reply — we’re happy to help.`)}
       ${staffSignature(fields)}
     `,
   }

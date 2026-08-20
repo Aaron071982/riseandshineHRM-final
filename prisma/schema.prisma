@@ -3233,6 +3233,8 @@ model ClientCommunication {
   body            String?       @db.Text
   /// Comma-separated CC addresses for outbound email sends.
   ccRecipients    String?
+  /// JSON array of attachment metadata: [{ id, fileName, sizeBytes, storagePath, contentType }]
+  attachmentsJson Json?
   sentByUserId    String?
   sentAt          DateTime      @default(now())
   status          String?

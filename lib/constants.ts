@@ -160,6 +160,12 @@ export const STORAGE_BUCKET = 'onboarding-documents'
 /** Supabase storage bucket for resume uploads (private). */
 export const RESUMES_STORAGE_BUCKET = 'resumes'
 
+/**
+ * CRM parent-email attachments (PHI) — private bucket path prefix inside STORAGE_BUCKET.
+ * Files live at: crm-email-attachments/{clientId}/{uuid}-{safeName}
+ */
+export const CRM_EMAIL_ATTACHMENTS_PREFIX = 'crm-email-attachments'
+
 export { UserRole }
 
 export const USER_ROLE = {

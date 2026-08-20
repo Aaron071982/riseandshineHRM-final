@@ -6,6 +6,13 @@ export function graphEmailEnabled(): boolean {
   return process.env.GRAPH_EMAIL_ENABLED === 'true'
 }
 
+export type GraphFileAttachment = {
+  fileName: string
+  contentType: string
+  /** Raw file bytes — encoded to base64 for Graph. */
+  contentBytes: Buffer
+}
+
 export type GraphSendPayload = {
   accessToken: string
   fromAddress: string
@@ -14,6 +21,7 @@ export type GraphSendPayload = {
   subject: string
   html: string
   text: string
+  attachments?: GraphFileAttachment[]
 }
 
 export type GraphSendResult =
@@ -34,7 +42,6 @@ export async function resolveDelegatedGraphToken(
   const fromCookie = cookieStore.get(MICROSOFT_GRAPH_TOKEN_COOKIE)?.value?.trim()
   if (fromCookie) return fromCookie
 
-  // Future: load from user-linked token store keyed by userId
   void userId
   return null
 }
@@ -47,6 +54,14 @@ export async function sendMailViaGraph(
   }
 
   try {
+    const graphAttachments =
+      payload.attachments?.map((a) => ({
+        '@odata.type': '#microsoft.graph.fileAttachment',
+        name: a.fileName,
+        contentType: a.contentType || 'application/octet-stream',
+        contentBytes: a.contentBytes.toString('base64'),
+      })) ?? []
+
     const message = {
       subject: payload.subject,
       body: { contentType: 'HTML', content: payload.html },
@@ -60,6 +75,7 @@ export async function sendMailViaGraph(
             })),
           }
         : {}),
+      ...(graphAttachments.length ? { attachments: graphAttachments } : {}),
     }
 
     const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {

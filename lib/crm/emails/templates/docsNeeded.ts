@@ -1,26 +1,36 @@
 import type { StaffEmailContent, StaffMergeFields } from './types'
-import { childName, greeting, infoBlock, staffSignature } from './shell'
+import {
+  COMPANY_EMAIL,
+  childName,
+  ctaButton,
+  greeting,
+  infoBlock,
+  para,
+  staffSignature,
+} from './shell'
 
 export function renderDocsNeeded(fields: StaffMergeFields): StaffEmailContent {
   const child = childName(fields)
+  const reply = `mailto:${fields.staffEmail || COMPANY_EMAIL}?subject=${encodeURIComponent(`Documents for ${child}`)}`
   return {
-    subject: `Thank you for choosing Rise & Shine ABA`,
+    subject: `Documents we need for ${child}`,
     bodyHtml: `
-      <p style="margin:0 0 16px;">${greeting(fields)}</p>
-      <p style="margin:0 0 16px;">Thank you for choosing <strong>Rise & Shine ABA</strong>! To keep ${child}'s intake moving forward, we need a few documents from you.</p>
-      ${infoBlock('Documents needed', [
+      ${para(greeting(fields))}
+      ${para(`Thank you for choosing <strong>Rise &amp; Shine ABA</strong>. To keep ${child}’s intake moving, we still need a few documents from you.`)}
+      ${infoBlock('Please send when you can', [
         'Parent consent form',
         'Family packet',
         'Intake form',
-        'Insurance Card (front and back)',
-        'Parent / Guardian Photo ID',
-        'IEP / IFSP',
+        'Insurance card (front and back)',
+        'Parent / guardian photo ID',
+        'IEP / IFSP (if available)',
         'DSM-5 checklist',
-        'Psychological evaluation',
-        'Transfer letter (if coming from another company)',
-        "Doctor's referral / prescription",
+        'Psychological evaluation / autism diagnosis',
+        'Transfer letter (if coming from another provider)',
+        'Doctor’s referral / prescription',
       ])}
-      <p style="margin:16px 0 0;">You can reply to this email with attachments or let us know if you need a secure upload option. If you have already sent any of these items, thank you — just send whatever is still outstanding.</p>
+      ${ctaButton('Reply with documents', reply)}
+      ${para(`You can reply to this email with attachments, or tell us if you need a secure upload option. If you’ve already sent some items, thank you — just send what’s still outstanding.`)}
       ${staffSignature(fields)}
     `,
   }

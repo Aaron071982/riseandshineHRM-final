@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { parentFirstNameFromFull } from '@/lib/crm/emails/templates/shell'
 import type { StaffMergeFields } from '@/lib/crm/emails/templates'
 
 export function formatEmailDate(d: Date | null | undefined): string | null {
@@ -33,6 +34,9 @@ export async function loadStaffEmailMergeContext(clientId: string) {
           rbtProfile: { select: { firstName: true, lastName: true } },
         },
       },
+      consent: {
+        select: { lines: true, deletedAt: true },
+      },
     },
   })
 }
@@ -50,6 +54,7 @@ export function buildStaffMergeFields(
     childFirstName: client.firstName,
     childLastName: client.lastName,
     parentName: client.parentName,
+    parentFirstName: parentFirstNameFromFull(client.parentName),
     parentEmail: client.parentEmail,
     coordinatorName:
       client.caseCoordinatorUser?.name || client.caseCoordinatorName,

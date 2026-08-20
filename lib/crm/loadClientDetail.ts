@@ -17,6 +17,10 @@ import { graphEmailEnabled } from '@/lib/crm/emails/graphSend'
 import { hasRiseAndShineMailbox, mailboxBlockedReason } from '@/lib/crm/emails/mailbox'
 import { ensureClientRequirements } from '@/lib/crm/ensureRequirements'
 import { ensureCanonicalOwnerDept } from '@/lib/crm/ensureOwnerDept'
+import {
+  isConsentLineInitialed,
+  parseConsentLines,
+} from '@/lib/crm/consent'
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
@@ -161,6 +165,9 @@ export async function loadClientCrmDetail(clientId: string) {
   })
   const mailboxReason = mailboxBlockedReason(user.email)
   const canSendEmail = claimed && !mailboxReason && !!client.parentEmail?.trim()
+  const emailConsentOk =
+    !!consentLive &&
+    isConsentLineInitialed(parseConsentLines(consentLive.lines), 'comm_email')
 
   return {
     user,
@@ -181,6 +188,7 @@ export async function loadClientCrmDetail(clientId: string) {
             : null),
       graphEnabled: graphEmailEnabled(),
       hasMailbox: hasRiseAndShineMailbox(user.email),
+      emailConsentOk,
     },
   }
 }

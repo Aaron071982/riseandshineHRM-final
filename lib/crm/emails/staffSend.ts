@@ -1,4 +1,4 @@
-import type { CommTemplate } from '@prisma/client'
+import type { CommTemplate, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   auditClientAction,
@@ -21,6 +21,16 @@ import {
   parseCcList,
 } from '@/lib/crm/emails/mergeContext'
 import { renderStaffEmail } from '@/lib/crm/emails/templates'
+import {
+  downloadEmailAttachment,
+  type EmailAttachmentRecord,
+  MAX_ATTACHMENTS,
+} from '@/lib/crm/emails/attachments'
+import { CRM_EMAIL_ATTACHMENTS_PREFIX } from '@/lib/constants'
+import {
+  isConsentLineInitialed,
+  parseConsentLines,
+} from '@/lib/crm/consent'
 
 export type StaffEmailSendResult = {
   status: 'SENT' | 'SKIPPED' | 'FAILED'
@@ -28,8 +38,35 @@ export type StaffEmailSendResult = {
   reason?: string
 }
 
+export type StaffEmailAttachmentInput = {
+  id: string
+  fileName: string
+  sizeBytes: number
+  contentType: string
+  storagePath: string
+}
+
 function isDuplicateLockedStatus(status: string | null | undefined): boolean {
   return status === 'SENT' || status === 'SKIPPED'
+}
+
+function validateAttachmentRefs(
+  clientId: string,
+  attachments: StaffEmailAttachmentInput[]
+): StaffEmailAttachmentInput[] {
+  if (attachments.length > MAX_ATTACHMENTS) {
+    throw new CrmAccessError(`At most ${MAX_ATTACHMENTS} attachments allowed`, 400)
+  }
+  const prefix = `${CRM_EMAIL_ATTACHMENTS_PREFIX}/${clientId}/`
+  for (const a of attachments) {
+    if (!a.storagePath?.startsWith(prefix)) {
+      throw new CrmAccessError('Invalid attachment for this client', 400)
+    }
+    if (!a.fileName?.trim()) {
+      throw new CrmAccessError('Attachment file name required', 400)
+    }
+  }
+  return attachments
 }
 
 async function assertCanSendStaffEmail(
@@ -68,6 +105,13 @@ async function assertCanSendStaffEmail(
   return client
 }
 
+export function clientHasEmailConsent(
+  consent: { lines: unknown; deletedAt: Date | null } | null | undefined
+): boolean {
+  if (!consent || consent.deletedAt) return false
+  return isConsentLineInitialed(parseConsentLines(consent.lines), 'comm_email')
+}
+
 export async function previewStaffClientEmail(
   user: CrmUser,
   clientId: string,
@@ -75,6 +119,7 @@ export async function previewStaffClientEmail(
     template: CommTemplate
     subject?: string | null
     bodyHtml?: string | null
+    attachments?: StaffEmailAttachmentInput[]
   }
 ) {
   await assertCanSendStaffEmail(user, clientId)
@@ -82,6 +127,8 @@ export async function previewStaffClientEmail(
 
   const client = await loadStaffEmailMergeContext(clientId)
   if (!client) throw new Error('Client not found')
+
+  const attachments = validateAttachmentRefs(clientId, input.attachments ?? [])
 
   const rendered = renderStaffEmail(
     input.template,
@@ -92,6 +139,10 @@ export async function previewStaffClientEmail(
     {
       subject: input.subject ?? undefined,
       bodyHtml: input.bodyHtml ?? undefined,
+      attachments: attachments.map((a) => ({
+        fileName: a.fileName,
+        sizeBytes: a.sizeBytes,
+      })),
     }
   )
   if (!rendered) throw new Error(`No renderer for ${input.template}`)
@@ -101,7 +152,44 @@ export async function previewStaffClientEmail(
     html: rendered.html,
     text: rendered.text,
     to: client.parentEmail,
+    emailConsentOk: clientHasEmailConsent(
+      client.consent && !client.consent.deletedAt ? client.consent : null
+    ),
   }
+}
+
+async function loadGraphAttachments(
+  attachments: StaffEmailAttachmentInput[]
+): Promise<
+  { fileName: string; contentType: string; contentBytes: Buffer }[]
+> {
+  const out: { fileName: string; contentType: string; contentBytes: Buffer }[] =
+    []
+  for (const a of attachments) {
+    const file = await downloadEmailAttachment(a.storagePath)
+    if (!file) {
+      throw new CrmAccessError(`Could not load attachment: ${a.fileName}`, 400)
+    }
+    out.push({
+      fileName: a.fileName,
+      contentType: a.contentType || file.contentType,
+      contentBytes: file.bytes,
+    })
+  }
+  return out
+}
+
+function attachmentsJsonValue(
+  attachments: StaffEmailAttachmentInput[]
+): Prisma.InputJsonValue | undefined {
+  if (!attachments.length) return undefined
+  return attachments.map((a) => ({
+    id: a.id,
+    fileName: a.fileName,
+    sizeBytes: a.sizeBytes,
+    contentType: a.contentType,
+    storagePath: a.storagePath,
+  }))
 }
 
 export async function sendStaffClientEmail(
@@ -113,6 +201,7 @@ export async function sendStaffClientEmail(
     bodyHtml?: string | null
     cc?: string | null
     force?: boolean
+    attachments?: StaffEmailAttachmentInput[]
   }
 ): Promise<StaffEmailSendResult> {
   await assertCanSendStaffEmail(user, clientId)
@@ -137,6 +226,8 @@ export async function sendStaffClientEmail(
       throw new CrmAccessError(`Invalid CC address: ${cc}`, 400)
     }
   }
+
+  const attachments = validateAttachmentRefs(clientId, input.attachments ?? [])
 
   if (!input.force && input.template !== 'MANUAL' && !isFullAccess(user)) {
     const prior = await prisma.clientCommunication.findFirst({
@@ -167,12 +258,18 @@ export async function sendStaffClientEmail(
     {
       subject: input.subject ?? undefined,
       bodyHtml: input.bodyHtml ?? undefined,
+      attachments: attachments.map((a) => ({
+        fileName: a.fileName,
+        sizeBytes: a.sizeBytes,
+      })),
     }
   )
   if (!rendered) throw new Error(`No renderer for ${input.template}`)
 
   const now = new Date()
   const ccStored = ccList.length ? ccList.join(', ') : null
+  const attachJson = attachmentsJsonValue(attachments)
+  const attachNames = attachments.map((a) => a.fileName).join(', ')
 
   if (!graphEmailEnabled()) {
     const row = await prisma.clientCommunication.create({
@@ -184,6 +281,7 @@ export async function sendStaffClientEmail(
         subject: rendered.subject,
         body: rendered.html,
         ccRecipients: ccStored,
+        attachmentsJson: attachJson,
         sentByUserId: user.id,
         sentAt: now,
         status: 'SKIPPED',
@@ -198,13 +296,17 @@ export async function sendStaffClientEmail(
     await auditClientAction({
       userId: user.id,
       serviceClientId: clientId,
-      action: `EMAIL_SEND_SKIPPED:${input.template}`,
+      action: attachments.length
+        ? `EMAIL_SEND_SKIPPED:${input.template}:ATTACH:${attachNames}`
+        : `EMAIL_SEND_SKIPPED:${input.template}`,
     })
 
     return {
       status: 'SKIPPED',
       communicationId: row.id,
-      reason: 'GRAPH_EMAIL_ENABLED is not true — recorded without sending',
+      reason: attachments.length
+        ? `GRAPH_EMAIL_ENABLED is not true — recorded without sending (attachments: ${attachNames})`
+        : 'GRAPH_EMAIL_ENABLED is not true — recorded without sending',
     }
   }
 
@@ -219,6 +321,7 @@ export async function sendStaffClientEmail(
         subject: rendered.subject,
         body: rendered.html,
         ccRecipients: ccStored,
+        attachmentsJson: attachJson,
         sentByUserId: user.id,
         sentAt: now,
         status: 'SKIPPED',
@@ -228,7 +331,9 @@ export async function sendStaffClientEmail(
     await auditClientAction({
       userId: user.id,
       serviceClientId: clientId,
-      action: `EMAIL_SEND_SKIPPED:${input.template}`,
+      action: attachments.length
+        ? `EMAIL_SEND_SKIPPED:${input.template}:ATTACH:${attachNames}`
+        : `EMAIL_SEND_SKIPPED:${input.template}`,
     })
 
     return {
@@ -236,6 +341,14 @@ export async function sendStaffClientEmail(
       communicationId: row.id,
       reason: 'Microsoft sign-in required — no delegated Graph token',
     }
+  }
+
+  let graphAttachments: Awaited<ReturnType<typeof loadGraphAttachments>> = []
+  try {
+    graphAttachments = await loadGraphAttachments(attachments)
+  } catch (err) {
+    if (err instanceof CrmAccessError) throw err
+    throw new CrmAccessError('Failed to load attachments for send', 400)
   }
 
   const delivery = await sendMailViaGraph({
@@ -246,6 +359,7 @@ export async function sendStaffClientEmail(
     subject: rendered.subject,
     html: rendered.html,
     text: rendered.text,
+    attachments: graphAttachments,
   })
 
   if (!delivery.ok) {
@@ -258,6 +372,7 @@ export async function sendStaffClientEmail(
         subject: rendered.subject,
         body: `${rendered.html}\n\n<!-- ERROR: ${delivery.error} -->`,
         ccRecipients: ccStored,
+        attachmentsJson: attachJson,
         sentByUserId: user.id,
         sentAt: now,
         status: 'FAILED',
@@ -286,6 +401,7 @@ export async function sendStaffClientEmail(
       subject: rendered.subject,
       body: rendered.html,
       ccRecipients: ccStored,
+      attachmentsJson: attachJson,
       sentByUserId: user.id,
       sentAt: now,
       status: 'SENT',
@@ -300,8 +416,12 @@ export async function sendStaffClientEmail(
   await auditClientAction({
     userId: user.id,
     serviceClientId: clientId,
-    action: `EMAIL_SEND:${input.template}`,
+    action: attachments.length
+      ? `EMAIL_SEND:${input.template}:ATTACH:${attachNames}:TO:${to}`
+      : `EMAIL_SEND:${input.template}`,
   })
 
   return { status: 'SENT', communicationId: row.id }
 }
+
+export type { EmailAttachmentRecord }

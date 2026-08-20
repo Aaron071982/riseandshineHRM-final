@@ -56,7 +56,8 @@ ALTER TABLE "client_authorization_lines"
   ADD COLUMN IF NOT EXISTS "unitsRequested" INTEGER;
 
 ALTER TABLE "client_communications"
-  ADD COLUMN IF NOT EXISTS "ccRecipients" TEXT;
+  ADD COLUMN IF NOT EXISTS "ccRecipients" TEXT,
+  ADD COLUMN IF NOT EXISTS "attachmentsJson" JSONB;
 
 ALTER TABLE "rbt_schedule_assignments"
   ADD COLUMN IF NOT EXISTS "billabilityReason" TEXT,

@@ -2461,8 +2461,22 @@ export async function previewClientEmail(
     template: CommTemplate
     subject?: string | null
     bodyHtml?: string | null
+    attachments?: {
+      id: string
+      fileName: string
+      sizeBytes: number
+      contentType: string
+      storagePath: string
+    }[]
   }
-): Promise<ActionResult<{ subject: string; html: string; to: string | null }>> {
+): Promise<
+  ActionResult<{
+    subject: string
+    html: string
+    to: string | null
+    emailConsentOk: boolean
+  }>
+> {
   try {
     const user = await getClientServicesUser()
     const { previewStaffClientEmail } = await import('@/lib/crm/emails/staffSend')
@@ -2472,6 +2486,7 @@ export async function previewClientEmail(
       subject: preview.subject,
       html: preview.html,
       to: preview.to,
+      emailConsentOk: preview.emailConsentOk,
     }
   } catch (err) {
     return fail(err)
@@ -2486,6 +2501,13 @@ export async function sendClientEmail(
     bodyHtml?: string | null
     cc?: string | null
     force?: boolean
+    attachments?: {
+      id: string
+      fileName: string
+      sizeBytes: number
+      contentType: string
+      storagePath: string
+    }[]
   }
 ): Promise<
   ActionResult<{ status: string; communicationId: string; reason?: string }>

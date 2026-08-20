@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CommTemplate } from '@prisma/client'
 import { previewClientEmail, sendClientEmail } from '@/lib/crm/actions'
@@ -16,6 +16,7 @@ type Comm = {
   subject: string | null
   body: string | null
   ccRecipients?: string | null
+  attachmentsJson?: unknown
   sentAt: string | Date
   status: string | null
   sentByUser: { id: string; name: string | null; email: string | null } | null
@@ -27,6 +28,32 @@ export type EmailSendContext = {
   blockedReason: string | null
   graphEnabled: boolean
   hasMailbox: boolean
+  emailConsentOk?: boolean
+}
+
+type AttachedFile = {
+  id: string
+  fileName: string
+  sizeBytes: number
+  contentType: string
+  storagePath: string
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function attachmentNamesFromJson(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null
+      const name = (row as { fileName?: unknown }).fileName
+      return typeof name === 'string' ? name : null
+    })
+    .filter((n): n is string => !!n)
 }
 
 export function EmailPanel({
@@ -43,8 +70,10 @@ export function EmailPanel({
   emailSend: EmailSendContext
 }) {
   const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [pending, startTransition] = useTransition()
   const [previewPending, startPreview] = useTransition()
+  const [uploadPending, setUploadPending] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -53,15 +82,18 @@ export function EmailPanel({
   const [subject, setSubject] = useState('')
   const [manualBody, setManualBody] = useState('')
   const [cc, setCc] = useState('')
+  const [attachments, setAttachments] = useState<AttachedFile[]>([])
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewSubject, setPreviewSubject] = useState('')
+  const [consentAcknowledged, setConsentAcknowledged] = useState(false)
 
   const isManual = template === 'MANUAL'
+  const needsConsentWarn = emailSend.emailConsentOk === false
 
   const localPreviewLogoUrl =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/new-real-logo.png`
-      : '/new-real-logo.png'
+      ? `${window.location.origin}/api/public/email-logo`
+      : '/api/public/email-logo'
 
   const loadPreview = useCallback(() => {
     startPreview(async () => {
@@ -70,6 +102,7 @@ export function EmailPanel({
         template,
         subject: isManual ? subject : undefined,
         bodyHtml: isManual && manualBody.trim() ? manualBody : undefined,
+        attachments,
       })
       if (!res.ok) {
         setError(res.error)
@@ -77,11 +110,18 @@ export function EmailPanel({
         return
       }
       setPreviewSubject(res.subject)
-      // Preview runs in an iframe; use local origin logo for reliable rendering.
       setPreviewHtml(res.html.replaceAll(EMAIL_LOGO_URL, localPreviewLogoUrl))
       if (!isManual) setSubject(res.subject)
     })
-  }, [clientId, template, subject, manualBody, isManual, localPreviewLogoUrl])
+  }, [
+    clientId,
+    template,
+    subject,
+    manualBody,
+    isManual,
+    localPreviewLogoUrl,
+    attachments,
+  ])
 
   useEffect(() => {
     if (emailSend.allowedTemplates.includes(template)) {
@@ -98,12 +138,54 @@ export function EmailPanel({
   const timeline = useMemo(
     () =>
       communications.filter(
-        (c) => c.channel === 'EMAIL' || c.status === 'SENT' || c.status === 'SKIPPED' || c.status === 'FAILED' || c.status === 'RECORDED'
+        (c) =>
+          c.channel === 'EMAIL' ||
+          c.status === 'SENT' ||
+          c.status === 'SKIPPED' ||
+          c.status === 'FAILED' ||
+          c.status === 'RECORDED'
       ),
     [communications]
   )
 
+  const onUpload = async (fileList: FileList | null) => {
+    if (!fileList?.length) return
+    setError('')
+    setUploadPending(true)
+    try {
+      for (const file of Array.from(fileList)) {
+        const form = new FormData()
+        form.append('file', file)
+        const res = await fetch(
+          `/api/client-services/clients/${clientId}/email-attachments`,
+          { method: 'POST', body: form, credentials: 'include' }
+        )
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string
+          attachment?: AttachedFile
+        }
+        if (!res.ok || !data.attachment) {
+          setError(data.error || `Failed to upload ${file.name}`)
+          break
+        }
+        setAttachments((prev) => {
+          if (prev.some((a) => a.id === data.attachment!.id)) return prev
+          return [...prev, data.attachment!]
+        })
+      }
+    } finally {
+      setUploadPending(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   const onSend = () => {
+    if (needsConsentWarn && !consentAcknowledged) {
+      setError(
+        'Confirm the email-consent warning before sending PHI by email, or cancel.'
+      )
+      return
+    }
     startTransition(async () => {
       setError('')
       setNotice('')
@@ -112,6 +194,7 @@ export function EmailPanel({
         subject: isManual ? subject : undefined,
         bodyHtml: isManual && manualBody.trim() ? manualBody : undefined,
         cc: cc.trim() || undefined,
+        attachments,
       })
       if (!res.ok) {
         setError(res.error)
@@ -127,6 +210,8 @@ export function EmailPanel({
       } else {
         setNotice(res.reason ?? `Status: ${res.status}`)
       }
+      setAttachments([])
+      setConsentAcknowledged(false)
       router.refresh()
     })
   }
@@ -156,6 +241,28 @@ export function EmailPanel({
         <p className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-quiet">
           {emailSend.blockedReason}
         </p>
+      )}
+
+      {needsConsentWarn && (
+        <div className="rounded-lg border border-[var(--amber)] bg-[var(--amber-bg)] px-3 py-3 text-sm text-ink">
+          <p className="font-medium text-[var(--espresso)]">
+            Email consent not on file
+          </p>
+          <p className="mt-1 text-quiet">
+            Consent Form 02 “Communication — email” is not initialed for this
+            family. You can still send, but confirm you’re choosing to email PHI
+            without that preference line.
+          </p>
+          <label className="mt-2 flex items-start gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={consentAcknowledged}
+              onChange={(e) => setConsentAcknowledged(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>I understand and want to proceed with this email.</span>
+          </label>
+        </div>
       )}
 
       <div className="rounded-xl border border-line bg-surface p-4">
@@ -235,6 +342,67 @@ export function EmailPanel({
               />
             </label>
           )}
+
+          <div className="sm:col-span-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-faint">
+                Attachments
+              </span>
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.txt,application/pdf,image/png,image/jpeg"
+                  onChange={(e) => onUpload(e.target.files)}
+                />
+                <button
+                  type="button"
+                  disabled={!emailSend.canSend || uploadPending || attachments.length >= 5}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-8 rounded-lg border border-line bg-surface px-3 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
+                >
+                  {uploadPending ? 'Uploading…' : 'Attach file'}
+                </button>
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-quiet">
+              Client-tailored forms (PHI) upload to private storage and ride the
+              Graph mailbox when sending is enabled. PDF, images, Office docs —
+              up to 5 files, 15&nbsp;MB each.
+            </p>
+            {attachments.length > 0 ? (
+              <ul className="mt-2 space-y-1.5">
+                {attachments.map((a) => (
+                  <li
+                    key={a.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-line bg-line-2/30 px-3 py-2 text-sm"
+                  >
+                    <span className="min-w-0 truncate text-ink">
+                      {a.fileName}{' '}
+                      <span className="text-xs text-quiet">
+                        ({formatSize(a.sizeBytes)})
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAttachments((prev) => prev.filter((x) => x.id !== a.id))
+                      }
+                      className="shrink-0 text-xs text-[var(--urgent)] hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 rounded-lg border border-dashed border-line px-3 py-4 text-center text-xs text-quiet">
+                No files attached
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -248,11 +416,20 @@ export function EmailPanel({
           </button>
           <button
             type="button"
-            disabled={pending || !emailSend.canSend || !parentEmail}
+            disabled={
+              pending ||
+              !emailSend.canSend ||
+              !parentEmail ||
+              (needsConsentWarn && !consentAcknowledged)
+            }
             onClick={onSend}
             className="h-9 rounded-lg bg-brand px-3.5 text-sm font-medium text-white hover:bg-brand-2 disabled:opacity-50"
           >
-            {pending ? 'Sending…' : emailSend.graphEnabled ? 'Send email' : 'Record send (Graph off)'}
+            {pending
+              ? 'Sending…'
+              : emailSend.graphEnabled
+                ? 'Send email'
+                : 'Record send (Graph off)'}
           </button>
         </div>
       </div>
@@ -260,13 +437,19 @@ export function EmailPanel({
       <div className="rounded-xl border border-line bg-surface overflow-hidden">
         <div className="border-b border-line px-4 py-2">
           <h3 className="font-display text-sm font-semibold text-ink">Preview</h3>
-          <p className="text-xs text-quiet">Exact branded output parents will receive.</p>
+          <p className="text-xs text-quiet">
+            Exact branded output parents will receive
+            {attachments.length
+              ? ` · Attachments: ${attachments.map((a) => a.fileName).join(', ')}`
+              : ''}
+            .
+          </p>
         </div>
         {previewHtml ? (
           <iframe
             title="Email preview"
             srcDoc={previewHtml}
-            className="h-[420px] w-full border-0 bg-white"
+            className="h-[480px] w-full border-0 bg-white"
             sandbox=""
           />
         ) : (
@@ -286,38 +469,48 @@ export function EmailPanel({
           </div>
         ) : (
           <ol className="mt-2 space-y-2">
-            {timeline.map((c) => (
-              <li
-                key={c.id}
-                className="rounded-xl border border-line bg-surface px-4 py-3"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-ink">
-                      {staffTemplateLabel(c.template)}
-                    </span>
-                    <StatusBadge status={c.status} />
+            {timeline.map((c) => {
+              const names = attachmentNamesFromJson(c.attachmentsJson)
+              return (
+                <li
+                  key={c.id}
+                  className="rounded-xl border border-line bg-surface px-4 py-3"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-ink">
+                        {staffTemplateLabel(c.template)}
+                      </span>
+                      <StatusBadge status={c.status} />
+                    </div>
+                    <time className="text-xs tabular-nums text-quiet">
+                      {new Date(c.sentAt).toLocaleString()}
+                    </time>
                   </div>
-                  <time className="text-xs tabular-nums text-quiet">
-                    {new Date(c.sentAt).toLocaleString()}
-                  </time>
-                </div>
-                {c.subject && (
-                  <p className="mt-1 text-sm text-ink">{c.subject}</p>
-                )}
-                {c.ccRecipients && (
-                  <p className="mt-0.5 text-xs text-quiet">CC: {c.ccRecipients}</p>
-                )}
-                {c.status === 'SKIPPED' && (
-                  <p className="mt-0.5 text-sm text-quiet">
-                    Not delivered — Graph sending disabled or no mailbox token.
+                  {c.subject && (
+                    <p className="mt-1 text-sm text-ink">{c.subject}</p>
+                  )}
+                  {c.ccRecipients && (
+                    <p className="mt-0.5 text-xs text-quiet">
+                      CC: {c.ccRecipients}
+                    </p>
+                  )}
+                  {names.length > 0 && (
+                    <p className="mt-0.5 text-xs text-quiet">
+                      Attachments: {names.join(', ')}
+                    </p>
+                  )}
+                  {c.status === 'SKIPPED' && (
+                    <p className="mt-0.5 text-sm text-quiet">
+                      Not delivered — Graph sending disabled or no mailbox token.
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-faint">
+                    {c.sentByUser?.name || c.sentByUser?.email || 'System'}
                   </p>
-                )}
-                <p className="mt-1 text-xs text-faint">
-                  {c.sentByUser?.name || c.sentByUser?.email || 'System'}
-                </p>
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ol>
         )}
       </div>
