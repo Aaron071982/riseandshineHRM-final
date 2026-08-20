@@ -21,10 +21,16 @@ export function wrapStaffEmail(bodyHtml: string): string {
       <td align="center">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e8ddd0;box-shadow:0 2px 8px rgba(47,35,24,0.06);">
           <tr>
-            <td style="padding:28px 32px;background:linear-gradient(135deg,#ffa94d 0%,#f2652a 50%,#e7692c 100%);text-align:center;">
-              <img src="${LOGO_URL}" alt="${COMPANY_NAME}" width="180" style="display:block;margin:0 auto 12px;max-width:180px;height:auto;" />
+            <td style="padding:28px 32px;background:#f2652a;text-align:center;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 12px;">
+                <tr>
+                  <td style="background:#ffffff;border-radius:12px;padding:10px 14px;">
+                    <img src="${LOGO_URL}" alt="${COMPANY_NAME}" width="120" height="120" style="display:block;margin:0 auto;width:120px;height:auto;border:0;outline:none;text-decoration:none;" />
+                  </td>
+                </tr>
+              </table>
               <div style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.02em;">${COMPANY_NAME}</div>
-              <div style="font-size:13px;color:rgba(255,255,255,0.92);margin-top:6px;">Supporting your family every step of the way</div>
+              <div style="font-size:13px;color:#ffffff;margin-top:6px;">Supporting your family every step of the way</div>
             </td>
           </tr>
           <tr>

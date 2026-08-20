@@ -4,6 +4,11 @@ import type { NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Public static assets (email clients + <img> tags must load without a session)
+  if (/\.(?:png|jpe?g|gif|webp|svg|ico|woff2?|ttf|eot|css|js|map|txt|xml)$/i.test(pathname)) {
+    return NextResponse.next()
+  }
+
   // Public routes that don't require authentication
   const publicRoutes = ['/', '/verify-otp', '/login', '/apply', '/apply/success', '/schedule-interview']
   const publicApiRoutes = ['/api/auth/send-otp', '/api/auth/verify-otp', '/api/auth/get-latest-otp']
@@ -48,13 +53,12 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - logo.png (logo file)
+     * Match all request paths except:
+     * - _next/static, _next/image
+     * - favicon / brand logos used in emails and UI
+     * - common public static file extensions
      */
-    '/((?!_next/static|_next/image|favicon.ico|logo.png).*)',
+    '/((?!_next/static|_next/image|favicon.ico|logo\\.png|new-real-logo\\.png|.*\\.(?:png|jpe?g|gif|webp|svg|ico)$).*)',
   ],
 }
 
