@@ -125,6 +125,12 @@ type Note = {
   author: { id: string; name: string | null; email: string | null }
 }
 
+function noteKind(content: string): string | null {
+  if (content.startsWith('Pipeline status →')) return 'Pipeline'
+  if (content.startsWith('Parent contact ·')) return 'Contact'
+  return null
+}
+
 export function NotesPanel({
   clientId,
   notes,
@@ -332,22 +338,33 @@ export function NotesPanel({
         <ul className="mt-4 space-y-3">
           {notes.length === 0 && (
             <li className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-quiet">
-              No notes yet — capture the first update above.
+              No notes yet — pipeline changes, parent contacts, and updates all
+              show here.
             </li>
           )}
-          {notes.map((n) => (
-            <li key={n.id} className="rounded-xl border border-line bg-surface px-4 py-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs text-quiet">
-                <span className="font-medium text-ink">
-                  {n.author.name || n.author.email || 'User'}
-                </span>
-                <time className="tabular-nums">
-                  {new Date(n.createdAt).toLocaleString()}
-                </time>
-              </div>
-              <p className="mt-1.5 whitespace-pre-wrap text-sm text-ink">{n.content}</p>
-            </li>
-          ))}
+          {notes.map((n) => {
+            const kind = noteKind(n.content)
+            return (
+              <li key={n.id} className="rounded-xl border border-line bg-surface px-4 py-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs text-quiet">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-ink">
+                      {n.author.name || n.author.email || 'User'}
+                    </span>
+                    {kind && (
+                      <span className="rounded-md bg-line-2 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-quiet">
+                        {kind}
+                      </span>
+                    )}
+                  </span>
+                  <time className="tabular-nums">
+                    {new Date(n.createdAt).toLocaleString()}
+                  </time>
+                </div>
+                <p className="mt-1.5 whitespace-pre-wrap text-sm text-ink">{n.content}</p>
+              </li>
+            )
+          })}
         </ul>
       </section>
     </div>

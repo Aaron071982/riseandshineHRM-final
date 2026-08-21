@@ -1175,6 +1175,12 @@ export async function logParentContact(
     await assertCanEditClient(user, clientId)
 
     const now = new Date()
+    const channelLabel = input.channel.replace(/_/g, ' ')
+    const detail = input.note?.trim()
+    const noteContent = detail
+      ? `Parent contact · ${channelLabel}\n${detail}`
+      : `Parent contact · ${channelLabel}`
+
     await prisma.$transaction([
       prisma.clientCommunication.create({
         data: {
@@ -1183,10 +1189,17 @@ export async function logParentContact(
           channel: input.channel,
           direction: 'OUTBOUND',
           subject: 'Parent contact',
-          body: input.note?.trim() || `Logged ${input.channel.toLowerCase()} contact`,
+          body: detail || `Logged ${input.channel.toLowerCase()} contact`,
           sentByUserId: user.id,
           sentAt: now,
           status: 'LOGGED',
+        },
+      }),
+      prisma.serviceClientNote.create({
+        data: {
+          serviceClientId: clientId,
+          authorId: user.id,
+          content: noteContent,
         },
       }),
       prisma.serviceClient.update({
@@ -1243,6 +1256,14 @@ export async function setPipelineStatus(
           durationSeconds,
           reason: reasonText,
           changedBy: user.id,
+        },
+      })
+
+      await tx.serviceClientNote.create({
+        data: {
+          serviceClientId: clientId,
+          authorId: user.id,
+          content: `Pipeline status → ${status.replace(/_/g, ' ')}\n${reasonText}`,
         },
       })
 
