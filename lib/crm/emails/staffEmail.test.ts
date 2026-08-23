@@ -129,13 +129,17 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email?.html).toContain('jordan@riseandshineaba.com')
   })
 
-  it('MEET_AND_GREET uses proper subject without double-encoded ampersand', () => {
+  it('MEET_AND_GREET is scheduling-only without client or care-team PHI', () => {
     const email = renderStaffEmail('MEET_AND_GREET', fields)
     expect(email?.subject).toBe('Meet and Greet for Alex')
     expect(email?.subject).not.toContain('&amp;')
-    expect(email?.html).toContain('Alex Rivera')
-    expect(email?.html).toContain('Sam Taylor')
-    expect(email?.html).toContain('Dr. Pat Chen')
+    expect(email?.html).toContain('Hi Maria,')
+    expect(email?.html).toContain('Meet &amp; Greet form')
+    expect(email?.html).not.toContain('Alex Rivera')
+    expect(email?.html).not.toContain('123 Main St')
+    expect(email?.html).not.toContain('Sam Taylor')
+    expect(email?.html).not.toContain('Dr. Pat Chen')
+    expect(email?.html).not.toContain('(555) 123-4567')
   })
 
   it('ASSESSMENT_SCHEDULED reflects in-home vs telehealth choice', () => {

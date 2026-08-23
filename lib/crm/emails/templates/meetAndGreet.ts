@@ -8,47 +8,23 @@ import {
   para,
   staffSignature,
 } from './shell'
-import { contactBlock, formatClientAddress, formatRbtAddress } from './helpers'
 
+/**
+ * Scheduling intro only — full client/care-team details go on the Meet & Greet form
+ * (attached or sent separately), not in this email body.
+ */
 export function renderMeetAndGreet(fields: StaffMergeFields): StaffEmailContent {
   const child = childName(fields)
-  const clientAddr = formatClientAddress(fields)
-
-  const clientBlock = contactBlock(`${child} — contact & location`, [
-    { label: 'Name', value: `${fields.childFirstName} ${fields.childLastName}`.trim() },
-    { label: 'Phone', value: fields.parentPhone },
-    { label: 'Address', value: clientAddr },
-  ])
-
-  const rbtBlock = fields.rbtName
-    ? contactBlock(`RBT — ${fields.rbtName}`, [
-        { label: 'Name', value: fields.rbtName },
-        { label: 'Phone', value: fields.rbtPhone },
-        { label: 'Email', value: fields.rbtEmail },
-        { label: 'Address', value: formatRbtAddress(fields) },
-      ])
-    : ''
-
-  const bcbaBlock = fields.bcbaName
-    ? contactBlock(`BCBA — ${fields.bcbaName}`, [
-        { label: 'Name', value: fields.bcbaName },
-        { label: 'Phone', value: fields.bcbaPhone },
-        { label: 'Email', value: fields.bcbaEmail },
-      ])
-    : ''
 
   return {
     subject: `Meet and Greet for ${child}`,
     bodyHtml: `
       ${para(greeting(fields))}
-      ${para(`We would like to schedule a meet and greet so you can connect with ${child}&apos;s care team before services begin. This is an opportunity to ask questions and make sure everyone feels comfortable.`)}
-      ${infoBlock('Your care team', [
-        'Below is contact information for your family and clinical team.',
-        'Please reply with a few times that work this week, and we will confirm.',
+      ${para(`We would like to schedule a short meet and greet so you can connect with ${child}&apos;s care team before services begin. This is a chance to ask questions and make sure everyone feels comfortable.`)}
+      ${infoBlock('What happens next', [
+        'Reply with a few times that work this week, and we will confirm.',
+        'You will receive a Meet &amp; Greet form with care-team and family details — please complete and return that form separately.',
       ])}
-      ${clientBlock}
-      ${rbtBlock}
-      ${bcbaBlock}
       ${ctaButton('Share your availability', `mailto:${fields.staffEmail || COMPANY_EMAIL}?subject=${encodeURIComponent(`Meet and Greet for ${child}`)}`)}
       ${staffSignature(fields)}
     `,

@@ -358,14 +358,6 @@ export async function sendStaffClientEmail(
       action: `EMAIL_SEND_SKIPPED:${input.template}${extras}`,
     })
 
-    if (input.template === 'MEET_AND_GREET') {
-      await auditClientAction({
-        userId: user.id,
-        serviceClientId: clientId,
-        action: `EMAIL_PHI_DISCLOSURE:MEET_AND_GREET:STAFF:${ccList.join(';')}:TO:${to}`,
-      })
-    }
-
     return {
       status: 'SKIPPED' as const,
       communicationId: row.id,
@@ -467,14 +459,6 @@ export async function sendStaffClientEmail(
     serviceClientId: clientId,
     action: `EMAIL_SEND:${input.template}${extras}:TO:${to}`,
   })
-
-  if (input.template === 'MEET_AND_GREET') {
-    await auditClientAction({
-      userId: user.id,
-      serviceClientId: clientId,
-      action: `EMAIL_PHI_DISCLOSURE:MEET_AND_GREET:STAFF:${ccList.join(';')}:TO:${to}`,
-    })
-  }
 
   return { status: 'SENT', communicationId: row.id }
 }
