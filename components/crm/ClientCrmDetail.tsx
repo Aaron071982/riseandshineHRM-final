@@ -213,19 +213,18 @@ export default function ClientCrmDetail({
         )}
         {tab === 'requirements' && (
           <RequirementsPanel
-            requirements={client.requirements}
-            currentStage={client.stage}
-            canEdit={canEdit}
-          />
-        )}
-        {tab === 'documents' && (
-          <ClientDocumentsPanel
             clientId={client.id}
             requirements={client.requirements}
             currentStage={client.stage}
             canEdit={canEdit}
             consent={client.consent}
             referralCheck={client.referralCheck}
+          />
+        )}
+        {tab === 'documents' && (
+          <ClientDocumentsPanel
+            clientId={client.id}
+            requirements={client.requirements}
           />
         )}
         {tab === 'tasks' && (

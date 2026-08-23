@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { ClientStage, RequirementGroup, RequirementStatus } from '@prisma/client'
 import {
   attestRequirementOnFile,
+  markRequirementReceived,
   updateRequirement,
 } from '@/lib/crm/actions'
 import {
@@ -13,6 +14,8 @@ import {
   DOCUMENT_GROUP_ORDER,
 } from '@/lib/crm/documents'
 import { STAGE_LABELS } from '@/lib/crm/stages'
+import { ConsentInitialsPanel, type ConsentShape } from '@/components/crm/ConsentInitialsPanel'
+import { ReferralCheckPanel, type ReferralCheckShape } from '@/components/crm/ReferralCheckPanel'
 import { cn } from '@/lib/utils'
 
 const STATUSES: RequirementStatus[] = [
@@ -58,16 +61,23 @@ function daysUntil(expiresAt: Date | string | null): number | null {
 }
 
 export function RequirementsPanel({
+  clientId,
   requirements,
   currentStage,
   canEdit,
+  consent,
+  referralCheck,
 }: {
+  clientId: string
   requirements: Req[]
   currentStage: ClientStage
   canEdit: boolean
+  consent: ConsentShape | null
+  referralCheck: ReferralCheckShape | null
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
 
   const grouped = useMemo(() => {
     const docs = requirements.filter((r) => !!DOCUMENT_BY_KEY[r.key])
@@ -105,11 +115,6 @@ export function RequirementsPanel({
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-quiet">
-        Stage gates and checklist status. Upload and download files on the{' '}
-        <strong className="font-medium text-ink">Documents</strong> tab.
-      </p>
-
       {grouped.byGroup.map(({ group, items }) => (
         <section key={group}>
           <h3 className="mb-2 font-display text-base font-semibold text-ink">
@@ -167,6 +172,21 @@ export function RequirementsPanel({
                     </span>
                     {canEdit && (
                       <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() =>
+                            run(() =>
+                              markRequirementReceived(
+                                req.id,
+                                fileUrls[req.id]?.trim() || req.fileUrl
+                              )
+                            )
+                          }
+                          className="h-8 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
+                        >
+                          Upload / received
+                        </button>
                         {attestOk && (
                           <button
                             type="button"
@@ -199,6 +219,30 @@ export function RequirementsPanel({
                       </div>
                     )}
                   </div>
+                  {canEdit && (
+                    <input
+                      value={fileUrls[req.id] ?? req.fileUrl ?? ''}
+                      onChange={(e) =>
+                        setFileUrls((m) => ({ ...m, [req.id]: e.target.value }))
+                      }
+                      placeholder="File URL (upload path or shared link)"
+                      className="mt-2 h-8 w-full rounded-lg border border-line bg-surface px-2 text-xs"
+                    />
+                  )}
+                  {req.key === 'consent_form' && (
+                    <ConsentInitialsPanel
+                      clientId={clientId}
+                      consent={consent}
+                      canEdit={canEdit}
+                    />
+                  )}
+                  {req.key === 'physician_referral' && (
+                    <ReferralCheckPanel
+                      clientId={clientId}
+                      check={referralCheck}
+                      canEdit={canEdit}
+                    />
+                  )}
                 </li>
               )
             })}

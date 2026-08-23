@@ -1,10 +1,8 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
-import { Download, FileText, Loader2, Upload } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Download, FileText, Loader2 } from 'lucide-react'
 import type { ClientStage, RequirementGroup, RequirementStatus } from '@prisma/client'
-import { attestRequirementOnFile } from '@/lib/crm/actions'
 import {
   DOCUMENT_BY_KEY,
   DOCUMENT_GROUP_LABELS,
@@ -12,8 +10,6 @@ import {
 } from '@/lib/crm/documents'
 import { isStoredRequirementPath } from '@/lib/crm/requirementDocuments'
 import { STAGE_LABELS } from '@/lib/crm/stages'
-import { ConsentInitialsPanel, type ConsentShape } from '@/components/crm/ConsentInitialsPanel'
-import { ReferralCheckPanel, type ReferralCheckShape } from '@/components/crm/ReferralCheckPanel'
 import { cn } from '@/lib/utils'
 
 const STATUS_CHIP: Record<RequirementStatus, string> = {
@@ -34,7 +30,6 @@ export type ClientDocumentRequirement = {
   status: RequirementStatus
   stage: ClientStage
   group: RequirementGroup
-  isRequiredToAdvance: boolean
   fileUrl: string | null
   fileName: string | null
   fileContentType: string | null
@@ -53,41 +48,35 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function daysUntil(expiresAt: Date | string | null): number | null {
-  if (!expiresAt) return null
-  const exp = new Date(expiresAt)
-  if (Number.isNaN(exp.getTime())) return null
-  return Math.ceil((exp.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
-}
-
-function statusLabel(status: RequirementStatus): string {
-  return status.replace(/_/g, ' ')
+function hasDocumentOnFile(req: ClientDocumentRequirement): boolean {
+  if (!req.fileUrl?.trim()) return false
+  return (
+    req.status === 'RECEIVED' ||
+    req.status === 'ON_FILE' ||
+    req.status === 'COMPLETE' ||
+    req.status === 'EXPIRED'
+  )
 }
 
 export function ClientDocumentsPanel({
   clientId,
   requirements,
-  currentStage,
-  canEdit,
-  consent,
-  referralCheck,
 }: {
   clientId: string
   requirements: ClientDocumentRequirement[]
-  currentStage: ClientStage
-  canEdit: boolean
-  consent: ConsentShape | null
-  referralCheck: ReferralCheckShape | null
+  /** Kept for call-site compatibility; Documents is read-only. */
+  currentStage?: ClientStage
+  canEdit?: boolean
+  consent?: unknown
+  referralCheck?: unknown
 }) {
-  const router = useRouter()
-  const [pending, startTransition] = useTransition()
-  const [uploadingId, setUploadingId] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [error, setError] = useState('')
-  const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const grouped = useMemo(() => {
-    const docs = requirements.filter((r) => r.type === 'DOCUMENT')
+    const docs = requirements.filter(
+      (r) => r.type === 'DOCUMENT' && hasDocumentOnFile(r)
+    )
     const docGroup = (r: ClientDocumentRequirement) =>
       DOCUMENT_BY_KEY[r.key]?.group ??
       (r.group !== 'STAGE' && r.group !== 'CONSENT' ? r.group : 'INTAKE')
@@ -96,36 +85,6 @@ export function ClientDocumentsPanel({
       items: docs.filter((r) => docGroup(r) === group),
     })).filter((g) => g.items.length > 0)
   }, [requirements])
-
-  const run = (fn: () => Promise<unknown>) => {
-    startTransition(async () => {
-      setError('')
-      await fn()
-      router.refresh()
-    })
-  }
-
-  const onUpload = async (requirementId: string, file: File) => {
-    setError('')
-    setUploadingId(requirementId)
-    try {
-      const form = new FormData()
-      form.append('file', file)
-      const res = await fetch(
-        `/api/client-services/clients/${clientId}/requirements/${requirementId}/upload`,
-        { method: 'POST', body: form, credentials: 'include' }
-      )
-      const data = (await res.json().catch(() => ({}))) as { error?: string }
-      if (!res.ok) {
-        throw new Error(data.error || 'Upload failed')
-      }
-      router.refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Upload failed')
-    } finally {
-      setUploadingId(null)
-    }
-  }
 
   const onDownload = async (requirementId: string, fileName: string) => {
     setError('')
@@ -161,9 +120,13 @@ export function ClientDocumentsPanel({
   if (grouped.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-line bg-surface px-4 py-10 text-center">
-        <p className="font-display text-base font-semibold text-ink">No documents yet</p>
+        <FileText className="mx-auto h-8 w-8 text-faint" />
+        <p className="mt-3 font-display text-base font-semibold text-ink">
+          No uploaded documents yet
+        </p>
         <p className="mt-1 text-sm text-quiet">
-          Required documents appear here as this client moves through intake.
+          Mark documents received or on file in the Requirements tab — they will
+          appear here as a library for the care team.
         </p>
       </div>
     )
@@ -178,8 +141,9 @@ export function ClientDocumentsPanel({
       )}
 
       <p className="text-sm text-quiet">
-        Upload and download tracked requirement documents. Files are stored privately and
-        access is logged. Use the Requirements tab for stage gate checklist items.
+        Library of documents already on file for this client. Upload and status
+        updates happen on the <strong className="font-medium text-ink">Requirements</strong>{' '}
+        tab.
       </p>
 
       {grouped.map(({ group, items }) => (
@@ -189,17 +153,15 @@ export function ClientDocumentsPanel({
           </h3>
           <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
             {items.map((req) => {
-              const catalog = DOCUMENT_BY_KEY[req.key]
-              const days = daysUntil(req.expiresAt)
-              const attestOk = catalog?.attestAllowed !== false
               const hasStoredFile = isStoredRequirementPath(req.fileUrl)
               const displayFileName =
                 req.fileName?.trim() ||
-                (hasStoredFile ? req.fileUrl!.split('/').pop() : null)
+                (hasStoredFile
+                  ? req.fileUrl!.split('/').pop()
+                  : req.fileUrl?.trim()) ||
+                null
               const uploader =
-                req.status === 'ON_FILE'
-                  ? req.attestedByUser
-                  : req.completedByUser
+                req.status === 'ON_FILE' ? req.attestedByUser : req.completedByUser
               const uploadedAt =
                 req.status === 'ON_FILE' ? req.attestedAt : req.completedAt
 
@@ -212,12 +174,9 @@ export function ClientDocumentsPanel({
                         <div className="text-sm font-medium text-ink">{req.label}</div>
                         <div className="mt-0.5 text-xs text-quiet">
                           {STAGE_LABELS[req.stage]}
-                          {req.isRequiredToAdvance && req.stage === currentStage && (
-                            <span className="ml-2 text-brand">Required to advance</span>
-                          )}
                         </div>
                         {displayFileName && (
-                          <div className="mt-1 text-xs text-ink">
+                          <div className="mt-1 text-xs text-ink break-all">
                             {displayFileName}
                             {req.fileSizeBytes ? (
                               <span className="text-quiet">
@@ -238,27 +197,6 @@ export function ClientDocumentsPanel({
                               : ''}
                           </div>
                         )}
-                        {days != null && (
-                          <div
-                            className={cn(
-                              'mt-0.5 text-xs',
-                              days < 0
-                                ? 'text-[var(--urgent)]'
-                                : days <= 30
-                                  ? 'text-[var(--amber)]'
-                                  : 'text-quiet'
-                            )}
-                          >
-                            {days < 0
-                              ? `Expired ${Math.abs(days)}d ago`
-                              : `Expires in ${days}d`}
-                          </div>
-                        )}
-                        {req.status === 'RECEIVED' && !hasStoredFile && req.fileUrl && (
-                          <div className="mt-0.5 text-xs text-quiet">
-                            External link on file (legacy)
-                          </div>
-                        )}
                       </div>
                     </div>
 
@@ -268,95 +206,40 @@ export function ClientDocumentsPanel({
                         STATUS_CHIP[req.status]
                       )}
                     >
-                      {statusLabel(req.status)}
+                      {req.status.replace(/_/g, ' ')}
                     </span>
 
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {hasStoredFile && (
-                        <button
-                          type="button"
-                          disabled={downloadingId === req.id}
-                          onClick={() =>
-                            onDownload(
-                              req.id,
-                              displayFileName ?? `${req.label}.pdf`
-                            )
-                          }
-                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
-                        >
-                          {downloadingId === req.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Download className="h-3.5 w-3.5" />
-                          )}
-                          Download
-                        </button>
-                      )}
-
-                      {canEdit && (
-                        <>
-                          <input
-                            ref={(el) => {
-                              fileInputs.current[req.id] = el
-                            }}
-                            type="file"
-                            accept=".pdf,.png,.jpg,.jpeg,.heic,.doc,.docx,.xls,.xlsx,.txt"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              e.target.value = ''
-                              if (file) void onUpload(req.id, file)
-                            }}
-                          />
-                          <button
-                            type="button"
-                            disabled={pending || uploadingId === req.id}
-                            onClick={() => fileInputs.current[req.id]?.click()}
-                            className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
-                          >
-                            {uploadingId === req.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Upload className="h-3.5 w-3.5" />
-                            )}
-                            {hasStoredFile ? 'Replace' : 'Upload'}
-                          </button>
-
-                          {attestOk && (
-                            <button
-                              type="button"
-                              disabled={pending}
-                              onClick={() =>
-                                run(() => attestRequirementOnFile(req.id))
-                              }
-                              className="h-8 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
-                            >
-                              Mark on file
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
+                    {hasStoredFile && (
+                      <button
+                        type="button"
+                        disabled={downloadingId === req.id}
+                        onClick={() =>
+                          onDownload(
+                            req.id,
+                            displayFileName ?? `${req.label}.pdf`
+                          )
+                        }
+                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
+                      >
+                        {downloadingId === req.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Download className="h-3.5 w-3.5" />
+                        )}
+                        Download
+                      </button>
+                    )}
+                    {!hasStoredFile && req.fileUrl?.startsWith('http') && (
+                      <a
+                        href={req.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-8 items-center rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2"
+                      >
+                        Open link
+                      </a>
+                    )}
                   </div>
-
-                  {req.key === 'consent_form' && (
-                    <div className="mt-3 border-t border-line pt-3">
-                      <ConsentInitialsPanel
-                        clientId={clientId}
-                        consent={consent}
-                        canEdit={canEdit}
-                      />
-                    </div>
-                  )}
-                  {req.key === 'physician_referral' && (
-                    <div className="mt-3 border-t border-line pt-3">
-                      <ReferralCheckPanel
-                        clientId={clientId}
-                        check={referralCheck}
-                        canEdit={canEdit}
-                      />
-                    </div>
-                  )}
                 </li>
               )
             })}
