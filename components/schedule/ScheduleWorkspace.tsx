@@ -235,11 +235,12 @@ export default function ScheduleWorkspace({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#E4E8E9] dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="outline"
+            className="h-8 border-line"
             disabled={!periodList.length}
             onClick={() => navigatePeriod(1)}
             title="Older period"
@@ -247,14 +248,14 @@ export default function ScheduleWorkspace({
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <div className="text-sm">
-            <span className="font-medium text-[#0E4D52]">
+            <span className="font-display font-semibold text-ink">
               {periodStart && periodEnd
                 ? `${periodStart} → ${periodEnd}`
                 : 'Weekly template (no import yet)'}
             </span>
             {periodList.length > 0 && (
               <select
-                className="ml-2 h-8 rounded border px-2 text-xs max-w-[14rem]"
+                className="ml-2 h-8 rounded-lg border border-line bg-surface px-2 text-xs text-ink max-w-[14rem] focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
                 value={periodStart && periodEnd ? `${periodStart}|${periodEnd}` : ''}
                 onChange={(e) => {
                   const [ps, pe] = e.target.value.split('|')
@@ -275,6 +276,7 @@ export default function ScheduleWorkspace({
           <Button
             size="sm"
             variant="outline"
+            className="h-8 border-line"
             disabled={!periodList.length}
             onClick={() => navigatePeriod(-1)}
             title="Newer period"
@@ -285,7 +287,7 @@ export default function ScheduleWorkspace({
             <Button
               size="sm"
               variant="outline"
-              className="text-red-700 border-red-200 hover:bg-red-50 hover:text-red-800"
+              className="h-8 border-[var(--urgent)]/30 text-[var(--urgent)] hover:bg-[var(--urgent-bg)]"
               disabled={deletingPeriod}
               onClick={() => void deleteCurrentPeriod()}
               title="Delete this schedule period"
@@ -297,10 +299,10 @@ export default function ScheduleWorkspace({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs text-gray-500 flex items-center gap-1">
+          <label className="text-xs text-quiet flex items-center gap-1">
             Client borough
             <select
-              className="h-8 rounded border px-2 text-sm"
+              className="h-8 rounded-lg border border-line bg-surface px-2 text-sm text-ink"
               value={borough}
               onChange={(e) => {
                 const v = e.target.value
@@ -323,12 +325,12 @@ export default function ScheduleWorkspace({
           {unsetClientCount > 0 && (
             <Link
               href="/client-services/schedule/import"
-              className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1"
+              className="text-xs font-medium text-[var(--espresso)] bg-[var(--amber-bg)] border border-[var(--amber)]/30 rounded-lg px-2 py-1"
             >
               Unset boroughs: {unsetClientCount} clients
             </Link>
           )}
-          <Button size="sm" className="bg-[#0D9488] hover:bg-teal-700" asChild>
+          <Button size="sm" className="h-8 bg-brand hover:bg-brand-2 text-white" asChild>
             <Link href="/client-services/schedule/import">
               <Upload className="w-4 h-4 mr-1" />
               Import Artemis
@@ -393,6 +395,7 @@ export default function ScheduleWorkspace({
           clients={clients}
           slots={filteredSlots}
           rowDim={rowDim}
+          showAllRows={showAllRows}
           onEditSlot={openEdit}
           onAddSlot={({ therapistId, clientId, day }) =>
             openCreate({
@@ -426,7 +429,7 @@ export default function ScheduleWorkspace({
           slot={editor.mode === 'edit' ? editor.slot : undefined}
           defaults={editor.mode === 'create' ? editor.defaults : undefined}
           therapists={therapists.filter((t) => t.active)}
-          clients={clients.filter((c) => c.active)}
+          clients={clients}
           conflicts={conflicts}
           periodStart={periodStart}
           periodEnd={periodEnd}

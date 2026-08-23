@@ -2489,6 +2489,8 @@ export async function previewClientEmail(
       contentType: string
       storagePath: string
     }[]
+    links?: { url: string; label?: string }[]
+    assessmentModality?: 'IN_HOME' | 'TELEHEALTH' | null
   }
 ): Promise<
   ActionResult<{
@@ -2496,6 +2498,7 @@ export async function previewClientEmail(
     html: string
     to: string | null
     emailConsentOk: boolean
+    suggestedCc?: string[]
   }>
 > {
   try {
@@ -2508,6 +2511,7 @@ export async function previewClientEmail(
       html: preview.html,
       to: preview.to,
       emailConsentOk: preview.emailConsentOk,
+      suggestedCc: preview.suggestedCc,
     }
   } catch (err) {
     return fail(err)
@@ -2529,6 +2533,8 @@ export async function sendClientEmail(
       contentType: string
       storagePath: string
     }[]
+    links?: { url: string; label?: string }[]
+    assessmentModality?: 'IN_HOME' | 'TELEHEALTH' | null
   }
 ): Promise<
   ActionResult<{ status: string; communicationId: string; reason?: string }>

@@ -54,15 +54,19 @@ export default function ScheduleToolbar({
   ]
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg border border-[#E4E8E9] dark:border-gray-700 p-4 space-y-3">
-      <div className="flex flex-wrap items-center gap-4 text-sm">
-        <span className="tabular-nums">
-          <strong className="text-[#0E4D52]">{stats.slotCount}</strong> sessions
+    <div className="rounded-xl border border-line bg-surface p-4 space-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <span className="tabular-nums text-ink">
+          <strong className="font-semibold">{stats.slotCount}</strong> sessions
         </span>
-        <span className="tabular-nums text-[#E7A13A] font-semibold">{stats.totalHours} hrs</span>
-        <span className="text-gray-500">{stats.therapistCount} therapists · {stats.clientCount} clients</span>
+        <span className="tabular-nums font-semibold text-brand">{stats.totalHours} hrs</span>
+        <span className="text-quiet">
+          {stats.therapistCount} therapists · {stats.clientCount} clients
+        </span>
         {stats.conflictCount > 0 && (
-          <span className="text-amber-600 font-medium">⚠ {stats.conflictCount} conflicts</span>
+          <span className="font-medium text-[var(--amber)]">
+            {stats.conflictCount} conflicts
+          </span>
         )}
       </div>
 
@@ -74,10 +78,10 @@ export default function ScheduleToolbar({
               type="button"
               onClick={() => onViewChange(t.id)}
               className={cn(
-                'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                'h-8 px-3 rounded-lg text-sm font-medium transition-colors',
                 view === t.id
-                  ? 'bg-[#0E4D52] text-white'
-                  : 'text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  ? 'bg-brand text-white'
+                  : 'text-quiet hover:bg-line-2 hover:text-ink'
               )}
             >
               {t.label}
@@ -87,12 +91,14 @@ export default function ScheduleToolbar({
 
         <div className="flex flex-wrap items-center gap-2">
           {view === 'roster' && (
-            <div className="flex rounded-md border border-[#E4E8E9] overflow-hidden text-xs">
+            <div className="flex rounded-lg border border-line overflow-hidden text-xs">
               <button
                 type="button"
                 className={cn(
-                  'px-2.5 py-1.5',
-                  rowDim === 'therapist' && 'bg-[#0E4D52] text-white'
+                  'px-2.5 py-1.5 transition-colors',
+                  rowDim === 'therapist'
+                    ? 'bg-brand text-white'
+                    : 'text-quiet hover:bg-line-2'
                 )}
                 onClick={() => onRowDimChange('therapist')}
               >
@@ -101,8 +107,10 @@ export default function ScheduleToolbar({
               <button
                 type="button"
                 className={cn(
-                  'px-2.5 py-1.5',
-                  rowDim === 'client' && 'bg-[#0E4D52] text-white'
+                  'px-2.5 py-1.5 transition-colors',
+                  rowDim === 'client'
+                    ? 'bg-brand text-white'
+                    : 'text-quiet hover:bg-line-2'
                 )}
                 onClick={() => onRowDimChange('client')}
               >
@@ -114,38 +122,50 @@ export default function ScheduleToolbar({
             placeholder="Search…"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="h-8 w-36 text-sm"
+            className="h-8 w-36 text-sm border-line bg-surface"
           />
-          <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+          <label className="flex items-center gap-1.5 text-xs text-quiet cursor-pointer">
             <input
               type="checkbox"
               checked={showAllRows}
               onChange={(e) => onShowAllRowsChange(e.target.checked)}
+              className="rounded border-line"
             />
-            Show all
+            Show inactive
           </label>
-          <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+          <label className="flex items-center gap-1.5 text-xs text-quiet cursor-pointer">
             <input
               type="checkbox"
               checked={showCancelled}
               onChange={(e) => onShowCancelledChange(e.target.checked)}
+              className="rounded border-line"
             />
             Cancelled
           </label>
-          <Button size="sm" className="bg-[#0E4D52] hover:bg-[#0A3A3E]" onClick={onAddSession}>
+          <Button
+            size="sm"
+            className="h-8 bg-brand hover:bg-brand-2 text-white"
+            onClick={onAddSession}
+          >
             <Plus className="w-4 h-4 mr-1" />
             Add session
           </Button>
-          <Button size="sm" variant="outline" onClick={onExport}>
+          <Button size="sm" variant="outline" className="h-8 border-line" onClick={onExport}>
             <Download className="w-4 h-4 mr-1" />
             Export
           </Button>
           {onExportAll && (
-            <Button size="sm" variant="ghost" onClick={onExportAll} title="Export all boroughs">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-quiet"
+              onClick={onExportAll}
+              title="Export all boroughs"
+            >
               Export all
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={onManage}>
+          <Button size="sm" variant="outline" className="h-8 border-line" onClick={onManage}>
             <Settings2 className="w-4 h-4 mr-1" />
             Manage
           </Button>

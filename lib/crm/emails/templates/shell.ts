@@ -2,10 +2,7 @@ export const COMPANY_NAME = 'Rise & Shine ABA'
 export const COMPANY_PHONE = '(888) 898-4774'
 export const COMPANY_EMAIL = 'info@riseandshineaba.com'
 
-/**
- * Absolute HTTPS URL for email clients (Gmail/Outlook/Apple Mail).
- * Served from production public assets — never relative or localhost.
- */
+/** Absolute HTTPS URL — renders in Gmail, Outlook, Apple Mail. */
 export const EMAIL_LOGO_URL =
   'https://www.riseandshinehrm.com/api/public/email-logo'
 
@@ -14,8 +11,22 @@ export type EmailAttachmentMeta = {
   sizeBytes: number
 }
 
+export type EmailLinkMeta = {
+  url: string
+  label?: string
+}
+
 export type WrapStaffEmailOptions = {
   attachments?: EmailAttachmentMeta[]
+  links?: EmailLinkMeta[]
+}
+
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function formatFileSize(bytes: number): string {
@@ -39,30 +50,53 @@ function attachmentsStrip(attachments: EmailAttachmentMeta[] | undefined): strin
     })
     .join('')
   return `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 0;border-top:1px solid #ebe3da;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;">
       <tr>
-        <td style="padding:16px 0 0;">
-          <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;margin-bottom:8px;">Attachments</div>
+        <td style="padding:14px 16px;background:#fffcf8;border:1px solid #ebe3da;border-radius:10px;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;margin-bottom:8px;">Attached files</div>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
         </td>
       </tr>
     </table>`
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+function linksStrip(links: EmailLinkMeta[] | undefined): string {
+  if (!links?.length) return ''
+  const buttons = links
+    .map((l) => {
+      const label = l.label?.trim() || 'Open link'
+      const href = l.url.trim()
+      return `<tr><td style="padding:6px 0;">${ctaButtonInner(label, href)}</td></tr>`
+    })
+    .join('')
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;">
+      <tr>
+        <td style="padding:14px 16px;background:#fff8f2;border:1px solid #f0dcc8;border-radius:10px;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;margin-bottom:10px;">Links included</div>
+          <table role="presentation" cellpadding="0" cellspacing="0">${buttons}</table>
+        </td>
+      </tr>
+    </table>`
 }
 
-/** Branded HTML shell — refined sunrise/espresso, email-client-safe tables. */
+function ctaButtonInner(label: string, href: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0">
+  <tr>
+    <td align="left" bgcolor="#f2652a" style="border-radius:8px;background:#f2652a;">
+      <a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;line-height:1.2;">${escapeHtml(label)}</a>
+    </td>
+  </tr>
+</table>`
+}
+
+/** Branded HTML shell — full-width friendly, warm sunrise/espresso palette. */
 export function wrapStaffEmail(
   bodyHtml: string,
   options?: WrapStaffEmailOptions
 ): string {
   const attachHtml = attachmentsStrip(options?.attachments)
+  const linkHtml = linksStrip(options?.links)
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -72,45 +106,46 @@ export function wrapStaffEmail(
   <title>${COMPANY_NAME}</title>
 </head>
 <body style="margin:0;padding:0;background:#faf6f1;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#2f2318;-webkit-text-size-adjust:100%;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6f1;padding:28px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf6f1;padding:24px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #ebe3da;">
+        <table role="presentation" width="700" cellpadding="0" cellspacing="0" style="max-width:700px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #ebe3da;box-shadow:0 1px 3px rgba(47,35,24,0.06);">
           <tr>
-            <td style="height:4px;line-height:4px;font-size:0;background:#f2652a;">&nbsp;</td>
+            <td style="height:3px;line-height:3px;font-size:0;background:linear-gradient(90deg,#f2652a 0%,#f5a623 100%);">&nbsp;</td>
           </tr>
           <tr>
-            <td style="padding:28px 36px 20px;text-align:left;">
-              <table role="presentation" cellpadding="0" cellspacing="0">
+            <td style="padding:32px 40px 24px;text-align:left;border-bottom:1px solid #f0e8df;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="vertical-align:middle;padding-right:14px;">
-                    <img src="${EMAIL_LOGO_URL}" alt="${COMPANY_NAME}" width="56" height="56" style="display:block;width:56px;height:56px;border:0;outline:none;text-decoration:none;border-radius:10px;" />
+                  <td style="vertical-align:middle;width:72px;padding-right:16px;">
+                    <img src="${EMAIL_LOGO_URL}" alt="${COMPANY_NAME}" width="64" height="64" style="display:block;width:64px;height:64px;border:0;outline:none;text-decoration:none;border-radius:12px;" />
                   </td>
                   <td style="vertical-align:middle;">
-                    <div style="font-size:18px;font-weight:700;color:#2f2318;letter-spacing:-0.01em;line-height:1.2;">${COMPANY_NAME}</div>
-                    <div style="font-size:13px;color:#8a7a6c;margin-top:4px;line-height:1.35;">Supporting your family every step of the way</div>
+                    <div style="font-size:20px;font-weight:700;color:#2f2318;letter-spacing:-0.02em;line-height:1.2;">${COMPANY_NAME}</div>
+                    <div style="font-size:13px;color:#8a7a6c;margin-top:5px;line-height:1.4;">Supporting your family every step of the way</div>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
           <tr>
-            <td style="padding:8px 36px 32px;font-size:15px;line-height:1.65;color:#2f2318;">
+            <td style="padding:28px 40px 36px;font-size:15px;line-height:1.65;color:#2f2318;">
               ${bodyHtml}
               ${attachHtml}
+              ${linkHtml}
             </td>
           </tr>
           <tr>
-            <td style="padding:20px 36px;background:#f7f3ee;border-top:1px solid #ebe3da;font-size:13px;color:#6b5e52;line-height:1.55;">
+            <td style="padding:22px 40px;background:#f7f3ee;border-top:1px solid #ebe3da;font-size:13px;color:#6b5e52;line-height:1.55;">
               <strong style="color:#2f2318;">${COMPANY_NAME}</strong><br />
               <a href="mailto:${COMPANY_EMAIL}" style="color:#c45a1a;text-decoration:none;">${COMPANY_EMAIL}</a>
               &nbsp;·&nbsp;
               <a href="tel:+18888984774" style="color:#c45a1a;text-decoration:none;">${COMPANY_PHONE}</a><br />
-              <span style="font-size:12px;color:#8a7a6c;">Confidential family communication — please do not forward without permission.</span>
+              <span style="font-size:12px;color:#8a7a6c;margin-top:6px;display:inline-block;">Confidential family communication — please do not forward without permission.</span>
             </td>
           </tr>
         </table>
-        <div style="max-width:600px;margin:14px auto 0;font-size:11px;color:#a89888;line-height:1.4;text-align:center;">
+        <div style="max-width:700px;margin:16px auto 0;font-size:11px;color:#a89888;line-height:1.4;text-align:center;">
           Rise &amp; Shine ABA Client Services
         </div>
       </td>
@@ -120,19 +155,19 @@ export function wrapStaffEmail(
 </html>`
 }
 
-/** Soft callout for lists and next steps. */
+/** Warm cream callout — sunrise/espresso palette (no blue). */
 export function infoBlock(title: string, items: string[]): string {
   const lis = items
     .map(
       (i) =>
-        `<li style="margin:0 0 10px;padding:0;line-height:1.45;">${i}</li>`
+        `<li style="margin:0 0 10px;padding:0;line-height:1.5;">${i}</li>`
     )
     .join('')
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;">
   <tr>
-    <td style="padding:18px 20px;background:#f3f8ff;border-left:4px solid #3b82f6;border-radius:0 10px 10px 0;">
-      <div style="font-size:13px;font-weight:700;color:#1e40af;margin:0 0 12px;letter-spacing:0.02em;">${title}</div>
-      <ul style="margin:0;padding-left:18px;color:#1e3a5f;font-size:14px;">${lis}</ul>
+    <td style="padding:18px 20px;background:#fff8f2;border-left:4px solid #f2652a;border-radius:0 10px 10px 0;border:1px solid #f0dcc8;border-left:4px solid #f2652a;">
+      <div style="font-size:13px;font-weight:700;color:#8b4513;margin:0 0 12px;letter-spacing:0.02em;">${title}</div>
+      <ul style="margin:0;padding-left:18px;color:#2f2318;font-size:14px;">${lis}</ul>
     </td>
   </tr>
 </table>`
@@ -142,9 +177,7 @@ export function infoBlock(title: string, items: string[]): string {
 export function ctaButton(label: string, href: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 8px;">
   <tr>
-    <td align="left" bgcolor="#f2652a" style="border-radius:8px;background:#f2652a;">
-      <a href="${href}" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;line-height:1.2;">${label}</a>
-    </td>
+    <td align="left">${ctaButtonInner(label, href)}</td>
   </tr>
 </table>`
 }
@@ -181,10 +214,6 @@ export function greeting(fields: {
   return first ? `Hi ${first},` : 'Hi there,'
 }
 
-export function childName(fields: { childFirstName: string }): string {
-  return fields.childFirstName.trim() || 'your child'
-}
-
 export function staffSignature(fields: {
   staffName: string
   staffEmail: string | null
@@ -205,3 +234,5 @@ export function staffSignature(fields: {
 export function para(html: string): string {
   return `<p style="margin:0 0 16px;">${html}</p>`
 }
+
+export { childName, childInitialLast } from './helpers'

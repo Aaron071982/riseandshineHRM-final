@@ -39,21 +39,49 @@ type AttachedFile = {
   storagePath: string
 }
 
+type AttachedLink = {
+  id: string
+  url: string
+  label: string
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function attachmentNamesFromJson(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map((row) => {
-      if (!row || typeof row !== 'object') return null
-      const name = (row as { fileName?: unknown }).fileName
-      return typeof name === 'string' ? name : null
-    })
-    .filter((n): n is string => !!n)
+function parseAttachmentsJson(raw: unknown): {
+  fileNames: string[]
+  linkUrls: string[]
+} {
+  if (!raw || typeof raw !== 'object') {
+    if (Array.isArray(raw)) {
+      return {
+        fileNames: raw
+          .map((row) =>
+            row && typeof row === 'object' && typeof (row as { fileName?: unknown }).fileName === 'string'
+              ? (row as { fileName: string }).fileName
+              : null
+          )
+          .filter((n): n is string => !!n),
+        linkUrls: [],
+      }
+    }
+    return { fileNames: [], linkUrls: [] }
+  }
+  const obj = raw as {
+    files?: { fileName?: string }[]
+    links?: { url?: string }[]
+  }
+  return {
+    fileNames: (obj.files ?? [])
+      .map((f) => f.fileName)
+      .filter((n): n is string => !!n),
+    linkUrls: (obj.links ?? [])
+      .map((l) => l.url)
+      .filter((u): u is string => !!u),
+  }
 }
 
 export function EmailPanel({
@@ -83,11 +111,19 @@ export function EmailPanel({
   const [manualBody, setManualBody] = useState('')
   const [cc, setCc] = useState('')
   const [attachments, setAttachments] = useState<AttachedFile[]>([])
+  const [links, setLinks] = useState<AttachedLink[]>([])
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkLabel, setLinkLabel] = useState('')
+  const [assessmentModality, setAssessmentModality] = useState<
+    'IN_HOME' | 'TELEHEALTH' | ''
+  >('')
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewSubject, setPreviewSubject] = useState('')
   const [consentAcknowledged, setConsentAcknowledged] = useState(false)
+  const [ccTouched, setCcTouched] = useState(false)
 
   const isManual = template === 'MANUAL'
+  const isAssessment = template === 'ASSESSMENT_SCHEDULED'
   const needsConsentWarn = emailSend.emailConsentOk === false
 
   const localPreviewLogoUrl =
@@ -103,6 +139,8 @@ export function EmailPanel({
         subject: isManual ? subject : undefined,
         bodyHtml: isManual && manualBody.trim() ? manualBody : undefined,
         attachments,
+        links: links.map(({ url, label }) => ({ url, label: label || undefined })),
+        assessmentModality: isAssessment && assessmentModality ? assessmentModality : null,
       })
       if (!res.ok) {
         setError(res.error)
@@ -112,6 +150,13 @@ export function EmailPanel({
       setPreviewSubject(res.subject)
       setPreviewHtml(res.html.replaceAll(EMAIL_LOGO_URL, localPreviewLogoUrl))
       if (!isManual) setSubject(res.subject)
+      if (
+        template === 'MEET_AND_GREET' &&
+        !ccTouched &&
+        res.suggestedCc?.length
+      ) {
+        setCc(res.suggestedCc.join(', '))
+      }
     })
   }, [
     clientId,
@@ -119,8 +164,12 @@ export function EmailPanel({
     subject,
     manualBody,
     isManual,
+    isAssessment,
+    assessmentModality,
     localPreviewLogoUrl,
     attachments,
+    links,
+    ccTouched,
   ])
 
   useEffect(() => {
@@ -134,6 +183,13 @@ export function EmailPanel({
       setTemplate(emailSend.allowedTemplates[0] ?? 'MANUAL')
     }
   }, [emailSend.allowedTemplates, template])
+
+  useEffect(() => {
+    setCcTouched(false)
+    if (template !== 'ASSESSMENT_SCHEDULED') {
+      setAssessmentModality('')
+    }
+  }, [template])
 
   const timeline = useMemo(
     () =>
@@ -179,6 +235,36 @@ export function EmailPanel({
     }
   }
 
+  const addLink = () => {
+    const url = linkUrl.trim()
+    if (!url) return
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        setError('Links must use http or https')
+        return
+      }
+    } catch {
+      setError('Enter a valid URL')
+      return
+    }
+    if (links.length >= 5) {
+      setError('At most 5 links allowed')
+      return
+    }
+    setError('')
+    setLinks((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        url,
+        label: linkLabel.trim() || 'Open link',
+      },
+    ])
+    setLinkUrl('')
+    setLinkLabel('')
+  }
+
   const onSend = () => {
     if (needsConsentWarn && !consentAcknowledged) {
       setError(
@@ -195,6 +281,8 @@ export function EmailPanel({
         bodyHtml: isManual && manualBody.trim() ? manualBody : undefined,
         cc: cc.trim() || undefined,
         attachments,
+        links: links.map(({ url, label }) => ({ url, label: label || undefined })),
+        assessmentModality: isAssessment && assessmentModality ? assessmentModality : null,
       })
       if (!res.ok) {
         setError(res.error)
@@ -211,6 +299,9 @@ export function EmailPanel({
         setNotice(res.reason ?? `Status: ${res.status}`)
       }
       setAttachments([])
+      setLinks([])
+      setLinkUrl('')
+      setLinkLabel('')
       setConsentAcknowledged(false)
       router.refresh()
     })
@@ -309,12 +400,41 @@ export function EmailPanel({
             CC (comma-separated)
             <input
               value={cc}
-              onChange={(e) => setCc(e.target.value)}
+              onChange={(e) => {
+                setCcTouched(true)
+                setCc(e.target.value)
+              }}
               placeholder="colleague@riseandshineaba.com"
               disabled={!emailSend.canSend}
               className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)] disabled:opacity-50"
             />
           </label>
+
+          {isAssessment && (
+            <fieldset className="sm:col-span-2">
+              <legend className="text-xs text-quiet">Assessment format</legend>
+              <div className="mt-2 flex flex-wrap gap-4 text-sm text-ink">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="assessmentModality"
+                    checked={assessmentModality === 'IN_HOME'}
+                    onChange={() => setAssessmentModality('IN_HOME')}
+                  />
+                  In-home
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="assessmentModality"
+                    checked={assessmentModality === 'TELEHEALTH'}
+                    onChange={() => setAssessmentModality('TELEHEALTH')}
+                  />
+                  Telehealth
+                </label>
+              </div>
+            </fieldset>
+          )}
 
           {(isManual || previewSubject) && (
             <label className="text-xs text-quiet sm:col-span-2">
@@ -346,9 +466,9 @@ export function EmailPanel({
           <div className="sm:col-span-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-medium uppercase tracking-wide text-faint">
-                Attachments
+                Files &amp; links
               </span>
-              <div>
+              <div className="flex flex-wrap gap-2">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -368,9 +488,10 @@ export function EmailPanel({
               </div>
             </div>
             <p className="mt-1 text-xs text-quiet">
-              Client-tailored forms (PHI) upload to private storage and ride the
-              Graph mailbox when sending is enabled. PDF, images, Office docs —
-              up to 5 files, 15&nbsp;MB each.
+              Client-tailored files (PHI) upload to private storage and ride the
+              Graph mailbox when sending is enabled. Blank forms and external
+              signing links can be pasted below. PDF, images, Office docs — up
+              to 5 files, 15&nbsp;MB each; up to 5 links.
             </p>
             {attachments.length > 0 ? (
               <ul className="mt-2 space-y-1.5">
@@ -380,7 +501,7 @@ export function EmailPanel({
                     className="flex items-center justify-between gap-2 rounded-lg border border-line bg-line-2/30 px-3 py-2 text-sm"
                   >
                     <span className="min-w-0 truncate text-ink">
-                      {a.fileName}{' '}
+                      📎 {a.fileName}{' '}
                       <span className="text-xs text-quiet">
                         ({formatSize(a.sizeBytes)})
                       </span>
@@ -397,11 +518,59 @@ export function EmailPanel({
                   </li>
                 ))}
               </ul>
-            ) : (
+            ) : null}
+            <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+              <input
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                placeholder="https://sign.example.com/..."
+                disabled={!emailSend.canSend || links.length >= 5}
+                className="h-9 rounded-lg border border-line bg-surface px-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)] disabled:opacity-50"
+              />
+              <input
+                value={linkLabel}
+                onChange={(e) => setLinkLabel(e.target.value)}
+                placeholder="Button label (optional)"
+                disabled={!emailSend.canSend || links.length >= 5}
+                className="h-9 rounded-lg border border-line bg-surface px-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)] disabled:opacity-50"
+              />
+              <button
+                type="button"
+                disabled={!emailSend.canSend || links.length >= 5 || !linkUrl.trim()}
+                onClick={addLink}
+                className="h-9 rounded-lg border border-line bg-surface px-3 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
+              >
+                Add link
+              </button>
+            </div>
+            {links.length > 0 ? (
+              <ul className="mt-2 space-y-1.5">
+                {links.map((l) => (
+                  <li
+                    key={l.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-line bg-[var(--sunrise-soft)]/40 px-3 py-2 text-sm"
+                  >
+                    <span className="min-w-0 truncate text-ink">
+                      🔗 {l.label}{' '}
+                      <span className="text-xs text-quiet">({l.url})</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLinks((prev) => prev.filter((x) => x.id !== l.id))
+                      }
+                      className="shrink-0 text-xs text-[var(--urgent)] hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : attachments.length === 0 ? (
               <p className="mt-2 rounded-lg border border-dashed border-line px-3 py-4 text-center text-xs text-quiet">
-                No files attached
+                No files or links attached
               </p>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -434,13 +603,16 @@ export function EmailPanel({
         </div>
       </div>
 
-      <div className="rounded-xl border border-line bg-surface overflow-hidden">
-        <div className="border-b border-line px-4 py-2">
+      <div className="overflow-hidden rounded-xl border border-line bg-[#faf6f1]">
+        <div className="border-b border-line bg-surface px-4 py-2">
           <h3 className="font-display text-sm font-semibold text-ink">Preview</h3>
           <p className="text-xs text-quiet">
-            Exact branded output parents will receive
+            Branded output parents will receive
             {attachments.length
-              ? ` · Attachments: ${attachments.map((a) => a.fileName).join(', ')}`
+              ? ` · Files: ${attachments.map((a) => a.fileName).join(', ')}`
+              : ''}
+            {links.length
+              ? ` · Links: ${links.map((l) => l.label).join(', ')}`
               : ''}
             .
           </p>
@@ -449,7 +621,7 @@ export function EmailPanel({
           <iframe
             title="Email preview"
             srcDoc={previewHtml}
-            className="h-[480px] w-full border-0 bg-white"
+            className="min-h-[560px] w-full border-0 bg-[#faf6f1]"
             sandbox=""
           />
         ) : (
@@ -470,7 +642,7 @@ export function EmailPanel({
         ) : (
           <ol className="mt-2 space-y-2">
             {timeline.map((c) => {
-              const names = attachmentNamesFromJson(c.attachmentsJson)
+              const { fileNames, linkUrls } = parseAttachmentsJson(c.attachmentsJson)
               return (
                 <li
                   key={c.id}
@@ -495,9 +667,14 @@ export function EmailPanel({
                       CC: {c.ccRecipients}
                     </p>
                   )}
-                  {names.length > 0 && (
+                  {fileNames.length > 0 && (
                     <p className="mt-0.5 text-xs text-quiet">
-                      Attachments: {names.join(', ')}
+                      Files: {fileNames.join(', ')}
+                    </p>
+                  )}
+                  {linkUrls.length > 0 && (
+                    <p className="mt-0.5 text-xs text-quiet">
+                      Links: {linkUrls.join(', ')}
                     </p>
                   )}
                   {c.status === 'SKIPPED' && (

@@ -26,7 +26,6 @@ export default function ClientHoursPanel({
 
   const rows = useMemo(() => {
     return clients
-      .filter((c) => c.active)
       .map((c) => {
         const scheduled = slots
           .filter((s) => s.clientId === c.id && s.status !== 'CANCELLED')

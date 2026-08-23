@@ -1,4 +1,5 @@
 import type { ScheduleDayOfWeek, ScheduleSlotStatus, ScheduleTherapistRole } from '@prisma/client'
+import type { ClientStage } from '@prisma/client'
 
 export type ScheduleTherapist = {
   id: string
@@ -19,6 +20,7 @@ export type ScheduleClient = {
   bcba: string | null
   authorizedHoursPerWeek: number | null
   active: boolean
+  stage: ClientStage | null
 }
 
 export type ScheduleSlot = {

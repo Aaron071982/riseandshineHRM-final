@@ -16,21 +16,19 @@ export function renderDocsNeeded(fields: StaffMergeFields): StaffEmailContent {
     subject: `Documents we need for ${child}`,
     bodyHtml: `
       ${para(greeting(fields))}
-      ${para(`Thank you for choosing <strong>Rise &amp; Shine ABA</strong>. To keep ${child}’s intake moving, we still need a few documents from you.`)}
-      ${infoBlock('Please send when you can', [
-        'Parent consent form',
-        'Family packet',
-        'Intake form',
+      ${para(`Thank you for completing the consent forms — that helps us move forward with ${child}&apos;s care.`)}
+      ${para(`To keep intake on track, we still need a few documents from you. Please send what you have available; if something is missing, let us know and we can help.`)}
+      ${infoBlock('Documents to send', [
+        '<strong>Intake form</strong> (we can provide this if you need a copy)',
+        '<strong>Transfer letter</strong> (if coming from another provider)',
+        'Diagnostic evaluation / psychological evaluation',
+        'Physician referral / prescription',
         'Insurance card (front and back)',
         'Parent / guardian photo ID',
-        'IEP / IFSP (if available)',
-        'DSM-5 checklist',
-        'Psychological evaluation / autism diagnosis',
-        'Transfer letter (if coming from another provider)',
-        'Doctor’s referral / prescription',
+        'IEP (if applicable)',
       ])}
       ${ctaButton('Reply with documents', reply)}
-      ${para(`You can reply to this email with attachments, or tell us if you need a secure upload option. If you’ve already sent some items, thank you — just send what’s still outstanding.`)}
+      ${para(`You can reply to this email with attachments. If you have already sent some items, thank you — just send what is still outstanding.`)}
       ${staffSignature(fields)}
     `,
   }

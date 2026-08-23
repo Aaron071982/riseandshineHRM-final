@@ -30,6 +30,7 @@ END $$;
 ALTER TYPE "CommTemplate" ADD VALUE IF NOT EXISTS 'WELCOME';
 ALTER TYPE "CommTemplate" ADD VALUE IF NOT EXISTS 'MEET_AND_GREET';
 ALTER TYPE "CommTemplate" ADD VALUE IF NOT EXISTS 'CASE_COORDINATION_FORM';
+ALTER TYPE "CommTemplate" ADD VALUE IF NOT EXISTS 'CC_INTRODUCTION';
 
 -- ── Columns ──────────────────────────────────────────────────────────────────
 

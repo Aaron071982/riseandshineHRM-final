@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { parentFirstNameFromFull } from '@/lib/crm/emails/templates/shell'
-import type { StaffMergeFields } from '@/lib/crm/emails/templates'
+import type { StaffMergeFields, ScheduleSlotRow } from '@/lib/crm/emails/templates/types'
 
 export function formatEmailDate(d: Date | null | undefined): string | null {
   if (!d) return null
@@ -20,18 +20,50 @@ export async function loadStaffEmailMergeContext(clientId: string) {
       lastName: true,
       parentName: true,
       parentEmail: true,
+      parentPhone: true,
+      addressLine: true,
+      city: true,
+      state: true,
+      zip: true,
       currentOwnerUserId: true,
       caseCoordinatorUserId: true,
       caseCoordinatorName: true,
       actualServiceStartDate: true,
       serviceStartDate: true,
       caseCoordinatorUser: { select: { name: true, email: true } },
+      bcbaProfile: { select: { fullName: true, email: true, phone: true } },
+      bcbaName: true,
       btAssignments: {
         where: { status: 'ACTIVE', deletedAt: null },
         orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
         take: 1,
         include: {
-          rbtProfile: { select: { firstName: true, lastName: true } },
+          rbtProfile: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              addressLine1: true,
+              addressLine2: true,
+              locationCity: true,
+              locationState: true,
+              zipCode: true,
+            },
+          },
+        },
+      },
+      scheduleAssignments: {
+        where: {
+          isActive: true,
+          deletedAt: null,
+          reviewStatus: { in: ['NONE', 'CONFIRMED'] },
+        },
+        orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+        include: {
+          rbtProfile: {
+            select: { firstName: true, lastName: true },
+          },
         },
       },
       consent: {
@@ -41,14 +73,31 @@ export async function loadStaffEmailMergeContext(clientId: string) {
   })
 }
 
+function buildScheduleSlots(
+  client: NonNullable<Awaited<ReturnType<typeof loadStaffEmailMergeContext>>>
+): ScheduleSlotRow[] {
+  return client.scheduleAssignments.map((a) => ({
+    dayOfWeek: a.dayOfWeek,
+    startTime: a.startTime,
+    endTime: a.endTime,
+    rbtName: a.rbtProfile
+      ? `${a.rbtProfile.firstName} ${a.rbtProfile.lastName}`.trim()
+      : 'Therapist',
+  }))
+}
+
 export function buildStaffMergeFields(
   client: NonNullable<Awaited<ReturnType<typeof loadStaffEmailMergeContext>>>,
   staff: { name: string | null; email: string | null }
 ): StaffMergeFields {
   const primary = client.btAssignments[0]
-  const rbtName = primary?.rbtProfile
-    ? `${primary.rbtProfile.firstName} ${primary.rbtProfile.lastName}`.trim()
-    : null
+  const rbt = primary?.rbtProfile
+  const rbtName = rbt ? `${rbt.firstName} ${rbt.lastName}`.trim() : null
+  const bcba = client.bcbaProfile
+
+  const rbtAddressLine = [rbt?.addressLine1, rbt?.addressLine2]
+    .filter(Boolean)
+    .join(', ')
 
   return {
     childFirstName: client.firstName,
@@ -56,13 +105,30 @@ export function buildStaffMergeFields(
     parentName: client.parentName,
     parentFirstName: parentFirstNameFromFull(client.parentName),
     parentEmail: client.parentEmail,
+    parentPhone: client.parentPhone,
+    clientAddressLine: client.addressLine,
+    clientCity: client.city,
+    clientState: client.state,
+    clientZip: client.zip,
     coordinatorName:
       client.caseCoordinatorUser?.name || client.caseCoordinatorName,
+    coordinatorEmail: client.caseCoordinatorUser?.email ?? null,
     rbtName,
+    rbtEmail: rbt?.email ?? null,
+    rbtPhone: rbt?.phoneNumber ?? null,
+    rbtAddressLine: rbtAddressLine || null,
+    rbtCity: rbt?.locationCity ?? null,
+    rbtState: rbt?.locationState ?? null,
+    rbtZip: rbt?.zipCode ?? null,
+    bcbaName: bcba?.fullName || client.bcbaName,
+    bcbaEmail: bcba?.email ?? null,
+    bcbaPhone: bcba?.phone ?? null,
+    scheduleSlots: buildScheduleSlots(client),
     startDate: formatEmailDate(
       client.actualServiceStartDate ?? client.serviceStartDate
     ),
     assessmentDate: null,
+    assessmentModality: null,
     staffName: staff.name?.trim() || staff.email || 'Rise & Shine Team',
     staffEmail: staff.email,
     companyPhone: '(888) 898-4774',
@@ -81,4 +147,26 @@ export function parseCcList(raw: string | null | undefined): string[] {
 
 export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+/** Suggested CC for templates that disclose full PHI to clinical staff. */
+export function meetAndGreetCcEmails(fields: StaffMergeFields): string[] {
+  const out: string[] = []
+  if (fields.rbtEmail?.trim()) out.push(fields.rbtEmail.trim().toLowerCase())
+  if (fields.bcbaEmail?.trim()) out.push(fields.bcbaEmail.trim().toLowerCase())
+  return out
+}
+
+export function mergeCcLists(...lists: string[][]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const list of lists) {
+    for (const email of list) {
+      const e = email.trim().toLowerCase()
+      if (!e || seen.has(e)) continue
+      seen.add(e)
+      out.push(e)
+    }
+  }
+  return out
 }

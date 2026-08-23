@@ -18,8 +18,12 @@ const clinical = { id: 'u4', email: 'd@riseandshineaba.com', crmRoles: ['CLINICA
 const full = { id: 'u5', email: 'admin@example.com', fullAccess: true, crmRoles: [] as CrmRole[] }
 
 describe('lib/crm/emails/templatePolicy', () => {
-  it('INTAKE sees WELCOME and DOCS_NEEDED only', () => {
-    expect(templatesForRoles(['INTAKE'])).toEqual(['WELCOME', 'DOCS_NEEDED'])
+  it('INTAKE sees welcome, consent, and docs', () => {
+    expect(templatesForRoles(['INTAKE'])).toEqual([
+      'WELCOME',
+      'CONSENT_REQUEST',
+      'DOCS_NEEDED',
+    ])
     expect(isTemplateAllowedForUser(intake, 'WELCOME')).toBe(true)
     expect(isTemplateAllowedForUser(intake, 'RBT_ASSIGNED')).toBe(false)
   })
@@ -33,7 +37,8 @@ describe('lib/crm/emails/templatePolicy', () => {
     expect(isTemplateAllowedForUser(billing, 'WELCOME')).toBe(false)
   })
 
-  it('CASE_COORDINATION sees CC templates', () => {
+  it('CASE_COORDINATION sees CC templates including introduction', () => {
+    expect(isTemplateAllowedForUser(cc, 'CC_INTRODUCTION')).toBe(true)
     expect(isTemplateAllowedForUser(cc, 'MEET_AND_GREET')).toBe(true)
     expect(isTemplateAllowedForUser(cc, 'CONSENT_REQUEST')).toBe(true)
     expect(isTemplateAllowedForUser(cc, 'DOCS_NEEDED')).toBe(false)

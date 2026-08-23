@@ -122,6 +122,7 @@ export async function loadPeriodWorkspaceData(opts: {
       borough: true,
       authHours: true,
       clientCode: true,
+      stage: true,
     },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   })
@@ -184,7 +185,8 @@ export async function loadPeriodWorkspaceData(opts: {
       insurance: null,
       bcba: null,
       authorizedHoursPerWeek: c.authHours,
-      active: true,
+      active: false,
+      stage: c.stage,
     })
   }
 
@@ -218,6 +220,7 @@ export async function loadPeriodWorkspaceData(opts: {
           bcba: null,
           authorizedHoursPerWeek: null,
           active: true,
+          stage: null,
         })
       }
     }
@@ -238,6 +241,11 @@ export async function loadPeriodWorkspaceData(opts: {
       createdBy: a.createdBy,
       updatedBy: null,
     })
+  }
+
+  const clientIdsWithSlots = new Set(slots.map((s) => s.clientId))
+  for (const client of clientMap.values()) {
+    client.active = clientIdsWithSlots.has(client.id)
   }
 
   const hiredWithoutSlots = await prisma.rBTProfile.findMany({

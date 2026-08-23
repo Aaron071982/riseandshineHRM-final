@@ -18,9 +18,13 @@ import {
   buildStaffMergeFields,
   isValidEmail,
   loadStaffEmailMergeContext,
+  meetAndGreetCcEmails,
+  mergeCcLists,
   parseCcList,
 } from '@/lib/crm/emails/mergeContext'
 import { renderStaffEmail } from '@/lib/crm/emails/templates'
+import type { AssessmentModality } from '@/lib/crm/emails/templates/types'
+import type { EmailLinkMeta } from '@/lib/crm/emails/templates/shell'
 import {
   downloadEmailAttachment,
   type EmailAttachmentRecord,
@@ -46,6 +50,13 @@ export type StaffEmailAttachmentInput = {
   storagePath: string
 }
 
+export type StaffEmailLinkInput = {
+  url: string
+  label?: string
+}
+
+const MAX_LINKS = 5
+
 function isDuplicateLockedStatus(status: string | null | undefined): boolean {
   return status === 'SENT' || status === 'SKIPPED'
 }
@@ -67,6 +78,28 @@ function validateAttachmentRefs(
     }
   }
   return attachments
+}
+
+function validateLinks(links: StaffEmailLinkInput[]): EmailLinkMeta[] {
+  if (links.length > MAX_LINKS) {
+    throw new CrmAccessError(`At most ${MAX_LINKS} links allowed`, 400)
+  }
+  const out: EmailLinkMeta[] = []
+  for (const link of links) {
+    const url = link.url?.trim()
+    if (!url) continue
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new CrmAccessError('Links must use http or https', 400)
+      }
+    } catch (err) {
+      if (err instanceof CrmAccessError) throw err
+      throw new CrmAccessError(`Invalid link URL: ${url}`, 400)
+    }
+    out.push({ url, label: link.label?.trim() || undefined })
+  }
+  return out
 }
 
 async function assertCanSendStaffEmail(
@@ -112,6 +145,36 @@ export function clientHasEmailConsent(
   return isConsentLineInitialed(parseConsentLines(consent.lines), 'comm_email')
 }
 
+function attachmentsJsonValue(
+  attachments: StaffEmailAttachmentInput[],
+  links: EmailLinkMeta[]
+): Prisma.InputJsonValue | undefined {
+  const files = attachments.map((a) => ({
+    id: a.id,
+    fileName: a.fileName,
+    sizeBytes: a.sizeBytes,
+    contentType: a.contentType,
+    storagePath: a.storagePath,
+  }))
+  const linkRows = links.map((l) => ({ url: l.url, label: l.label ?? null }))
+  if (!files.length && !linkRows.length) return undefined
+  return { files, links: linkRows }
+}
+
+function auditExtras(
+  attachments: StaffEmailAttachmentInput[],
+  links: EmailLinkMeta[]
+): string {
+  const parts: string[] = []
+  if (attachments.length) {
+    parts.push(`ATTACH:${attachments.map((a) => a.fileName).join(',')}`)
+  }
+  if (links.length) {
+    parts.push(`LINK:${links.map((l) => l.url).join(',')}`)
+  }
+  return parts.length ? `:${parts.join(':')}` : ''
+}
+
 export async function previewStaffClientEmail(
   user: CrmUser,
   clientId: string,
@@ -120,6 +183,8 @@ export async function previewStaffClientEmail(
     subject?: string | null
     bodyHtml?: string | null
     attachments?: StaffEmailAttachmentInput[]
+    links?: StaffEmailLinkInput[]
+    assessmentModality?: AssessmentModality | null
   }
 ) {
   await assertCanSendStaffEmail(user, clientId)
@@ -129,22 +194,22 @@ export async function previewStaffClientEmail(
   if (!client) throw new Error('Client not found')
 
   const attachments = validateAttachmentRefs(clientId, input.attachments ?? [])
+  const links = validateLinks(input.links ?? [])
+  const fields = buildStaffMergeFields(client, {
+    name: user.name ?? null,
+    email: user.email ?? null,
+  })
 
-  const rendered = renderStaffEmail(
-    input.template,
-    buildStaffMergeFields(client, {
-      name: user.name ?? null,
-      email: user.email ?? null,
-    }),
-    {
-      subject: input.subject ?? undefined,
-      bodyHtml: input.bodyHtml ?? undefined,
-      attachments: attachments.map((a) => ({
-        fileName: a.fileName,
-        sizeBytes: a.sizeBytes,
-      })),
-    }
-  )
+  const rendered = renderStaffEmail(input.template, fields, {
+    subject: input.subject ?? undefined,
+    bodyHtml: input.bodyHtml ?? undefined,
+    attachments: attachments.map((a) => ({
+      fileName: a.fileName,
+      sizeBytes: a.sizeBytes,
+    })),
+    links,
+    assessmentModality: input.assessmentModality ?? null,
+  })
   if (!rendered) throw new Error(`No renderer for ${input.template}`)
 
   return {
@@ -155,6 +220,8 @@ export async function previewStaffClientEmail(
     emailConsentOk: clientHasEmailConsent(
       client.consent && !client.consent.deletedAt ? client.consent : null
     ),
+    suggestedCc:
+      input.template === 'MEET_AND_GREET' ? meetAndGreetCcEmails(fields) : [],
   }
 }
 
@@ -179,19 +246,6 @@ async function loadGraphAttachments(
   return out
 }
 
-function attachmentsJsonValue(
-  attachments: StaffEmailAttachmentInput[]
-): Prisma.InputJsonValue | undefined {
-  if (!attachments.length) return undefined
-  return attachments.map((a) => ({
-    id: a.id,
-    fileName: a.fileName,
-    sizeBytes: a.sizeBytes,
-    contentType: a.contentType,
-    storagePath: a.storagePath,
-  }))
-}
-
 export async function sendStaffClientEmail(
   user: CrmUser,
   clientId: string,
@@ -202,6 +256,8 @@ export async function sendStaffClientEmail(
     cc?: string | null
     force?: boolean
     attachments?: StaffEmailAttachmentInput[]
+    links?: StaffEmailLinkInput[]
+    assessmentModality?: AssessmentModality | null
   }
 ): Promise<StaffEmailSendResult> {
   await assertCanSendStaffEmail(user, clientId)
@@ -220,7 +276,14 @@ export async function sendStaffClientEmail(
     throw new CrmAccessError('Client has no valid parent email on file', 400)
   }
 
-  const ccList = parseCcList(input.cc)
+  const fields = buildStaffMergeFields(client, {
+    name: user.name ?? null,
+    email: user.email ?? null,
+  })
+
+  const autoCc =
+    input.template === 'MEET_AND_GREET' ? meetAndGreetCcEmails(fields) : []
+  const ccList = mergeCcLists(parseCcList(input.cc), autoCc)
   for (const cc of ccList) {
     if (!isValidEmail(cc)) {
       throw new CrmAccessError(`Invalid CC address: ${cc}`, 400)
@@ -228,6 +291,7 @@ export async function sendStaffClientEmail(
   }
 
   const attachments = validateAttachmentRefs(clientId, input.attachments ?? [])
+  const links = validateLinks(input.links ?? [])
 
   if (!input.force && input.template !== 'MANUAL' && !isFullAccess(user)) {
     const prior = await prisma.clientCommunication.findFirst({
@@ -249,29 +313,24 @@ export async function sendStaffClientEmail(
     }
   }
 
-  const rendered = renderStaffEmail(
-    input.template,
-    buildStaffMergeFields(client, {
-      name: user.name ?? null,
-      email: user.email ?? null,
-    }),
-    {
-      subject: input.subject ?? undefined,
-      bodyHtml: input.bodyHtml ?? undefined,
-      attachments: attachments.map((a) => ({
-        fileName: a.fileName,
-        sizeBytes: a.sizeBytes,
-      })),
-    }
-  )
+  const rendered = renderStaffEmail(input.template, fields, {
+    subject: input.subject ?? undefined,
+    bodyHtml: input.bodyHtml ?? undefined,
+    attachments: attachments.map((a) => ({
+      fileName: a.fileName,
+      sizeBytes: a.sizeBytes,
+    })),
+    links,
+    assessmentModality: input.assessmentModality ?? null,
+  })
   if (!rendered) throw new Error(`No renderer for ${input.template}`)
 
   const now = new Date()
   const ccStored = ccList.length ? ccList.join(', ') : null
-  const attachJson = attachmentsJsonValue(attachments)
-  const attachNames = attachments.map((a) => a.fileName).join(', ')
+  const attachJson = attachmentsJsonValue(attachments, links)
+  const extras = auditExtras(attachments, links)
 
-  if (!graphEmailEnabled()) {
+  const recordSkipped = async (reason: string) => {
     const row = await prisma.clientCommunication.create({
       data: {
         serviceClientId: clientId,
@@ -296,51 +355,41 @@ export async function sendStaffClientEmail(
     await auditClientAction({
       userId: user.id,
       serviceClientId: clientId,
-      action: attachments.length
-        ? `EMAIL_SEND_SKIPPED:${input.template}:ATTACH:${attachNames}`
-        : `EMAIL_SEND_SKIPPED:${input.template}`,
+      action: `EMAIL_SEND_SKIPPED:${input.template}${extras}`,
     })
 
-    return {
-      status: 'SKIPPED',
-      communicationId: row.id,
-      reason: attachments.length
-        ? `GRAPH_EMAIL_ENABLED is not true — recorded without sending (attachments: ${attachNames})`
-        : 'GRAPH_EMAIL_ENABLED is not true — recorded without sending',
+    if (input.template === 'MEET_AND_GREET') {
+      await auditClientAction({
+        userId: user.id,
+        serviceClientId: clientId,
+        action: `EMAIL_PHI_DISCLOSURE:MEET_AND_GREET:STAFF:${ccList.join(';')}:TO:${to}`,
+      })
     }
+
+    return {
+      status: 'SKIPPED' as const,
+      communicationId: row.id,
+      reason,
+    }
+  }
+
+  if (!graphEmailEnabled()) {
+    const detail = [
+      attachments.length ? `attachments: ${attachments.map((a) => a.fileName).join(', ')}` : null,
+      links.length ? `links: ${links.map((l) => l.url).join(', ')}` : null,
+    ]
+      .filter(Boolean)
+      .join('; ')
+    return recordSkipped(
+      detail
+        ? `GRAPH_EMAIL_ENABLED is not true — recorded without sending (${detail})`
+        : 'GRAPH_EMAIL_ENABLED is not true — recorded without sending'
+    )
   }
 
   const token = await resolveDelegatedGraphToken(user.id)
   if (!token) {
-    const row = await prisma.clientCommunication.create({
-      data: {
-        serviceClientId: clientId,
-        template: input.template,
-        channel: 'EMAIL',
-        direction: 'OUTBOUND',
-        subject: rendered.subject,
-        body: rendered.html,
-        ccRecipients: ccStored,
-        attachmentsJson: attachJson,
-        sentByUserId: user.id,
-        sentAt: now,
-        status: 'SKIPPED',
-      },
-    })
-
-    await auditClientAction({
-      userId: user.id,
-      serviceClientId: clientId,
-      action: attachments.length
-        ? `EMAIL_SEND_SKIPPED:${input.template}:ATTACH:${attachNames}`
-        : `EMAIL_SEND_SKIPPED:${input.template}`,
-    })
-
-    return {
-      status: 'SKIPPED',
-      communicationId: row.id,
-      reason: 'Microsoft sign-in required — no delegated Graph token',
-    }
+    return recordSkipped('Microsoft sign-in required — no delegated Graph token')
   }
 
   let graphAttachments: Awaited<ReturnType<typeof loadGraphAttachments>> = []
@@ -382,7 +431,7 @@ export async function sendStaffClientEmail(
     await auditClientAction({
       userId: user.id,
       serviceClientId: clientId,
-      action: `EMAIL_SEND_FAILED:${input.template}`,
+      action: `EMAIL_SEND_FAILED:${input.template}${extras}`,
     })
 
     return {
@@ -416,10 +465,16 @@ export async function sendStaffClientEmail(
   await auditClientAction({
     userId: user.id,
     serviceClientId: clientId,
-    action: attachments.length
-      ? `EMAIL_SEND:${input.template}:ATTACH:${attachNames}:TO:${to}`
-      : `EMAIL_SEND:${input.template}`,
+    action: `EMAIL_SEND:${input.template}${extras}:TO:${to}`,
   })
+
+  if (input.template === 'MEET_AND_GREET') {
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: `EMAIL_PHI_DISCLOSURE:MEET_AND_GREET:STAFF:${ccList.join(';')}:TO:${to}`,
+    })
+  }
 
   return { status: 'SENT', communicationId: row.id }
 }

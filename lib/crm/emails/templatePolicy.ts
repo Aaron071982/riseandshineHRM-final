@@ -4,13 +4,14 @@ import { CrmAccessError, isFullAccess, getUserCrmRoles, type CrmAccessSubject } 
 /** Human-composed staff email templates (excludes journey-only INQUIRY_ACK / SERVICES_STARTED). */
 export const STAFF_EMAIL_TEMPLATES: CommTemplate[] = [
   'WELCOME',
-  'DOCS_NEEDED',
   'CONSENT_REQUEST',
+  'DOCS_NEEDED',
   'BENEFITS_UPDATE',
   'ASSESSMENT_SCHEDULED',
   'AUTH_APPROVED',
   'READY_FOR_STAFFING',
   'RBT_ASSIGNED',
+  'CC_INTRODUCTION',
   'SCHEDULE_CONFIRMED',
   'MEET_AND_GREET',
   'CASE_COORDINATION_FORM',
@@ -18,14 +19,14 @@ export const STAFF_EMAIL_TEMPLATES: CommTemplate[] = [
 ]
 
 const ROLE_TEMPLATES: Partial<Record<CrmRole, CommTemplate[]>> = {
-  INTAKE: ['WELCOME', 'DOCS_NEEDED'],
+  INTAKE: ['WELCOME', 'CONSENT_REQUEST', 'DOCS_NEEDED'],
   BILLING: ['BENEFITS_UPDATE', 'AUTH_APPROVED'],
   AUTHORIZATION: ['BENEFITS_UPDATE', 'AUTH_APPROVED'],
   CLINICAL: ['ASSESSMENT_SCHEDULED'],
   CASE_COORDINATION: [
     'CONSENT_REQUEST',
+    'CC_INTRODUCTION',
     'MEET_AND_GREET',
-    'CASE_COORDINATION_FORM',
     'SCHEDULE_CONFIRMED',
     'RBT_ASSIGNED',
   ],

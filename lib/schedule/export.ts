@@ -84,6 +84,7 @@ function buildGrouped(
           bcba: null,
           authorizedHoursPerWeek: null,
           active: true,
+          stage: null,
         },
         sessions: [],
         totalHours: 0,
