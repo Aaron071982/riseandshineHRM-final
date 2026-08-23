@@ -62,7 +62,17 @@ export async function loadStaffEmailMergeContext(clientId: string) {
         orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
         include: {
           rbtProfile: {
-            select: { firstName: true, lastName: true },
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+              phoneNumber: true,
+              addressLine1: true,
+              addressLine2: true,
+              locationCity: true,
+              locationState: true,
+              zipCode: true,
+            },
           },
         },
       },
@@ -86,18 +96,79 @@ function buildScheduleSlots(
   }))
 }
 
+type RbtProfileRow = NonNullable<
+  NonNullable<
+    Awaited<ReturnType<typeof loadStaffEmailMergeContext>>
+  >['btAssignments'][number]['rbtProfile']
+>
+
+function rbtContactFromProfile(profile: RbtProfileRow) {
+  const addressLine = [profile.addressLine1, profile.addressLine2]
+    .filter(Boolean)
+    .join(', ')
+  return {
+    rbtName: `${profile.firstName} ${profile.lastName}`.trim(),
+    rbtEmail: profile.email ?? null,
+    rbtPhone: profile.phoneNumber ?? null,
+    rbtAddressLine: addressLine || null,
+    rbtCity: profile.locationCity ?? null,
+    rbtState: profile.locationState ?? null,
+    rbtZip: profile.zipCode ?? null,
+  }
+}
+
+/** Primary RBT: staffing assignment → schedule slots → name-only BT row. */
+function resolvePrimaryRbtContact(
+  client: NonNullable<Awaited<ReturnType<typeof loadStaffEmailMergeContext>>>
+): {
+  rbtName: string | null
+  rbtEmail: string | null
+  rbtPhone: string | null
+  rbtAddressLine: string | null
+  rbtCity: string | null
+  rbtState: string | null
+  rbtZip: string | null
+} {
+  const primaryAssignment = client.btAssignments[0]
+  if (primaryAssignment?.rbtProfile) {
+    return rbtContactFromProfile(primaryAssignment.rbtProfile)
+  }
+
+  const scheduleWithProfile = client.scheduleAssignments.find((a) => a.rbtProfile)
+  if (scheduleWithProfile?.rbtProfile) {
+    return rbtContactFromProfile(scheduleWithProfile.rbtProfile)
+  }
+
+  const nameOnly = primaryAssignment?.btName?.trim()
+  if (nameOnly) {
+    return {
+      rbtName: nameOnly,
+      rbtEmail: null,
+      rbtPhone: null,
+      rbtAddressLine: null,
+      rbtCity: null,
+      rbtState: null,
+      rbtZip: null,
+    }
+  }
+
+  return {
+    rbtName: null,
+    rbtEmail: null,
+    rbtPhone: null,
+    rbtAddressLine: null,
+    rbtCity: null,
+    rbtState: null,
+    rbtZip: null,
+  }
+}
+
 export function buildStaffMergeFields(
   client: NonNullable<Awaited<ReturnType<typeof loadStaffEmailMergeContext>>>,
   staff: { name: string | null; email: string | null }
 ): StaffMergeFields {
-  const primary = client.btAssignments[0]
-  const rbt = primary?.rbtProfile
-  const rbtName = rbt ? `${rbt.firstName} ${rbt.lastName}`.trim() : null
+  const rbt = resolvePrimaryRbtContact(client)
   const bcba = client.bcbaProfile
-
-  const rbtAddressLine = [rbt?.addressLine1, rbt?.addressLine2]
-    .filter(Boolean)
-    .join(', ')
 
   return {
     childFirstName: client.firstName,
@@ -113,13 +184,13 @@ export function buildStaffMergeFields(
     coordinatorName:
       client.caseCoordinatorUser?.name || client.caseCoordinatorName,
     coordinatorEmail: client.caseCoordinatorUser?.email ?? null,
-    rbtName,
-    rbtEmail: rbt?.email ?? null,
-    rbtPhone: rbt?.phoneNumber ?? null,
-    rbtAddressLine: rbtAddressLine || null,
-    rbtCity: rbt?.locationCity ?? null,
-    rbtState: rbt?.locationState ?? null,
-    rbtZip: rbt?.zipCode ?? null,
+    rbtName: rbt.rbtName,
+    rbtEmail: rbt.rbtEmail,
+    rbtPhone: rbt.rbtPhone,
+    rbtAddressLine: rbt.rbtAddressLine,
+    rbtCity: rbt.rbtCity,
+    rbtState: rbt.rbtState,
+    rbtZip: rbt.rbtZip,
     bcbaName: bcba?.fullName || client.bcbaName,
     bcbaEmail: bcba?.email ?? null,
     bcbaPhone: bcba?.phone ?? null,
