@@ -335,13 +335,13 @@ export async function previewTrainingModuleForRole(
     assertCanEditTrainingContent(viewer)
     await ensureCrmTrainingModules()
 
-    const module = await prisma.crmTrainingModule.findUnique({
+    const row = await prisma.crmTrainingModule.findUnique({
       where: { crmRole },
       include: { steps: { orderBy: { stepNumber: 'asc' } } },
     })
-    if (!module) return { ok: false, error: 'Module not found', status: 404 }
+    if (!row) return { ok: false, error: 'Module not found', status: 404 }
 
-    return { ok: true, module }
+    return { ok: true, module: row }
   } catch (err) {
     return fail(err) as TrainingActionResult<{ module: EditorModuleRow }>
   }

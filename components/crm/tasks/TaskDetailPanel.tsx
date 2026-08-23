@@ -58,16 +58,25 @@ export function TaskDetailPanel({
   const [mentionQuery, setMentionQuery] = useState('')
   const [activityOpen, setActivityOpen] = useState(false)
 
+  useEffect(() => {
+    setActivityOpen(false)
+    let cancelled = false
+    void (async () => {
+      const res = await getTeamTask(taskId)
+      if (cancelled) return
+      if (res.ok) setTask(res.task as TaskDetail)
+      else setError(res.error)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [taskId])
+
   const load = async () => {
     const res = await getTeamTask(taskId)
     if (res.ok) setTask(res.task as TaskDetail)
     else setError(res.error)
   }
-
-  useEffect(() => {
-    setActivityOpen(false)
-    void load()
-  }, [taskId])
 
   const run = (fn: () => Promise<unknown>) => {
     startTransition(async () => {
