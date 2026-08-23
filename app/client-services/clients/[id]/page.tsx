@@ -43,6 +43,8 @@ export default async function ClientServicesClientPage({
             gate: serialized.gate,
             emailSend: serialized.emailSend,
             client: serialized.client,
+            teamTasks: serialized.teamTasks,
+            taskUsers: serialized.taskUsers,
           }}
         />
       </Suspense>

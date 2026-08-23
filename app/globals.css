@@ -32,6 +32,7 @@
     /* CRM action tokens: amber fill + deep-brown ink */
     --sunrise: #ffb066;
     --sunrise-soft: #fff4e8;
+    --sunrise-dark: #ce551b;
     --espresso: #2f2318;
 
     --side: #2a2019;
@@ -183,6 +184,30 @@
     font-variant-numeric: tabular-nums lining-nums;
     background: var(--bg);
     color: var(--ink);
+  }
+
+  .crm-card {
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgba(42, 32, 25, 0.04), 0 4px 16px rgba(42, 32, 25, 0.06);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .crm-card-hover:hover {
+    border-color: color-mix(in srgb, var(--brand) 25%, var(--line));
+    box-shadow: 0 2px 8px rgba(231, 105, 44, 0.08), 0 8px 24px rgba(42, 32, 25, 0.08);
+  }
+
+  .sunrise-gradient {
+    background: linear-gradient(135deg, var(--sunrise-a) 0%, var(--sunrise-b) 100%);
+  }
+
+  .sunrise-gradient-text {
+    background: linear-gradient(135deg, var(--sunrise-a) 0%, var(--brand) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
   .dark body {
     background: var(--bg-primary) !important;

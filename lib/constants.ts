@@ -166,6 +166,11 @@ export const RESUMES_STORAGE_BUCKET = 'resumes'
  */
 export const CRM_EMAIL_ATTACHMENTS_PREFIX = 'crm-email-attachments'
 
+/**
+ * CRM client requirement documents (PHI) — private bucket path prefix inside STORAGE_BUCKET.
+ */
+export const CRM_CLIENT_REQUIREMENTS_PREFIX = 'crm-client-documents'
+
 export { UserRole }
 
 export const USER_ROLE = {

@@ -104,8 +104,11 @@ export async function GET(request: NextRequest) {
           select: { id: true },
           take: 1,
         },
-        tasks: {
-          where: { status: 'OPEN', dueAt: { lt: new Date() } },
+        teamTasks: {
+          where: {
+            status: { in: ['TODO', 'IN_PROGRESS', 'BLOCKED'] },
+            dueAt: { lt: new Date() },
+          },
           select: { id: true },
           take: 1,
         },
@@ -138,7 +141,7 @@ export async function GET(request: NextRequest) {
     const days = daysInStage(c)
     const stalled = isStalled(c)
     const needsAttention =
-      stalled || c.alerts.length > 0 || c.tasks.length > 0
+      stalled || c.alerts.length > 0 || c.teamTasks.length > 0
     const btNames =
       m.careTeamBtNames.length > 0 ? m.careTeamBtNames : m.scheduleBtNames
     return {

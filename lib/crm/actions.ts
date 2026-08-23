@@ -2491,6 +2491,7 @@ export async function previewClientEmail(
     }[]
     links?: { url: string; label?: string }[]
     assessmentModality?: 'IN_HOME' | 'TELEHEALTH' | null
+    rbtAssignmentId?: string | null
   }
 ): Promise<
   ActionResult<{
@@ -2535,6 +2536,7 @@ export async function sendClientEmail(
     }[]
     links?: { url: string; label?: string }[]
     assessmentModality?: 'IN_HOME' | 'TELEHEALTH' | null
+    rbtAssignmentId?: string | null
   }
 ): Promise<
   ActionResult<{ status: string; communicationId: string; reason?: string }>

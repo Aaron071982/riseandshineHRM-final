@@ -8,6 +8,7 @@ import {
   parentFirstNameFromFull,
   EMAIL_LOGO_URL,
 } from './templates/shell'
+import { defaultRbtAssignmentId } from './mergeContext'
 
 describe('lib/crm/emails/mailbox', () => {
   it('accepts @riseandshineaba.com addresses', () => {
@@ -38,6 +39,26 @@ describe('greeting personalization', () => {
   it('falls back to Hi there when missing', () => {
     expect(greeting({ parentName: null, parentFirstName: null })).toBe('Hi there,')
     expect(greeting({ parentName: '  ', parentFirstName: null })).toBe('Hi there,')
+  })
+})
+
+describe('defaultRbtAssignmentId', () => {
+  it('prefers primary assignment', () => {
+    expect(
+      defaultRbtAssignmentId([
+        { id: 'a', isPrimary: false },
+        { id: 'b', isPrimary: true },
+      ])
+    ).toBe('b')
+  })
+
+  it('falls back to first when no primary', () => {
+    expect(
+      defaultRbtAssignmentId([
+        { id: 'a', isPrimary: false },
+        { id: 'b', isPrimary: false },
+      ])
+    ).toBe('a')
   })
 })
 
@@ -122,13 +143,6 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email?.html).toContain('A. Rivera')
   })
 
-  it('CC_INTRODUCTION introduces case coordinator', () => {
-    const email = renderStaffEmail('CC_INTRODUCTION', fields)
-    expect(email?.subject).toContain('case coordinator')
-    expect(email?.html).toContain('Jordan Lee')
-    expect(email?.html).toContain('jordan@riseandshineaba.com')
-  })
-
   it('MEET_AND_GREET is scheduling-only without client or care-team PHI', () => {
     const email = renderStaffEmail('MEET_AND_GREET', fields)
     expect(email?.subject).toBe('Meet and Greet for Alex')
@@ -164,5 +178,29 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email?.html).toContain('Links included')
     expect(email?.html).toContain('Sign consent')
     expect(email?.html).toContain('https://sign.example.com/abc')
+  })
+
+  it('renders journey timeline under the header with auto milestone', () => {
+    const welcome = renderStaffEmail('WELCOME', fields)
+    expect(welcome?.html).toContain('Your journey with us')
+    expect(welcome?.html).toContain('You&rsquo;re here')
+    expect(welcome?.html).toMatch(/Progress:[\s\S]*Welcome \(you're here\)/)
+    expect(welcome?.html).not.toContain('#3b82f6')
+    expect(welcome?.html).not.toContain('#2563eb')
+
+    const docs = renderStaffEmail('DOCS_NEEDED', fields)
+    expect(docs?.html).toMatch(/Progress:[\s\S]*Welcome \(done\)[\s\S]*Documents \(you're here\)/)
+
+    const meet = renderStaffEmail('MEET_AND_GREET', fields)
+    expect(meet?.html).toMatch(/Services Begin \(you're here\)/)
+    expect(meet?.html).toMatch(/Matching Your Therapist \(done\)/)
+  })
+
+  it('skips timeline for MANUAL (no mapped milestone)', () => {
+    const email = renderStaffEmail('MANUAL', fields, {
+      bodyHtml: '<p>Custom note</p>',
+      subject: 'Custom',
+    })
+    expect(email?.html).not.toContain('Your journey with us')
   })
 })

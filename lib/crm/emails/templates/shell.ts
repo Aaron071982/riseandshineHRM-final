@@ -1,3 +1,6 @@
+import type { CommTemplate } from '@prisma/client'
+import { progressionTimelineForTemplate } from './milestones'
+
 export const COMPANY_NAME = 'Rise & Shine ABA'
 export const COMPANY_PHONE = '(888) 898-4774'
 export const COMPANY_EMAIL = 'info@riseandshineaba.com'
@@ -19,6 +22,8 @@ export type EmailLinkMeta = {
 export type WrapStaffEmailOptions = {
   attachments?: EmailAttachmentMeta[]
   links?: EmailLinkMeta[]
+  /** When set, inserts the parent journey timeline under the logo/header. */
+  template?: CommTemplate
 }
 
 export function escapeHtml(s: string): string {
@@ -97,6 +102,9 @@ export function wrapStaffEmail(
 ): string {
   const attachHtml = attachmentsStrip(options?.attachments)
   const linkHtml = linksStrip(options?.links)
+  const timelineHtml = options?.template
+    ? progressionTimelineForTemplate(options.template)
+    : ''
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -128,6 +136,7 @@ export function wrapStaffEmail(
               </table>
             </td>
           </tr>
+          ${timelineHtml}
           <tr>
             <td style="padding:28px 40px 36px;font-size:15px;line-height:1.65;color:#2f2318;">
               ${bodyHtml}

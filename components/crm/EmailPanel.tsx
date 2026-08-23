@@ -84,18 +84,26 @@ function parseAttachmentsJson(raw: unknown): {
   }
 }
 
+export type StaffingRbtEmailOption = {
+  assignmentId: string
+  label: string
+  isPrimary: boolean
+}
+
 export function EmailPanel({
   clientId,
   parentEmail,
   senderEmail,
   communications,
   emailSend,
+  staffingRbts = [],
 }: {
   clientId: string
   parentEmail: string | null
   senderEmail: string | null
   communications: Comm[]
   emailSend: EmailSendContext
+  staffingRbts?: StaffingRbtEmailOption[]
 }) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -117,6 +125,7 @@ export function EmailPanel({
   const [assessmentModality, setAssessmentModality] = useState<
     'IN_HOME' | 'TELEHEALTH' | ''
   >('')
+  const [rbtAssignmentId, setRbtAssignmentId] = useState('')
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewSubject, setPreviewSubject] = useState('')
   const [consentAcknowledged, setConsentAcknowledged] = useState(false)
@@ -124,6 +133,7 @@ export function EmailPanel({
 
   const isManual = template === 'MANUAL'
   const isAssessment = template === 'ASSESSMENT_SCHEDULED'
+  const isRbtAssigned = template === 'RBT_ASSIGNED'
   const needsConsentWarn = emailSend.emailConsentOk === false
 
   const localPreviewLogoUrl =
@@ -141,6 +151,8 @@ export function EmailPanel({
         attachments,
         links: links.map(({ url, label }) => ({ url, label: label || undefined })),
         assessmentModality: isAssessment && assessmentModality ? assessmentModality : null,
+        rbtAssignmentId:
+          isRbtAssigned && rbtAssignmentId ? rbtAssignmentId : null,
       })
       if (!res.ok) {
         setError(res.error)
@@ -166,6 +178,8 @@ export function EmailPanel({
     isManual,
     isAssessment,
     assessmentModality,
+    isRbtAssigned,
+    rbtAssignmentId,
     localPreviewLogoUrl,
     attachments,
     links,
@@ -189,7 +203,28 @@ export function EmailPanel({
     if (template !== 'ASSESSMENT_SCHEDULED') {
       setAssessmentModality('')
     }
+    if (template !== 'RBT_ASSIGNED') {
+      setRbtAssignmentId('')
+    }
   }, [template])
+
+  useEffect(() => {
+    if (template !== 'RBT_ASSIGNED') return
+    if (!staffingRbts.length) {
+      setRbtAssignmentId('')
+      return
+    }
+    const primary =
+      staffingRbts.find((r) => r.isPrimary)?.assignmentId ??
+      staffingRbts[0]!.assignmentId
+    setRbtAssignmentId(primary)
+  }, [template, staffingRbts])
+
+  useEffect(() => {
+    if (template === 'RBT_ASSIGNED' && rbtAssignmentId) {
+      loadPreview()
+    }
+  }, [rbtAssignmentId, template, loadPreview])
 
   const timeline = useMemo(
     () =>
@@ -283,6 +318,8 @@ export function EmailPanel({
         attachments,
         links: links.map(({ url, label }) => ({ url, label: label || undefined })),
         assessmentModality: isAssessment && assessmentModality ? assessmentModality : null,
+        rbtAssignmentId:
+          isRbtAssigned && rbtAssignmentId ? rbtAssignmentId : null,
       })
       if (!res.ok) {
         setError(res.error)
@@ -409,6 +446,31 @@ export function EmailPanel({
               className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)] disabled:opacity-50"
             />
           </label>
+
+          {isRbtAssigned && (
+            <label className="text-xs text-quiet sm:col-span-2">
+              RBT (from staffing)
+              {staffingRbts.length ? (
+                <select
+                  value={rbtAssignmentId}
+                  onChange={(e) => setRbtAssignmentId(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
+                >
+                  {staffingRbts.map((rbt) => (
+                    <option key={rbt.assignmentId} value={rbt.assignmentId}>
+                      {rbt.label}
+                      {rbt.isPrimary ? ' (primary)' : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="mt-1 rounded-lg border border-line bg-line-2/40 px-2.5 py-2 text-sm text-quiet">
+                  No active RBT assignments on the Staffing tab. Add one before
+                  sending this email.
+                </p>
+              )}
+            </label>
+          )}
 
           {isAssessment && (
             <fieldset className="sm:col-span-2">

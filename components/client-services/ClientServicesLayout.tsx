@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   CalendarDays,
+  CheckSquare,
   ClipboardList,
   FolderOpen,
   LayoutDashboard,
   Network,
   Search as SearchIcon,
   Shield,
+  UserCircle,
   Users,
 } from 'lucide-react'
 import AppShell from '@/components/shell/AppShell'
@@ -43,6 +45,7 @@ export default function ClientServicesLayout({
     () => [
       { href: '/client-services', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/client-services/clients', label: 'Clients', icon: Users },
+      { href: '/client-services/tasks', label: 'Tasks', icon: CheckSquare },
       ...departmentNav.map((d) => ({
         href: d.href,
         label: d.label,
@@ -70,6 +73,7 @@ export default function ClientServicesLayout({
       ...(showAdmin
         ? ([{ href: '/client-services/admin', label: 'Admin', icon: Shield }] as ShellNavItem[])
         : []),
+      { href: '/client-services/profile', label: 'Profile', icon: UserCircle },
     ],
     [departmentNav, showAdmin, showTherapistSearch, showScheduleNav]
   )
@@ -115,6 +119,7 @@ export default function ClientServicesLayout({
   )
   const onSchedule = pathname.startsWith('/client-services/schedule')
   const onProcess = pathname.startsWith('/client-services/process')
+  const onProfile = pathname.startsWith('/client-services/profile')
   const deptCrumb = onDept
     ? departmentNav.find((d) => pathname.startsWith(d.href))?.label ?? 'Department'
     : null
@@ -155,6 +160,12 @@ export default function ClientServicesLayout({
               { label: 'Admin', href: '/admin/dashboard' },
               { label: 'Client Services', href: '/client-services' },
               { label: 'Process map' },
+            ]
+          : onProfile
+          ? [
+              { label: 'Admin', href: '/admin/dashboard' },
+              { label: 'Client Services', href: '/client-services' },
+              { label: 'Profile' },
             ]
           : onDept
           ? [
@@ -198,7 +209,7 @@ export default function ClientServicesLayout({
           )
         }
       }}
-      showSearch={!onDetail && !onAdmin && !onProcess}
+      showSearch={!onDetail && !onAdmin && !onProcess && !onProfile}
     >
       {children}
     </AppShell>

@@ -21,6 +21,7 @@ import {
   isConsentLineInitialed,
   parseConsentLines,
 } from '@/lib/crm/consent'
+import { teamTaskVisibilityWhere } from '@/lib/crm/tasks/access'
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
@@ -35,6 +36,7 @@ export async function loadClientCrmDetail(clientId: string) {
         orderBy: [{ stage: 'asc' }, { key: 'asc' }],
         include: {
           attestedByUser: { select: { id: true, name: true, email: true } },
+          completedByUser: { select: { id: true, name: true, email: true } },
         },
       },
       consent: true,
@@ -169,9 +171,37 @@ export async function loadClientCrmDetail(clientId: string) {
     !!consentLive &&
     isConsentLineInitialed(parseConsentLines(consentLive.lines), 'comm_email')
 
+  const [teamTasks, taskUsers] = await Promise.all([
+    prisma.teamTask.findMany({
+      where: {
+        AND: [
+          teamTaskVisibilityWhere(user),
+          { serviceClientId: clientId },
+        ],
+      },
+      orderBy: [{ dueAt: 'asc' }, { priority: 'desc' }],
+      include: {
+        assignedToUser: { select: { id: true, name: true, email: true } },
+        createdByUser: { select: { id: true, name: true, email: true } },
+        serviceClient: {
+          select: { id: true, firstName: true, lastName: true, clientCode: true },
+        },
+        subtasks: { orderBy: { sortOrder: 'asc' } },
+        _count: { select: { comments: true } },
+      },
+    }),
+    prisma.user.findMany({
+      select: { id: true, name: true, email: true },
+      orderBy: { name: 'asc' },
+      take: 200,
+    }),
+  ])
+
   return {
     user,
     client,
+    teamTasks,
+    taskUsers,
     gate,
     daysInStage,
     weeklyScheduleHours,

@@ -175,6 +175,17 @@ function auditExtras(
   return parts.length ? `:${parts.join(':')}` : ''
 }
 
+function assertRbtAssignmentForClient(
+  client: NonNullable<Awaited<ReturnType<typeof loadStaffEmailMergeContext>>>,
+  rbtAssignmentId: string | null | undefined
+): void {
+  if (!rbtAssignmentId) return
+  const ok = client.btAssignments.some((a) => a.id === rbtAssignmentId)
+  if (!ok) {
+    throw new CrmAccessError('Selected RBT is not an active staffing assignment for this client', 400)
+  }
+}
+
 export async function previewStaffClientEmail(
   user: CrmUser,
   clientId: string,
@@ -185,6 +196,7 @@ export async function previewStaffClientEmail(
     attachments?: StaffEmailAttachmentInput[]
     links?: StaffEmailLinkInput[]
     assessmentModality?: AssessmentModality | null
+    rbtAssignmentId?: string | null
   }
 ) {
   await assertCanSendStaffEmail(user, clientId)
@@ -193,12 +205,18 @@ export async function previewStaffClientEmail(
   const client = await loadStaffEmailMergeContext(clientId)
   if (!client) throw new Error('Client not found')
 
+  assertRbtAssignmentForClient(client, input.rbtAssignmentId)
+
   const attachments = validateAttachmentRefs(clientId, input.attachments ?? [])
   const links = validateLinks(input.links ?? [])
-  const fields = buildStaffMergeFields(client, {
-    name: user.name ?? null,
-    email: user.email ?? null,
-  })
+  const fields = buildStaffMergeFields(
+    client,
+    {
+      name: user.name ?? null,
+      email: user.email ?? null,
+    },
+    { rbtAssignmentId: input.rbtAssignmentId ?? null }
+  )
 
   const rendered = renderStaffEmail(input.template, fields, {
     subject: input.subject ?? undefined,
@@ -258,6 +276,7 @@ export async function sendStaffClientEmail(
     attachments?: StaffEmailAttachmentInput[]
     links?: StaffEmailLinkInput[]
     assessmentModality?: AssessmentModality | null
+    rbtAssignmentId?: string | null
   }
 ): Promise<StaffEmailSendResult> {
   await assertCanSendStaffEmail(user, clientId)
@@ -271,15 +290,21 @@ export async function sendStaffClientEmail(
   const client = await loadStaffEmailMergeContext(clientId)
   if (!client) throw new Error('Client not found')
 
+  assertRbtAssignmentForClient(client, input.rbtAssignmentId)
+
   const to = client.parentEmail?.trim().toLowerCase()
   if (!to || !isValidEmail(to)) {
     throw new CrmAccessError('Client has no valid parent email on file', 400)
   }
 
-  const fields = buildStaffMergeFields(client, {
-    name: user.name ?? null,
-    email: user.email ?? null,
-  })
+  const fields = buildStaffMergeFields(
+    client,
+    {
+      name: user.name ?? null,
+      email: user.email ?? null,
+    },
+    { rbtAssignmentId: input.rbtAssignmentId ?? null }
+  )
 
   const autoCc =
     input.template === 'MEET_AND_GREET' ? meetAndGreetCcEmails(fields) : []

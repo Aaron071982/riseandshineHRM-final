@@ -42,8 +42,11 @@ export function caseloadQueueWhere(
             alerts: { some: { resolvedAt: null } },
           },
           {
-            tasks: {
-              some: { status: 'OPEN', dueAt: { lt: taskOverdueBefore(now) } },
+            teamTasks: {
+              some: {
+                status: { in: ['TODO', 'IN_PROGRESS', 'BLOCKED'] },
+                dueAt: { lt: taskOverdueBefore(now) },
+              },
             },
           },
         ],

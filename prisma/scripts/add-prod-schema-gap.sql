@@ -30,7 +30,6 @@ END $$;
 ALTER TYPE "CommTemplate" ADD VALUE IF NOT EXISTS 'WELCOME';
 ALTER TYPE "CommTemplate" ADD VALUE IF NOT EXISTS 'MEET_AND_GREET';
 ALTER TYPE "CommTemplate" ADD VALUE IF NOT EXISTS 'CASE_COORDINATION_FORM';
-ALTER TYPE "CommTemplate" ADD VALUE IF NOT EXISTS 'CC_INTRODUCTION';
 
 -- ── Columns ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +58,11 @@ ALTER TABLE "client_authorization_lines"
 ALTER TABLE "client_communications"
   ADD COLUMN IF NOT EXISTS "ccRecipients" TEXT,
   ADD COLUMN IF NOT EXISTS "attachmentsJson" JSONB;
+
+ALTER TABLE "client_requirements"
+  ADD COLUMN IF NOT EXISTS "fileName" TEXT,
+  ADD COLUMN IF NOT EXISTS "fileContentType" TEXT,
+  ADD COLUMN IF NOT EXISTS "fileSizeBytes" INTEGER;
 
 ALTER TABLE "rbt_schedule_assignments"
   ADD COLUMN IF NOT EXISTS "billabilityReason" TEXT,
@@ -183,6 +187,164 @@ DO $$ BEGIN
       ADD CONSTRAINT "service_client_notes_deletedByUserId_fkey"
       FOREIGN KEY ("deletedByUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
   END IF;
+END $$;
+
+-- ── Team tasks (v1 collaborative task system) ───────────────────────────────
+
+DO $$ BEGIN
+  CREATE TYPE "TeamTaskStatus" AS ENUM ('TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "TeamTaskPriority" AS ENUM ('LOW', 'NORMAL', 'HIGH', 'URGENT');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "TeamTaskExtensionStatus" AS ENUM ('PENDING', 'APPROVED', 'DENIED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "team_tasks" (
+  "id" TEXT NOT NULL,
+  "serviceClientId" TEXT,
+  "title" TEXT NOT NULL,
+  "description" TEXT,
+  "status" "TeamTaskStatus" NOT NULL DEFAULT 'TODO',
+  "priority" "TeamTaskPriority" NOT NULL DEFAULT 'NORMAL',
+  "dueAt" TIMESTAMP(3),
+  "assignedToUserId" TEXT,
+  "assignedDept" "ClientOwnerDept",
+  "createdByUserId" TEXT NOT NULL,
+  "completedAt" TIMESTAMP(3),
+  "completedByUserId" TEXT,
+  "blockedReason" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  "deletedAt" TIMESTAMP(3),
+  "deletedByUserId" TEXT,
+  CONSTRAINT "team_tasks_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "team_task_subtasks" (
+  "id" TEXT NOT NULL,
+  "teamTaskId" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "done" BOOLEAN NOT NULL DEFAULT false,
+  "sortOrder" INTEGER NOT NULL DEFAULT 0,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "team_task_subtasks_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "team_task_comments" (
+  "id" TEXT NOT NULL,
+  "teamTaskId" TEXT NOT NULL,
+  "authorUserId" TEXT NOT NULL,
+  "body" TEXT NOT NULL,
+  "mentionsJson" JSONB NOT NULL DEFAULT '[]',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "deletedAt" TIMESTAMP(3),
+  CONSTRAINT "team_task_comments_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "team_task_extension_requests" (
+  "id" TEXT NOT NULL,
+  "teamTaskId" TEXT NOT NULL,
+  "requestedByUserId" TEXT NOT NULL,
+  "requestedDueAt" TIMESTAMP(3) NOT NULL,
+  "reason" TEXT,
+  "status" "TeamTaskExtensionStatus" NOT NULL DEFAULT 'PENDING',
+  "reviewedByUserId" TEXT,
+  "reviewedAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "team_task_extension_requests_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "team_task_activities" (
+  "id" TEXT NOT NULL,
+  "teamTaskId" TEXT NOT NULL,
+  "actorUserId" TEXT NOT NULL,
+  "action" TEXT NOT NULL,
+  "detail" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "team_task_activities_pkey" PRIMARY KEY ("id")
+);
+
+-- CRM role-based training / responsibilities
+CREATE TABLE IF NOT EXISTS "crm_training_modules" (
+  "id" TEXT NOT NULL,
+  "crmRole" "CrmRole" NOT NULL,
+  "title" TEXT NOT NULL,
+  "summary" TEXT,
+  "goalStatement" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "crm_training_modules_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "crm_training_modules_crmRole_key"
+  ON "crm_training_modules"("crmRole");
+
+CREATE TABLE IF NOT EXISTS "crm_training_steps" (
+  "id" TEXT NOT NULL,
+  "moduleId" TEXT NOT NULL,
+  "stepNumber" INTEGER NOT NULL,
+  "slug" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "body" TEXT NOT NULL,
+  "icon" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "crm_training_steps_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "crm_training_steps_slug_key"
+  ON "crm_training_steps"("slug");
+
+CREATE UNIQUE INDEX IF NOT EXISTS "crm_training_steps_moduleId_stepNumber_key"
+  ON "crm_training_steps"("moduleId", "stepNumber");
+
+CREATE INDEX IF NOT EXISTS "crm_training_steps_moduleId_idx"
+  ON "crm_training_steps"("moduleId");
+
+CREATE TABLE IF NOT EXISTS "crm_training_step_completions" (
+  "id" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+  "stepId" TEXT NOT NULL,
+  "completedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "crm_training_step_completions_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "crm_training_step_completions_userId_stepId_key"
+  ON "crm_training_step_completions"("userId", "stepId");
+
+CREATE INDEX IF NOT EXISTS "crm_training_step_completions_userId_idx"
+  ON "crm_training_step_completions"("userId");
+
+DO $$ BEGIN
+  ALTER TABLE "crm_training_steps"
+    ADD CONSTRAINT "crm_training_steps_moduleId_fkey"
+    FOREIGN KEY ("moduleId") REFERENCES "crm_training_modules"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "crm_training_step_completions"
+    ADD CONSTRAINT "crm_training_step_completions_userId_fkey"
+    FOREIGN KEY ("userId") REFERENCES "users"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "crm_training_step_completions"
+    ADD CONSTRAINT "crm_training_step_completions_stepId_fkey"
+    FOREIGN KEY ("stepId") REFERENCES "crm_training_steps"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 COMMIT;

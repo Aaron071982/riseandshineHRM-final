@@ -37,8 +37,7 @@ describe('lib/crm/emails/templatePolicy', () => {
     expect(isTemplateAllowedForUser(billing, 'WELCOME')).toBe(false)
   })
 
-  it('CASE_COORDINATION sees CC templates including introduction', () => {
-    expect(isTemplateAllowedForUser(cc, 'CC_INTRODUCTION')).toBe(true)
+  it('CASE_COORDINATION sees scheduling templates', () => {
     expect(isTemplateAllowedForUser(cc, 'MEET_AND_GREET')).toBe(true)
     expect(isTemplateAllowedForUser(cc, 'CONSENT_REQUEST')).toBe(true)
     expect(isTemplateAllowedForUser(cc, 'DOCS_NEEDED')).toBe(false)

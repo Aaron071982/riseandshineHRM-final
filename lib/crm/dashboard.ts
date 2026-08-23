@@ -590,10 +590,10 @@ export async function getPerformance(user: DashUser): Promise<PerformanceRow[]> 
         },
         _count: { _all: true },
       }),
-      prisma.clientTask.groupBy({
+      prisma.teamTask.groupBy({
         by: ['assignedToUserId'],
         where: {
-          status: 'OPEN',
+          status: { in: ['TODO', 'IN_PROGRESS', 'BLOCKED'] },
           dueAt: { lt: overdueAt },
           assignedToUserId: { in: coordIds },
           serviceClient: { is: base },
@@ -713,9 +713,9 @@ export async function getDashboardKpis(user: DashUser): Promise<DashboardKpis> {
       prisma.clientAlert.count({
         where: { resolvedAt: null, serviceClient: { is: live } },
       }),
-      prisma.clientTask.count({
+      prisma.teamTask.count({
         where: {
-          status: 'OPEN',
+          status: { in: ['TODO', 'IN_PROGRESS', 'BLOCKED'] },
           dueAt: { lt: overdueAt },
           serviceClient: { is: base },
         },
@@ -776,9 +776,9 @@ export async function loadManagerDashboard(
       prisma.clientAlert.count({
         where: { resolvedAt: null, serviceClient: { is: live } },
       }),
-      prisma.clientTask.count({
+      prisma.teamTask.count({
         where: {
-          status: 'OPEN',
+          status: { in: ['TODO', 'IN_PROGRESS', 'BLOCKED'] },
           dueAt: { lt: overdueAt },
           serviceClient: { is: base },
         },

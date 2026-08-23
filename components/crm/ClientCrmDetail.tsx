@@ -13,6 +13,8 @@ import { ActivityPanel } from '@/components/crm/ActivityPanel'
 import { AuthorizationPanel } from '@/components/crm/AuthorizationPanel'
 import { StaffingPanel } from '@/components/crm/StaffingPanel'
 import { SchedulePanel } from '@/components/crm/SchedulePanel'
+import { ClientDocumentsPanel } from '@/components/crm/ClientDocumentsPanel'
+import { ClientTasksPanel } from '@/components/crm/ClientTasksPanel'
 import { EmailPanel } from '@/components/crm/EmailPanel'
 import { advanceStage, setStage } from '@/lib/crm/actions'
 import { REQUIREMENT_KEY_LABELS } from '@/lib/crm/stages'
@@ -25,6 +27,8 @@ import { cn } from '@/lib/utils'
 type TabId =
   | 'overview'
   | 'requirements'
+  | 'documents'
+  | 'tasks'
   | 'notes'
   | 'activity'
   | 'staffing'
@@ -35,6 +39,8 @@ type TabId =
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'requirements', label: 'Requirements' },
+  { id: 'documents', label: 'Documents' },
+  { id: 'tasks', label: 'Tasks' },
   { id: 'notes', label: 'Notes' },
   { id: 'activity', label: 'Activity' },
   { id: 'staffing', label: 'Staffing' },
@@ -71,12 +77,26 @@ export default function ClientCrmDetail({
     setTab(resolveTab(initialTab))
   }, [initialTab])
 
-  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit } =
+  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit, teamTasks, taskUsers } =
     data
 
   const blockedLabels = useMemo(
     () => gateError.map((k) => REQUIREMENT_KEY_LABELS[k] ?? k),
     [gateError]
+  )
+
+  const staffingRbts = useMemo(
+    () =>
+      client.btAssignments
+        .filter((a) => a.status === 'ACTIVE')
+        .map((a) => ({
+          assignmentId: a.id,
+          label: a.rbtProfile
+            ? `${a.rbtProfile.firstName} ${a.rbtProfile.lastName}`.trim()
+            : a.btName?.trim() || 'Unnamed RBT',
+          isPrimary: a.isPrimary,
+        })),
+    [client.btAssignments]
   )
 
   const onAdvance = () => {
@@ -193,12 +213,29 @@ export default function ClientCrmDetail({
         )}
         {tab === 'requirements' && (
           <RequirementsPanel
+            requirements={client.requirements}
+            currentStage={client.stage}
+            canEdit={canEdit}
+          />
+        )}
+        {tab === 'documents' && (
+          <ClientDocumentsPanel
             clientId={client.id}
             requirements={client.requirements}
             currentStage={client.stage}
             canEdit={canEdit}
             consent={client.consent}
             referralCheck={client.referralCheck}
+          />
+        )}
+        {tab === 'tasks' && (
+          <ClientTasksPanel
+            clientId={client.id}
+            clientName={`${client.firstName} ${client.lastName}`}
+            tasks={teamTasks}
+            users={taskUsers}
+            currentUserId={user.id}
+            canEdit={canEdit}
           />
         )}
         {tab === 'notes' && (
@@ -254,6 +291,7 @@ export default function ClientCrmDetail({
             senderEmail={user.email}
             communications={client.communications}
             emailSend={emailSend}
+            staffingRbts={staffingRbts}
           />
         )}
       </div>
@@ -272,4 +310,6 @@ export type SerializeClientDetail = {
   gate: { ok: boolean; blockedBy: string[] }
   emailSend: EmailSendContext & { allowedTemplates: CommTemplate[] }
   client: ClientCrmDetailData['client']
+  teamTasks: ClientCrmDetailData['teamTasks']
+  taskUsers: ClientCrmDetailData['taskUsers']
 }

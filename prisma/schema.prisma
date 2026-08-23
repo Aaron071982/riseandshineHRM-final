@@ -432,9 +432,14 @@ model User {
   clientRequirementsAttested   ClientRequirement[]       @relation("ClientRequirementAttestedBy")
   clientConsentsWitnessed      ClientConsent[]           @relation("ClientConsentWitnessedBy")
   clientReferralChecksUpdated  ClientReferralCheck[]     @relation("ClientReferralCheckUpdatedBy")
-  clientTasksAssigned          ClientTask[]              @relation("ClientTaskAssignedTo")
-  clientTasksCompleted         ClientTask[]              @relation("ClientTaskCompletedBy")
-  clientTasksCreated           ClientTask[]              @relation("ClientTaskCreatedBy")
+  teamTasksAssigned            TeamTask[]                @relation("TeamTaskAssignedTo")
+  teamTasksCompleted           TeamTask[]                @relation("TeamTaskCompletedBy")
+  teamTasksCreated             TeamTask[]                @relation("TeamTaskCreatedBy")
+  teamTasksDeleted             TeamTask[]                @relation("TeamTaskDeletedBy")
+  teamTaskComments             TeamTaskComment[]         @relation("TeamTaskCommentAuthor")
+  teamTaskExtensionRequests    TeamTaskExtensionRequest[] @relation("TeamTaskExtensionRequestedBy")
+  teamTaskExtensionReviews     TeamTaskExtensionRequest[] @relation("TeamTaskExtensionReviewedBy")
+  teamTaskActivities           TeamTaskActivity[]        @relation("TeamTaskActivityActor")
   clientCommunicationsSent     ClientCommunication[]     @relation("ClientCommunicationSentBy")
   clientAlertsResolved         ClientAlert[]             @relation("ClientAlertResolvedBy")
   crmRoles                     UserCrmRole[]             @relation("UserCrmRoles")
@@ -444,7 +449,6 @@ model User {
   clientRequirementsDeleted    ClientRequirement[]       @relation("ClientRequirementDeletedBy")
   clientAuthorizationsDeleted  ClientAuthorization[]     @relation("ClientAuthorizationDeletedBy")
   clientAuthorizationLinesDeleted ClientAuthorizationLine[] @relation("ClientAuthorizationLineDeletedBy")
-  clientTasksDeleted           ClientTask[]              @relation("ClientTaskDeletedBy")
   clientCommunicationsDeleted  ClientCommunication[]     @relation("ClientCommunicationDeletedBy")
   clientAlertsDeleted          ClientAlert[]             @relation("ClientAlertDeletedBy")
   serviceClientNotesDeleted    ServiceClientNote[]       @relation("ServiceClientNoteDeletedBy")
@@ -453,6 +457,7 @@ model User {
   clientClaims                  ClientClaim[]            @relation("ClientClaimUser")
   clientClaimsOpened            ClientClaim[]            @relation("ClientClaimClaimedBy")
   clientClaimsReleased          ClientClaim[]            @relation("ClientClaimReleasedBy")
+  crmTrainingCompletions        CrmTrainingStepCompletion[] @relation("CrmTrainingCompletions")
 
   @@map("users")
 }
@@ -2636,6 +2641,26 @@ enum SessionBillabilityStatus {
   UNKNOWN
 }
 
+enum TeamTaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
+enum TeamTaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TeamTaskExtensionStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
 enum TaskStatus {
   OPEN
   DONE
@@ -2656,7 +2681,6 @@ enum CommTemplate {
   SERVICES_STARTED
   MEET_AND_GREET
   CASE_COORDINATION_FORM
-  CC_INTRODUCTION
   MANUAL
 }
 
@@ -2754,6 +2778,54 @@ model UserCrmRole {
   @@index([userId])
   @@index([revokedAt])
   @@map("user_crm_roles")
+}
+
+/// Role-based CRM training / responsibilities (editable structured content).
+model CrmTrainingModule {
+  id            String   @id @default(cuid())
+  crmRole       CrmRole  @unique
+  title         String
+  summary       String?  @db.Text
+  goalStatement String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  steps CrmTrainingStep[]
+
+  @@map("crm_training_modules")
+}
+
+model CrmTrainingStep {
+  id         String   @id @default(cuid())
+  moduleId   String
+  stepNumber Int
+  slug       String   @unique
+  title      String
+  body       String   @db.Text
+  icon       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  module      CrmTrainingModule           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  completions CrmTrainingStepCompletion[]
+
+  @@unique([moduleId, stepNumber])
+  @@index([moduleId])
+  @@map("crm_training_steps")
+}
+
+model CrmTrainingStepCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  stepId      String
+  completedAt DateTime @default(now())
+
+  user User            @relation("CrmTrainingCompletions", fields: [userId], references: [id], onDelete: Cascade)
+  step CrmTrainingStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, stepId])
+  @@index([userId])
+  @@map("crm_training_step_completions")
 }
 
 /// Parallel clinical milestone (treatment plan) — not a linear pipeline stage.
@@ -2856,7 +2928,7 @@ model ServiceClient {
   consent             ClientConsent?
   referralCheck       ClientReferralCheck?
   authorizations      ClientAuthorization[]
-  tasks               ClientTask[]
+  teamTasks           TeamTask[]
   communications      ClientCommunication[]
   alerts              ClientAlert[]
   claims              ClientClaim[]
@@ -3057,6 +3129,9 @@ model ClientRequirement {
   group                RequirementGroup  @default(STAGE)
   isRequiredToAdvance  Boolean           @default(true)
   fileUrl              String?
+  fileName             String?
+  fileContentType      String?
+  fileSizeBytes        Int?
   expiresAt            DateTime?
   completedAt          DateTime?
   completedByUserId    String?
@@ -3195,33 +3270,109 @@ model ClientAuthorizationLine {
   @@map("client_authorization_lines")
 }
 
-model ClientTask {
-  id               String          @id @default(cuid())
-  serviceClientId  String
-  title            String
-  description      String?         @db.Text
-  ownerDept        ClientOwnerDept
-  assignedToUserId String?
-  dueAt            DateTime?
-  status           TaskStatus      @default(OPEN)
-  completedAt      DateTime?
+model TeamTask {
+  id                String            @id @default(cuid())
+  /// Null = standalone team ops task (no PHI client link).
+  serviceClientId   String?
+  title             String
+  description       String?           @db.Text
+  status            TeamTaskStatus    @default(TODO)
+  priority          TeamTaskPriority  @default(NORMAL)
+  dueAt             DateTime?
+  assignedToUserId  String?
+  /// Department pool — members can claim when assignee is null.
+  assignedDept      ClientOwnerDept?
+  createdByUserId   String
+  completedAt       DateTime?
   completedByUserId String?
-  createdByUserId  String
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  deletedAt        DateTime?
-  deletedByUserId  String?
+  blockedReason     String?           @db.Text
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+  deletedByUserId   String?
 
-  serviceClient   ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
-  assignedToUser  User?         @relation("ClientTaskAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
-  completedByUser User?         @relation("ClientTaskCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
-  createdByUser   User          @relation("ClientTaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  deletedByUser   User?         @relation("ClientTaskDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+  serviceClient     ServiceClient?    @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  assignedToUser    User?             @relation("TeamTaskAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  createdByUser     User              @relation("TeamTaskCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  completedByUser   User?             @relation("TeamTaskCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  deletedByUser     User?             @relation("TeamTaskDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+  subtasks          TeamTaskSubtask[]
+  comments          TeamTaskComment[]
+  extensionRequests TeamTaskExtensionRequest[]
+  activities        TeamTaskActivity[]
 
   @@index([serviceClientId, status])
   @@index([assignedToUserId, status])
+  @@index([assignedDept, status])
+  @@index([createdByUserId, status])
+  @@index([dueAt])
   @@index([deletedAt])
-  @@map("client_tasks")
+  @@map("team_tasks")
+}
+
+model TeamTaskSubtask {
+  id         String   @id @default(cuid())
+  teamTaskId String
+  title      String
+  done       Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  teamTask TeamTask @relation(fields: [teamTaskId], references: [id], onDelete: Cascade)
+
+  @@index([teamTaskId, sortOrder])
+  @@map("team_task_subtasks")
+}
+
+model TeamTaskComment {
+  id           String    @id @default(cuid())
+  teamTaskId   String
+  authorUserId String
+  body         String    @db.Text
+  mentionsJson Json      @default("[]")
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  teamTask TeamTask @relation(fields: [teamTaskId], references: [id], onDelete: Cascade)
+  author   User     @relation("TeamTaskCommentAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([teamTaskId, createdAt])
+  @@map("team_task_comments")
+}
+
+model TeamTaskExtensionRequest {
+  id                String                  @id @default(cuid())
+  teamTaskId        String
+  requestedByUserId String
+  requestedDueAt    DateTime
+  reason            String?                 @db.Text
+  status            TeamTaskExtensionStatus @default(PENDING)
+  reviewedByUserId  String?
+  reviewedAt        DateTime?
+  createdAt         DateTime                @default(now())
+
+  teamTask        TeamTask @relation(fields: [teamTaskId], references: [id], onDelete: Cascade)
+  requestedByUser User     @relation("TeamTaskExtensionRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  reviewedByUser  User?    @relation("TeamTaskExtensionReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([teamTaskId, status])
+  @@map("team_task_extension_requests")
+}
+
+model TeamTaskActivity {
+  id          String   @id @default(cuid())
+  teamTaskId  String
+  actorUserId String
+  action      String
+  detail      String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  teamTask TeamTask @relation(fields: [teamTaskId], references: [id], onDelete: Cascade)
+  actor    User     @relation("TeamTaskActivityActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([teamTaskId, createdAt])
+  @@map("team_task_activities")
 }
 
 model ClientCommunication {

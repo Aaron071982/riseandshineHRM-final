@@ -61,9 +61,11 @@ export default async function ClientServicesSectionLayout({
     showTherapistSearch = canAccessDepartment(subject, 'STAFFING')
     showScheduleNav = canAccessCrmSchedule(subject)
     const full = isFullAccess(subject)
-    departmentNav = DEPT_SLUGS.filter((slug) =>
-      full ? true : canAccessDepartment(subject, DEPT_SLUG_TO_OWNER[slug])
-    ).map((slug) => ({
+    // Skip authorization slug only — it shares the Billing label/queue with billing.
+    departmentNav = DEPT_SLUGS.filter((slug) => {
+      if (slug === 'authorization') return false
+      return full ? true : canAccessDepartment(subject, DEPT_SLUG_TO_OWNER[slug])
+    }).map((slug) => ({
       href: deptHref(slug),
       label: deptLabel(slug),
     }))

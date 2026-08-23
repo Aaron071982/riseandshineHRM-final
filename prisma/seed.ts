@@ -1093,27 +1093,27 @@ async function main() {
 
     // Tasks: one open + one overdue for live clients
     if (plan.pipelineStatus === 'LIVE') {
-      await prisma.clientTask.create({
+      await prisma.teamTask.create({
         data: {
           serviceClientId: client.id,
           title: `Follow up — ${plan.stage}`,
           description: '[SYNTHETIC] open task',
-          ownerDept,
+          assignedDept: ownerDept,
           assignedToUserId: admin.id,
           dueAt: daysFromNow(5),
-          status: 'OPEN',
+          status: 'TODO',
           createdByUserId: admin.id,
         },
       })
-      await prisma.clientTask.create({
+      await prisma.teamTask.create({
         data: {
           serviceClientId: client.id,
           title: 'Overdue checklist item',
           description: '[SYNTHETIC] overdue task',
-          ownerDept,
+          assignedDept: ownerDept,
           assignedToUserId: admin.id,
           dueAt: daysFromNow(-4),
-          status: 'OPEN',
+          status: 'TODO',
           createdByUserId: admin.id,
         },
       })
@@ -1272,7 +1272,7 @@ async function main() {
     clientAuthorizations: await prisma.clientAuthorization.count({
       where: { notes: { contains: '[SYNTHETIC]' } },
     }),
-    clientTasks: await prisma.clientTask.count({
+    teamTasks: await prisma.teamTask.count({
       where: { description: { contains: '[SYNTHETIC]' } },
     }),
     scheduleAssignments: await prisma.rbtScheduleAssignment.count({
@@ -1288,6 +1288,10 @@ async function main() {
 
   console.log('🎉 Synthetic seed complete')
   console.table(counts)
+
+  const { ensureCrmTrainingModules } = await import('@/lib/crm/training/ensureModules')
+  await ensureCrmTrainingModules()
+  console.log('[crm-training] default modules ensured')
 
   const { bootstrapCrmSuperAdmins } = await import('@/lib/crm/bootstrapRoles')
   const boot = await bootstrapCrmSuperAdmins(admin.id)

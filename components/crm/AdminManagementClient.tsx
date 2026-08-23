@@ -1,12 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState, useTransition } from 'react'
+import Link from 'next/link'
 import type { CrmRole } from '@prisma/client'
 import {
   grantCrmRole,
   listCrmUsersWithRoles,
   revokeCrmRole,
 } from '@/lib/crm/roleActions'
+import { getTrainingCompletionSummaries } from '@/lib/crm/training/actions'
 import { CRM_DEPARTMENT_ROLES } from '@/lib/crm/roleConstants'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { cn } from '@/lib/utils'
@@ -46,6 +48,7 @@ export default function AdminManagementClient() {
     role: CrmRole
     name: string
   } | null>(null)
+  const [trainingPct, setTrainingPct] = useState<Record<string, number>>({})
 
   const load = useCallback((query?: string) => {
     startTransition(async () => {
@@ -57,6 +60,17 @@ export default function AdminManagementClient() {
         return
       }
       setUsers(res.users)
+      const ids = res.users.map((u) => u.id)
+      if (ids.length) {
+        const t = await getTrainingCompletionSummaries(ids)
+        if (t.ok) {
+          const map: Record<string, number> = {}
+          for (const [uid, s] of Object.entries(t.summaries)) {
+            map[uid] = s.percent
+          }
+          setTrainingPct(map)
+        }
+      }
     })
   }, [])
 
@@ -204,6 +218,7 @@ export default function AdminManagementClient() {
               <tr className="border-b border-line bg-line-2/40 text-[11px] uppercase tracking-wide text-faint">
                 <th className="px-3 py-2.5 font-medium">User</th>
                 <th className="px-3 py-2.5 font-medium">Roles</th>
+                <th className="px-3 py-2.5 font-medium">Training</th>
                 <th className="px-3 py-2.5 font-medium">Access</th>
                 <th className="px-3 py-2.5 font-medium">Departments</th>
               </tr>
@@ -211,7 +226,7 @@ export default function AdminManagementClient() {
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-8 text-center text-quiet">
+                  <td colSpan={5} className="px-3 py-8 text-center text-quiet">
                     {pending ? 'Loading…' : 'No admin users found'}
                   </td>
                 </tr>
@@ -219,9 +234,12 @@ export default function AdminManagementClient() {
                 users.map((u) => (
                   <tr key={u.id} className="border-b border-line-2 align-top">
                     <td className="px-3 py-2.5">
-                      <div className="font-medium text-ink">
+                      <Link
+                        href={`/client-services/profile/${u.id}`}
+                        className="font-medium text-[var(--sunrise-dark)] hover:underline"
+                      >
                         {u.name || '—'}
-                      </div>
+                      </Link>
                       <div className="text-xs text-quiet">{u.email || u.id}</div>
                     </td>
                     <td className="px-3 py-2.5">
@@ -248,6 +266,23 @@ export default function AdminManagementClient() {
                           </button>
                         ))}
                       </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-xs">
+                      {trainingPct[u.id] !== undefined ? (
+                        <Link
+                          href={`/client-services/profile/${u.id}`}
+                          className={cn(
+                            'font-medium tabular-nums',
+                            trainingPct[u.id] >= 100
+                              ? 'text-[var(--green)]'
+                              : 'text-quiet hover:text-ink'
+                          )}
+                        >
+                          {trainingPct[u.id]}%
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-xs">
                       {u.superAdmin && (
