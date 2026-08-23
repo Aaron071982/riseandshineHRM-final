@@ -2680,6 +2680,8 @@ enum CommTemplate {
   SCHEDULE_CONFIRMED
   SERVICES_STARTED
   MEET_AND_GREET
+  /// Retired from compose UI; kept so prod `db push` does not drop the PG enum value.
+  CC_INTRODUCTION
   CASE_COORDINATION_FORM
   MANUAL
 }

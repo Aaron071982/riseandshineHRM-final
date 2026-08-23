@@ -27,8 +27,8 @@ export type ParentMilestoneId = (typeof PARENT_MILESTONES)[number]['id']
  * Single editable map: which template lights which milestone.
  * Earlier milestones render as done; later ones muted.
  *
- * Note: CC_INTRODUCTION was retired — READY_FOR_STAFFING / RBT_ASSIGNED
- * cover “Matching Your Therapist.”
+ * Note: CC_INTRODUCTION remains on the CommTemplate enum for DB compat
+ * but is not offered in compose UI; map it to Matching if ever rendered.
  */
 export const TEMPLATE_MILESTONE: Partial<Record<CommTemplate, ParentMilestoneId>> =
   {
@@ -40,6 +40,7 @@ export const TEMPLATE_MILESTONE: Partial<Record<CommTemplate, ParentMilestoneId>
     ASSESSMENT_SCHEDULED: 'assessment',
     READY_FOR_STAFFING: 'matching',
     RBT_ASSIGNED: 'matching',
+    CC_INTRODUCTION: 'matching',
     SCHEDULE_CONFIRMED: 'services',
     MEET_AND_GREET: 'services',
     SERVICES_STARTED: 'services',

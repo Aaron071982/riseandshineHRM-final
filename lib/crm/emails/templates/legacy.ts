@@ -6,6 +6,25 @@ import { COMPANY_EMAIL, childName, greeting, para, staffSignature } from './shel
 export const LEGACY_RENDERERS: Partial<
   Record<CommTemplate, (f: StaffMergeFields) => StaffEmailContent>
 > = {
+  /** Kept for historical sends; not offered in compose UI. */
+  CC_INTRODUCTION: (f) => {
+    const child = childName(f)
+    const coord = f.coordinatorName?.trim()
+    return {
+      subject: `Meet your case coordinator for ${child}`,
+      bodyHtml: `
+        ${para(greeting(f))}
+        ${para(
+          coord
+            ? `We&apos;re glad to introduce <strong>${coord}</strong>, who will help coordinate care for ${child}.`
+            : `We&apos;re assigning a case coordinator to help guide ${child}&apos;s care.`
+        )}
+        ${para(`They&apos;ll be in touch about next steps. Reply anytime with questions.`)}
+        ${staffSignature(f)}
+      `,
+    }
+  },
+
   CASE_COORDINATION_FORM: (f) => {
     const child = childName(f)
     return {
