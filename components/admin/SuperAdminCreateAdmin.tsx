@@ -40,7 +40,12 @@ export default function SuperAdminCreateAdmin() {
       }
 
       const data = await response.json()
-      showToast(`Admin ${data.user.email} created successfully`, 'success')
+      showToast(
+        data.promoted
+          ? `Promoted ${data.user.email} to admin`
+          : `Admin ${data.user.email} created successfully`,
+        'success'
+      )
 
       // Dispatch event to refresh user list
       window.dispatchEvent(new CustomEvent('adminCreated'))
@@ -63,7 +68,7 @@ export default function SuperAdminCreateAdmin() {
       <CardHeader>
         <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
           <UserPlus className="w-5 h-5" />
-          Create New Admin
+          Create or promote admin
         </CardTitle>
       </CardHeader>
       <CardContent>

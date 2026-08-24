@@ -115,30 +115,79 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { email, fullName } = body
+    const trimmedEmail = typeof email === 'string' ? email.trim() : ''
+    const trimmedName = typeof fullName === 'string' ? fullName.trim() : ''
 
-    if (!email || !fullName) {
+    if (!trimmedEmail || !trimmedName) {
       return NextResponse.json({ error: 'Email and full name are required' }, { status: 400 })
     }
 
-    // Check if email already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: trimmedEmail, mode: 'insensitive' } },
     })
 
-    if (existingUser) {
-      return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 })
+    if (existingUser?.role === 'ADMIN') {
+      return NextResponse.json(
+        { error: 'This email is already an admin' },
+        { status: 400 }
+      )
     }
 
-    // Create user with ADMIN role
+    if (existingUser) {
+      const promotedUser = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          email: trimmedEmail,
+          name: trimmedName,
+          role: 'ADMIN',
+          isActive: true,
+        },
+        include: { profile: true },
+      })
+
+      await prisma.userProfile.upsert({
+        where: { userId: existingUser.id },
+        update: { fullName: trimmedName },
+        create: {
+          userId: existingUser.id,
+          fullName: trimmedName,
+          timezone: 'America/New_York',
+          skills: [],
+          languages: [],
+        },
+      })
+
+      try {
+        await prisma.activityLog.create({
+          data: {
+            userId: user.id,
+            activityType: 'FORM_SUBMISSION',
+            action: `Promoted existing user to admin: ${trimmedEmail}`,
+            resourceType: 'User',
+            resourceId: promotedUser.id,
+            metadata: {
+              createdUserEmail: trimmedEmail,
+              createdUserName: trimmedName,
+              previousRole: existingUser.role,
+            },
+          },
+        })
+      } catch (error) {
+        console.error('Failed to track admin promotion:', error)
+      }
+
+      return NextResponse.json({ user: promotedUser, promoted: true }, { status: 200 })
+    }
+
     const newUser = await prisma.user.create({
       data: {
-        email,
-        name: fullName,
+        email: trimmedEmail,
+        name: trimmedName,
         role: 'ADMIN',
         isActive: true,
         profile: {
           create: {
-            fullName,
+            fullName: trimmedName,
             timezone: 'America/New_York',
             skills: [],
             languages: [],
@@ -150,18 +199,17 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Track admin creation
     try {
       await prisma.activityLog.create({
         data: {
           userId: user.id,
           activityType: 'FORM_SUBMISSION',
-          action: `Created admin user: ${email}`,
+          action: `Created admin user: ${trimmedEmail}`,
           resourceType: 'User',
           resourceId: newUser.id,
           metadata: {
-            createdUserEmail: email,
-            createdUserName: fullName,
+            createdUserEmail: trimmedEmail,
+            createdUserName: trimmedName,
           },
         },
       })
