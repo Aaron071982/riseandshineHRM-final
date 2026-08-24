@@ -2792,7 +2792,8 @@ model CrmTrainingModule {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  steps CrmTrainingStep[]
+  steps  CrmTrainingStep[]
+  videos CrmTrainingVideo[]
 
   @@map("crm_training_modules")
 }
@@ -2800,6 +2801,7 @@ model CrmTrainingModule {
 model CrmTrainingStep {
   id         String   @id @default(cuid())
   moduleId   String
+  /// 1-indexed display order within the module (also used for drag-and-drop reorder).
   stepNumber Int
   slug       String   @unique
   title      String
@@ -2814,6 +2816,23 @@ model CrmTrainingStep {
   @@unique([moduleId, stepNumber])
   @@index([moduleId])
   @@map("crm_training_steps")
+}
+
+/// Module-level YouTube embeds shown in staff training ("Videos & Guides").
+model CrmTrainingVideo {
+  id        String   @id @default(cuid())
+  moduleId  String
+  url       String
+  videoId   String
+  title     String?
+  position  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  module CrmTrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@index([moduleId, position])
+  @@map("crm_training_videos")
 }
 
 model CrmTrainingStepCompletion {

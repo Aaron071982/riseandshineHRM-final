@@ -210,7 +210,34 @@ export async function deleteTrainingStep(
     const viewer = await getClientServicesUser()
     assertCanEditTrainingContent(viewer)
 
+    const existing = await prisma.crmTrainingStep.findUnique({
+      where: { id: stepId },
+      select: { id: true, moduleId: true },
+    })
+    if (!existing) return { ok: false, error: 'Step not found', status: 404 }
+
     await prisma.crmTrainingStep.delete({ where: { id: stepId } })
+
+    // Keep stepNumber contiguous after delete (avoids gaps in the UI).
+    const remaining = await prisma.crmTrainingStep.findMany({
+      where: { moduleId: existing.moduleId },
+      orderBy: { stepNumber: 'asc' },
+      select: { id: true },
+    })
+    await prisma.$transaction(async (tx) => {
+      for (let i = 0; i < remaining.length; i++) {
+        await tx.crmTrainingStep.update({
+          where: { id: remaining[i].id },
+          data: { stepNumber: -(i + 1) },
+        })
+      }
+      for (let i = 0; i < remaining.length; i++) {
+        await tx.crmTrainingStep.update({
+          where: { id: remaining[i].id },
+          data: { stepNumber: i + 1 },
+        })
+      }
+    })
 
     await writeAuditLog({
       actorUserId: viewer.id,
@@ -218,6 +245,263 @@ export async function deleteTrainingStep(
       entityId: stepId,
       action: 'DELETE',
     })
+
+    revalidateProfilePaths()
+    return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+/**
+ * Persist a full ordered list of step IDs for a module.
+ * Uses temporary negative stepNumbers to satisfy @@unique([moduleId, stepNumber]).
+ */
+export async function reorderTrainingSteps(
+  moduleId: string,
+  orderedStepIds: string[]
+): Promise<TrainingActionResult> {
+  try {
+    const viewer = await getClientServicesUser()
+    assertCanEditTrainingContent(viewer)
+
+    if (!Array.isArray(orderedStepIds) || orderedStepIds.length === 0) {
+      return { ok: false, error: 'orderedStepIds is required', status: 400 }
+    }
+
+    const steps = await prisma.crmTrainingStep.findMany({
+      where: { moduleId },
+      select: { id: true },
+    })
+    const existingIds = new Set(steps.map((s) => s.id))
+    if (orderedStepIds.length !== existingIds.size) {
+      return {
+        ok: false,
+        error: 'Step list does not match this module',
+        status: 400,
+      }
+    }
+    for (const id of orderedStepIds) {
+      if (!existingIds.has(id)) {
+        return { ok: false, error: 'Unknown step id for this module', status: 400 }
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (let i = 0; i < orderedStepIds.length; i++) {
+        await tx.crmTrainingStep.update({
+          where: { id: orderedStepIds[i] },
+          data: { stepNumber: -(i + 1) },
+        })
+      }
+      for (let i = 0; i < orderedStepIds.length; i++) {
+        await tx.crmTrainingStep.update({
+          where: { id: orderedStepIds[i] },
+          data: { stepNumber: i + 1 },
+        })
+      }
+    })
+
+    await writeAuditLog({
+      actorUserId: viewer.id,
+      entityType: 'CrmTrainingModule',
+      entityId: moduleId,
+      action: 'UPDATE',
+      after: { reorderSteps: orderedStepIds },
+    })
+
+    revalidateProfilePaths()
+    return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function addTrainingVideo(
+  moduleId: string,
+  data: { url: string; title?: string | null }
+): Promise<TrainingActionResult<{ videoId: string }>> {
+  try {
+    const viewer = await getClientServicesUser()
+    assertCanEditTrainingContent(viewer)
+
+    const { extractYoutubeVideoId } = await import('@/lib/crm/training/youtube')
+    const ytId = extractYoutubeVideoId(data.url)
+    if (!ytId) {
+      return {
+        ok: false,
+        error: 'Paste a valid YouTube link (watch, youtu.be, shorts, or embed)',
+        status: 400,
+      }
+    }
+
+    const mod = await prisma.crmTrainingModule.findUnique({
+      where: { id: moduleId },
+      select: { id: true },
+    })
+    if (!mod) return { ok: false, error: 'Module not found', status: 404 }
+
+    const max = await prisma.crmTrainingVideo.aggregate({
+      where: { moduleId },
+      _max: { position: true },
+    })
+    const position = (max._max.position ?? -1) + 1
+
+    const video = await prisma.crmTrainingVideo.create({
+      data: {
+        moduleId,
+        url: data.url.trim(),
+        videoId: ytId,
+        title: data.title?.trim() || null,
+        position,
+      },
+    })
+
+    await writeAuditLog({
+      actorUserId: viewer.id,
+      entityType: 'CrmTrainingVideo',
+      entityId: video.id,
+      action: 'CREATE',
+      after: { moduleId, videoId: ytId, url: data.url.trim() },
+    })
+
+    revalidateProfilePaths()
+    return { ok: true, videoId: video.id }
+  } catch (err) {
+    return fail(err) as TrainingActionResult<{ videoId: string }>
+  }
+}
+
+export async function updateTrainingVideo(
+  videoId: string,
+  data: { url?: string; title?: string | null }
+): Promise<TrainingActionResult> {
+  try {
+    const viewer = await getClientServicesUser()
+    assertCanEditTrainingContent(viewer)
+
+    const existing = await prisma.crmTrainingVideo.findUnique({
+      where: { id: videoId },
+      select: { id: true },
+    })
+    if (!existing) return { ok: false, error: 'Video not found', status: 404 }
+
+    const patch: {
+      url?: string
+      videoId?: string
+      title?: string | null
+    } = {}
+
+    if (data.url !== undefined) {
+      const { extractYoutubeVideoId } = await import('@/lib/crm/training/youtube')
+      const ytId = extractYoutubeVideoId(data.url)
+      if (!ytId) {
+        return {
+          ok: false,
+          error: 'Paste a valid YouTube link (watch, youtu.be, shorts, or embed)',
+          status: 400,
+        }
+      }
+      patch.url = data.url.trim()
+      patch.videoId = ytId
+    }
+    if (data.title !== undefined) {
+      patch.title = data.title?.trim() || null
+    }
+
+    await prisma.crmTrainingVideo.update({
+      where: { id: videoId },
+      data: patch,
+    })
+
+    await writeAuditLog({
+      actorUserId: viewer.id,
+      entityType: 'CrmTrainingVideo',
+      entityId: videoId,
+      action: 'UPDATE',
+      after: patch,
+    })
+
+    revalidateProfilePaths()
+    return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function deleteTrainingVideo(
+  videoId: string
+): Promise<TrainingActionResult> {
+  try {
+    const viewer = await getClientServicesUser()
+    assertCanEditTrainingContent(viewer)
+
+    const existing = await prisma.crmTrainingVideo.findUnique({
+      where: { id: videoId },
+      select: { id: true, moduleId: true },
+    })
+    if (!existing) return { ok: false, error: 'Video not found', status: 404 }
+
+    await prisma.crmTrainingVideo.delete({ where: { id: videoId } })
+
+    const remaining = await prisma.crmTrainingVideo.findMany({
+      where: { moduleId: existing.moduleId },
+      orderBy: { position: 'asc' },
+      select: { id: true },
+    })
+    await prisma.$transaction(
+      remaining.map((v, i) =>
+        prisma.crmTrainingVideo.update({
+          where: { id: v.id },
+          data: { position: i },
+        })
+      )
+    )
+
+    await writeAuditLog({
+      actorUserId: viewer.id,
+      entityType: 'CrmTrainingVideo',
+      entityId: videoId,
+      action: 'DELETE',
+    })
+
+    revalidateProfilePaths()
+    return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function reorderTrainingVideos(
+  moduleId: string,
+  orderedVideoIds: string[]
+): Promise<TrainingActionResult> {
+  try {
+    const viewer = await getClientServicesUser()
+    assertCanEditTrainingContent(viewer)
+
+    const videos = await prisma.crmTrainingVideo.findMany({
+      where: { moduleId },
+      select: { id: true },
+    })
+    const existingIds = new Set(videos.map((v) => v.id))
+    if (orderedVideoIds.length !== existingIds.size) {
+      return { ok: false, error: 'Video list does not match this module', status: 400 }
+    }
+    for (const id of orderedVideoIds) {
+      if (!existingIds.has(id)) {
+        return { ok: false, error: 'Unknown video id for this module', status: 400 }
+      }
+    }
+
+    await prisma.$transaction(
+      orderedVideoIds.map((id, i) =>
+        prisma.crmTrainingVideo.update({
+          where: { id },
+          data: { position: i },
+        })
+      )
+    )
 
     revalidateProfilePaths()
     return { ok: true }
@@ -245,7 +529,10 @@ export async function listAllTrainingModulesForEditor(): Promise<
 async function loadEditorModules() {
   return prisma.crmTrainingModule.findMany({
     orderBy: { crmRole: 'asc' },
-    include: { steps: { orderBy: { stepNumber: 'asc' } } },
+    include: {
+      steps: { orderBy: { stepNumber: 'asc' } },
+      videos: { orderBy: { position: 'asc' } },
+    },
   })
 }
 
@@ -337,7 +624,10 @@ export async function previewTrainingModuleForRole(
 
     const row = await prisma.crmTrainingModule.findUnique({
       where: { crmRole },
-      include: { steps: { orderBy: { stepNumber: 'asc' } } },
+      include: {
+        steps: { orderBy: { stepNumber: 'asc' } },
+        videos: { orderBy: { position: 'asc' } },
+      },
     })
     if (!row) return { ok: false, error: 'Module not found', status: 404 }
 

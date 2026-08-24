@@ -67,6 +67,7 @@ export async function listTrainingModulesForRoles(roles: CrmRole[]) {
     orderBy: { crmRole: 'asc' },
     include: {
       steps: { orderBy: { stepNumber: 'asc' } },
+      videos: { orderBy: { position: 'asc' } },
     },
   })
 }

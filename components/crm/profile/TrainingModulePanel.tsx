@@ -49,6 +49,7 @@ import {
 } from 'lucide-react'
 import { toggleTrainingStepCompletion } from '@/lib/crm/training/actions'
 import { TRAINING_MODULE_ROLE_LABELS } from '@/lib/crm/training/constants'
+import { youtubeEmbedUrl } from '@/lib/crm/training/youtube'
 import { ProgressRing } from '@/components/crm/shared/ProgressRing'
 import { cn } from '@/lib/utils'
 
@@ -113,6 +114,13 @@ export type TrainingModuleView = {
     body: string
     icon: string | null
     completed: boolean
+  }[]
+  videos?: {
+    id: string
+    url: string
+    videoId: string
+    title: string | null
+    position: number
   }[]
 }
 
@@ -199,6 +207,35 @@ export function TrainingModulePanel({
         <blockquote className="rounded-xl border border-[var(--sunrise)]/25 bg-gradient-to-r from-[var(--sunrise-soft)] to-transparent px-4 py-3 text-sm italic text-ink">
           {mod.goalStatement}
         </blockquote>
+      )}
+
+      {(mod.videos?.length ?? 0) > 0 && (
+        <section className="space-y-3">
+          <h4 className="font-display text-base font-semibold text-ink">
+            Videos &amp; Guides
+          </h4>
+          <div className="grid gap-4 sm:grid-cols-1">
+            {mod.videos!.map((video) => (
+              <div key={video.id} className="overflow-hidden rounded-xl border border-line bg-surface">
+                {video.title && (
+                  <p className="border-b border-line px-3 py-2 text-sm font-medium text-ink">
+                    {video.title}
+                  </p>
+                )}
+                <div className="relative aspect-video w-full bg-[var(--espresso)]/5">
+                  <iframe
+                    src={youtubeEmbedUrl(video.videoId)}
+                    title={video.title || 'Training video'}
+                    loading="lazy"
+                    allowFullScreen
+                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    className="absolute inset-0 h-full w-full border-0"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {error && (

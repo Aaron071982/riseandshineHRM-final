@@ -136,6 +136,13 @@ export async function loadStaffProfile(targetUserId: string) {
         icon: s.icon,
         completed: completed.has(s.id),
       })),
+      videos: m.videos.map((v) => ({
+        id: v.id,
+        url: v.url,
+        videoId: v.videoId,
+        title: v.title,
+        position: v.position,
+      })),
     }
   })
 
