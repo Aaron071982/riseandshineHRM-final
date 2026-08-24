@@ -15,6 +15,7 @@ import { graphEmailEnabled } from '@/lib/crm/emails/graphSend'
 import { hasRiseAndShineMailbox, mailboxBlockedReason } from '@/lib/crm/emails/mailbox'
 import { ensureClientRequirements } from '@/lib/crm/ensureRequirements'
 import { ensureCanonicalOwnerDept } from '@/lib/crm/ensureOwnerDept'
+import { loadCrmTaskAssigneeUsers } from '@/lib/crm/tasks/assignees'
 import {
   isConsentLineInitialed,
   parseConsentLines,
@@ -180,11 +181,7 @@ export async function loadClientCrmDetail(clientId: string) {
         _count: { select: { comments: true } },
       },
     }),
-    prisma.user.findMany({
-      select: { id: true, name: true, email: true },
-      orderBy: { name: 'asc' },
-      take: 200,
-    }),
+    loadCrmTaskAssigneeUsers(),
   ])
 
   return {

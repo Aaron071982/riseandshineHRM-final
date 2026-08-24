@@ -4,6 +4,7 @@ import {
   loadOwnedClientIds,
   teamTaskVisibilityWhere,
 } from '@/lib/crm/tasks/access'
+import { loadCrmTaskAssigneeUsers } from '@/lib/crm/tasks/assignees'
 import { TasksHubClient } from '@/components/crm/tasks/TasksHubClient'
 
 export const dynamic = 'force-dynamic'
@@ -26,12 +27,7 @@ export default async function TeamTasksPage() {
         _count: { select: { comments: true } },
       },
     }),
-    prisma.user.findMany({
-      where: { email: { not: null } },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: 'asc' },
-      take: 200,
-    }),
+    loadCrmTaskAssigneeUsers(),
     prisma.serviceClient.findMany({
       where: getVisibleClientsWhere(user),
       select: { id: true, firstName: true, lastName: true, clientCode: true },

@@ -20,6 +20,10 @@ import {
   teamTaskVisibilityWhere,
   userOwnerDepts,
 } from '@/lib/crm/tasks/access'
+import {
+  assertCrmTaskAssigneeUserId,
+  crmTaskAssigneeUserWhere,
+} from '@/lib/crm/tasks/assignees'
 import { writeAuditLog } from '@/lib/audit'
 import { parseMentionIds } from '@/lib/crm/tasks/mentions'
 import {
@@ -229,6 +233,10 @@ export async function createTeamTask(input: {
 
     if (!assignedToUserId && !assignedDept) {
       throw new CrmAccessError('Assign to a person or department pool', 400)
+    }
+
+    if (assignedToUserId) {
+      await assertCrmTaskAssigneeUserId(assignedToUserId)
     }
 
     const dueAt = input.dueAt ? new Date(input.dueAt) : null
@@ -607,9 +615,14 @@ export async function searchTaskMentionUsers(query: string) {
 
     const users = await prisma.user.findMany({
       where: {
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { email: { contains: q, mode: 'insensitive' } },
+        AND: [
+          crmTaskAssigneeUserWhere(),
+          {
+            OR: [
+              { name: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+            ],
+          },
         ],
       },
       select: { id: true, name: true, email: true },
