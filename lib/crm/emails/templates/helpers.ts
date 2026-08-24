@@ -35,6 +35,48 @@ export function formatRbtAddress(fields: StaffMergeFields): string | null {
   return parts.length ? parts.join(', ') : null
 }
 
+/** Weekly schedule (Mon–Sun) for Meet & Greet — matches the family guide layout. */
+export function meetGreetWeeklyScheduleTable(slots: ScheduleSlotRow[]): string {
+  const byDay = new Map<number, ScheduleSlotRow>()
+  for (const s of slots) {
+    if (!byDay.has(s.dayOfWeek)) byDay.set(s.dayOfWeek, s)
+  }
+  const order = [1, 2, 3, 4, 5, 6, 0]
+  const rows = order
+    .map((dow) => {
+      const slot = byDay.get(dow)
+      const day = DAY_LABELS[dow] ?? 'Day'
+      const start = slot ? formatTime12h(slot.startTime) : '—'
+      const end = slot ? formatTime12h(slot.endTime) : '—'
+      return `<tr>
+        <td style="padding:10px 14px;border-bottom:1px solid #ebe3da;font-size:14px;color:#2f2318;font-weight:600;">${escapeHtml(day)}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #ebe3da;font-size:14px;color:#2f2318;">${escapeHtml(start)}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #ebe3da;font-size:14px;color:#2f2318;">${escapeHtml(end)}</td>
+      </tr>`
+    })
+    .join('')
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;border:1px solid #ebe3da;border-radius:10px;overflow:hidden;background:#fffcf8;">
+    <tr style="background:#f7f0e8;">
+      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">Day</th>
+      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">Start</th>
+      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">End</th>
+    </tr>
+    ${rows}
+  </table>`
+}
+
+/** Branded email section heading + body (Meet & Greet guide blocks). */
+export function emailGuideSection(title: string, bodyHtml: string): string {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0 0;">
+  <tr>
+    <td style="padding:16px 18px;background:#fffcf8;border:1px solid #ebe3da;border-radius:10px;">
+      <div style="font-size:13px;font-weight:700;color:#8b4513;margin:0 0 10px;letter-spacing:0.02em;">${escapeHtml(title)}</div>
+      <div style="font-size:14px;line-height:1.6;color:#2f2318;">${bodyHtml}</div>
+    </td>
+  </tr>
+</table>`
+}
+
 /** Email-safe schedule table for SCHEDULE_CONFIRMED. */
 export function scheduleTable(slots: ScheduleSlotRow[]): string {
   if (!slots.length) {

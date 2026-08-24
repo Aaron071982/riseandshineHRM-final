@@ -76,6 +76,7 @@ describe('lib/crm/emails/templates branded render', () => {
     clientZip: '10451',
     coordinatorName: 'Jordan Lee',
     coordinatorEmail: 'jordan@riseandshineaba.com',
+    coordinatorPhone: '(917) 915-2544',
     rbtName: 'Sam Taylor',
     rbtEmail: 'sam@riseandshineaba.com',
     rbtPhone: '(555) 987-6543',
@@ -143,17 +144,19 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email?.html).toContain('A. Rivera')
   })
 
-  it('MEET_AND_GREET is scheduling-only without client or care-team PHI', () => {
+  it('MEET_AND_GREET embeds family guide with CC, RBT, and schedule', () => {
     const email = renderStaffEmail('MEET_AND_GREET', fields)
-    expect(email?.subject).toBe('Meet and Greet for Alex')
-    expect(email?.subject).not.toContain('&amp;')
+    expect(email?.subject).toMatch(/Meet.*Greet/)
     expect(email?.html).toContain('Hi Maria,')
-    expect(email?.html).toContain('Meet &amp; Greet form')
-    expect(email?.html).not.toContain('Alex Rivera')
-    expect(email?.html).not.toContain('123 Main St')
-    expect(email?.html).not.toContain('Sam Taylor')
-    expect(email?.html).not.toContain('Dr. Pat Chen')
-    expect(email?.html).not.toContain('(555) 123-4567')
+    expect(email?.html).toContain('Meet &amp; Greet Guide for Families')
+    expect(email?.html).toContain('Sam Taylor')
+    expect(email?.html).toContain('Jordan Lee')
+    expect(email?.html).toContain('Monday')
+    expect(email?.html).toContain('9:00 AM')
+    expect(email?.html).toContain('123 Main St')
+    expect(email?.html).toContain('official Meet &amp; Greet form')
+    expect(email?.html).toContain('send separately')
+    expect(email?.html).toContain('Your Case Coordinator')
   })
 
   it('ASSESSMENT_SCHEDULED reflects in-home vs telehealth choice', () => {

@@ -30,7 +30,7 @@ export async function loadStaffEmailMergeContext(clientId: string) {
       caseCoordinatorName: true,
       actualServiceStartDate: true,
       serviceStartDate: true,
-      caseCoordinatorUser: { select: { name: true, email: true } },
+      caseCoordinatorUser: { select: { name: true, email: true, phoneNumber: true } },
       bcbaProfile: { select: { fullName: true, email: true, phone: true } },
       bcbaName: true,
       btAssignments: {
@@ -196,6 +196,7 @@ export function buildStaffMergeFields(
     coordinatorName:
       client.caseCoordinatorUser?.name || client.caseCoordinatorName,
     coordinatorEmail: client.caseCoordinatorUser?.email ?? null,
+    coordinatorPhone: client.caseCoordinatorUser?.phoneNumber ?? null,
     rbtName: rbt.rbtName,
     rbtEmail: rbt.rbtEmail,
     rbtPhone: rbt.rbtPhone,

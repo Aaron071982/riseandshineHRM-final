@@ -22,6 +22,7 @@ export type StaffMergeFields = {
   clientZip: string | null
   coordinatorName: string | null
   coordinatorEmail: string | null
+  coordinatorPhone: string | null
   rbtName: string | null
   rbtEmail: string | null
   rbtPhone: string | null

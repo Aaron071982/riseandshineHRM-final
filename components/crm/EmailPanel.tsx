@@ -134,6 +134,8 @@ export function EmailPanel({
   const isManual = template === 'MANUAL'
   const isAssessment = template === 'ASSESSMENT_SCHEDULED'
   const isRbtAssigned = template === 'RBT_ASSIGNED'
+  const isMeetAndGreet = template === 'MEET_AND_GREET'
+  const isRbtPick = isRbtAssigned || isMeetAndGreet
   const needsConsentWarn = emailSend.emailConsentOk === false
 
   const localPreviewLogoUrl =
@@ -152,7 +154,7 @@ export function EmailPanel({
         links: links.map(({ url, label }) => ({ url, label: label || undefined })),
         assessmentModality: isAssessment && assessmentModality ? assessmentModality : null,
         rbtAssignmentId:
-          isRbtAssigned && rbtAssignmentId ? rbtAssignmentId : null,
+          isRbtPick && rbtAssignmentId ? rbtAssignmentId : null,
       })
       if (!res.ok) {
         setError(res.error)
@@ -178,7 +180,7 @@ export function EmailPanel({
     isManual,
     isAssessment,
     assessmentModality,
-    isRbtAssigned,
+    isRbtPick,
     rbtAssignmentId,
     localPreviewLogoUrl,
     attachments,
@@ -203,13 +205,13 @@ export function EmailPanel({
     if (template !== 'ASSESSMENT_SCHEDULED') {
       setAssessmentModality('')
     }
-    if (template !== 'RBT_ASSIGNED') {
+    if (template !== 'RBT_ASSIGNED' && template !== 'MEET_AND_GREET') {
       setRbtAssignmentId('')
     }
   }, [template])
 
   useEffect(() => {
-    if (template !== 'RBT_ASSIGNED') return
+    if (template !== 'RBT_ASSIGNED' && template !== 'MEET_AND_GREET') return
     if (!staffingRbts.length) {
       setRbtAssignmentId('')
       return
@@ -221,10 +223,10 @@ export function EmailPanel({
   }, [template, staffingRbts])
 
   useEffect(() => {
-    if (template === 'RBT_ASSIGNED' && rbtAssignmentId) {
+    if (isRbtPick && rbtAssignmentId) {
       loadPreview()
     }
-  }, [rbtAssignmentId, template, loadPreview])
+  }, [rbtAssignmentId, isRbtPick, loadPreview])
 
   const timeline = useMemo(
     () =>
@@ -319,7 +321,7 @@ export function EmailPanel({
         links: links.map(({ url, label }) => ({ url, label: label || undefined })),
         assessmentModality: isAssessment && assessmentModality ? assessmentModality : null,
         rbtAssignmentId:
-          isRbtAssigned && rbtAssignmentId ? rbtAssignmentId : null,
+          isRbtPick && rbtAssignmentId ? rbtAssignmentId : null,
       })
       if (!res.ok) {
         setError(res.error)
@@ -447,9 +449,9 @@ export function EmailPanel({
             />
           </label>
 
-          {isRbtAssigned && (
+          {isRbtPick && (
             <label className="text-xs text-quiet sm:col-span-2">
-              RBT (from staffing)
+              RBT for this email (from staffing)
               {staffingRbts.length ? (
                 <select
                   value={rbtAssignmentId}
