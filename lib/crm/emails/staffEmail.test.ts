@@ -115,10 +115,13 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email?.html).not.toContain('[Template copy pending')
   })
 
-  it('CONSENT_REQUEST supports consent copy before documents', () => {
+  it('CONSENT_REQUEST includes professional link copy for consent', () => {
     const email = renderStaffEmail('CONSENT_REQUEST', fields)
-    expect(email?.html).toContain('signing link')
+    expect(email?.html).toContain('secure link')
+    expect(email?.html).toContain('submit the consent form')
+    expect(email?.html).toContain('so we can begin')
     expect(email?.html).toContain('Hi Maria,')
+    expect(email?.html).not.toContain('How to complete consent')
   })
 
   it('DOCS_NEEDED thanks for consent and drops family packet', () => {

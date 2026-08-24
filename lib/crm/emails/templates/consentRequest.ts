@@ -1,28 +1,27 @@
 import type { StaffEmailContent, StaffMergeFields } from './types'
 import {
   COMPANY_EMAIL,
+  COMPANY_PHONE,
   childName,
-  ctaButton,
   greeting,
-  infoBlock,
   para,
   staffSignature,
 } from './shell'
 
 export function renderConsentRequest(fields: StaffMergeFields): StaffEmailContent {
   const child = childName(fields)
+  const contact = fields.staffEmail || COMPANY_EMAIL
+
   return {
     subject: `Consent forms for ${child}`,
     bodyHtml: `
       ${para(greeting(fields))}
-      ${para(`We are ready for the next step in ${child}&apos;s journey with Rise &amp; Shine ABA. Please review and sign the consent form so we can continue coordinating care and services.`)}
-      ${infoBlock('How to complete consent', [
-        'If we included a <strong>signing link</strong>, use the button below to sign electronically.',
-        'You may also receive a separate signing email from our e-sign provider — either path works.',
-        'Once signed, email the form back to us or confirm completion through the link.',
-      ])}
-      ${para(`Consent confirms how we may deliver services and how you prefer us to reach you (email, phone, or text). If anything is unclear, reply and we will walk you through it.`)}
-      ${ctaButton('Reply with questions', `mailto:${fields.staffEmail || COMPANY_EMAIL}?subject=${encodeURIComponent(`Consent for ${child}`)}`)}
+      ${para(`Thank you for choosing Rise &amp; Shine ABA. We are preparing to move forward with services for ${child}, and the next step is to complete our consent paperwork.`)}
+      ${para(`We have included a secure link in this email where you can review and submit the consent form. The form covers how we deliver services, how we may contact you, and other standard intake authorizations. Completing it allows our team to continue coordinating care and scheduling without delay.`)}
+      ${para(`<strong>Please open the link below and submit the consent form when you are ready so we can begin.</strong> If you have any trouble opening the link, reply to this message and we will resend it or walk you through the steps.`)}
+      ${para(`Most families finish in just a few minutes. Once we receive your signed consent, we will confirm receipt and keep you updated on the next steps in ${child}&apos;s intake process.`)}
+      ${para(`If you prefer to discuss the form by phone before signing, call us at ${COMPANY_PHONE} or email <a href="mailto:${contact}" style="color:#c45a1a;text-decoration:none;">${contact}</a> — we are happy to answer any questions.`)}
+      ${para(`We appreciate your partnership and look forward to supporting your family.`)}
       ${staffSignature(fields)}
     `,
   }
