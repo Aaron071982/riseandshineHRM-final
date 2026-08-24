@@ -39,14 +39,14 @@ type TabId =
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'requirements', label: 'Requirements' },
-  { id: 'documents', label: 'Documents' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'notes', label: 'Notes' },
-  { id: 'activity', label: 'Activity' },
   { id: 'staffing', label: 'Staffing' },
   { id: 'authorization', label: 'Authorization' },
   { id: 'schedule', label: 'Schedule' },
   { id: 'email', label: 'Email' },
+  { id: 'documents', label: 'Documents' },
+  { id: 'activity', label: 'Activity' },
 ]
 
 function resolveTab(value?: string | null): TabId {

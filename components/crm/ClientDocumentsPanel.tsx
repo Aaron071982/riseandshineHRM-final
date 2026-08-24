@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Download, FileText, Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Download, Eye, FileText, Loader2, X } from 'lucide-react'
 import type { ClientStage, RequirementGroup, RequirementStatus } from '@prisma/client'
 import {
   DOCUMENT_BY_KEY,
@@ -41,6 +41,15 @@ export type ClientDocumentRequirement = {
   completedByUser?: { name: string | null; email: string | null } | null
 }
 
+type PreviewState = {
+  requirementId: string
+  title: string
+  fileName: string
+  contentType: string | null
+  blobUrl: string | null
+  externalUrl: string | null
+}
+
 function formatSize(bytes: number | null): string {
   if (bytes == null || bytes <= 0) return ''
   if (bytes < 1024) return `${bytes} B`
@@ -58,20 +67,44 @@ function hasDocumentOnFile(req: ClientDocumentRequirement): boolean {
   )
 }
 
+function guessContentType(req: ClientDocumentRequirement): string | null {
+  if (req.fileContentType?.trim()) return req.fileContentType.trim()
+  const name = (req.fileName || req.fileUrl || '').toLowerCase()
+  if (name.endsWith('.pdf')) return 'application/pdf'
+  if (name.endsWith('.png')) return 'image/png'
+  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg'
+  if (name.endsWith('.gif')) return 'image/gif'
+  if (name.endsWith('.webp')) return 'image/webp'
+  if (name.endsWith('.txt')) return 'text/plain'
+  return null
+}
+
+function canInlinePreview(contentType: string | null, fileName: string): boolean {
+  const t = (contentType || '').toLowerCase()
+  const n = fileName.toLowerCase()
+  return (
+    t.includes('pdf') ||
+    t.startsWith('image/') ||
+    t.startsWith('text/') ||
+    n.endsWith('.pdf') ||
+    /\.(png|jpe?g|gif|webp|txt)$/i.test(n)
+  )
+}
+
 export function ClientDocumentsPanel({
   clientId,
   requirements,
 }: {
   clientId: string
   requirements: ClientDocumentRequirement[]
-  /** Kept for call-site compatibility; Documents is read-only. */
   currentStage?: ClientStage
   canEdit?: boolean
   consent?: unknown
   referralCheck?: unknown
 }) {
-  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [preview, setPreview] = useState<PreviewState | null>(null)
 
   const grouped = useMemo(() => {
     const docs = requirements.filter(
@@ -86,34 +119,123 @@ export function ClientDocumentsPanel({
     })).filter((g) => g.items.length > 0)
   }, [requirements])
 
-  const onDownload = async (requirementId: string, fileName: string) => {
+  useEffect(() => {
+    return () => {
+      if (preview?.blobUrl) URL.revokeObjectURL(preview.blobUrl)
+    }
+  }, [preview?.blobUrl])
+
+  const closePreview = () => {
+    setPreview((prev) => {
+      if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl)
+      return null
+    })
+  }
+
+  const fetchStoredBlob = async (requirementId: string, inline: boolean) => {
+    const qs = inline ? '?inline=1' : ''
+    const res = await fetch(
+      `/api/client-services/clients/${clientId}/requirements/${requirementId}/download${qs}`,
+      { credentials: 'include' }
+    )
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      throw new Error(data.error || (inline ? 'Preview failed' : 'Download failed'))
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition')
+    const match = disposition?.match(/filename="?([^";]+)"?/)
+    return {
+      blob,
+      fileName: match?.[1] ?? null,
+      contentType: res.headers.get('Content-Type'),
+    }
+  }
+
+  const onDownload = async (req: ClientDocumentRequirement, displayFileName: string) => {
     setError('')
-    setDownloadingId(requirementId)
+    setBusyId(req.id)
     try {
-      const res = await fetch(
-        `/api/client-services/clients/${clientId}/requirements/${requirementId}/download`,
-        { credentials: 'include' }
-      )
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(data.error || 'Download failed')
+      if (isStoredRequirementPath(req.fileUrl)) {
+        const { blob, fileName } = await fetchStoredBlob(req.id, false)
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName ?? displayFileName
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        return
       }
-      const blob = await res.blob()
-      const disposition = res.headers.get('Content-Disposition')
-      const match = disposition?.match(/filename="?([^";]+)"?/)
-      const name = match?.[1] ?? fileName
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = name
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      if (req.fileUrl?.startsWith('http')) {
+        window.open(req.fileUrl, '_blank', 'noopener,noreferrer')
+        return
+      }
+      throw new Error('No downloadable file for this document')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Download failed')
     } finally {
-      setDownloadingId(null)
+      setBusyId(null)
+    }
+  }
+
+  const onPreview = async (req: ClientDocumentRequirement, displayFileName: string) => {
+    setError('')
+    setBusyId(req.id)
+    try {
+      closePreview()
+      const contentType = guessContentType(req)
+
+      if (isStoredRequirementPath(req.fileUrl)) {
+        const fetched = await fetchStoredBlob(req.id, true)
+        const name = fetched.fileName ?? displayFileName
+        const type = fetched.contentType || contentType
+        if (!canInlinePreview(type, name)) {
+          // Fall back to download for office docs etc.
+          const url = URL.createObjectURL(fetched.blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = name
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+          setError('This file type can’t be previewed in-browser — downloaded instead.')
+          return
+        }
+        setPreview({
+          requirementId: req.id,
+          title: req.label,
+          fileName: name,
+          contentType: type,
+          blobUrl: URL.createObjectURL(fetched.blob),
+          externalUrl: null,
+        })
+        return
+      }
+
+      if (req.fileUrl?.startsWith('http')) {
+        if (canInlinePreview(contentType, displayFileName)) {
+          setPreview({
+            requirementId: req.id,
+            title: req.label,
+            fileName: displayFileName,
+            contentType,
+            blobUrl: null,
+            externalUrl: req.fileUrl,
+          })
+        } else {
+          window.open(req.fileUrl, '_blank', 'noopener,noreferrer')
+        }
+        return
+      }
+
+      throw new Error('No previewable file for this document')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Preview failed')
+    } finally {
+      setBusyId(null)
     }
   }
 
@@ -132,6 +254,16 @@ export function ClientDocumentsPanel({
     )
   }
 
+  const previewSrc = preview?.blobUrl || preview?.externalUrl || null
+  const previewIsImage =
+    !!preview &&
+    ((preview.contentType || '').startsWith('image/') ||
+      /\.(png|jpe?g|gif|webp)$/i.test(preview.fileName))
+  const previewIsText =
+    !!preview &&
+    ((preview.contentType || '').startsWith('text/') ||
+      /\.txt$/i.test(preview.fileName))
+
   return (
     <div className="space-y-6">
       {error && (
@@ -141,9 +273,9 @@ export function ClientDocumentsPanel({
       )}
 
       <p className="text-sm text-quiet">
-        Library of documents already on file for this client. Upload and status
-        updates happen on the <strong className="font-medium text-ink">Requirements</strong>{' '}
-        tab.
+        Library of documents already on file for this client. Preview or download
+        here; upload and status updates happen on the{' '}
+        <strong className="font-medium text-ink">Requirements</strong> tab.
       </p>
 
       {grouped.map(({ group, items }) => (
@@ -154,16 +286,18 @@ export function ClientDocumentsPanel({
           <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
             {items.map((req) => {
               const hasStoredFile = isStoredRequirementPath(req.fileUrl)
+              const hasHttp = !!req.fileUrl?.startsWith('http')
               const displayFileName =
                 req.fileName?.trim() ||
                 (hasStoredFile
                   ? req.fileUrl!.split('/').pop()
                   : req.fileUrl?.trim()) ||
-                null
+                `${req.label}.pdf`
               const uploader =
                 req.status === 'ON_FILE' ? req.attestedByUser : req.completedByUser
               const uploadedAt =
                 req.status === 'ON_FILE' ? req.attestedAt : req.completedAt
+              const busy = busyId === req.id
 
               return (
                 <li key={req.id} className="px-3 py-3">
@@ -175,17 +309,15 @@ export function ClientDocumentsPanel({
                         <div className="mt-0.5 text-xs text-quiet">
                           {STAGE_LABELS[req.stage]}
                         </div>
-                        {displayFileName && (
-                          <div className="mt-1 text-xs text-ink break-all">
-                            {displayFileName}
-                            {req.fileSizeBytes ? (
-                              <span className="text-quiet">
-                                {' '}
-                                · {formatSize(req.fileSizeBytes)}
-                              </span>
-                            ) : null}
-                          </div>
-                        )}
+                        <div className="mt-1 text-xs text-ink break-all">
+                          {displayFileName}
+                          {req.fileSizeBytes ? (
+                            <span className="text-quiet">
+                              {' '}
+                              · {formatSize(req.fileSizeBytes)}
+                            </span>
+                          ) : null}
+                        </div>
                         {(uploader || uploadedAt) && (
                           <div className="mt-0.5 text-xs text-quiet">
                             {req.status === 'ON_FILE' ? 'On file' : 'Received'}
@@ -209,35 +341,31 @@ export function ClientDocumentsPanel({
                       {req.status.replace(/_/g, ' ')}
                     </span>
 
-                    {hasStoredFile && (
-                      <button
-                        type="button"
-                        disabled={downloadingId === req.id}
-                        onClick={() =>
-                          onDownload(
-                            req.id,
-                            displayFileName ?? `${req.label}.pdf`
-                          )
-                        }
-                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
-                      >
-                        {downloadingId === req.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
+                    {(hasStoredFile || hasHttp) && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void onPreview(req, displayFileName)}
+                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
+                        >
+                          {busy ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5" />
+                          )}
+                          Preview
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void onDownload(req, displayFileName)}
+                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
+                        >
                           <Download className="h-3.5 w-3.5" />
-                        )}
-                        Download
-                      </button>
-                    )}
-                    {!hasStoredFile && req.fileUrl?.startsWith('http') && (
-                      <a
-                        href={req.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex h-8 items-center rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2"
-                      >
-                        Open link
-                      </a>
+                          Download
+                        </button>
+                      </div>
                     )}
                   </div>
                 </li>
@@ -246,6 +374,71 @@ export function ClientDocumentsPanel({
           </ul>
         </section>
       ))}
+
+      {preview && previewSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[1px]"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Preview ${preview.title}`}
+          onClick={closePreview}
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-ink">
+                  {preview.title}
+                </div>
+                <div className="truncate text-xs text-quiet">{preview.fileName}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const req = requirements.find((r) => r.id === preview.requirementId)
+                  if (req) void onDownload(req, preview.fileName)
+                }}
+                className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download
+              </button>
+              <button
+                type="button"
+                onClick={closePreview}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-line text-ink hover:bg-line-2"
+                aria-label="Close preview"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto bg-[var(--bg)] p-3">
+              {previewIsImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewSrc}
+                  alt={preview.title}
+                  className="mx-auto max-h-[75vh] max-w-full object-contain"
+                />
+              ) : previewIsText ? (
+                <iframe
+                  title={preview.title}
+                  src={previewSrc}
+                  className="h-[75vh] w-full rounded-lg border border-line bg-white"
+                />
+              ) : (
+                <iframe
+                  title={preview.title}
+                  src={previewSrc}
+                  className="h-[75vh] w-full rounded-lg border border-line bg-white"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

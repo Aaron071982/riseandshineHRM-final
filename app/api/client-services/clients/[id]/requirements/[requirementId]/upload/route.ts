@@ -6,7 +6,6 @@ import {
   auditClientAction,
   CrmAccessError,
   fetchUserCrmRoles,
-  isFullAccess,
 } from '@/lib/crm/access'
 import { computeExpiresAt } from '@/lib/crm/documents'
 import {
@@ -30,28 +29,6 @@ export async function POST(request: NextRequest, context: Ctx) {
     const crmRoles = await fetchUserCrmRoles(user.id)
     const subject = { ...user, crmRoles }
     await assertCanEditClient(subject, clientId)
-
-    if (!isFullAccess(subject)) {
-      const client = await prisma.serviceClient.findUnique({
-        where: { id: clientId },
-        select: { currentOwnerUserId: true, caseCoordinatorUserId: true },
-      })
-      if (!client) {
-        return NextResponse.json({ error: 'Not found' }, { status: 404 })
-      }
-      const claimed =
-        client.currentOwnerUserId === user.id ||
-        client.caseCoordinatorUserId === user.id
-      if (!claimed) {
-        return NextResponse.json(
-          {
-            error:
-              'You must claim this client (or be assigned as case coordinator) before uploading documents',
-          },
-          { status: 403 }
-        )
-      }
-    }
 
     const requirement = await prisma.clientRequirement.findFirst({
       where: {

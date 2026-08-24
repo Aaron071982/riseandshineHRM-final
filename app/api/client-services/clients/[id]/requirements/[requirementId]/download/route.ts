@@ -58,17 +58,22 @@ export async function GET(request: NextRequest, context: Ctx) {
       label: requirement.label,
     })
 
+    const wantInline =
+      request.nextUrl.searchParams.get('inline') === '1' ||
+      request.nextUrl.searchParams.get('preview') === '1'
+    const disposition = wantInline ? 'inline' : 'attachment'
+
     await auditClientAction({
       userId: user.id,
       serviceClientId: clientId,
-      action: `REQUIREMENT_DOCUMENT_DOWNLOAD:${requirement.key}`,
+      action: `REQUIREMENT_DOCUMENT_${wantInline ? 'PREVIEW' : 'DOWNLOAD'}:${requirement.key}`,
       ip: getClientIpFromRequest(request),
     })
 
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         'Content-Type': requirement.fileContentType || contentType,
-        'Content-Disposition': `attachment; filename="${downloadName.replace(/"/g, '')}"`,
+        'Content-Disposition': `${disposition}; filename="${downloadName.replace(/"/g, '')}"`,
         'Content-Length': bytes.length.toString(),
         'Cache-Control': 'private, no-store',
       },

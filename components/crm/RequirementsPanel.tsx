@@ -1,18 +1,16 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Loader2, Upload } from 'lucide-react'
 import type { ClientStage, RequirementGroup, RequirementStatus } from '@prisma/client'
-import {
-  attestRequirementOnFile,
-  markRequirementReceived,
-  updateRequirement,
-} from '@/lib/crm/actions'
+import { attestRequirementOnFile, updateRequirement } from '@/lib/crm/actions'
 import {
   DOCUMENT_BY_KEY,
   DOCUMENT_GROUP_LABELS,
   DOCUMENT_GROUP_ORDER,
 } from '@/lib/crm/documents'
+import { isStoredRequirementPath } from '@/lib/crm/requirementDocuments'
 import { STAGE_LABELS } from '@/lib/crm/stages'
 import { ConsentInitialsPanel, type ConsentShape } from '@/components/crm/ConsentInitialsPanel'
 import { ReferralCheckPanel, type ReferralCheckShape } from '@/components/crm/ReferralCheckPanel'
@@ -48,6 +46,8 @@ type Req = {
   group: RequirementGroup
   isRequiredToAdvance: boolean
   fileUrl: string | null
+  fileName?: string | null
+  fileSizeBytes?: number | null
   expiresAt: Date | string | null
   attestedAt: Date | string | null
   attestedByUser?: { name: string | null; email: string | null } | null
@@ -58,6 +58,15 @@ function daysUntil(expiresAt: Date | string | null): number | null {
   const exp = new Date(expiresAt)
   if (Number.isNaN(exp.getTime())) return null
   return Math.ceil((exp.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+}
+
+function displayFileLabel(req: Req): string | null {
+  if (req.fileName?.trim()) return req.fileName.trim()
+  if (isStoredRequirementPath(req.fileUrl)) {
+    return req.fileUrl.split('/').pop() ?? req.fileUrl
+  }
+  if (req.fileUrl?.trim()) return req.fileUrl.trim()
+  return null
 }
 
 export function RequirementsPanel({
@@ -77,14 +86,18 @@ export function RequirementsPanel({
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
-  const [fileUrls, setFileUrls] = useState<Record<string, string>>({})
+  const [uploadingId, setUploadingId] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const grouped = useMemo(() => {
     const docs = requirements.filter((r) => !!DOCUMENT_BY_KEY[r.key])
     const legacyDocs = requirements.filter(
       (r) => !DOCUMENT_BY_KEY[r.key] && r.type === 'DOCUMENT'
     )
-    const tasks = requirements.filter((r) => !DOCUMENT_BY_KEY[r.key] && r.type !== 'DOCUMENT')
+    const tasks = requirements.filter(
+      (r) => !DOCUMENT_BY_KEY[r.key] && r.type !== 'DOCUMENT'
+    )
     const docGroup = (r: Req) =>
       DOCUMENT_BY_KEY[r.key]?.group ??
       (r.group !== 'STAGE' && r.group !== 'CONSENT' ? r.group : 'INTAKE')
@@ -94,6 +107,36 @@ export function RequirementsPanel({
     })).filter((g) => g.items.length > 0)
     return { byGroup, tasks, legacyDocs }
   }, [requirements])
+
+  const run = (fn: () => Promise<unknown>) => {
+    startTransition(async () => {
+      setError('')
+      await fn()
+      router.refresh()
+    })
+  }
+
+  const onUpload = async (requirementId: string, file: File) => {
+    setError('')
+    setUploadingId(requirementId)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch(
+        `/api/client-services/clients/${clientId}/requirements/${requirementId}/upload`,
+        { method: 'POST', body: form, credentials: 'include' }
+      )
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        throw new Error(data.error || 'Upload failed')
+      }
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setUploadingId(null)
+    }
+  }
 
   if (requirements.length === 0) {
     return (
@@ -106,15 +149,20 @@ export function RequirementsPanel({
     )
   }
 
-  const run = (fn: () => Promise<unknown>) => {
-    startTransition(async () => {
-      await fn()
-      router.refresh()
-    })
-  }
-
   return (
     <div className="space-y-6">
+      {error && (
+        <p className="rounded-lg bg-[var(--urgent-bg)] px-3 py-2 text-sm text-[var(--urgent)]">
+          {error}
+        </p>
+      )}
+
+      <p className="text-sm text-quiet">
+        Upload documents and update checklist status here. Uploaded files appear on the{' '}
+        <strong className="font-medium text-ink">Documents</strong> tab for preview and
+        download.
+      </p>
+
       {grouped.byGroup.map(({ group, items }) => (
         <section key={group}>
           <h3 className="mb-2 font-display text-base font-semibold text-ink">
@@ -125,6 +173,9 @@ export function RequirementsPanel({
               const catalog = DOCUMENT_BY_KEY[req.key]
               const days = daysUntil(req.expiresAt)
               const attestOk = catalog?.attestAllowed !== false
+              const fileLabel = displayFileLabel(req)
+              const busy = uploadingId === req.id
+
               return (
                 <li key={req.id} className="px-3 py-2.5">
                   <div className="flex flex-wrap items-center gap-3">
@@ -161,6 +212,9 @@ export function RequirementsPanel({
                           </span>
                         )}
                       </div>
+                      {fileLabel && (
+                        <div className="mt-1 truncate text-xs text-ink">{fileLabel}</div>
+                      )}
                     </div>
                     <span
                       className={cn(
@@ -172,25 +226,36 @@ export function RequirementsPanel({
                     </span>
                     {canEdit && (
                       <div className="flex flex-wrap items-center gap-1.5">
+                        <input
+                          ref={(el) => {
+                            fileInputs.current[req.id] = el
+                          }}
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.heic,.doc,.docx,.xls,.xlsx,.txt"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            e.target.value = ''
+                            if (file) void onUpload(req.id, file)
+                          }}
+                        />
                         <button
                           type="button"
-                          disabled={pending}
-                          onClick={() =>
-                            run(() =>
-                              markRequirementReceived(
-                                req.id,
-                                fileUrls[req.id]?.trim() || req.fileUrl
-                              )
-                            )
-                          }
-                          className="h-8 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
+                          disabled={pending || busy}
+                          onClick={() => fileInputs.current[req.id]?.click()}
+                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
                         >
-                          Upload / received
+                          {busy ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Upload className="h-3.5 w-3.5" />
+                          )}
+                          {fileLabel ? 'Replace' : 'Upload'}
                         </button>
                         {attestOk && (
                           <button
                             type="button"
-                            disabled={pending}
+                            disabled={pending || busy}
                             onClick={() =>
                               run(() => attestRequirementOnFile(req.id))
                             }
@@ -200,7 +265,7 @@ export function RequirementsPanel({
                           </button>
                         )}
                         <select
-                          disabled={pending}
+                          disabled={pending || busy}
                           value={req.status}
                           onChange={(e) => {
                             const status = e.target.value as RequirementStatus
@@ -219,29 +284,23 @@ export function RequirementsPanel({
                       </div>
                     )}
                   </div>
-                  {canEdit && (
-                    <input
-                      value={fileUrls[req.id] ?? req.fileUrl ?? ''}
-                      onChange={(e) =>
-                        setFileUrls((m) => ({ ...m, [req.id]: e.target.value }))
-                      }
-                      placeholder="File URL (upload path or shared link)"
-                      className="mt-2 h-8 w-full rounded-lg border border-line bg-surface px-2 text-xs"
-                    />
-                  )}
                   {req.key === 'consent_form' && (
-                    <ConsentInitialsPanel
-                      clientId={clientId}
-                      consent={consent}
-                      canEdit={canEdit}
-                    />
+                    <div className="mt-3 border-t border-line pt-3">
+                      <ConsentInitialsPanel
+                        clientId={clientId}
+                        consent={consent}
+                        canEdit={canEdit}
+                      />
+                    </div>
                   )}
                   {req.key === 'physician_referral' && (
-                    <ReferralCheckPanel
-                      clientId={clientId}
-                      check={referralCheck}
-                      canEdit={canEdit}
-                    />
+                    <div className="mt-3 border-t border-line pt-3">
+                      <ReferralCheckPanel
+                        clientId={clientId}
+                        check={referralCheck}
+                        canEdit={canEdit}
+                      />
+                    </div>
                   )}
                 </li>
               )
@@ -256,42 +315,76 @@ export function RequirementsPanel({
             Other documents
           </h3>
           <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
-            {grouped.legacyDocs.map((req) => (
-              <li
-                key={req.id}
-                className="flex flex-wrap items-center gap-3 px-3 py-2.5"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-ink">{req.label}</div>
-                  <div className="text-xs text-quiet">{STAGE_LABELS[req.stage]}</div>
-                </div>
-                <span
-                  className={cn(
-                    'rounded-md px-2 py-0.5 text-[11px] font-medium',
-                    STATUS_CHIP[req.status]
-                  )}
-                >
-                  {req.status.replace(/_/g, ' ')}
-                </span>
-                {canEdit && (
-                  <select
-                    disabled={pending}
-                    value={req.status}
-                    onChange={(e) => {
-                      const status = e.target.value as RequirementStatus
-                      run(() => updateRequirement(req.id, { status }))
-                    }}
-                    className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-ink"
-                  >
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s.replace(/_/g, ' ')}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </li>
-            ))}
+            {grouped.legacyDocs.map((req) => {
+              const fileLabel = displayFileLabel(req)
+              const busy = uploadingId === req.id
+              return (
+                <li key={req.id} className="px-3 py-2.5">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-ink">{req.label}</div>
+                      <div className="text-xs text-quiet">{STAGE_LABELS[req.stage]}</div>
+                      {fileLabel && (
+                        <div className="mt-1 truncate text-xs text-ink">{fileLabel}</div>
+                      )}
+                    </div>
+                    <span
+                      className={cn(
+                        'rounded-md px-2 py-0.5 text-[11px] font-medium',
+                        STATUS_CHIP[req.status]
+                      )}
+                    >
+                      {req.status.replace(/_/g, ' ')}
+                    </span>
+                    {canEdit && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <input
+                          ref={(el) => {
+                            fileInputs.current[req.id] = el
+                          }}
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.heic,.doc,.docx,.xls,.xlsx,.txt"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            e.target.value = ''
+                            if (file) void onUpload(req.id, file)
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={pending || busy}
+                          onClick={() => fileInputs.current[req.id]?.click()}
+                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
+                        >
+                          {busy ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Upload className="h-3.5 w-3.5" />
+                          )}
+                          {fileLabel ? 'Replace' : 'Upload'}
+                        </button>
+                        <select
+                          disabled={pending || busy}
+                          value={req.status}
+                          onChange={(e) => {
+                            const status = e.target.value as RequirementStatus
+                            run(() => updateRequirement(req.id, { status }))
+                          }}
+                          className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-ink"
+                        >
+                          {STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {s.replace(/_/g, ' ')}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         </section>
       )}
