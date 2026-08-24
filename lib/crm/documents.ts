@@ -110,17 +110,8 @@ export const CANONICAL_DOCUMENTS: readonly CanonicalDocument[] = [
     attestAllowed: true,
   },
   {
-    key: 'vineland',
-    label: 'Vineland',
-    group: 'CLINICAL',
-    stage: 'AUTHORIZATION',
-    type: 'DOCUMENT',
-    requiredToAdvance: true,
-    attestAllowed: true,
-  },
-  {
-    key: 'fast_assessment',
-    label: 'FAST',
+    key: 'clinical_assessment',
+    label: 'Assessment',
     group: 'CLINICAL',
     stage: 'AUTHORIZATION',
     type: 'DOCUMENT',
@@ -160,6 +151,8 @@ export const LEGACY_DOCUMENT_KEY_MAP: Record<string, string> = {
   prior_aba_records: 'prior_aba',
   consent_form_signed: 'consent_form',
   medicaid_card: 'insurance_card',
+  vineland: 'clinical_assessment',
+  fast_assessment: 'clinical_assessment',
 }
 
 export const DOCUMENT_GROUP_ORDER: RequirementGroup[] = [

@@ -12,6 +12,8 @@ import {
   STAGE_GATE_REQUIREMENT_KEYS,
 } from '@/lib/crm/stages'
 
+const RETIRED_REQUIREMENT_KEYS = new Set(['vineland', 'fast_assessment'])
+
 export type RequirementSeed = {
   key: string
   label: string
@@ -103,7 +105,17 @@ export async function ensureClientRequirements(
 
   for (const row of client.requirements) {
     const mapped = LEGACY_DOCUMENT_KEY_MAP[row.key]
-    if (!mapped || mapped === row.key || byKey.has(mapped)) continue
+    if (!mapped || mapped === row.key) continue
+
+    if (byKey.has(mapped)) {
+      await prisma.clientRequirement.update({
+        where: { id: row.id },
+        data: { deletedAt: new Date() },
+      })
+      byKey.delete(row.key)
+      updated++
+      continue
+    }
 
     const seed = seedCatalog.get(mapped)
     if (!seed) continue
@@ -129,6 +141,16 @@ export async function ensureClientRequirements(
       group: seed.group,
       isRequiredToAdvance: seed.isRequiredToAdvance,
     })
+    updated++
+  }
+
+  for (const row of byKey.values()) {
+    if (!RETIRED_REQUIREMENT_KEYS.has(row.key)) continue
+    await prisma.clientRequirement.update({
+      where: { id: row.id },
+      data: { deletedAt: new Date() },
+    })
+    byKey.delete(row.key)
     updated++
   }
 

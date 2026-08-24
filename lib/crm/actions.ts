@@ -45,7 +45,6 @@ import {
   computeExpiresAt,
   DOCUMENT_BY_KEY,
   isDocumentRequired,
-  isMedicaidPayer,
 } from '@/lib/crm/documents'
 import {
   computeConsentBillingReady,
@@ -163,32 +162,17 @@ export async function advanceStage(clientId: string): Promise<
       },
     })
 
-    const consentLive =
-      client.consent && !client.consent.deletedAt ? client.consent : null
-    const referralLive =
-      client.referralCheck && !client.referralCheck.deletedAt
-        ? client.referralCheck
-        : null
-    const referralEval = evaluateReferralValidity(referralLive)
     const gate = canAdvance(
       {
         stage: client.stage,
         treatmentPlanStatus: client.treatmentPlanStatus,
-        consentBillingReady: consentLive?.billingReady ?? false,
-        referralValid: referralEval.ok,
-        requiresMedicaidReferral: isMedicaidPayer(client.insuranceProvider),
       },
       client.requirements
     )
     if (!gate.ok) {
-      const referralHint =
-        gate.blockedBy.includes('physician_referral_validity') &&
-        referralEval.missing.length > 0
-          ? ` Incomplete referral: ${referralEval.missing.join(', ')}.`
-          : ''
       return {
         ok: false,
-        error: `Requirements incomplete.${referralHint}`,
+        error: 'Requirements incomplete.',
         blocked: true,
         blockedBy: gate.blockedBy,
       }
@@ -332,18 +316,6 @@ export async function setStage(
         error: 'Treatment plan must be complete before Active',
         blocked: true,
         blockedBy: ['treatment_plan_complete'],
-      }
-    }
-
-    const consentLive =
-      client.consent && !client.consent.deletedAt ? client.consent : null
-    if (toStage === 'ACTIVE' && !consentLive?.billingReady) {
-      return {
-        ok: false,
-        error:
-          'Consent Form 02 billing gate: 97151 (assessment) and 97153 (direct therapy) must be initialed',
-        blocked: true,
-        blockedBy: ['consent_billing_ready'],
       }
     }
 

@@ -5,7 +5,7 @@ import {
   LEGACY_DOCUMENT_KEY_MAP,
   DOCUMENT_BY_KEY,
 } from './documents'
-import { requirementStatusSatisfies, canAdvance } from './stages'
+import { requirementStatusSatisfies } from './stages'
 import {
   computeConsentBillingReady,
   emptyConsentLines,
@@ -17,6 +17,13 @@ describe('canonical documents', () => {
     expect(LEGACY_DOCUMENT_KEY_MAP.custody_guardian).toBe('intake_form')
     expect(LEGACY_DOCUMENT_KEY_MAP.prior_aba_records).toBe('prior_aba')
     expect(LEGACY_DOCUMENT_KEY_MAP.consent_form_signed).toBe('consent_form')
+    expect(LEGACY_DOCUMENT_KEY_MAP.vineland).toBe('clinical_assessment')
+    expect(LEGACY_DOCUMENT_KEY_MAP.fast_assessment).toBe('clinical_assessment')
+  })
+
+  it('uses a single clinical assessment document', () => {
+    expect(DOCUMENT_BY_KEY.clinical_assessment.label).toBe('Assessment')
+    expect(DOCUMENT_BY_KEY.clinical_assessment.group).toBe('CLINICAL')
   })
 
   it('keeps insurance and psych eval in the intake section', () => {
@@ -61,32 +68,6 @@ describe('consent billing gate', () => {
     lines.cpt_97153 = { initialed: true, initialedAt: 'x', initialedBy: 'u' }
     expect(computeConsentBillingReady(lines)).toBe(true)
   })
-
-  it('blocks ACTIVE without billing-ready consent', () => {
-    const gate = canAdvance(
-      {
-        stage: 'PRE_START',
-        treatmentPlanStatus: 'COMPLETE',
-        consentBillingReady: false,
-      },
-      [
-        {
-          key: 'meet_and_greet_done',
-          stage: 'PRE_START',
-          status: 'COMPLETE',
-          isRequiredToAdvance: true,
-        },
-        {
-          key: 'start_date_set',
-          stage: 'PRE_START',
-          status: 'COMPLETE',
-          isRequiredToAdvance: true,
-        },
-      ]
-    )
-    expect(gate.ok).toBe(false)
-    expect(gate.blockedBy).toContain('consent_billing_ready')
-  })
 })
 
 describe('referral validity', () => {
@@ -111,31 +92,5 @@ describe('referral validity', () => {
       dsm5ChecklistAttached: true,
     })
     expect(complete.ok).toBe(true)
-  })
-
-  it('canAdvance blocks INTAKE when Medicaid referral is invalid', () => {
-    const gate = canAdvance(
-      {
-        stage: 'INTAKE',
-        referralValid: false,
-        requiresMedicaidReferral: true,
-      },
-      [
-        {
-          key: 'intake_packet_complete',
-          stage: 'INTAKE',
-          status: 'COMPLETE',
-          isRequiredToAdvance: true,
-        },
-        {
-          key: 'demographics_complete',
-          stage: 'INTAKE',
-          status: 'COMPLETE',
-          isRequiredToAdvance: true,
-        },
-      ]
-    )
-    expect(gate.ok).toBe(false)
-    expect(gate.blockedBy).toContain('physician_referral_validity')
   })
 })

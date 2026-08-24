@@ -217,8 +217,6 @@ export default function ClientCrmDetail({
             requirements={client.requirements}
             currentStage={client.stage}
             canEdit={canEdit}
-            consent={client.consent}
-            referralCheck={client.referralCheck}
           />
         )}
         {tab === 'documents' && (

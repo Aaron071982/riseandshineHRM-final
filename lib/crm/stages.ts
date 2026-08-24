@@ -141,8 +141,7 @@ export const STAGE_GATE_REQUIREMENT_KEYS: Record<ClientStage, readonly string[]>
     'diagnostic_eval',
     'dsm5_checklist',
     'physician_referral',
-    'vineland',
-    'fast_assessment',
+    'clinical_assessment',
     'eligibility_vob',
   ],
   APPROVED: [],
@@ -189,7 +188,7 @@ export const STAGE_DESCRIPTIONS: Record<ClientStage, string> = {
   INTAKE:
     'Gather demographics and the intake packet. Intake completes the packet so consent and documents can start.',
   CONSENT:
-    'Collect signed Consent Form 02 (per-line initials; 97151 + 97153 are the billing hard-gate) and HIPAA acknowledgment.',
+    'Collect signed consent and HIPAA acknowledgment — upload the returned form or mark complete when done.',
   DOCUMENTS:
     'Collect family documents (IDs, insurance, clinical packets). Shared docs are one record; they gate VOB / authorization rather than this stage.',
   BENEFITS:
@@ -246,8 +245,7 @@ export const REQUIREMENT_KEY_LABELS: Record<string, string> = {
   iep_ifsp: 'IEP/IFSP',
   prior_aba_records: 'Prior ABA records',
   prior_aba: 'Transfer letter (if coming from another company)',
-  vineland: 'Vineland',
-  fast_assessment: 'FAST',
+  clinical_assessment: 'Assessment',
   eligibility_vob: 'Insurance eligibility (VOB)',
   consent_billing_ready: 'Consent 97151 + 97153 initials (billing gate)',
   physician_referral_validity: 'NY Medicaid referral completeness',
@@ -311,9 +309,9 @@ export function requirementStatusSatisfies(
 export type AdvanceClientInput = {
   stage: ClientStage
   treatmentPlanStatus?: MilestoneStatus | null
-  /** When set, entering ACTIVE requires 97151 + 97153 initials. */
+  /** @deprecated Consent billing initials gate removed — upload/mark complete only. */
   consentBillingReady?: boolean | null
-  /** When set and stage is INTAKE, NY Medicaid referral must be complete. */
+  /** @deprecated NY Medicaid referral validity gate removed — upload/mark complete only. */
   referralValid?: boolean | null
   requiresMedicaidReferral?: boolean
 }
@@ -335,8 +333,7 @@ export type CanAdvanceResult = {
  * Pure gate check: every `isRequiredToAdvance` requirement for the client's
  * current stage must be COMPLETE, RECEIVED, ON_FILE, or NOT_APPLICABLE
  * (consent_form cannot be ON_FILE; expired windows fail).
- * Entering ACTIVE also requires treatmentPlanStatus === COMPLETE and
- * consentBillingReady when provided.
+ * Entering ACTIVE also requires treatmentPlanStatus === COMPLETE.
  */
 export function canAdvance(
   client: AdvanceClientInput,
@@ -352,23 +349,12 @@ export function canAdvance(
     )
     .map((r) => r.key)
 
-  if (
-    client.stage === 'INTAKE' &&
-    client.requiresMedicaidReferral === true &&
-    client.referralValid === false
-  ) {
-    blockedBy.push('physician_referral_validity')
-  }
-
   const upcoming = nextStage(client.stage)
   if (
     upcoming === 'ACTIVE' &&
     client.treatmentPlanStatus !== 'COMPLETE'
   ) {
     blockedBy.push('treatment_plan_complete')
-  }
-  if (upcoming === 'ACTIVE' && client.consentBillingReady === false) {
-    blockedBy.push('consent_billing_ready')
   }
 
   return { ok: blockedBy.length === 0, blockedBy }

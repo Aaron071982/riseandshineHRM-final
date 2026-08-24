@@ -9,8 +9,6 @@ import {
   type CrmUser,
 } from '@/lib/crm/access'
 import { canAdvance, stageIndex } from '@/lib/crm/stages'
-import { isMedicaidPayer } from '@/lib/crm/documents'
-import { evaluateReferralValidity } from '@/lib/crm/referralValidity'
 import { hoursBetween } from '@/lib/rbt-schedule/utils'
 import { allowedTemplatesForUser } from '@/lib/crm/emails/templatePolicy'
 import { graphEmailEnabled } from '@/lib/crm/emails/graphSend'
@@ -133,20 +131,10 @@ export async function loadClientCrmDetail(clientId: string) {
     action: 'VIEW',
   })
 
-  const consentLive =
-    client.consent && !client.consent.deletedAt ? client.consent : null
-  const referralLive =
-    client.referralCheck && !client.referralCheck.deletedAt
-      ? client.referralCheck
-      : null
-  const referralEval = evaluateReferralValidity(referralLive)
   const gate = canAdvance(
     {
       stage: client.stage,
       treatmentPlanStatus: client.treatmentPlanStatus,
-      consentBillingReady: consentLive?.billingReady ?? false,
-      referralValid: referralEval.ok,
-      requiresMedicaidReferral: isMedicaidPayer(client.insuranceProvider),
     },
     client.requirements
   )
@@ -167,6 +155,8 @@ export async function loadClientCrmDetail(clientId: string) {
   })
   const mailboxReason = mailboxBlockedReason(user.email)
   const canSendEmail = claimed && !mailboxReason && !!client.parentEmail?.trim()
+  const consentLive =
+    client.consent && !client.consent.deletedAt ? client.consent : null
   const emailConsentOk =
     !!consentLive &&
     isConsentLineInitialed(parseConsentLines(consentLive.lines), 'comm_email')

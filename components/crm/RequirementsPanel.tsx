@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition, type MutableRefObject } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, Upload } from 'lucide-react'
+import { Check, Loader2, Upload } from 'lucide-react'
 import type { ClientStage, RequirementGroup, RequirementStatus } from '@prisma/client'
-import { attestRequirementOnFile, updateRequirement } from '@/lib/crm/actions'
+import { updateRequirement } from '@/lib/crm/actions'
 import {
   DOCUMENT_BY_KEY,
   DOCUMENT_GROUP_LABELS,
@@ -12,19 +12,7 @@ import {
 } from '@/lib/crm/documents'
 import { isStoredRequirementPath } from '@/lib/crm/requirementDocuments'
 import { STAGE_LABELS } from '@/lib/crm/stages'
-import { ConsentInitialsPanel, type ConsentShape } from '@/components/crm/ConsentInitialsPanel'
-import { ReferralCheckPanel, type ReferralCheckShape } from '@/components/crm/ReferralCheckPanel'
 import { cn } from '@/lib/utils'
-
-const STATUSES: RequirementStatus[] = [
-  'PENDING',
-  'RECEIVED',
-  'ON_FILE',
-  'MISSING',
-  'EXPIRED',
-  'NOT_APPLICABLE',
-  'COMPLETE',
-]
 
 const STATUS_CHIP: Record<RequirementStatus, string> = {
   PENDING: 'bg-[var(--slate-bg)] text-[var(--slate)]',
@@ -35,6 +23,13 @@ const STATUS_CHIP: Record<RequirementStatus, string> = {
   NOT_APPLICABLE: 'bg-line-2 text-quiet',
   COMPLETE: 'bg-[var(--green-bg)] text-[var(--green)]',
 }
+
+const SATISFIED_STATUSES: RequirementStatus[] = [
+  'COMPLETE',
+  'RECEIVED',
+  'ON_FILE',
+  'NOT_APPLICABLE',
+]
 
 type Req = {
   id: string
@@ -69,20 +64,87 @@ function displayFileLabel(req: Req): string | null {
   return null
 }
 
+function RequirementActions({
+  req,
+  canEdit,
+  pending,
+  busy,
+  showUpload,
+  fileInputs,
+  onUpload,
+  onMarkComplete,
+}: {
+  req: Req
+  canEdit: boolean
+  pending: boolean
+  busy: boolean
+  showUpload: boolean
+  fileInputs: MutableRefObject<Record<string, HTMLInputElement | null>>
+  onUpload: (requirementId: string, file: File) => Promise<void>
+  onMarkComplete: () => void
+}) {
+  const fileLabel = displayFileLabel(req)
+  const satisfied = SATISFIED_STATUSES.includes(req.status)
+
+  if (!canEdit) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {showUpload && (
+        <>
+          <input
+            ref={(el) => {
+              fileInputs.current[req.id] = el
+            }}
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,.heic,.doc,.docx,.xls,.xlsx,.txt"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) void onUpload(req.id, file)
+            }}
+          />
+          <button
+            type="button"
+            disabled={pending || busy}
+            onClick={() => fileInputs.current[req.id]?.click()}
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
+          >
+            {busy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="h-3.5 w-3.5" />
+            )}
+            {fileLabel ? 'Replace' : 'Upload'}
+          </button>
+        </>
+      )}
+      {!satisfied && (
+        <button
+          type="button"
+          disabled={pending || busy}
+          onClick={onMarkComplete}
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
+        >
+          <Check className="h-3.5 w-3.5" />
+          Mark complete
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function RequirementsPanel({
   clientId,
   requirements,
   currentStage,
   canEdit,
-  consent,
-  referralCheck,
 }: {
   clientId: string
   requirements: Req[]
   currentStage: ClientStage
   canEdit: boolean
-  consent: ConsentShape | null
-  referralCheck: ReferralCheckShape | null
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -138,6 +200,10 @@ export function RequirementsPanel({
     }
   }
 
+  const markComplete = (requirementId: string) => {
+    run(() => updateRequirement(requirementId, { status: 'COMPLETE' }))
+  }
+
   if (requirements.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-line bg-surface px-4 py-10 text-center">
@@ -146,6 +212,65 @@ export function RequirementsPanel({
           Gate checklist items appear as this client moves through stages.
         </p>
       </div>
+    )
+  }
+
+  const renderRow = (req: Req, showUpload: boolean) => {
+    const days = daysUntil(req.expiresAt)
+    const fileLabel = displayFileLabel(req)
+    const busy = uploadingId === req.id
+
+    return (
+      <li key={req.id} className="px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-ink">{req.label}</div>
+            <div className="text-xs text-quiet">
+              {STAGE_LABELS[req.stage]}
+              {req.isRequiredToAdvance && req.stage === currentStage && (
+                <span className="ml-2 text-brand">Required to advance</span>
+              )}
+              {days != null && (
+                <span
+                  className={cn(
+                    'ml-2',
+                    days < 0
+                      ? 'text-[var(--urgent)]'
+                      : days <= 30
+                        ? 'text-[var(--amber)]'
+                        : 'text-quiet'
+                  )}
+                >
+                  {days < 0
+                    ? `Expired ${Math.abs(days)}d ago`
+                    : `Expires in ${days}d`}
+                </span>
+              )}
+            </div>
+            {fileLabel && (
+              <div className="mt-1 truncate text-xs text-ink">{fileLabel}</div>
+            )}
+          </div>
+          <span
+            className={cn(
+              'rounded-md px-2 py-0.5 text-[11px] font-medium',
+              STATUS_CHIP[req.status]
+            )}
+          >
+            {req.status.replace(/_/g, ' ')}
+          </span>
+          <RequirementActions
+            req={req}
+            canEdit={canEdit}
+            pending={pending}
+            busy={busy}
+            showUpload={showUpload}
+            fileInputs={fileInputs}
+            onUpload={onUpload}
+            onMarkComplete={() => markComplete(req.id)}
+          />
+        </div>
+      </li>
     )
   }
 
@@ -158,9 +283,9 @@ export function RequirementsPanel({
       )}
 
       <p className="text-sm text-quiet">
-        Upload documents and update checklist status here. Uploaded files appear on the{' '}
-        <strong className="font-medium text-ink">Documents</strong> tab for preview and
-        download.
+        Upload a document or mark an item complete when it is done. Uploaded files
+        appear on the <strong className="font-medium text-ink">Documents</strong> tab
+        for preview and download.
       </p>
 
       {grouped.byGroup.map(({ group, items }) => (
@@ -169,142 +294,7 @@ export function RequirementsPanel({
             {DOCUMENT_GROUP_LABELS[group]}
           </h3>
           <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
-            {items.map((req) => {
-              const catalog = DOCUMENT_BY_KEY[req.key]
-              const days = daysUntil(req.expiresAt)
-              const attestOk = catalog?.attestAllowed !== false
-              const fileLabel = displayFileLabel(req)
-              const busy = uploadingId === req.id
-
-              return (
-                <li key={req.id} className="px-3 py-2.5">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-ink">{req.label}</div>
-                      <div className="text-xs text-quiet">
-                        {STAGE_LABELS[req.stage]}
-                        {req.isRequiredToAdvance && req.stage === currentStage && (
-                          <span className="ml-2 text-brand">Required to advance</span>
-                        )}
-                        {days != null && (
-                          <span
-                            className={cn(
-                              'ml-2',
-                              days < 0
-                                ? 'text-[var(--urgent)]'
-                                : days <= 30
-                                  ? 'text-[var(--amber)]'
-                                  : 'text-quiet'
-                            )}
-                          >
-                            {days < 0
-                              ? `Expired ${Math.abs(days)}d ago`
-                              : `Expires in ${days}d`}
-                          </span>
-                        )}
-                        {req.status === 'ON_FILE' && req.attestedByUser && (
-                          <span className="ml-2">
-                            On file by{' '}
-                            {req.attestedByUser.name || req.attestedByUser.email}
-                            {req.attestedAt
-                              ? ` · ${new Date(req.attestedAt).toLocaleDateString()}`
-                              : ''}
-                          </span>
-                        )}
-                      </div>
-                      {fileLabel && (
-                        <div className="mt-1 truncate text-xs text-ink">{fileLabel}</div>
-                      )}
-                    </div>
-                    <span
-                      className={cn(
-                        'rounded-md px-2 py-0.5 text-[11px] font-medium',
-                        STATUS_CHIP[req.status]
-                      )}
-                    >
-                      {req.status.replace(/_/g, ' ')}
-                    </span>
-                    {canEdit && (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <input
-                          ref={(el) => {
-                            fileInputs.current[req.id] = el
-                          }}
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg,.heic,.doc,.docx,.xls,.xlsx,.txt"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            e.target.value = ''
-                            if (file) void onUpload(req.id, file)
-                          }}
-                        />
-                        <button
-                          type="button"
-                          disabled={pending || busy}
-                          onClick={() => fileInputs.current[req.id]?.click()}
-                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
-                        >
-                          {busy ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Upload className="h-3.5 w-3.5" />
-                          )}
-                          {fileLabel ? 'Replace' : 'Upload'}
-                        </button>
-                        {attestOk && (
-                          <button
-                            type="button"
-                            disabled={pending || busy}
-                            onClick={() =>
-                              run(() => attestRequirementOnFile(req.id))
-                            }
-                            className="h-8 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
-                          >
-                            Mark on file
-                          </button>
-                        )}
-                        <select
-                          disabled={pending || busy}
-                          value={req.status}
-                          onChange={(e) => {
-                            const status = e.target.value as RequirementStatus
-                            run(() => updateRequirement(req.id, { status }))
-                          }}
-                          className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-ink"
-                        >
-                          {STATUSES.filter(
-                            (s) => s !== 'ON_FILE' || attestOk
-                          ).map((s) => (
-                            <option key={s} value={s}>
-                              {s.replace(/_/g, ' ')}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                  {req.key === 'consent_form' && (
-                    <div className="mt-3 border-t border-line pt-3">
-                      <ConsentInitialsPanel
-                        clientId={clientId}
-                        consent={consent}
-                        canEdit={canEdit}
-                      />
-                    </div>
-                  )}
-                  {req.key === 'physician_referral' && (
-                    <div className="mt-3 border-t border-line pt-3">
-                      <ReferralCheckPanel
-                        clientId={clientId}
-                        check={referralCheck}
-                        canEdit={canEdit}
-                      />
-                    </div>
-                  )}
-                </li>
-              )
-            })}
+            {items.map((req) => renderRow(req, true))}
           </ul>
         </section>
       ))}
@@ -315,76 +305,7 @@ export function RequirementsPanel({
             Other documents
           </h3>
           <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
-            {grouped.legacyDocs.map((req) => {
-              const fileLabel = displayFileLabel(req)
-              const busy = uploadingId === req.id
-              return (
-                <li key={req.id} className="px-3 py-2.5">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-ink">{req.label}</div>
-                      <div className="text-xs text-quiet">{STAGE_LABELS[req.stage]}</div>
-                      {fileLabel && (
-                        <div className="mt-1 truncate text-xs text-ink">{fileLabel}</div>
-                      )}
-                    </div>
-                    <span
-                      className={cn(
-                        'rounded-md px-2 py-0.5 text-[11px] font-medium',
-                        STATUS_CHIP[req.status]
-                      )}
-                    >
-                      {req.status.replace(/_/g, ' ')}
-                    </span>
-                    {canEdit && (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <input
-                          ref={(el) => {
-                            fileInputs.current[req.id] = el
-                          }}
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg,.heic,.doc,.docx,.xls,.xlsx,.txt"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            e.target.value = ''
-                            if (file) void onUpload(req.id, file)
-                          }}
-                        />
-                        <button
-                          type="button"
-                          disabled={pending || busy}
-                          onClick={() => fileInputs.current[req.id]?.click()}
-                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
-                        >
-                          {busy ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Upload className="h-3.5 w-3.5" />
-                          )}
-                          {fileLabel ? 'Replace' : 'Upload'}
-                        </button>
-                        <select
-                          disabled={pending || busy}
-                          value={req.status}
-                          onChange={(e) => {
-                            const status = e.target.value as RequirementStatus
-                            run(() => updateRequirement(req.id, { status }))
-                          }}
-                          className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-ink"
-                        >
-                          {STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {s.replace(/_/g, ' ')}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
+            {grouped.legacyDocs.map((req) => renderRow(req, true))}
           </ul>
         </section>
       )}
@@ -395,42 +316,7 @@ export function RequirementsPanel({
             Stage checklist
           </h3>
           <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
-            {grouped.tasks.map((req) => (
-              <li
-                key={req.id}
-                className="flex flex-wrap items-center gap-3 px-3 py-2.5"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-ink">{req.label}</div>
-                  <div className="text-xs text-quiet">{STAGE_LABELS[req.stage]}</div>
-                </div>
-                <span
-                  className={cn(
-                    'rounded-md px-2 py-0.5 text-[11px] font-medium',
-                    STATUS_CHIP[req.status]
-                  )}
-                >
-                  {req.status.replace(/_/g, ' ')}
-                </span>
-                {canEdit && (
-                  <select
-                    disabled={pending}
-                    value={req.status}
-                    onChange={(e) => {
-                      const status = e.target.value as RequirementStatus
-                      run(() => updateRequirement(req.id, { status }))
-                    }}
-                    className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-ink"
-                  >
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s.replace(/_/g, ' ')}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </li>
-            ))}
+            {grouped.tasks.map((req) => renderRow(req, false))}
           </ul>
         </section>
       )}
