@@ -554,51 +554,6 @@ export function TrainingAdminEditor({ viewerUserId }: { viewerUserId: string }) 
                 />
               </label>
 
-              <div className="flex items-center justify-between pt-2">
-                <h4 className="font-display text-sm font-semibold text-ink">
-                  Steps
-                </h4>
-                <button
-                  type="button"
-                  onClick={addStep}
-                  disabled={pending}
-                  className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-xs hover:bg-line-2"
-                >
-                  <Plus className="h-3 w-3" /> Add step
-                </button>
-              </div>
-
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                modifiers={[restrictToVerticalAxis]}
-                onDragEnd={onDragEnd}
-              >
-                <SortableContext
-                  items={selected.steps.map((s) => s.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <ul className="space-y-2">
-                    {selected.steps.map((step) => (
-                      <SortableStepRow
-                        key={step.id}
-                        step={step}
-                        pending={pending}
-                        editingStepId={editingStepId}
-                        editTitle={editTitle}
-                        editBody={editBody}
-                        setEditTitle={setEditTitle}
-                        setEditBody={setEditBody}
-                        onStartEdit={startEditStep}
-                        onSave={saveStep}
-                        onCancelEdit={() => setEditingStepId(null)}
-                        onDelete={removeStep}
-                      />
-                    ))}
-                  </ul>
-                </SortableContext>
-              </DndContext>
-
               <div className="space-y-3 border-t border-line pt-4">
                 <h4 className="font-display text-sm font-semibold text-ink">
                   Videos &amp; Guides
@@ -718,6 +673,51 @@ export function TrainingAdminEditor({ viewerUserId }: { viewerUserId: string }) 
                   ))}
                 </ul>
               </div>
+
+              <div className="flex items-center justify-between border-t border-line pt-4">
+                <h4 className="font-display text-sm font-semibold text-ink">
+                  Steps
+                </h4>
+                <button
+                  type="button"
+                  onClick={addStep}
+                  disabled={pending}
+                  className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-xs hover:bg-line-2"
+                >
+                  <Plus className="h-3 w-3" /> Add step
+                </button>
+              </div>
+
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToVerticalAxis]}
+                onDragEnd={onDragEnd}
+              >
+                <SortableContext
+                  items={selected.steps.map((s) => s.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <ul className="space-y-2">
+                    {selected.steps.map((step) => (
+                      <SortableStepRow
+                        key={step.id}
+                        step={step}
+                        pending={pending}
+                        editingStepId={editingStepId}
+                        editTitle={editTitle}
+                        editBody={editBody}
+                        setEditTitle={setEditTitle}
+                        setEditBody={setEditBody}
+                        onStartEdit={startEditStep}
+                        onSave={saveStep}
+                        onCancelEdit={() => setEditingStepId(null)}
+                        onDelete={removeStep}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
             </div>
 
             <div>
