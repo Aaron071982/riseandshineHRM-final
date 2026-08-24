@@ -476,8 +476,11 @@ export function TasksHubClient({
           taskId={selectedId}
           currentUserId={currentUserId}
           users={users}
+          clients={clients}
+          fullAccess={fullAccess}
           onClose={() => setSelectedId(null)}
           onUpdated={refresh}
+          onDeleted={() => setSelectedId(null)}
         />
       )}
 

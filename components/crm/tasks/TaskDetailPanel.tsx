@@ -1,15 +1,17 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { ChevronDown, X } from 'lucide-react'
-import type { TeamTaskStatus } from '@prisma/client'
+import { ChevronDown, Pencil, Trash2, X } from 'lucide-react'
+import type { ClientOwnerDept, TeamTaskPriority, TeamTaskStatus } from '@prisma/client'
 import {
   addTeamTaskComment,
   addTeamTaskSubtask,
+  deleteTeamTask,
   getTeamTask,
   requestTeamTaskExtension,
   reviewTeamTaskExtension,
   toggleTeamTaskSubtask,
+  updateTeamTask,
   updateTeamTaskStatus,
 } from '@/lib/crm/tasks/actions'
 import {
@@ -18,6 +20,7 @@ import {
   TASK_STATUS_CHIP,
   TASK_STATUS_LABELS,
   isTaskOverdue,
+  ownerDeptLabel,
 } from '@/lib/crm/tasks/constants'
 import { formatDueRelative } from '@/lib/crm/tasks/formatDue'
 import { formatMentionDisplay } from '@/lib/crm/tasks/mentions'
@@ -27,7 +30,24 @@ import {
   type ChatComment,
 } from '@/components/crm/tasks/TaskChatThread'
 import { CrmAvatar } from '@/components/crm/shared/CrmAvatar'
+import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { cn } from '@/lib/utils'
+
+const DEPTS: ClientOwnerDept[] = [
+  'INTAKE',
+  'CLINICAL',
+  'AUTHORIZATION',
+  'STAFFING',
+  'CASE_COORDINATION',
+  'BILLING',
+]
+
+function toDateInputValue(value: Date | string | null | undefined): string {
+  if (!value) return ''
+  const dt = new Date(value)
+  if (Number.isNaN(dt.getTime())) return ''
+  return dt.toISOString().slice(0, 10)
+}
 
 type TaskDetail = Extract<
   Awaited<ReturnType<typeof getTeamTask>>,
@@ -38,14 +58,27 @@ export function TaskDetailPanel({
   taskId,
   currentUserId,
   users,
+  clients = [],
+  fullAccess = false,
+  canManage = false,
   onClose,
   onUpdated,
+  onDeleted,
 }: {
   taskId: string
   currentUserId: string
   users: { id: string; name: string | null; email: string | null }[]
+  clients?: {
+    id: string
+    firstName: string
+    lastName: string
+    clientCode: string
+  }[]
+  fullAccess?: boolean
+  canManage?: boolean
   onClose: () => void
   onUpdated: () => void
+  onDeleted?: () => void
 }) {
   const [pending, startTransition] = useTransition()
   const [task, setTask] = useState<TaskDetail | null>(null)
@@ -57,6 +90,15 @@ export function TaskDetailPanel({
   const [blockedReason, setBlockedReason] = useState('')
   const [mentionQuery, setMentionQuery] = useState('')
   const [activityOpen, setActivityOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [editDue, setEditDue] = useState('')
+  const [editPriority, setEditPriority] = useState<TeamTaskPriority>('NORMAL')
+  const [editAssignee, setEditAssignee] = useState('')
+  const [editDept, setEditDept] = useState<ClientOwnerDept | ''>('')
+  const [editClientId, setEditClientId] = useState('')
 
   useEffect(() => {
     setActivityOpen(false)
@@ -107,7 +149,62 @@ export function TaskDetailPanel({
   const due = formatDueRelative(task.dueAt, task.status)
   const isAssigner = task.createdByUserId === currentUserId
   const isAssignee = task.assignedToUserId === currentUserId
+  const canManageTask =
+    fullAccess || canManage || task.createdByUserId === currentUserId
   const pendingExt = task.extensionRequests.find((r) => r.status === 'PENDING')
+
+  const startEditing = () => {
+    setEditTitle(task.title)
+    setEditDesc(task.description ?? '')
+    setEditDue(toDateInputValue(task.dueAt))
+    setEditPriority(task.priority)
+    setEditAssignee(task.assignedToUserId ?? '')
+    setEditDept(task.assignedDept ?? '')
+    setEditClientId(task.serviceClientId ?? '')
+    setEditing(true)
+  }
+
+  const saveEdits = () => {
+    if (!editTitle.trim()) {
+      setError('Title is required')
+      return
+    }
+    if (!editAssignee && !editDept) {
+      setError('Assign to a person or department pool')
+      return
+    }
+    run(async () => {
+      const res = await updateTeamTask(taskId, {
+        title: editTitle,
+        description: editDesc,
+        dueAt: editDue || null,
+        priority: editPriority,
+        assignedToUserId: editAssignee || null,
+        assignedDept: editAssignee ? null : editDept || null,
+        serviceClientId: editClientId || null,
+      })
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setEditing(false)
+    })
+  }
+
+  const confirmDelete = () => {
+    startTransition(async () => {
+      setError('')
+      const res = await deleteTeamTask(taskId)
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      setShowDelete(false)
+      onDeleted?.()
+      onUpdated()
+      onClose()
+    })
+  }
 
   const mentionMatches = mentionQuery.trim()
     ? users.filter((u) => {
@@ -151,13 +248,35 @@ export function TaskDetailPanel({
                 </p>
               )}
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-quiet transition hover:bg-line-2 hover:text-ink"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              {canManageTask && !editing && (
+                <>
+                  <button
+                    type="button"
+                    onClick={startEditing}
+                    className="rounded-lg p-1.5 text-quiet transition hover:bg-line-2 hover:text-ink"
+                    title="Edit task"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDelete(true)}
+                    className="rounded-lg p-1.5 text-quiet transition hover:bg-[var(--urgent-bg)] hover:text-[var(--urgent)]"
+                    title="Delete task"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg p-1.5 text-quiet transition hover:bg-line-2 hover:text-ink"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -199,10 +318,136 @@ export function TaskDetailPanel({
             </p>
           )}
 
-          {task.description && (
-            <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap rounded-xl border border-line bg-[var(--bg)]/50 px-3 py-2">
-              {task.description}
-            </p>
+          {editing ? (
+            <section className="space-y-3 rounded-xl border border-line bg-[var(--bg)]/50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-faint">
+                Edit task
+              </p>
+              <label className="block text-xs text-quiet">
+                Title
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm"
+                />
+              </label>
+              <label className="block text-xs text-quiet">
+                Description
+                <textarea
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-line bg-surface px-2 py-1.5 text-sm"
+                />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs text-quiet">
+                  Due date
+                  <input
+                    type="date"
+                    value={editDue}
+                    onChange={(e) => setEditDue(e.target.value)}
+                    className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm"
+                  />
+                </label>
+                <label className="text-xs text-quiet">
+                  Priority
+                  <select
+                    value={editPriority}
+                    onChange={(e) =>
+                      setEditPriority(e.target.value as TeamTaskPriority)
+                    }
+                    className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm"
+                  >
+                    {(
+                      ['LOW', 'NORMAL', 'HIGH', 'URGENT'] as TeamTaskPriority[]
+                    ).map((p) => (
+                      <option key={p} value={p}>
+                        {TASK_PRIORITY_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="block text-xs text-quiet">
+                Assign to person
+                <select
+                  value={editAssignee}
+                  onChange={(e) => {
+                    setEditAssignee(e.target.value)
+                    if (e.target.value) setEditDept('')
+                  }}
+                  className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm"
+                >
+                  <option value="">— Department pool —</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name || u.email}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!editAssignee && (
+                <label className="block text-xs text-quiet">
+                  Department pool
+                  <select
+                    value={editDept}
+                    onChange={(e) =>
+                      setEditDept(e.target.value as ClientOwnerDept | '')
+                    }
+                    className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm"
+                  >
+                    <option value="">Select department</option>
+                    {DEPTS.map((d) => (
+                      <option key={d} value={d}>
+                        {ownerDeptLabel(d)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {clients.length > 0 && (
+                <label className="block text-xs text-quiet">
+                  Client (optional)
+                  <select
+                    value={editClientId}
+                    onChange={(e) => setEditClientId(e.target.value)}
+                    className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm"
+                  >
+                    <option value="">— Standalone (no client) —</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.lastName}, {c.firstName} ({c.clientCode})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => setEditing(false)}
+                  className="h-8 rounded-lg border border-line px-3 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={saveEdits}
+                  className="h-8 rounded-lg bg-[var(--espresso)] px-3 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  Save changes
+                </button>
+              </div>
+            </section>
+          ) : (
+            task.description && (
+              <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap rounded-xl border border-line bg-[var(--bg)]/50 px-3 py-2">
+                {task.description}
+              </p>
+            )
           )}
 
           <section>
@@ -439,6 +684,16 @@ export function TaskDetailPanel({
           </section>
         </div>
       </div>
+
+      <ConfirmDestructiveDialog
+        open={showDelete}
+        onOpenChange={setShowDelete}
+        title="Delete task?"
+        description="This removes the task from your lists. Comments and activity history stay in the audit log."
+        confirmLabel="Delete task"
+        pending={pending}
+        onConfirm={confirmDelete}
+      />
     </div>
   )
 }

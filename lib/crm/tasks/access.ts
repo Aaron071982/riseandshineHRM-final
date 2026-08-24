@@ -207,3 +207,31 @@ export async function assertCanEditTeamTaskById(
   await assertCanEditTeamTask(user, task)
   return task
 }
+
+/** Change task details or delete — creator, client editor, or full access. */
+export async function assertCanManageTeamTask(
+  user: CrmUser,
+  task: TeamTaskAccessRow
+): Promise<void> {
+  await assertCanViewTeamTask(user, task)
+  if (isFullAccess(user) || isSuperAdmin(user)) return
+  if (task.createdByUserId === user.id) return
+  if (task.serviceClientId) {
+    try {
+      await assertCanEditClient(user, task.serviceClientId)
+      return
+    } catch {
+      // fall through
+    }
+  }
+  throw new CrmAccessError('You cannot edit or delete this task', 403)
+}
+
+export async function assertCanManageTeamTaskById(
+  user: CrmUser,
+  taskId: string
+): Promise<TeamTaskAccessRow> {
+  const task = await assertCanViewTeamTaskById(user, taskId)
+  await assertCanManageTeamTask(user, task)
+  return task
+}

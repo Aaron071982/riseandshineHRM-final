@@ -132,8 +132,10 @@ export function ClientTasksPanel({
           taskId={selectedId}
           currentUserId={currentUserId}
           users={users}
+          canManage={canEdit}
           onClose={() => setSelectedId(null)}
           onUpdated={() => router.refresh()}
+          onDeleted={() => setSelectedId(null)}
         />
       )}
 

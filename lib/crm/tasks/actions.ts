@@ -14,6 +14,7 @@ import {
 } from '@/lib/crm/access'
 import {
   assertCanEditTeamTaskById,
+  assertCanManageTeamTaskById,
   assertCanViewTeamTask,
   assertCanViewTeamTaskById,
   loadTeamTaskForAccess,
@@ -350,6 +351,149 @@ export async function updateTeamTaskStatus(
     }
 
     revalidateTaskPaths(task.serviceClientId)
+    return { ok: true as const }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function updateTeamTask(
+  taskId: string,
+  input: {
+    title: string
+    description?: string | null
+    serviceClientId?: string | null
+    assignedToUserId?: string | null
+    assignedDept?: ClientOwnerDept | null
+    dueAt?: string | null
+    priority?: TeamTaskPriority
+  }
+) {
+  try {
+    const user = await getClientServicesUser()
+    const access = await assertCanManageTeamTaskById(user, taskId)
+    const title = input.title.trim()
+    if (!title) throw new CrmAccessError('Title is required', 400)
+
+    const serviceClientId =
+      input.serviceClientId !== undefined
+        ? input.serviceClientId
+        : access.serviceClientId
+
+    if (serviceClientId) {
+      const { assertCanEditClient } = await import('@/lib/crm/access')
+      await assertCanEditClient(user, serviceClientId)
+    }
+
+    let assignedToUserId =
+      input.assignedToUserId !== undefined
+        ? input.assignedToUserId
+        : undefined
+    let assignedDept =
+      input.assignedDept !== undefined ? input.assignedDept : undefined
+
+    const existing = await prisma.teamTask.findUnique({
+      where: { id: taskId },
+      select: {
+        assignedToUserId: true,
+        assignedDept: true,
+        serviceClientId: true,
+      },
+    })
+    if (!existing) throw new CrmAccessError('Task not found', 404)
+
+    const nextAssignee =
+      assignedToUserId !== undefined ? assignedToUserId : existing.assignedToUserId
+    const nextDept =
+      assignedDept !== undefined ? assignedDept : existing.assignedDept
+
+    if (!nextAssignee && !nextDept) {
+      throw new CrmAccessError('Assign to a person or department pool', 400)
+    }
+
+    if (nextAssignee) {
+      await assertCrmTaskAssigneeUserId(nextAssignee)
+    }
+
+    const dueAt =
+      input.dueAt === undefined
+        ? undefined
+        : input.dueAt
+          ? new Date(input.dueAt)
+          : null
+    if (dueAt && Number.isNaN(dueAt.getTime())) {
+      throw new CrmAccessError('Invalid due date', 400)
+    }
+
+    const task = await prisma.teamTask.update({
+      where: { id: taskId },
+      data: {
+        title,
+        description:
+          input.description !== undefined
+            ? input.description?.trim() || null
+            : undefined,
+        serviceClientId:
+          input.serviceClientId !== undefined ? serviceClientId : undefined,
+        assignedToUserId: assignedToUserId !== undefined ? assignedToUserId : undefined,
+        assignedDept: assignedDept !== undefined ? assignedDept : undefined,
+        dueAt,
+        priority: input.priority,
+      },
+      select: {
+        id: true,
+        title: true,
+        serviceClientId: true,
+        assignedToUserId: true,
+      },
+    })
+
+    await logTaskActivity(task.id, user.id, 'UPDATE', title, task.serviceClientId)
+
+    if (
+      nextAssignee &&
+      nextAssignee !== existing.assignedToUserId &&
+      nextAssignee !== user.id
+    ) {
+      const client = task.serviceClientId
+        ? await prisma.serviceClient.findUnique({
+            where: { id: task.serviceClientId },
+            select: { firstName: true, lastName: true },
+          })
+        : null
+      void notifyTaskAssigned({
+        assigneeUserId: nextAssignee,
+        assignerName: user.name ?? user.email ?? 'A teammate',
+        taskTitle: title,
+        clientLabel: client
+          ? `${client.firstName} ${client.lastName}`
+          : null,
+        dueAt: dueAt ?? null,
+        from: { id: user.id, email: user.email ?? null, name: user.name ?? null },
+      })
+    }
+
+    revalidateTaskPaths(task.serviceClientId)
+    return { ok: true as const }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function deleteTeamTask(taskId: string) {
+  try {
+    const user = await getClientServicesUser()
+    const access = await assertCanManageTeamTaskById(user, taskId)
+    const now = new Date()
+
+    await prisma.teamTask.update({
+      where: { id: taskId },
+      data: { deletedAt: now, deletedByUserId: user.id },
+    })
+
+    await logTaskActivity(taskId, user.id, 'DELETE', null, access.serviceClientId)
+
+    revalidateTaskPaths(access.serviceClientId)
     return { ok: true as const }
   } catch (err) {
     return fail(err)
