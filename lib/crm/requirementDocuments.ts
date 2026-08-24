@@ -41,9 +41,10 @@ function safeFileName(name: string): string {
     .slice(0, 120)
 }
 
+/** True when fileUrl is a private storage path (not an external http(s) link). */
 export function isStoredRequirementPath(
   fileUrl: string | null | undefined
-): fileUrl is string {
+): boolean {
   if (!fileUrl?.trim()) return false
   const path = fileUrl.trim()
   return (

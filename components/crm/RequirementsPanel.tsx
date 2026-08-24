@@ -62,7 +62,7 @@ function daysUntil(expiresAt: Date | string | null): number | null {
 
 function displayFileLabel(req: Req): string | null {
   if (req.fileName?.trim()) return req.fileName.trim()
-  if (isStoredRequirementPath(req.fileUrl)) {
+  if (req.fileUrl && isStoredRequirementPath(req.fileUrl)) {
     return req.fileUrl.split('/').pop() ?? req.fileUrl
   }
   if (req.fileUrl?.trim()) return req.fileUrl.trim()

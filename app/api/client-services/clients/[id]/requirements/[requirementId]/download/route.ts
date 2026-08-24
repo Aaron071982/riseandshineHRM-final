@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, context: Ctx) {
     if (!requirement) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
-    if (!isStoredRequirementPath(requirement.fileUrl)) {
+    if (!isStoredRequirementPath(requirement.fileUrl) || !requirement.fileUrl) {
       return NextResponse.json({ error: 'No uploaded file for this requirement' }, { status: 404 })
     }
 
