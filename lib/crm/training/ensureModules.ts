@@ -1,4 +1,4 @@
-import type { CrmRole } from '@prisma/client'
+import type { CrmRole, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DEFAULT_CRM_TRAINING_MODULES } from '@/lib/crm/training/defaultModules'
 
@@ -12,40 +12,96 @@ const MODULE_ROLES: CrmRole[] = [
   'MANAGEMENT',
 ]
 
-/** Seed default modules/steps only when missing (never overwrite admin edits). */
-export async function ensureCrmTrainingModules(): Promise<void> {
-  for (const mod of DEFAULT_CRM_TRAINING_MODULES) {
-    let moduleRow = await prisma.crmTrainingModule.findUnique({
-      where: { crmRole: mod.crmRole },
-    })
-    if (!moduleRow) {
-      moduleRow = await prisma.crmTrainingModule.create({
-        data: {
-          crmRole: mod.crmRole,
-          title: mod.title,
-          summary: mod.summary ?? null,
-          goalStatement: mod.goalStatement ?? null,
-        },
-      })
-    }
+type Tx = Prisma.TransactionClient
 
-    for (const step of mod.steps) {
-      const existing = await prisma.crmTrainingStep.findUnique({
-        where: { slug: step.slug },
+/**
+ * Renumber steps 1..n for a module.
+ * Uses temporary negative stepNumbers to satisfy @@unique([moduleId, stepNumber]).
+ */
+export async function renumberModuleSteps(
+  moduleId: string,
+  orderedStepIds: string[],
+  tx: Tx = prisma
+): Promise<void> {
+  for (let i = 0; i < orderedStepIds.length; i++) {
+    await tx.crmTrainingStep.update({
+      where: { id: orderedStepIds[i] },
+      data: { stepNumber: -(i + 1) },
+    })
+  }
+  for (let i = 0; i < orderedStepIds.length; i++) {
+    await tx.crmTrainingStep.update({
+      where: { id: orderedStepIds[i] },
+      data: { stepNumber: i + 1 },
+    })
+  }
+}
+
+/** Repair gaps / negatives left by interrupted renumbers. Safe to run repeatedly. */
+export async function normalizeModuleStepNumbers(moduleId: string): Promise<void> {
+  const steps = await prisma.crmTrainingStep.findMany({
+    where: { moduleId },
+    orderBy: [{ stepNumber: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true, stepNumber: true },
+  })
+  if (!steps.length) return
+
+  const alreadyContiguous = steps.every((s, i) => s.stepNumber === i + 1)
+  if (alreadyContiguous) return
+
+  await prisma.$transaction(async (tx) => {
+    await renumberModuleSteps(
+      moduleId,
+      steps.map((s) => s.id),
+      tx
+    )
+  })
+}
+
+/**
+ * Seed default modules/steps only when a role module is missing.
+ * Never re-insert default steps into an existing module — that would undo admin
+ * deletes and can P2002 on (moduleId, stepNumber) after renumbering.
+ */
+export async function ensureCrmTrainingModules(): Promise<void> {
+  try {
+    for (const mod of DEFAULT_CRM_TRAINING_MODULES) {
+      const existingModule = await prisma.crmTrainingModule.findUnique({
+        where: { crmRole: mod.crmRole },
+        select: { id: true },
       })
-      if (!existing) {
-        await prisma.crmTrainingStep.create({
+      if (existingModule) {
+        // Existing catalog is admin-owned. Only heal broken stepNumber sequences.
+        await normalizeModuleStepNumbers(existingModule.id)
+        continue
+      }
+
+      await prisma.$transaction(async (tx) => {
+        const moduleRow = await tx.crmTrainingModule.create({
           data: {
-            moduleId: moduleRow.id,
-            stepNumber: step.stepNumber,
-            slug: step.slug,
-            title: step.title,
-            body: step.body,
-            icon: step.icon ?? null,
+            crmRole: mod.crmRole,
+            title: mod.title,
+            summary: mod.summary ?? null,
+            goalStatement: mod.goalStatement ?? null,
           },
         })
-      }
+        for (const step of mod.steps) {
+          await tx.crmTrainingStep.create({
+            data: {
+              moduleId: moduleRow.id,
+              stepNumber: step.stepNumber,
+              slug: step.slug,
+              title: step.title,
+              body: step.body,
+              icon: step.icon ?? null,
+            },
+          })
+        }
+      })
     }
+  } catch (err) {
+    // Profile / training pages must never hard-crash the CRM over seed issues.
+    console.error('[crm-training] ensureCrmTrainingModules failed:', err)
   }
 }
 

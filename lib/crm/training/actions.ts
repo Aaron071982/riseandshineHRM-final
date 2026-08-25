@@ -16,6 +16,7 @@ import {
 } from '@/lib/crm/training/access'
 import {
   ensureCrmTrainingModules,
+  renumberModuleSteps,
   trainingRolesForUser,
 } from '@/lib/crm/training/ensureModules'
 
@@ -170,11 +171,17 @@ export async function createTrainingStep(
 
     const mod = await prisma.crmTrainingModule.findUnique({
       where: { id: moduleId },
-      include: { steps: { orderBy: { stepNumber: 'desc' }, take: 1 } },
+      select: { id: true, crmRole: true },
     })
     if (!mod) return { ok: false, error: 'Module not found', status: 404 }
 
-    const nextNum = (mod.steps[0]?.stepNumber ?? 0) + 1
+    const agg = await prisma.crmTrainingStep.aggregate({
+      where: { moduleId },
+      _max: { stepNumber: true },
+    })
+    // Prefer positive next index; if mid-renumber negatives exist, append after abs max.
+    const maxNum = agg._max.stepNumber ?? 0
+    const nextNum = Math.max(maxNum, 0) + 1
     const slug = `${mod.crmRole.toLowerCase()}-custom-${Date.now()}`
 
     const step = await prisma.crmTrainingStep.create({
@@ -216,27 +223,19 @@ export async function deleteTrainingStep(
     })
     if (!existing) return { ok: false, error: 'Step not found', status: 404 }
 
-    await prisma.crmTrainingStep.delete({ where: { id: stepId } })
-
-    // Keep stepNumber contiguous after delete (avoids gaps in the UI).
-    const remaining = await prisma.crmTrainingStep.findMany({
-      where: { moduleId: existing.moduleId },
-      orderBy: { stepNumber: 'asc' },
-      select: { id: true },
-    })
     await prisma.$transaction(async (tx) => {
-      for (let i = 0; i < remaining.length; i++) {
-        await tx.crmTrainingStep.update({
-          where: { id: remaining[i].id },
-          data: { stepNumber: -(i + 1) },
-        })
-      }
-      for (let i = 0; i < remaining.length; i++) {
-        await tx.crmTrainingStep.update({
-          where: { id: remaining[i].id },
-          data: { stepNumber: i + 1 },
-        })
-      }
+      await tx.crmTrainingStep.delete({ where: { id: stepId } })
+
+      const remaining = await tx.crmTrainingStep.findMany({
+        where: { moduleId: existing.moduleId },
+        orderBy: { stepNumber: 'asc' },
+        select: { id: true },
+      })
+      await renumberModuleSteps(
+        existing.moduleId,
+        remaining.map((s) => s.id),
+        tx
+      )
     })
 
     await writeAuditLog({
@@ -288,18 +287,7 @@ export async function reorderTrainingSteps(
     }
 
     await prisma.$transaction(async (tx) => {
-      for (let i = 0; i < orderedStepIds.length; i++) {
-        await tx.crmTrainingStep.update({
-          where: { id: orderedStepIds[i] },
-          data: { stepNumber: -(i + 1) },
-        })
-      }
-      for (let i = 0; i < orderedStepIds.length; i++) {
-        await tx.crmTrainingStep.update({
-          where: { id: orderedStepIds[i] },
-          data: { stepNumber: i + 1 },
-        })
-      }
+      await renumberModuleSteps(moduleId, orderedStepIds, tx)
     })
 
     await writeAuditLog({
