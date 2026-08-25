@@ -13,7 +13,7 @@ export async function syncTherapistBoroughsFromRbtProfiles(): Promise<number> {
       select: { id: true, name: true, email: true, borough: true },
     }),
     prisma.rBTProfile.findMany({
-      where: { status: { not: 'FIRED' } },
+      where: { status: { notIn: ['FIRED', 'REJECTED'] } },
       select: {
         firstName: true,
         lastName: true,

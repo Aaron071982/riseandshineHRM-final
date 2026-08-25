@@ -149,6 +149,7 @@ async function resolveRbtProfileId(therapistId: string): Promise<string> {
   }
 
   const rbts = await prisma.rBTProfile.findMany({
+    where: { status: { notIn: ['FIRED', 'REJECTED'] } },
     select: { id: true, firstName: true, lastName: true },
   })
   const hits = rbts.filter((r) =>
@@ -515,6 +516,7 @@ async function resolveRbtProfileIdFromName(name: string, email?: string | null):
     if (byEmail) return byEmail.id
   }
   const rbts = await prisma.rBTProfile.findMany({
+    where: { status: { notIn: ['FIRED', 'REJECTED'] } },
     select: { id: true, firstName: true, lastName: true },
   })
   const hits = rbts.filter((r) =>

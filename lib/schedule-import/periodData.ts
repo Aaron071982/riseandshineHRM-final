@@ -7,6 +7,7 @@ import type {
   ScheduleWorkspaceData,
 } from '@/lib/schedule/types'
 import { parseTimeToMinutes } from '@/lib/rbt-schedule/utils'
+import { SCHEDULABLE_RBT_WHERE } from '@/lib/rbt/schedulable'
 
 const JS_TO_DAY: ScheduleDayOfWeek[] = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
@@ -249,7 +250,7 @@ export async function loadPeriodWorkspaceData(opts: {
   }
 
   const hiredWithoutSlots = await prisma.rBTProfile.findMany({
-    where: { status: 'HIRED', id: { notIn: [...therapistMap.keys()] } },
+    where: { ...SCHEDULABLE_RBT_WHERE, id: { notIn: [...therapistMap.keys()] } },
     select: { id: true, firstName: true, lastName: true, email: true },
     take: 200,
   })

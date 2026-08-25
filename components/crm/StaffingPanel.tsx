@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { AssignmentStage, ServiceBtAssignmentStatus } from '@prisma/client'
+import { MapPin, Search } from 'lucide-react'
 import {
   assignBcba,
   assignRbt,
@@ -54,6 +55,10 @@ export function StaffingPanel({
   assignments,
   bcbaProfile,
   bcbaProfileId,
+  addressLine,
+  city,
+  state,
+  zip,
   canEdit,
 }: {
   clientId: string
@@ -63,6 +68,10 @@ export function StaffingPanel({
   assignments: Assignment[]
   bcbaProfile: Bcba
   bcbaProfileId: string | null
+  addressLine?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
   canEdit: boolean
 }) {
   const router = useRouter()
@@ -83,6 +92,8 @@ export function StaffingPanel({
   const [needsMoreHours, setNeedsMoreHours] = useState(staffingNeedsMoreHours)
   const [highPriority, setHighPriority] = useState(staffingHighPriority)
   const isActive = stage === 'ACTIVE'
+  const addressLabel = [addressLine, city, state, zip].filter(Boolean).join(', ')
+  const therapistSearchHref = `/client-services/therapist-search?clientId=${encodeURIComponent(clientId)}`
 
   useEffect(() => {
     setNeedsMoreHours(staffingNeedsMoreHours)
@@ -192,6 +203,41 @@ export function StaffingPanel({
           </div>
         </section>
       )}
+
+      {/* Therapist proximity search */}
+      <section className="rounded-xl border border-line bg-surface p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-display text-base font-semibold text-ink">
+              Therapist search
+            </h3>
+            <p className="mt-0.5 text-sm text-quiet">
+              Find placeable RBTs closest to this client&apos;s address by drive
+              time.
+            </p>
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-ink">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--brand)]" />
+              <span className="min-w-0 break-words">
+                {addressLabel || (
+                  <span className="text-[var(--amber)]">
+                    No address on file — add one on Overview before searching.
+                  </span>
+                )}
+              </span>
+            </p>
+          </div>
+          <Link
+            href={therapistSearchHref}
+            className={cn(
+              'inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[var(--espresso)] px-4 text-sm font-semibold text-white hover:opacity-90',
+              !addressLabel && 'opacity-80'
+            )}
+          >
+            <Search className="h-4 w-4" />
+            Open therapist search
+          </Link>
+        </div>
+      </section>
 
       {/* BCBA */}
       <section className="rounded-xl border border-line bg-surface p-4">

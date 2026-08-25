@@ -259,6 +259,10 @@ export default function ClientCrmDetail({
             assignments={client.btAssignments}
             bcbaProfile={client.bcbaProfile}
             bcbaProfileId={client.bcbaProfileId}
+            addressLine={client.addressLine}
+            city={client.city}
+            state={client.state}
+            zip={client.zip}
             canEdit={canEdit}
           />
         )}

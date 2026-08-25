@@ -7,7 +7,7 @@ import {
 } from './therapistSearch'
 
 describe('Therapist Search candidate eligibility', () => {
-  it('includes hired/onboarded matching RBTs', () => {
+  it('includes all statuses except FIRED and REJECTED', () => {
     expect(
       isPlaceableForSearch({ status: 'HIRED', postHireStage: 'MATCHING' })
     ).toBe(true)
@@ -17,16 +17,24 @@ describe('Therapist Search candidate eligibility', () => {
         postHireStage: null,
       })
     ).toBe(true)
-  })
-
-  it('excludes active delivery and non-ready statuses', () => {
     expect(
       isPlaceableForSearch({
         status: 'HIRED',
         postHireStage: 'ACTIVE_DELIVERY',
       })
-    ).toBe(false)
-    for (const status of ['FIRED', 'REJECTED', 'STALLED', 'NEW'] as const) {
+    ).toBe(true)
+    for (const status of [
+      'NEW',
+      'REACH_OUT',
+      'STALLED',
+      'TO_INTERVIEW',
+    ] as const) {
+      expect(isPlaceableForSearch({ status, postHireStage: null })).toBe(true)
+    }
+  })
+
+  it('excludes FIRED and REJECTED', () => {
+    for (const status of ['FIRED', 'REJECTED'] as const) {
       expect(isPlaceableForSearch({ status, postHireStage: 'MATCHING' })).toBe(
         false
       )

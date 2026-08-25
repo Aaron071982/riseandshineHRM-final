@@ -3,14 +3,15 @@ import type {
   EthnicityPreference,
   GenderPreference,
   PostHireStage,
-  Prisma,
   RBTStatus,
 } from '@prisma/client'
+import {
+  isSchedulableRbtStatus,
+  SCHEDULABLE_RBT_WHERE,
+} from '@/lib/rbt/schedulable'
 
-export const PLACEABLE_RBT_WHERE: Prisma.RBTProfileWhereInput = {
-  status: { in: ['HIRED', 'ONBOARDING_COMPLETED'] },
-  OR: [{ postHireStage: null }, { postHireStage: 'MATCHING' }],
-}
+/** All RBTs except FIRED / REJECTED — used by therapist search and scheduling proximity. */
+export const PLACEABLE_RBT_WHERE = SCHEDULABLE_RBT_WHERE
 
 export type PlaceableRbt = {
   status: RBTStatus
@@ -19,10 +20,7 @@ export type PlaceableRbt = {
 
 /** Pure counterpart to PLACEABLE_RBT_WHERE for tests and non-Prisma callers. */
 export function isPlaceableForSearch(rbt: PlaceableRbt): boolean {
-  return (
-    (rbt.status === 'HIRED' || rbt.status === 'ONBOARDING_COMPLETED') &&
-    (rbt.postHireStage === null || rbt.postHireStage === 'MATCHING')
-  )
+  return isSchedulableRbtStatus(rbt.status)
 }
 
 export type TherapistPreferences = {

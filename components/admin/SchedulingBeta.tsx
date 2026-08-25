@@ -1089,7 +1089,7 @@ export default function SchedulingBeta() {
         <CardHeader>
           <CardTitle className="text-lg">RBT Location Data</CardTitle>
           <p className="text-sm text-gray-500 dark:text-[var(--text-tertiary)]">
-            {geocodeStats != null ? `${geocodeStats.withCoords} of ${geocodeStats.totalHired} hired RBTs have location data stored` : 'Loading…'}
+            {geocodeStats != null ? `${geocodeStats.withCoords} of ${geocodeStats.totalHired} schedulable RBTs have location data stored` : 'Loading…'}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -1140,14 +1140,14 @@ export default function SchedulingBeta() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Users className="w-5 h-5" />
-            RBTs (HIRED)
+            RBTs
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loadingRbts ? (
             <p className="text-sm text-gray-500">Loading...</p>
           ) : rbts.length === 0 ? (
-            <p className="text-sm text-gray-500">No HIRED RBTs in the system.</p>
+            <p className="text-sm text-gray-500">No schedulable RBTs in the system.</p>
           ) : (
             <ul className="space-y-3 max-h-[400px] overflow-y-auto">
               {rbts.map((rbt) => (

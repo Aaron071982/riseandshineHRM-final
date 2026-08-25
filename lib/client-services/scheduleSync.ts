@@ -175,7 +175,7 @@ async function resolveRbtProfileId(btName: string): Promise<string | null> {
     const last = parts.slice(1).join(' ')
     const byParts = await prisma.rBTProfile.findFirst({
       where: {
-        status: { not: 'FIRED' },
+        status: { notIn: ['FIRED', 'REJECTED'] },
         firstName: { equals: first, mode: 'insensitive' },
         lastName: { equals: last, mode: 'insensitive' },
       },
@@ -184,7 +184,7 @@ async function resolveRbtProfileId(btName: string): Promise<string | null> {
     if (byParts) return byParts.id
   }
   const all = await prisma.rBTProfile.findMany({
-    where: { status: { not: 'FIRED' }, postHireStage: 'ACTIVE_DELIVERY' },
+    where: { status: { notIn: ['FIRED', 'REJECTED'] } },
     select: { id: true, firstName: true, lastName: true },
     take: 500,
   })

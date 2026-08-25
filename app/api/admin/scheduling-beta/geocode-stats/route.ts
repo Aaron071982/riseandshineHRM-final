@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { SCHEDULABLE_RBT_WHERE } from '@/lib/rbt/schedulable'
 
 /**
  * GET /api/admin/scheduling-beta/geocode-stats
- * Returns { totalHired, withCoords } for RBT Location Data section.
+ * Returns { totalHired, withCoords } for RBT Location Data section
+ * (counts all schedulable RBTs — every status except FIRED / REJECTED).
  */
 export async function GET() {
   try {
@@ -12,9 +14,13 @@ export async function GET() {
     if (auth.response) return auth.response
 
     const [totalHired, withCoords] = await Promise.all([
-      prisma.rBTProfile.count({ where: { status: 'HIRED' } }),
+      prisma.rBTProfile.count({ where: SCHEDULABLE_RBT_WHERE }),
       prisma.rBTProfile.count({
-        where: { status: 'HIRED', latitude: { not: null }, longitude: { not: null } },
+        where: {
+          ...SCHEDULABLE_RBT_WHERE,
+          latitude: { not: null },
+          longitude: { not: null },
+        },
       }),
     ])
 

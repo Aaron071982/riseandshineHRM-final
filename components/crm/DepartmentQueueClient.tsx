@@ -278,6 +278,14 @@ function CaseCard({
         >
           Open case
         </Link>
+        {dept === 'STAFFING' && (
+          <Link
+            href={`/client-services/therapist-search?clientId=${encodeURIComponent(row.id)}`}
+            className="inline-flex h-8 items-center rounded-lg bg-[var(--sunrise)] px-2.5 text-xs font-semibold text-[var(--espresso)] hover:opacity-90"
+          >
+            Therapist search
+          </Link>
+        )}
         {onClaim && (
           <button
             type="button"

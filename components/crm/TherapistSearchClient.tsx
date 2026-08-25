@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { X } from 'lucide-react'
 import type {
   EthnicityPreference,
   GenderPreference,
@@ -116,6 +117,7 @@ export default function TherapistSearchClient({
   const [result, setResult] = useState<SearchResponse | null>(null)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set())
   const autoSearched = useRef(false)
 
   const searchedAddress = client
@@ -129,6 +131,7 @@ export default function TherapistSearchClient({
     setError(null)
     setHoveredIndex(null)
     setSelectedIndex(null)
+    setDismissedIds(new Set())
     try {
       const response = await fetch('/api/client-services/therapist-search', {
         method: 'POST',
@@ -172,6 +175,21 @@ export default function TherapistSearchClient({
     result?.preferences.preferredRbtEthnicities ??
     client?.preferredRbtEthnicities ??
     []
+
+  const visibleRbts = useMemo(() => {
+    if (!result) return []
+    return result.rbts.filter((rbt) => !dismissedIds.has(rbt.rbtProfileId))
+  }, [result, dismissedIds])
+
+  const dismissRbt = (rbtProfileId: string) => {
+    setDismissedIds((prev) => {
+      const next = new Set(prev)
+      next.add(rbtProfileId)
+      return next
+    })
+    setHoveredIndex(null)
+    setSelectedIndex(null)
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-16">
@@ -309,7 +327,7 @@ export default function TherapistSearchClient({
           clientLat={result?.clientLat ?? null}
           clientLng={result?.clientLng ?? null}
           clientAddress={searchedAddress}
-          rbts={result?.rbts ?? []}
+          rbts={visibleRbts}
           hoveredRbtIndex={hoveredIndex}
           selectedRbtIndex={selectedIndex}
         />
@@ -317,27 +335,43 @@ export default function TherapistSearchClient({
 
       {result && (
         <section>
-          <div className="mb-2 flex items-baseline justify-between gap-2">
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-display text-lg font-semibold text-ink">
               Closest placeable RBTs
             </h2>
-            <span className="text-xs text-quiet">
-              {result.rbts.length} result{result.rbts.length === 1 ? '' : 's'}
-            </span>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-quiet">
+              <span>
+                {visibleRbts.length} shown
+                {dismissedIds.size > 0
+                  ? ` · ${dismissedIds.size} removed`
+                  : ''}
+              </span>
+              {dismissedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setDismissedIds(new Set())}
+                  className="font-semibold text-brand hover:underline"
+                >
+                  Restore removed
+                </button>
+              )}
+            </div>
           </div>
-          {result.rbts.length === 0 ? (
+          {visibleRbts.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line px-4 py-8 text-center text-sm text-quiet">
-              {result.message || 'No placeable RBTs found within 30 miles.'}
+              {result.rbts.length === 0
+                ? result.message || 'No placeable RBTs found within 30 miles.'
+                : 'All suggestions were removed. Restore them or run a new search.'}
             </p>
           ) : (
             <ol className="overflow-hidden rounded-xl border border-line bg-surface">
-              {result.rbts.map((rbt, index) => (
+              {visibleRbts.map((rbt, index) => (
                 <li
                   key={rbt.rbtProfileId}
                   onMouseEnter={() => setHoveredIndex(index)}
                   onMouseLeave={() => setHoveredIndex(null)}
                   onClick={() => setSelectedIndex(index)}
-                  className={`grid cursor-pointer gap-3 border-b border-line px-4 py-3 transition-colors last:border-b-0 md:grid-cols-[2rem_1.4fr_1fr_1fr_auto] md:items-center ${
+                  className={`grid cursor-pointer gap-3 border-b border-line px-4 py-3 transition-colors last:border-b-0 md:grid-cols-[2rem_1.4fr_1fr_1fr_auto_auto] md:items-center ${
                     selectedIndex === index
                       ? 'bg-[var(--sunrise-soft)]'
                       : 'hover:bg-[var(--sunrise-soft)]'
@@ -397,6 +431,18 @@ export default function TherapistSearchClient({
                       <span className="text-[10px] text-faint">Distance match</span>
                     )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      dismissRbt(rbt.rbtProfileId)
+                    }}
+                    className="inline-flex h-8 w-8 items-center justify-center justify-self-end rounded-lg border border-line text-quiet hover:bg-[var(--urgent-bg)] hover:text-[var(--urgent)]"
+                    title={`Remove ${rbt.firstName} from suggestions`}
+                    aria-label={`Remove ${rbt.firstName} ${rbt.lastName} from suggestions`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </li>
               ))}
             </ol>

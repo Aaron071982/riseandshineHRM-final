@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { SCHEDULABLE_RBT_WHERE } from '@/lib/rbt/schedulable'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/admin/scheduling-beta/rbts
- * Returns HIRED RBTs with fields needed for scheduling beta (read-only).
+ * Returns schedulable RBTs (all statuses except FIRED / REJECTED).
  * Localhost/beta only - used by Scheduling System (beta) UI.
  */
 export async function GET() {
@@ -16,7 +17,7 @@ export async function GET() {
     const user = auth.user
 
     const profiles = await prisma.rBTProfile.findMany({
-      where: { status: 'HIRED' },
+      where: SCHEDULABLE_RBT_WHERE,
       select: {
         id: true,
         firstName: true,
