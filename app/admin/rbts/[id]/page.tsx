@@ -12,6 +12,7 @@ const rbtProfileInclude = {
   },
   onboardingTasks: { orderBy: { sortOrder: 'asc' as const } },
   documents: { orderBy: { uploadedAt: 'desc' as const } },
+  examFeeRequests: { orderBy: { createdAt: 'desc' as const } },
   onboardingCompletions: {
     select: {
       id: true,

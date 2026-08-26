@@ -24,6 +24,7 @@ import {
   Grid3x3,
   List,
   CalendarClock,
+  Award,
 } from 'lucide-react'
 import {
   Dialog,
@@ -60,6 +61,7 @@ import AdminRbtAvailabilityDialog from '@/components/admin/rbt-profile/AdminRbtA
 import EditProfileForm from '@/components/admin/rbt-profile/EditProfileForm'
 import TerminateRbtButton, { canTerminateRbt } from '@/components/admin/TerminateRbtButton'
 import { RbtActivityControls } from '@/components/admin/RbtActivityControls'
+import RbtExamJourneyAdminPanel from '@/components/admin/RbtExamJourneyAdminPanel'
 import TerminationOffboardingPanel from '@/components/admin/TerminationOffboardingPanel'
 import AdminRbtSchedulePanel from '@/components/admin/AdminRbtSchedulePanel'
 import type { RBTProfile } from './rbt-profile/types'
@@ -87,6 +89,7 @@ const BASE_TABS = [
   { id: 'scheduling', label: 'Scheduling', icon: CalendarClock },
   { id: 'interviews', label: 'Interviews', icon: Calendar },
   { id: 'onboarding', label: 'Onboarding', icon: CheckCircle2 },
+  { id: 'certification', label: 'RBT Exam', icon: Award },
   { id: 'documents', label: 'Documents', icon: FolderOpen },
   { id: 'audit', label: 'Audit Log', icon: List },
 ] as const
@@ -1637,6 +1640,16 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                   </>
                 )}
               </div>
+            )}
+            {activeTab === 'certification' && (
+              <RbtExamJourneyAdminPanel
+                rbtProfileId={rbtProfile.id}
+                scheduledAt={rbtProfile.rbtExamScheduledAt ?? null}
+                outcome={rbtProfile.rbtExamOutcome ?? null}
+                outcomeAt={rbtProfile.rbtExamOutcomeAt ?? null}
+                journeySeenAt={rbtProfile.rbtCertJourneySeenAt ?? null}
+                feeRequests={rbtProfile.examFeeRequests ?? []}
+              />
             )}
             {activeTab === 'documents' && (
               <RBTProfileDocuments

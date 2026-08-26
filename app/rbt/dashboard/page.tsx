@@ -276,7 +276,14 @@ async function RBTDashboardPageInner() {
   }
 
   // Load profile, documents, completions, shifts, time entries for unified dashboard
-  let rbtProfile: { firstName: string; scheduleCompleted?: boolean; fortyHourCourseCompleted?: boolean } | null = null
+  let rbtProfile: {
+    firstName: string
+    scheduleCompleted?: boolean
+    fortyHourCourseCompleted?: boolean
+    status?: string
+    rbtCertJourneySeenAt?: Date | null
+    rbtExamOutcome?: string | null
+  } | null = null
   let onboardingDocuments: Awaited<ReturnType<typeof prisma.onboardingDocument.findMany>> = []
   let completions: Awaited<ReturnType<typeof prisma.onboardingCompletion.findMany>> = []
   let todayShifts: Awaited<ReturnType<typeof prisma.shift.findMany>> = []
@@ -286,7 +293,14 @@ async function RBTDashboardPageInner() {
     const [profileResult, docsResult, completionsResult, todayResult, upcomingResult] = await Promise.all([
       prisma.rBTProfile.findUnique({
         where: { id: user.rbtProfileId },
-        select: { firstName: true, scheduleCompleted: true, fortyHourCourseCompleted: true },
+        select: {
+          firstName: true,
+          scheduleCompleted: true,
+          fortyHourCourseCompleted: true,
+          status: true,
+          rbtCertJourneySeenAt: true,
+          rbtExamOutcome: true,
+        },
       }),
       prisma.onboardingDocument.findMany({
         where: { isActive: true },
@@ -335,6 +349,15 @@ async function RBTDashboardPageInner() {
 
   if (!rbtProfile) {
     redirect('/')
+  }
+
+  // Hired RBTs who have not passed yet must see the certification journey at least once.
+  if (
+    (rbtProfile.status === 'HIRED' || rbtProfile.status === 'ONBOARDING_COMPLETED') &&
+    !rbtProfile.rbtCertJourneySeenAt &&
+    rbtProfile.rbtExamOutcome !== 'PASSED'
+  ) {
+    redirect('/rbt/get-certified')
   }
 
   // Show schedule setup if not completed

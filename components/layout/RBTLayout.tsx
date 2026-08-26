@@ -16,6 +16,7 @@ import {
   User,
   MessageCircle,
   GraduationCap,
+  Award,
 } from 'lucide-react'
 import { useState, useEffect, createContext, useContext } from 'react'
 import Image from 'next/image'
@@ -29,6 +30,7 @@ export function useRBTMessageModal() {
 }
 
 const baseNavItems = [
+  { href: '/rbt/get-certified', label: 'Get Certified', icon: Award },
   { href: '/rbt/training', label: '40-Hour', icon: GraduationCap },
   { href: '/rbt/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/rbt/tasks', label: 'My Tasks', icon: ClipboardList },
@@ -43,12 +45,15 @@ interface RBTLayoutProps {
   /** RBT first name for greeting and sidebar (from server layout) */
   rbtFirstName?: string | null
   canAccessSessions?: boolean
+  /** Show Get Certified nav (hired / onboarding completed) */
+  showCertJourney?: boolean
 }
 
 export default function RBTLayout({
   children,
   rbtFirstName,
   canAccessSessions = false,
+  showCertJourney = false,
 }: RBTLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -70,13 +75,15 @@ export default function RBTLayout({
   const initial = (rbtFirstName?.trim().charAt(0) || 'R').toUpperCase()
 
   const messageContextValue = { openMessageModal: () => setMessageModalOpen(true) }
+  const navWithoutCert = baseNavItems.filter((i) => i.href !== '/rbt/get-certified')
+  const withCert = showCertJourney ? baseNavItems : navWithoutCert
   const navItems = canAccessSessions
     ? [
-        ...baseNavItems.slice(0, 5),
+        ...withCert.slice(0, showCertJourney ? 5 : 4),
         { href: '/rbt/sessions', label: 'Pay', icon: Timer },
-        ...baseNavItems.slice(5),
+        ...withCert.slice(showCertJourney ? 5 : 4),
       ]
-    : baseNavItems
+    : withCert
 
   return (
     <RBTMessageContext.Provider value={messageContextValue}>
@@ -218,7 +225,11 @@ export default function RBTLayout({
                     <Icon className="w-5 h-5" />
                   </div>
                   <span className="truncate px-0.5 text-[10px] sm:text-xs">
-                    {item.href === '/rbt/training' ? '40hr' : item.label}
+                    {item.href === '/rbt/training'
+                      ? '40hr'
+                      : item.href === '/rbt/get-certified'
+                        ? 'Cert'
+                        : item.label}
                   </span>
                 </Link>
               )

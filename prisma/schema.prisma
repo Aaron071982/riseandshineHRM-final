@@ -78,6 +78,17 @@ enum RbtActivityState {
   INACTIVE
 }
 
+enum RbtExamFeeRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+enum RbtExamOutcome {
+  PASSED
+  FAILED
+}
+
 enum PostHireStage {
   MATCHING
   ACTIVE_DELIVERY
@@ -773,11 +784,36 @@ model RBTProfile {
   payrollRunEntries           PayrollRunEntry[]
   companyDocumentRecipients   CompanyDocumentRecipient[]
   serviceClientBtAssignments  ServiceClientBtAssignment[]
+  /// RBT certification exam journey (Pearson VUE)
+  rbtCertJourneySeenAt        DateTime?
+  rbtExamScheduledAt          DateTime?
+  rbtExamOutcome              RbtExamOutcome?
+  rbtExamOutcomeAt            DateTime?
+  examFeeRequests             RbtExamFeeRequest[]
 
   @@index([artemisTrainingCompleted])
   @@index([postHireStage])
   @@index([activityState])
   @@map("rbt_profiles")
+}
+
+/// Hired RBT asks Rise & Shine to cover Pearson VUE / BACB exam fee (not cancellation fees).
+model RbtExamFeeRequest {
+  id               String                   @id @default(cuid())
+  rbtProfileId     String
+  status           RbtExamFeeRequestStatus  @default(PENDING)
+  note             String?                  @db.Text
+  adminNote        String?                  @db.Text
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  rbtProfile RBTProfile @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
+
+  @@index([rbtProfileId, status])
+  @@index([status, createdAt])
+  @@map("rbt_exam_fee_requests")
 }
 
 model TrainingSession {

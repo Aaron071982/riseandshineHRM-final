@@ -123,6 +123,18 @@ export interface RBTProfile {
   terminationReason?: string | null
   terminatedAt?: Date | string | null
   terminatedBy?: string | null
+  rbtCertJourneySeenAt?: Date | string | null
+  rbtExamScheduledAt?: Date | string | null
+  rbtExamOutcome?: string | null
+  rbtExamOutcomeAt?: Date | string | null
+  examFeeRequests?: Array<{
+    id: string
+    status: string
+    note: string | null
+    adminNote: string | null
+    createdAt: Date | string
+    reviewedAt: Date | string | null
+  }>
   createdAt: Date
   updatedAt: Date
   user: {

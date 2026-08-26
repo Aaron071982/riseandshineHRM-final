@@ -38,7 +38,11 @@ export default async function RBTLayoutWrapper({
       profile.status === 'HIRED' || profile.status === 'ONBOARDING_COMPLETED'
 
     return (
-      <RBTLayout rbtFirstName={profile.firstName ?? null} canAccessSessions={canAccessSessions}>
+      <RBTLayout
+        rbtFirstName={profile.firstName ?? null}
+        canAccessSessions={canAccessSessions}
+        showCertJourney={canAccessSessions}
+      >
         {children}
       </RBTLayout>
     )
