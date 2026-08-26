@@ -25,7 +25,6 @@ import {
 import { loadOpsOverview, type OpsOverviewData } from '@/lib/operations/overview'
 import {
   filterTreeToWhere,
-  QUERY_FILTER_FIELDS,
   type QueryFilterGroup,
 } from '@/lib/operations/queryBuilder'
 import { buildWeeklyEmailSummaryPayload } from '@/lib/operations/weeklySummary'
@@ -498,10 +497,6 @@ export async function deleteSavedQuery(
   } catch (err) {
     return fail(err)
   }
-}
-
-export function getQueryFilterFieldWhitelist(): string[] {
-  return [...QUERY_FILTER_FIELDS]
 }
 
 export type { QueryFilterGroup, CommTemplate }
