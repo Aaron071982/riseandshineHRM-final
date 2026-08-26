@@ -46,7 +46,8 @@ export async function loadOpsOverview(user: CrmUser): Promise<OpsOverviewData> {
   const twelveWeeksAgo = new Date(now)
   twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 12 * 7)
 
-  const [liveClients, activeClients, auths, intakes] = await Promise.all([
+  const [liveClients, activeClients, auths, intakes, dueReactivateCount] =
+    await Promise.all([
     prisma.serviceClient.findMany({
       where: { AND: [visible, { pipelineStatus: 'LIVE' }] },
       select: {
@@ -84,6 +85,13 @@ export async function loadOpsOverview(user: CrmUser): Promise<OpsOverviewData> {
     prisma.serviceClient.findMany({
       where: { AND: [visible, { createdAt: { gte: twelveWeeksAgo } }] },
       select: { createdAt: true },
+    }),
+    prisma.rBTProfile.count({
+      where: {
+        activityState: 'INACTIVE',
+        inactiveUntil: { lt: now },
+        status: { in: ['HIRED', 'ONBOARDING_COMPLETED'] },
+      },
     }),
   ])
 
@@ -180,6 +188,11 @@ export async function loadOpsOverview(user: CrmUser): Promise<OpsOverviewData> {
     gaps: [
       'Client preferred language is not tracked on service_clients.',
       'Stage-at-send for Email Activity uses current client stage (historical stage at send time is not stored).',
+      ...(dueReactivateCount > 0
+        ? [
+            `${dueReactivateCount} inactive RBT(s) past inactiveUntil — due to reactivate (manual; not auto-reactivated).`,
+          ]
+        : []),
     ],
   }
 }

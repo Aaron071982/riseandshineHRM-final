@@ -40,6 +40,23 @@ describe('Therapist Search candidate eligibility', () => {
       )
     }
   })
+
+  it('excludes INACTIVE activity even when HIRED', () => {
+    expect(
+      isPlaceableForSearch({
+        status: 'HIRED',
+        postHireStage: 'MATCHING',
+        activityState: 'INACTIVE',
+      })
+    ).toBe(false)
+    expect(
+      isPlaceableForSearch({
+        status: 'HIRED',
+        postHireStage: 'MATCHING',
+        activityState: 'ACTIVE',
+      })
+    ).toBe(true)
+  })
 })
 
 describe('Therapist Search preference ranking', () => {

@@ -72,6 +72,12 @@ enum RBTStatus {
   FIRED
 }
 
+/// Separate from pipeline `status` — hired RBTs can be Inactive without leaving HIRED.
+enum RbtActivityState {
+  ACTIVE
+  INACTIVE
+}
+
 enum PostHireStage {
   MATCHING
   ACTIVE_DELIVERY
@@ -459,6 +465,8 @@ model User {
   clientClaimsReleased          ClientClaim[]            @relation("ClientClaimReleasedBy")
   crmTrainingCompletions        CrmTrainingStepCompletion[] @relation("CrmTrainingCompletions")
   savedQueries                  SavedQuery[]                 @relation("SavedQueryOwner")
+  orgTrainingModulesCreated     OrgTrainingModule[]          @relation("OrgTrainingModuleCreatedBy")
+  orgTrainingCompletions        OrgTrainingCompletion[]      @relation("OrgTrainingCompletions")
 
   @@map("users")
 }
@@ -677,6 +685,12 @@ model RBTProfile {
   ethnicity                Ethnicity?
   fortyHourCourseCompleted Boolean            @default(false)
   status                   RBTStatus          @default(NEW)
+  /// Activity overlay — INACTIVE excludes from staffing while status can stay HIRED.
+  activityState            RbtActivityState   @default(ACTIVE)
+  inactiveReason           String?
+  inactiveUntil            DateTime?
+  inactiveSetByUserId      String?
+  inactiveSetAt            DateTime?
   scheduleCompleted        Boolean            @default(false)
   source                   ApplicationSource? @default(ADMIN_CREATED)
   submittedAt              DateTime?
@@ -762,6 +776,7 @@ model RBTProfile {
 
   @@index([artemisTrainingCompleted])
   @@index([postHireStage])
+  @@index([activityState])
   @@map("rbt_profiles")
 }
 
@@ -3475,5 +3490,100 @@ model SavedQuery {
   @@index([ownerUserId])
   @@index([shareScope, sharedWithRole])
   @@map("saved_queries")
+}
+
+/// Org-wide compliance / department training (distinct from CRM checklist CrmTrainingModule
+/// and Artemis TrainingSession).
+
+enum OrgTrainingModuleStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum OrgTrainingItemType {
+  VIDEO_EMBED
+  EXTERNAL_LINK
+  FILE
+  READING
+}
+
+enum OrgTrainingEvidenceType {
+  ATTESTATION
+  QUIZ_PASS
+}
+
+model OrgTrainingModule {
+  id              String                   @id @default(cuid())
+  title           String
+  description     String?                  @db.Text
+  /// UserRole and/or CrmRole string keys this module is assigned to.
+  audienceRoles   String[]
+  required        Boolean                  @default(true)
+  status          OrgTrainingModuleStatus  @default(ACTIVE)
+  displayOrder    Int                      @default(0)
+  createdByUserId String
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  createdBy   User                     @relation("OrgTrainingModuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  items       OrgTrainingModuleItem[]
+  quiz        OrgTrainingQuiz?
+  completions OrgTrainingCompletion[]
+
+  @@index([status, displayOrder])
+  @@map("org_training_modules")
+}
+
+model OrgTrainingModuleItem {
+  id                String              @id @default(cuid())
+  moduleId          String
+  type              OrgTrainingItemType
+  title             String
+  position          Int                 @default(0)
+  embedUrl          String?             @db.Text
+  externalUrl       String?             @db.Text
+  storageObjectPath String?             @db.Text
+  richTextContent   String?             @db.Text
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  module OrgTrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@index([moduleId, position])
+  @@map("org_training_module_items")
+}
+
+model OrgTrainingQuiz {
+  id            String   @id @default(cuid())
+  moduleId      String   @unique
+  /// [{ id, prompt, options: string[], correctIndex }]
+  questionsJson Json
+  passThreshold Int      @default(8)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  module OrgTrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@map("org_training_quizzes")
+}
+
+model OrgTrainingCompletion {
+  id              String                  @id @default(cuid())
+  moduleId        String
+  userId          String
+  completedAt     DateTime                @default(now())
+  evidenceType    OrgTrainingEvidenceType
+  attestationText String?                 @db.Text
+  quizScore       Int?
+  ipAddress       String?
+  userAgent       String?                 @db.Text
+
+  module OrgTrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  user   User              @relation("OrgTrainingCompletions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, userId])
+  @@index([userId])
+  @@index([moduleId])
+  @@map("org_training_completions")
 }
 

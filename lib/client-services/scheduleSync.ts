@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { NOT_DELETED } from '@/lib/crm/softDelete'
+import { SCHEDULABLE_RBT_WHERE } from '@/lib/rbt/schedulable'
 import { namesMatch, normalizeName } from '@/lib/rbt-schedule/from-roster'
 import {
   getClientSchedulePeriod,
@@ -175,7 +176,7 @@ async function resolveRbtProfileId(btName: string): Promise<string | null> {
     const last = parts.slice(1).join(' ')
     const byParts = await prisma.rBTProfile.findFirst({
       where: {
-        status: { notIn: ['FIRED', 'REJECTED'] },
+        ...SCHEDULABLE_RBT_WHERE,
         firstName: { equals: first, mode: 'insensitive' },
         lastName: { equals: last, mode: 'insensitive' },
       },
@@ -184,7 +185,7 @@ async function resolveRbtProfileId(btName: string): Promise<string | null> {
     if (byParts) return byParts.id
   }
   const all = await prisma.rBTProfile.findMany({
-    where: { status: { notIn: ['FIRED', 'REJECTED'] } },
+    where: SCHEDULABLE_RBT_WHERE,
     select: { id: true, firstName: true, lastName: true },
     take: 500,
   })

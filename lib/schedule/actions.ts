@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { namesMatch } from '@/lib/rbt-schedule/from-roster'
 import { matchScheduleNameToClient } from '@/lib/client-services/scheduleSync'
 import { CRM_SCHEDULE_PATH } from '@/lib/schedule/paths'
+import { SCHEDULABLE_RBT_WHERE } from '@/lib/rbt/schedulable'
 import { canAccessCrmSchedule, getClientServicesUser, isFullAccess, CrmAccessError } from '@/lib/crm/access'
 import {
   assertScheduleAssignmentIdsEdit,
@@ -149,7 +150,7 @@ async function resolveRbtProfileId(therapistId: string): Promise<string> {
   }
 
   const rbts = await prisma.rBTProfile.findMany({
-    where: { status: { notIn: ['FIRED', 'REJECTED'] } },
+    where: SCHEDULABLE_RBT_WHERE,
     select: { id: true, firstName: true, lastName: true },
   })
   const hits = rbts.filter((r) =>
@@ -516,7 +517,7 @@ async function resolveRbtProfileIdFromName(name: string, email?: string | null):
     if (byEmail) return byEmail.id
   }
   const rbts = await prisma.rBTProfile.findMany({
-    where: { status: { notIn: ['FIRED', 'REJECTED'] } },
+    where: SCHEDULABLE_RBT_WHERE,
     select: { id: true, firstName: true, lastName: true },
   })
   const hits = rbts.filter((r) =>

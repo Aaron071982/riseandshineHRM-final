@@ -12,6 +12,7 @@ import {
   Network,
   Search as SearchIcon,
   Shield,
+  GraduationCap,
   UserCircle,
   Users,
 } from 'lucide-react'
@@ -47,6 +48,7 @@ export default function ClientServicesLayout({
       { href: '/client-services', label: 'Dashboard', icon: LayoutDashboard },
       { href: '/client-services/clients', label: 'Clients', icon: Users },
       { href: '/client-services/tasks', label: 'Tasks', icon: CheckSquare },
+      { href: '/client-services/training', label: 'Training', icon: GraduationCap },
       { href: '/client-services/operations', label: 'Operations', icon: LineChart },
       ...departmentNav.map((d) => ({
         href: d.href,

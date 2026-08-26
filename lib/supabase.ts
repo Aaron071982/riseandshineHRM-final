@@ -23,7 +23,7 @@ export const supabaseAdmin: SupabaseClient | null =
     : null
 
 // Storage bucket names (canonical definitions in lib/constants.ts)
-export { STORAGE_BUCKET, RESUMES_STORAGE_BUCKET } from '@/lib/constants'
+export { STORAGE_BUCKET, RESUMES_STORAGE_BUCKET, TRAINING_MATERIALS_BUCKET } from '@/lib/constants'
 
 // Helper function to check if Supabase is configured
 export function isSupabaseConfigured(): boolean {

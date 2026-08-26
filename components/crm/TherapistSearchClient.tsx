@@ -62,6 +62,12 @@ type ResultRow = {
     hasEthnicityPreference: boolean
     matchCount: number
   }
+  training?: {
+    requiredTotal: number
+    completedCount: number
+    outstandingTitles: string[]
+    label: string
+  } | null
 }
 
 type SearchResponse = {
@@ -415,6 +421,25 @@ export default function TherapistSearchClient({
                       {rbt.status.replace(/_/g, ' ')} ·{' '}
                       {(rbt.postHireStage ?? 'MATCHING').replace(/_/g, ' ')}
                     </p>
+                    {rbt.training && rbt.training.requiredTotal > 0 ? (
+                      <p
+                        className="mt-1 text-[11px] text-ink"
+                        title={
+                          rbt.training.outstandingTitles.length
+                            ? `Outstanding: ${rbt.training.outstandingTitles.join(', ')}`
+                            : 'All required training complete'
+                        }
+                      >
+                        {rbt.training.label}
+                        {rbt.training.outstandingTitles.length > 0
+                          ? ` · ${rbt.training.outstandingTitles.slice(0, 2).join(', ')}${
+                              rbt.training.outstandingTitles.length > 2
+                                ? ` +${rbt.training.outstandingTitles.length - 2}`
+                                : ''
+                            }`
+                          : ''}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-1 md:justify-end">
                     {rbt.preferenceMatch.gender && (

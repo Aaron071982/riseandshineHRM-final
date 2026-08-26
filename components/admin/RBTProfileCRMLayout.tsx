@@ -59,6 +59,7 @@ import AvailabilityGridPreview from '@/components/admin/rbt-profile/Availability
 import AdminRbtAvailabilityDialog from '@/components/admin/rbt-profile/AdminRbtAvailabilityDialog'
 import EditProfileForm from '@/components/admin/rbt-profile/EditProfileForm'
 import TerminateRbtButton, { canTerminateRbt } from '@/components/admin/TerminateRbtButton'
+import { RbtActivityControls } from '@/components/admin/RbtActivityControls'
 import TerminationOffboardingPanel from '@/components/admin/TerminationOffboardingPanel'
 import AdminRbtSchedulePanel from '@/components/admin/AdminRbtSchedulePanel'
 import type { RBTProfile } from './rbt-profile/types'
@@ -1107,9 +1108,16 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                 {rbtProfile.firstName} {rbtProfile.lastName}
               </CardTitle>
               <div className="flex flex-wrap gap-2 mt-2">
-                <Badge className={`${statusConfig.bg} ${statusConfig.text} ${statusConfig.darkBg} ${statusConfig.darkText} border-0`}>
-                  {rbtProfile.status.replace(/_/g, ' ')}
-                </Badge>
+                {rbtProfile.activityState === 'INACTIVE' &&
+                (rbtProfile.status === 'HIRED' || rbtProfile.status === 'ONBOARDING_COMPLETED') ? (
+                  <span className="inline-flex items-center rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-medium text-stone-600 dark:bg-stone-700 dark:text-stone-300">
+                    Inactive
+                  </span>
+                ) : (
+                  <Badge className={`${statusConfig.bg} ${statusConfig.text} ${statusConfig.darkBg} ${statusConfig.darkText} border-0`}>
+                    {rbtProfile.status.replace(/_/g, ' ')}
+                  </Badge>
+                )}
                 <Badge variant="outline" className="dark:border-[var(--border-subtle)]">
                   {rbtProfile.source === 'PUBLIC_APPLICATION' ? 'Applied Online' : 'Admin Created'}
                 </Badge>
@@ -1129,6 +1137,14 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                 {canHire && <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={handleHire} disabled={loading}>Hire</Button>}
                 {canStall && <Button size="sm" variant="outline" onClick={handleStall} disabled={loading}>Stall</Button>}
                 {canReject && <Button size="sm" variant="destructive" onClick={handleReject} disabled={loading || !rbtProfile.email}>Reject</Button>}
+                {(rbtProfile.status === 'HIRED' || rbtProfile.status === 'ONBOARDING_COMPLETED') && (
+                  <RbtActivityControls
+                    rbtProfileId={rbtProfile.id}
+                    activityState={rbtProfile.activityState ?? 'ACTIVE'}
+                    inactiveReason={rbtProfile.inactiveReason}
+                    inactiveUntil={rbtProfile.inactiveUntil}
+                  />
+                )}
                 {canTerminate && (
                   <TerminateRbtButton
                     rbtId={rbtProfile.id}

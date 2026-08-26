@@ -11,6 +11,7 @@ import {
   Calendar,
   FileText,
   BookOpen,
+  ClipboardCheck,
   Timer,
   LogOut,
   User,
@@ -30,6 +31,7 @@ export function useRBTMessageModal() {
 
 const baseNavItems = [
   { href: '/rbt/training', label: '40-Hour', icon: GraduationCap },
+  { href: '/rbt/org-training', label: 'Training', icon: ClipboardCheck },
   { href: '/rbt/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/rbt/tasks', label: 'My Tasks', icon: ClipboardList },
   { href: '/rbt/schedule', label: 'Schedule', icon: Calendar },
@@ -72,9 +74,9 @@ export default function RBTLayout({
   const messageContextValue = { openMessageModal: () => setMessageModalOpen(true) }
   const navItems = canAccessSessions
     ? [
-        ...baseNavItems.slice(0, 4),
+        ...baseNavItems.slice(0, 5),
         { href: '/rbt/sessions', label: 'Pay', icon: Timer },
-        ...baseNavItems.slice(4),
+        ...baseNavItems.slice(5),
       ]
     : baseNavItems
 

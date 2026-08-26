@@ -157,6 +157,9 @@ export function getOtpTestCode(): string {
 /** Supabase storage bucket for signed onboarding PDFs (private). */
 export const STORAGE_BUCKET = 'onboarding-documents'
 
+/** Supabase storage bucket for org-wide training materials (private). */
+export const TRAINING_MATERIALS_BUCKET = 'training-materials'
+
 /** Supabase storage bucket for resume uploads (private). */
 export const RESUMES_STORAGE_BUCKET = 'resumes'
 

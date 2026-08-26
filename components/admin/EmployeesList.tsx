@@ -31,6 +31,9 @@ interface RBTProfile {
   zipCode: string | null
   status: string
   source: string | null
+  activityState?: string | null
+  inactiveReason?: string | null
+  inactiveUntil?: Date | string | null
   postHireStage?: string | null
   activeWorkingSince?: Date | string | null
   updatedAt: Date
@@ -376,9 +379,16 @@ export default function EmployeesList({
                           <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-[var(--status-interview-bg)] dark:text-[var(--status-interview-text)] border-0">
                             RBT
                           </Badge>
-                          <Badge variant="outline" className={`${statusConfig.bg} ${statusConfig.text} ${statusConfig.darkBg} ${statusConfig.darkText} border-0`}>
-                            {rbt.status.replace(/_/g, ' ')}
-                          </Badge>
+                          {rbt.activityState === 'INACTIVE' &&
+                          (rbt.status === 'HIRED' || rbt.status === 'ONBOARDING_COMPLETED') ? (
+                            <span className="inline-flex items-center rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-medium text-stone-600 dark:bg-stone-700 dark:text-stone-300">
+                              Inactive
+                            </span>
+                          ) : (
+                            <Badge variant="outline" className={`${statusConfig.bg} ${statusConfig.text} ${statusConfig.darkBg} ${statusConfig.darkText} border-0`}>
+                              {rbt.status.replace(/_/g, ' ')}
+                            </Badge>
+                          )}
                           {activelyWorking && (
                             <Badge className="bg-green-500 hover:bg-green-500 text-white border-0 font-semibold">
                               Actively Working

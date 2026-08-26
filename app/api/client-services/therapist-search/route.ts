@@ -13,6 +13,7 @@ import {
 } from '@/lib/crm/therapistSearch'
 import { loadTherapistSearchClient } from '@/lib/crm/therapistSearchData'
 import { runRbtProximitySearch } from '@/lib/scheduling-beta/proximitySearch'
+import { getOrgTrainingStaffingSummariesForRbtProfiles } from '@/lib/org-training/staffingSummary'
 import { assertRateLimit } from '@/lib/otp-rate-limit'
 
 export const maxDuration = 60
@@ -111,12 +112,17 @@ export async function POST(request: NextRequest) {
       preferredRbtGender,
       preferredRbtEthnicities,
     }
-    const rbts = rankByDriveTimeWithPreferences(
+    const rbtsRanked = rankByDriveTimeWithPreferences(
       result.rbts,
       preferences
-    ).map((rbt) => ({
+    )
+    const trainingByProfile = await getOrgTrainingStaffingSummariesForRbtProfiles(
+      rbtsRanked.map((r) => r.rbtProfileId)
+    )
+    const rbts = rbtsRanked.map((rbt) => ({
       ...rbt,
       preferenceMatch: getPreferenceMatch(rbt, preferences),
+      training: trainingByProfile[rbt.rbtProfileId] ?? null,
     }))
 
     await auditClientAction({

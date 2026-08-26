@@ -6,21 +6,22 @@ import type {
   RBTStatus,
 } from '@prisma/client'
 import {
-  isSchedulableRbtStatus,
+  isSchedulableRbt,
   SCHEDULABLE_RBT_WHERE,
 } from '@/lib/rbt/schedulable'
 
-/** All RBTs except FIRED / REJECTED — used by therapist search and scheduling proximity. */
+/** Schedulable + ACTIVE activity — used by therapist search and scheduling proximity. */
 export const PLACEABLE_RBT_WHERE = SCHEDULABLE_RBT_WHERE
 
 export type PlaceableRbt = {
   status: RBTStatus
   postHireStage: PostHireStage | null
+  activityState?: string | null
 }
 
 /** Pure counterpart to PLACEABLE_RBT_WHERE for tests and non-Prisma callers. */
 export function isPlaceableForSearch(rbt: PlaceableRbt): boolean {
-  return isSchedulableRbtStatus(rbt.status)
+  return isSchedulableRbt(rbt)
 }
 
 export type TherapistPreferences = {

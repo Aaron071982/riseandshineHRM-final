@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { SCHEDULABLE_RBT_WHERE } from '@/lib/rbt/schedulable'
 import { inferBorough, normalizeBorough, normalizePersonName } from './borough'
 
 /**
@@ -13,7 +14,7 @@ export async function syncTherapistBoroughsFromRbtProfiles(): Promise<number> {
       select: { id: true, name: true, email: true, borough: true },
     }),
     prisma.rBTProfile.findMany({
-      where: { status: { notIn: ['FIRED', 'REJECTED'] } },
+      where: SCHEDULABLE_RBT_WHERE,
       select: {
         firstName: true,
         lastName: true,

@@ -27,6 +27,7 @@ interface RBTProfile {
   locationState: string | null
   zipCode: string | null
   status: string
+  activityState?: string | null
   source: string | null
   updatedAt: Date
   user: {
@@ -214,12 +215,20 @@ export default function RBTList({ initialRbts, loadError }: RBTListProps) {
                         {rbt.firstName} {rbt.lastName}
                       </h3>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <Badge
-                          variant="outline"
-                          className={`${statusConfig.bg} ${statusConfig.text} ${statusConfig.darkBg} ${statusConfig.darkText} border-0`}
-                        >
-                          {rbt.status.replace(/_/g, ' ')}
-                        </Badge>
+                        {rbt.activityState === 'INACTIVE' &&
+                        (rbt.status === 'HIRED' ||
+                          rbt.status === 'ONBOARDING_COMPLETED') ? (
+                          <span className="inline-flex items-center rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-medium text-stone-600 dark:bg-stone-700 dark:text-stone-300">
+                            Inactive
+                          </span>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className={`${statusConfig.bg} ${statusConfig.text} ${statusConfig.darkBg} ${statusConfig.darkText} border-0`}
+                          >
+                            {rbt.status.replace(/_/g, ' ')}
+                          </Badge>
+                        )}
                         {rbt.source === 'PUBLIC_APPLICATION' && (
                           <Badge
                             variant="outline"

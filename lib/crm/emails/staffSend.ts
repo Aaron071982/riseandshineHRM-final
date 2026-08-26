@@ -31,6 +31,10 @@ import {
   type EmailAttachmentRecord,
   MAX_ATTACHMENTS,
 } from '@/lib/crm/emails/attachments'
+import {
+  loadTemplateFormAttachments,
+  templateFormAttachmentMetas,
+} from '@/lib/crm/emails/templateFormAttachments'
 import { CRM_EMAIL_ATTACHMENTS_PREFIX } from '@/lib/constants'
 import {
   isConsentLineInitialed,
@@ -148,15 +152,26 @@ export function clientHasEmailConsent(
 
 function attachmentsJsonValue(
   attachments: StaffEmailAttachmentInput[],
-  links: EmailLinkMeta[]
+  links: EmailLinkMeta[],
+  templateForms?: { fileName: string; sizeBytes: number; contentType: string }[]
 ): Prisma.InputJsonValue | undefined {
-  const files = attachments.map((a) => ({
-    id: a.id,
-    fileName: a.fileName,
-    sizeBytes: a.sizeBytes,
-    contentType: a.contentType,
-    storagePath: a.storagePath,
-  }))
+  const files = [
+    ...(templateForms ?? []).map((a) => ({
+      id: `template:${a.fileName}`,
+      fileName: a.fileName,
+      sizeBytes: a.sizeBytes,
+      contentType: a.contentType,
+      source: 'template' as const,
+    })),
+    ...attachments.map((a) => ({
+      id: a.id,
+      fileName: a.fileName,
+      sizeBytes: a.sizeBytes,
+      contentType: a.contentType,
+      storagePath: a.storagePath,
+      source: 'upload' as const,
+    })),
+  ]
   const linkRows = links.map((l) => ({ url: l.url, label: l.label ?? null }))
   if (!files.length && !linkRows.length) return undefined
   return { files, links: linkRows }
@@ -164,11 +179,16 @@ function attachmentsJsonValue(
 
 function auditExtras(
   attachments: StaffEmailAttachmentInput[],
-  links: EmailLinkMeta[]
+  links: EmailLinkMeta[],
+  templateFormNames?: string[]
 ): string {
   const parts: string[] = []
-  if (attachments.length) {
-    parts.push(`ATTACH:${attachments.map((a) => a.fileName).join(',')}`)
+  const allNames = [
+    ...(templateFormNames ?? []),
+    ...attachments.map((a) => a.fileName),
+  ]
+  if (allNames.length) {
+    parts.push(`ATTACH:${allNames.join(',')}`)
   }
   if (links.length) {
     parts.push(`LINK:${links.map((l) => l.url).join(',')}`)
@@ -237,6 +257,7 @@ export async function previewStaffClientEmail(
 
   const attachments = validateAttachmentRefs(clientId, input.attachments ?? [])
   const links = validateLinks(input.links ?? [])
+  const formMetas = templateFormAttachmentMetas(input.template)
   const baseFields = buildStaffMergeFields(
     client,
     {
@@ -254,10 +275,13 @@ export async function previewStaffClientEmail(
   const rendered = renderStaffEmail(input.template, fields, {
     subject: input.subject ?? undefined,
     bodyHtml: input.bodyHtml ?? undefined,
-    attachments: attachments.map((a) => ({
-      fileName: a.fileName,
-      sizeBytes: a.sizeBytes,
-    })),
+    attachments: [
+      ...formMetas,
+      ...attachments.map((a) => ({
+        fileName: a.fileName,
+        sizeBytes: a.sizeBytes,
+      })),
+    ],
     links,
     assessmentModality: input.assessmentModality ?? null,
   })
@@ -273,6 +297,7 @@ export async function previewStaffClientEmail(
     ),
     suggestedCc:
       input.template === 'MEET_AND_GREET' ? meetAndGreetCcEmails(fields) : [],
+    templateAttachments: formMetas,
   }
 }
 
@@ -354,6 +379,7 @@ export async function sendStaffClientEmail(
 
   const attachments = validateAttachmentRefs(clientId, input.attachments ?? [])
   const links = validateLinks(input.links ?? [])
+  const templateForms = loadTemplateFormAttachments(input.template)
 
   if (!input.force && input.template !== 'MANUAL' && !isFullAccess(user)) {
     const prior = await prisma.clientCommunication.findFirst({
@@ -378,10 +404,16 @@ export async function sendStaffClientEmail(
   const rendered = renderStaffEmail(input.template, fields, {
     subject: input.subject ?? undefined,
     bodyHtml: input.bodyHtml ?? undefined,
-    attachments: attachments.map((a) => ({
-      fileName: a.fileName,
-      sizeBytes: a.sizeBytes,
-    })),
+    attachments: [
+      ...templateForms.map((a) => ({
+        fileName: a.fileName,
+        sizeBytes: a.sizeBytes,
+      })),
+      ...attachments.map((a) => ({
+        fileName: a.fileName,
+        sizeBytes: a.sizeBytes,
+      })),
+    ],
     links,
     assessmentModality: input.assessmentModality ?? null,
   })
@@ -389,8 +421,12 @@ export async function sendStaffClientEmail(
 
   const now = new Date()
   const ccStored = ccList.length ? ccList.join(', ') : null
-  const attachJson = attachmentsJsonValue(attachments, links)
-  const extras = auditExtras(attachments, links)
+  const attachJson = attachmentsJsonValue(attachments, links, templateForms)
+  const extras = auditExtras(
+    attachments,
+    links,
+    templateForms.map((f) => f.fileName)
+  )
 
   const recordSkipped = async (reason: string) => {
     const row = await prisma.clientCommunication.create({
@@ -429,7 +465,12 @@ export async function sendStaffClientEmail(
 
   if (!graphEmailEnabled()) {
     const detail = [
-      attachments.length ? `attachments: ${attachments.map((a) => a.fileName).join(', ')}` : null,
+      templateForms.length || attachments.length
+        ? `attachments: ${[
+            ...templateForms.map((a) => a.fileName),
+            ...attachments.map((a) => a.fileName),
+          ].join(', ')}`
+        : null,
       links.length ? `links: ${links.map((l) => l.url).join(', ')}` : null,
     ]
       .filter(Boolean)
@@ -448,7 +489,15 @@ export async function sendStaffClientEmail(
 
   let graphAttachments: Awaited<ReturnType<typeof loadGraphAttachments>> = []
   try {
-    graphAttachments = await loadGraphAttachments(attachments)
+    const uploaded = await loadGraphAttachments(attachments)
+    graphAttachments = [
+      ...templateForms.map((f) => ({
+        fileName: f.fileName,
+        contentType: f.contentType,
+        contentBytes: f.contentBytes,
+      })),
+      ...uploaded,
+    ]
   } catch (err) {
     if (err instanceof CrmAccessError) throw err
     throw new CrmAccessError('Failed to load attachments for send', 400)

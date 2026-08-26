@@ -115,6 +115,9 @@ export interface RBTProfile {
   transportation: boolean | null
   preferredHoursRange: string | null
   postHireStage?: string | null
+  activityState?: string | null
+  inactiveReason?: string | null
+  inactiveUntil?: Date | string | null
   activeWorkingSince?: Date | string | null
   activeWorkingManualOverride?: boolean
   terminationReason?: string | null
