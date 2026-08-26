@@ -124,7 +124,7 @@ export default function RBTDashboardHome({
             ))}
           </ul>
           <Button asChild size="sm" className="mt-3 bg-[#e36f1e] hover:bg-[#c95e18] text-white">
-            <Link href="/rbt/org-training">View all company training</Link>
+            <Link href="/rbt/org-training">View all training</Link>
           </Button>
         </div>
       )}

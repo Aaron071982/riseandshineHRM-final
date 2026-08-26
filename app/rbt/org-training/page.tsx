@@ -28,15 +28,15 @@ export default async function RbtOrgTrainingListPage() {
 
   if (!unlocked) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
-          Company training
-        </h1>
-        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Company training unlocks once you are hired. Finish onboarding paperwork
-          and check back here — required modules show up as tasks before you start
-          sessions.
-        </p>
+      <div className="mx-auto max-w-3xl py-8">
+        <div className="border-2 border-amber-300 bg-amber-50 px-5 py-6">
+          <h1 className="text-2xl font-bold text-amber-950">Training</h1>
+          <p className="mt-3 text-sm text-amber-900">
+            Training unlocks once you are hired. Finish onboarding paperwork and
+            check back — required modules show here as tasks before you start
+            sessions.
+          </p>
+        </div>
       </div>
     )
   }
@@ -47,14 +47,12 @@ export default async function RbtOrgTrainingListPage() {
   })
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6">
-      <OrgTrainingModuleList
-        modules={modules}
-        basePath="/rbt/org-training"
-        title="Company training"
-        subtitle="Required modules from Rise & Shine — complete these before you take on more sessions."
-        emptyMessage="No company training assigned yet. When HR uploads modules for RBTs, they will appear here."
-      />
-    </div>
+    <OrgTrainingModuleList
+      modules={modules}
+      basePath="/rbt/org-training"
+      title="Training"
+      subtitle="Complete each module below. Tap Start & complete, go through the material, then mark it done."
+      emptyMessage="No training assigned yet. When Rise & Shine uploads modules for RBTs, they will appear here."
+    />
   )
 }

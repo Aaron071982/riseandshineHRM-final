@@ -54,9 +54,9 @@ export default async function RBTProfilePage() {
           Training
         </h2>
         {!trainingUnlocked ? (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-            Company training unlocks after you are hired. Required modules will
-            show here and on Home as tasks to finish before the job.
+          <p className="rounded-none border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+            Training unlocks after you are hired. Required modules will show here
+            and on Home as tasks to finish before the job.
           </p>
         ) : (
           <OrgTrainingModuleList

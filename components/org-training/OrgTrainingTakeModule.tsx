@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/toast'
 import {
@@ -95,25 +94,31 @@ export default function OrgTrainingTakeModule({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <a
-          href={basePath}
-          className="text-sm text-[#e36f1e] hover:underline"
-        >
-          ← All training
-        </a>
-        <h1 className="mt-2 text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
-          {module.title}
-        </h1>
-        {module.description ? (
-          <p className="mt-2 whitespace-pre-wrap text-sm text-gray-600 dark:text-[var(--text-secondary)]">
-            {module.description}
-          </p>
-        ) : null}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {module.required ? <Badge variant="secondary">Required</Badge> : null}
+      <div className="overflow-hidden border-2 border-[#e36f1e]/30 bg-white shadow-sm">
+        <div className="border-b border-[#e36f1e]/15 bg-[#e36f1e] px-5 py-4 text-white">
+          <a
+            href={basePath}
+            className="text-xs font-semibold uppercase tracking-wide text-white/80 hover:text-white"
+          >
+            ← Back to Training
+          </a>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+            {module.title}
+          </h1>
+          {module.description ? (
+            <p className="mt-2 whitespace-pre-wrap text-sm text-white/90">
+              {module.description}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap gap-2 px-5 py-3">
+          {module.required ? (
+            <Badge className="rounded-none bg-[#e36f1e] hover:bg-[#e36f1e]">
+              Required
+            </Badge>
+          ) : null}
           {completed ? (
-            <Badge className="bg-emerald-600 hover:bg-emerald-600">
+            <Badge className="rounded-none bg-emerald-600 hover:bg-emerald-600">
               <CheckCircle2 className="mr-1 h-3 w-3" />
               Completed
               {completedAt
@@ -121,21 +126,27 @@ export default function OrgTrainingTakeModule({
                 : ''}
             </Badge>
           ) : (
-            <Badge variant="outline">Not completed</Badge>
+            <Badge
+              variant="outline"
+              className="rounded-none border-amber-400 text-amber-800"
+            >
+              In progress — finish materials, then mark complete below
+            </Badge>
           )}
         </div>
       </div>
 
       {module.items.map((item) => (
-        <Card key={item.id}>
-          <CardHeader>
-            <CardTitle className="text-base">{item.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div
+          key={item.id}
+          className="border-2 border-[#e8e0d4] bg-white p-4 shadow-sm sm:p-5"
+        >
+          <h2 className="mb-3 text-base font-bold text-gray-900">{item.title}</h2>
+          <div>
             {item.type === 'VIDEO_EMBED' &&
             item.embedUrl &&
             isYouTubeNoCookieEmbed(item.embedUrl) ? (
-              <div className="aspect-video overflow-hidden rounded-md bg-black">
+              <div className="aspect-video overflow-hidden bg-black">
                 <iframe
                   title={item.title}
                   src={item.embedUrl}
@@ -150,9 +161,9 @@ export default function OrgTrainingTakeModule({
                 href={item.externalUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[#e36f1e] underline"
+                className="inline-flex items-center gap-2 bg-[#e36f1e] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#c45a1a]"
               >
-                Open link <ExternalLink className="h-3.5 w-3.5" />
+                Open resource <ExternalLink className="h-4 w-4" />
               </a>
             ) : null}
             {item.type === 'FILE' && item.storageObjectPath ? (
@@ -160,7 +171,7 @@ export default function OrgTrainingTakeModule({
                 <video
                   controls
                   playsInline
-                  className="w-full max-h-[28rem] rounded-md bg-black"
+                  className="max-h-[28rem] w-full bg-black"
                   src={fileHref(item.storageObjectPath)}
                 >
                   Your browser does not support video playback.
@@ -171,9 +182,9 @@ export default function OrgTrainingTakeModule({
                   href={fileHref(item.storageObjectPath)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[#e36f1e] underline"
+                  className="inline-flex items-center gap-2 bg-[#e36f1e] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#c45a1a]"
                 >
-                  View file <ExternalLink className="h-3.5 w-3.5" />
+                  Open / download file <ExternalLink className="h-4 w-4" />
                 </a>
               )
             ) : null}
@@ -185,18 +196,21 @@ export default function OrgTrainingTakeModule({
                 }}
               />
             ) : null}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ))}
 
       {!completed ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              {module.quiz ? 'Quiz' : 'Attestation'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="border-2 border-[#e36f1e] bg-gradient-to-br from-[#fff4eb] to-white p-5 shadow-sm">
+          <h2 className="text-lg font-bold text-gray-900">
+            {module.quiz ? 'Step 2 — Pass the quiz' : 'Step 2 — Mark complete'}
+          </h2>
+          <p className="mt-1 text-sm text-gray-600">
+            {module.quiz
+              ? 'Review the materials above, then answer every question.'
+              : 'When you have finished the materials above, confirm below so your progress updates.'}
+          </p>
+          <div className="mt-4 space-y-4">
             {module.quiz ? (
               <>
                 <p className="text-sm text-gray-600">
@@ -204,21 +218,21 @@ export default function OrgTrainingTakeModule({
                   {module.quiz.questions.length} correct to pass.
                 </p>
                 {lastFail ? (
-                  <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  <p className="border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                     Last attempt: {lastFail.score} correct (need{' '}
                     {lastFail.passThreshold}). Try again.
                   </p>
                 ) : null}
                 {module.quiz.questions.map((q, qi) => (
                   <div key={q.id} className="space-y-2">
-                    <p className="font-medium text-sm">
+                    <p className="text-sm font-medium">
                       {qi + 1}. {q.prompt}
                     </p>
                     <div className="space-y-1">
                       {q.options.map((opt, oi) => (
                         <label
                           key={oi}
-                          className="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm dark:border-[var(--border-subtle)]"
+                          className="flex items-center gap-2 border border-gray-200 bg-white px-3 py-2 text-sm dark:border-[var(--border-subtle)]"
                         >
                           <input
                             type="radio"
@@ -234,29 +248,52 @@ export default function OrgTrainingTakeModule({
                     </div>
                   </div>
                 ))}
-                <Button onClick={submitQuiz} disabled={pending}>
+                <Button
+                  onClick={submitQuiz}
+                  disabled={pending}
+                  className="h-11 rounded-none bg-[#e36f1e] px-6 font-bold text-white hover:bg-[#c45a1a]"
+                >
                   {pending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : null}
-                  Submit quiz
+                  Submit quiz &amp; complete
                 </Button>
               </>
             ) : (
               <>
-                <p className="text-sm text-gray-600">
-                  I confirm I have reviewed all materials in this module.
+                <p className="text-sm text-gray-700">
+                  I attest that I completed this training module.
                 </p>
-                <Button onClick={attest} disabled={pending}>
+                <Button
+                  onClick={attest}
+                  disabled={pending}
+                  className="h-11 rounded-none bg-[#e36f1e] px-6 font-bold text-white hover:bg-[#c45a1a]"
+                >
                   {pending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Mark complete
+                  ) : (
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                  )}
+                  Mark training complete
                 </Button>
               </>
             )}
-          </CardContent>
-        </Card>
-      ) : null}
+          </div>
+        </div>
+      ) : (
+        <div className="border-2 border-emerald-300 bg-emerald-50 px-5 py-4 text-emerald-900">
+          <p className="flex items-center gap-2 font-bold">
+            <CheckCircle2 className="h-5 w-5" />
+            You completed this module
+          </p>
+          <a
+            href={basePath}
+            className="mt-3 inline-flex bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800"
+          >
+            Back to Training list
+          </a>
+        </div>
+      )}
     </div>
   )
 }
