@@ -458,6 +458,7 @@ model User {
   clientClaimsOpened            ClientClaim[]            @relation("ClientClaimClaimedBy")
   clientClaimsReleased          ClientClaim[]            @relation("ClientClaimReleasedBy")
   crmTrainingCompletions        CrmTrainingStepCompletion[] @relation("CrmTrainingCompletions")
+  savedQueries                  SavedQuery[]                 @relation("SavedQueryOwner")
 
   @@map("users")
 }
@@ -3447,4 +3448,32 @@ model ClientAlert {
   @@map("client_alerts")
 }
 
+/// Saved Operations query definitions — filter JSON only, never PHI.
+enum SavedQueryShareScope {
+  PRIVATE
+  ROLE
+  FULL_ACCESS
+}
+
+model SavedQuery {
+  id              String              @id @default(cuid())
+  ownerUserId     String
+  name            String
+  description     String?             @db.Text
+  /// Whitelisted filter tree JSON (see lib/operations/queryBuilder.ts).
+  filterJson      Json
+  /// Optional column keys for the results table.
+  columnsJson     Json?
+  shareScope      SavedQueryShareScope @default(PRIVATE)
+  /// When shareScope = ROLE, which CrmRole may see/run this definition.
+  sharedWithRole  CrmRole?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  owner User @relation("SavedQueryOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId])
+  @@index([shareScope, sharedWithRole])
+  @@map("saved_queries")
+}
 
