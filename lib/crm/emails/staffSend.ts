@@ -22,6 +22,7 @@ import {
   mergeCcLists,
   parseCcList,
 } from '@/lib/crm/emails/mergeContext'
+import { buildMissingDocsList } from '@/lib/crm/emails/missingDocs'
 import { renderStaffEmail } from '@/lib/crm/emails/templates'
 import type { AssessmentModality } from '@/lib/crm/emails/templates/types'
 import type { EmailLinkMeta } from '@/lib/crm/emails/templates/shell'
@@ -186,6 +187,33 @@ function assertRbtAssignmentForClient(
   }
 }
 
+async function enrichMergeFieldsForTemplate(
+  clientId: string,
+  template: CommTemplate,
+  fields: ReturnType<typeof buildStaffMergeFields>
+) {
+  if (template !== 'DOCS_NEEDED') return fields
+
+  const requirements = await prisma.clientRequirement.findMany({
+    where: {
+      serviceClientId: clientId,
+      deletedAt: null,
+      type: 'DOCUMENT',
+    },
+    select: {
+      key: true,
+      label: true,
+      status: true,
+      expiresAt: true,
+    },
+  })
+
+  return {
+    ...fields,
+    missingDocsList: buildMissingDocsList(requirements),
+  }
+}
+
 export async function previewStaffClientEmail(
   user: CrmUser,
   clientId: string,
@@ -209,13 +237,18 @@ export async function previewStaffClientEmail(
 
   const attachments = validateAttachmentRefs(clientId, input.attachments ?? [])
   const links = validateLinks(input.links ?? [])
-  const fields = buildStaffMergeFields(
+  const baseFields = buildStaffMergeFields(
     client,
     {
       name: user.name ?? null,
       email: user.email ?? null,
     },
     { rbtAssignmentId: input.rbtAssignmentId ?? null }
+  )
+  const fields = await enrichMergeFieldsForTemplate(
+    clientId,
+    input.template,
+    baseFields
   )
 
   const rendered = renderStaffEmail(input.template, fields, {
@@ -297,13 +330,17 @@ export async function sendStaffClientEmail(
     throw new CrmAccessError('Client has no valid parent email on file', 400)
   }
 
-  const fields = buildStaffMergeFields(
-    client,
-    {
-      name: user.name ?? null,
-      email: user.email ?? null,
-    },
-    { rbtAssignmentId: input.rbtAssignmentId ?? null }
+  const fields = await enrichMergeFieldsForTemplate(
+    clientId,
+    input.template,
+    buildStaffMergeFields(
+      client,
+      {
+        name: user.name ?? null,
+        email: user.email ?? null,
+      },
+      { rbtAssignmentId: input.rbtAssignmentId ?? null }
+    )
   )
 
   const autoCc =

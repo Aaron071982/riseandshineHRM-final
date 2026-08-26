@@ -23,6 +23,15 @@ export type StaffMergeFields = {
   coordinatorName: string | null
   coordinatorEmail: string | null
   coordinatorPhone: string | null
+  /** Display title for coordinator signature (e.g. Case Coordinator). */
+  coordinatorTitle: string | null
+  /**
+   * Secure parent portal URL for uploads / forms.
+   * Prefer staff-attached link; never put PHI in the email body.
+   */
+  portalLink: string | null
+  /** Outstanding document labels for DOCS_NEEDED nudge (system-filled). */
+  missingDocsList: string[]
   rbtName: string | null
   rbtEmail: string | null
   rbtPhone: string | null

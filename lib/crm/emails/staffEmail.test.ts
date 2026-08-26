@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { graphEmailEnabled } from './graphSend'
 import { hasRiseAndShineMailbox, mailboxBlockedReason } from './mailbox'
-import { renderStaffEmail } from './templates'
+import { renderStaffEmail, renderWeeklyActivitySummary } from './templates'
 import type { StaffMergeFields } from './templates/types'
 import {
   greeting,
@@ -9,6 +9,7 @@ import {
   EMAIL_LOGO_URL,
 } from './templates/shell'
 import { defaultRbtAssignmentId } from './mergeContext'
+import { buildMissingDocsList } from './missingDocs'
 
 describe('lib/crm/emails/mailbox', () => {
   it('accepts @riseandshineaba.com addresses', () => {
@@ -62,6 +63,21 @@ describe('defaultRbtAssignmentId', () => {
   })
 })
 
+describe('buildMissingDocsList', () => {
+  it('returns only unsatisfied parent-facing docs in priority order', () => {
+    const list = buildMissingDocsList([
+      { key: 'physician_referral', label: 'Referral', status: 'PENDING' },
+      { key: 'insurance_card', label: 'Insurance', status: 'PENDING' },
+      { key: 'eligibility_vob', label: 'VOB', status: 'PENDING' },
+      { key: 'diagnostic_eval', label: 'Eval', status: 'RECEIVED' },
+    ])
+    expect(list[0]).toMatch(/Insurance card/)
+    expect(list.some((l) => /referral/i.test(l))).toBe(true)
+    expect(list.some((l) => /VOB/i.test(l))).toBe(false)
+    expect(list.some((l) => /Eval|Diagnostic/i.test(l))).toBe(false)
+  })
+})
+
 describe('lib/crm/emails/templates branded render', () => {
   const fields: StaffMergeFields = {
     childFirstName: 'Alex',
@@ -77,6 +93,9 @@ describe('lib/crm/emails/templates branded render', () => {
     coordinatorName: 'Jordan Lee',
     coordinatorEmail: 'jordan@riseandshineaba.com',
     coordinatorPhone: '(917) 915-2544',
+    coordinatorTitle: 'Case Coordinator',
+    portalLink: null,
+    missingDocsList: [],
     rbtName: 'Sam Taylor',
     rbtEmail: 'sam@riseandshineaba.com',
     rbtPhone: '(555) 987-6543',
@@ -96,41 +115,60 @@ describe('lib/crm/emails/templates branded render', () => {
     assessmentModality: null,
     staffName: 'Intake Team',
     staffEmail: 'intake@riseandshineaba.com',
-    companyPhone: '(888) 898-4774',
+    companyPhone: '888-898-4774',
     companyEmail: 'info@riseandshineaba.com',
     companyName: 'Rise & Shine ABA',
   }
 
-  it('WELCOME includes refined shell, greeting, and absolute logo', () => {
+  it('WELCOME uses v1 packet voice and Dear greeting', () => {
     const email = renderStaffEmail('WELCOME', fields)
-    expect(email?.subject).toMatch(/Welcome/)
-    expect(email?.html).toContain('Hi Maria,')
-    expect(email?.html).toContain('Rise & Shine ABA')
-    expect(email?.html).toContain('What to expect next')
-    expect(email?.html).toContain('(888) 898-4774')
+    expect(email?.subject).toMatch(/Welcome to Rise & Shine ABA/)
+    expect(email?.html).toContain('Dear Maria Rivera,')
+    expect(email?.html).toContain('Parent Welcome Packet')
+    expect(email?.html).toContain('rather answer a question twice')
+    expect(email?.html).toContain('The Rise &amp; Shine ABA Team')
     expect(email?.html).toContain(EMAIL_LOGO_URL)
-    expect(email?.html).toContain('https://')
     expect(email?.html).not.toContain('localhost')
     expect(email?.html).not.toContain('#3b82f6')
-    expect(email?.html).not.toContain('[Template copy pending')
+    expect(email?.html).not.toContain('What to expect next')
   })
 
-  it('CONSENT_REQUEST includes professional link copy for consent', () => {
-    const email = renderStaffEmail('CONSENT_REQUEST', fields)
-    expect(email?.html).toContain('secure link')
-    expect(email?.html).toContain('submit the consent form')
-    expect(email?.html).toContain('so we can begin')
-    expect(email?.html).toContain('Hi Maria,')
+  it('CONSENT_REQUEST is intake + consent with portal CTA', () => {
+    const email = renderStaffEmail('CONSENT_REQUEST', fields, {
+      links: [{ url: 'https://portal.example.com/abc', label: 'Open secure portal' }],
+    })
+    expect(email?.subject).toMatch(/intake, consent/)
+    expect(email?.html).toContain('Client Intake Form (Form 01)')
+    expect(email?.html).toContain('Consent &amp; Authorization Form (Form 02)')
+    expect(email?.html).toContain('https://portal.example.com/abc')
+    expect(email?.html).toContain('Open secure portal')
+    expect(email?.html).toContain('Dear Maria Rivera,')
+    expect(email?.html).toContain('Jordan Lee')
+    // Portal CTA is in body — not duplicated as a second "Links" strip entry alone
     expect(email?.html).not.toContain('How to complete consent')
   })
 
-  it('DOCS_NEEDED thanks for consent and drops family packet', () => {
-    const email = renderStaffEmail('DOCS_NEEDED', fields)
-    expect(email?.html).toContain('Thank you for completing the consent')
-    expect(email?.html).toContain('Intake form')
-    expect(email?.html).toContain('Transfer letter')
-    expect(email?.html).not.toContain('Family packet')
-    expect(email?.html).not.toContain('Parent consent form')
+  it('DOCS_NEEDED nudge uses missing list and secure upload CTA', () => {
+    const email = renderStaffEmail(
+      'DOCS_NEEDED',
+      {
+        ...fields,
+        missingDocsList: [
+          'Insurance card — front and back',
+          'Physician referral or prescription for ABA',
+        ],
+      },
+      {
+        links: [{ url: 'https://portal.example.com/upload' }],
+      }
+    )
+    expect(email?.subject).toMatch(/One step left/)
+    expect(email?.html).toContain('gentle reminder')
+    expect(email?.html).toContain('Insurance card — front and back')
+    expect(email?.html).toContain('Physician referral')
+    expect(email?.html).toContain('https://portal.example.com/upload')
+    expect(email?.html).not.toContain('Thank you for completing the consent')
+    expect(email?.html).not.toContain('Reply with documents')
   })
 
   it('SCHEDULE_CONFIRMED renders schedule table', () => {
@@ -175,13 +213,13 @@ describe('lib/crm/emails/templates branded render', () => {
   })
 
   it('includes attachments and links in preview when provided', () => {
-    const email = renderStaffEmail('CONSENT_REQUEST', fields, {
-      attachments: [{ fileName: 'consent-zayan.pdf', sizeBytes: 2048 }],
+    const email = renderStaffEmail('WELCOME', fields, {
+      attachments: [{ fileName: 'Parent-Welcome-Packet.pdf', sizeBytes: 2048 }],
       links: [{ url: 'https://sign.example.com/abc', label: 'Sign consent' }],
     })
     expect(email?.html).toContain('Attached files')
-    expect(email?.html).toContain('consent-zayan.pdf')
-    expect(email?.html).toContain('Links included')
+    expect(email?.html).toContain('Parent-Welcome-Packet.pdf')
+    expect(email?.html).toContain('Links')
     expect(email?.html).toContain('Sign consent')
     expect(email?.html).toContain('https://sign.example.com/abc')
   })
@@ -208,5 +246,35 @@ describe('lib/crm/emails/templates branded render', () => {
       subject: 'Custom',
     })
     expect(email?.html).not.toContain('Your journey with us')
+  })
+
+  it('weekly activity summary is internal and branded', () => {
+    const email = renderWeeklyActivitySummary({
+      weekRange: 'Aug 18–24, 2026',
+      sentCount: 2,
+      activityRows: [
+        {
+          date: 'Aug 19',
+          sender: 'jordan@riseandshineaba.com',
+          recipient: 'maria@example.com',
+          template: 'Welcome (packet)',
+          stageAtSend: 'INTAKE',
+        },
+      ],
+      pendingFollowups: [
+        {
+          clientLabel: 'Alex R.',
+          note: 'Welcome sent; intake forms not returned',
+        },
+      ],
+      recipientList: ['ops@riseandshineaba.com'],
+    })
+    expect(email.subject).toMatch(/Client Email Activity/)
+    expect(email.html).toContain('Total client emails sent this week')
+    expect(email.html).toContain('Welcome (packet)')
+    expect(email.html).toContain('awaiting a follow-up')
+    expect(email.html).toContain('Internal operations summary')
+    expect(email.html).not.toContain('Your journey with us')
+    expect(email.html).toContain(EMAIL_LOGO_URL)
   })
 })

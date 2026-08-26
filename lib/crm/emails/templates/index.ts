@@ -38,6 +38,12 @@ const RENDERERS: Partial<
   ...LEGACY_RENDERERS,
 }
 
+/** Templates that embed the first attached link as {{portalLink}} in the body. */
+const PORTAL_LINK_TEMPLATES = new Set<CommTemplate>([
+  'CONSENT_REQUEST',
+  'DOCS_NEEDED',
+])
+
 export function renderStaffEmail(
   template: CommTemplate,
   fields: StaffMergeFields,
@@ -46,8 +52,13 @@ export function renderStaffEmail(
   const base = RENDERERS[template]
   if (!base && template !== 'MANUAL') return null
 
+  const links = overrides?.links ?? []
+  const usesPortal = PORTAL_LINK_TEMPLATES.has(template)
+  const portalFromLink = usesPortal ? links[0]?.url?.trim() || null : null
+
   const mergedFields: StaffMergeFields = {
     ...fields,
+    portalLink: portalFromLink || fields.portalLink || null,
     assessmentModality:
       overrides?.assessmentModality !== undefined
         ? overrides.assessmentModality
@@ -68,9 +79,14 @@ export function renderStaffEmail(
     return null
   }
 
+  // Avoid duplicating the portal CTA in the footer links strip.
+  const linksForShell: EmailLinkMeta[] | undefined = usesPortal
+    ? links.slice(1)
+    : links
+
   const html = wrapStaffEmail(innerHtml, {
     attachments: overrides?.attachments,
-    links: overrides?.links,
+    links: linksForShell?.length ? linksForShell : undefined,
     template,
   })
   return {
@@ -83,9 +99,9 @@ export function renderStaffEmail(
 
 export function staffTemplateLabel(template: CommTemplate): string {
   const labels: Partial<Record<CommTemplate, string>> = {
-    WELCOME: 'Welcome',
-    CONSENT_REQUEST: 'Consent request',
-    DOCS_NEEDED: 'Documents needed',
+    WELCOME: 'Welcome (packet)',
+    CONSENT_REQUEST: 'Intake & consent',
+    DOCS_NEEDED: 'Documents needed (nudge)',
     BENEFITS_UPDATE: 'Benefits update',
     ASSESSMENT_SCHEDULED: 'Assessment scheduled',
     AUTH_APPROVED: 'Authorization approved',
@@ -109,3 +125,7 @@ export {
   TEMPLATE_MILESTONE,
   milestoneForTemplate,
 } from './milestones'
+export {
+  renderWeeklyActivitySummary,
+  type WeeklyActivitySummaryFields,
+} from './weeklyActivitySummary'

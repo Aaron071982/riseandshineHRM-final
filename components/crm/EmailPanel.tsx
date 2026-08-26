@@ -136,6 +136,8 @@ export function EmailPanel({
   const isRbtAssigned = template === 'RBT_ASSIGNED'
   const isMeetAndGreet = template === 'MEET_AND_GREET'
   const isRbtPick = isRbtAssigned || isMeetAndGreet
+  const needsPortalLink =
+    template === 'CONSENT_REQUEST' || template === 'DOCS_NEEDED'
   const needsConsentWarn = emailSend.emailConsentOk === false
 
   const localPreviewLogoUrl =
@@ -295,7 +297,11 @@ export function EmailPanel({
       {
         id: crypto.randomUUID(),
         url,
-        label: linkLabel.trim() || 'Open link',
+        label:
+          linkLabel.trim() ||
+          (needsPortalLink && prev.length === 0
+            ? 'Open secure portal'
+            : 'Open link'),
       },
     ])
     setLinkUrl('')
@@ -587,7 +593,11 @@ export function EmailPanel({
               <input
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="https://sign.example.com/..."
+                placeholder={
+                  needsPortalLink
+                    ? 'https://… secure parent portal URL'
+                    : 'https://sign.example.com/...'
+                }
                 disabled={!emailSend.canSend || links.length >= 5}
                 className="h-9 rounded-lg border border-line bg-surface px-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)] disabled:opacity-50"
               />
@@ -607,6 +617,12 @@ export function EmailPanel({
                 Add link
               </button>
             </div>
+            {needsPortalLink && links.length === 0 ? (
+              <p className="mt-2 text-xs text-[var(--sunrise)]">
+                Add the family&apos;s secure portal link first — it becomes the
+                primary button in this email. Do not put PHI in the message body.
+              </p>
+            ) : null}
             {links.length > 0 ? (
               <ul className="mt-2 space-y-1.5">
                 {links.map((l) => (

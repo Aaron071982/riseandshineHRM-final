@@ -197,6 +197,9 @@ export function buildStaffMergeFields(
       client.caseCoordinatorUser?.name || client.caseCoordinatorName,
     coordinatorEmail: client.caseCoordinatorUser?.email ?? null,
     coordinatorPhone: client.caseCoordinatorUser?.phoneNumber ?? null,
+    coordinatorTitle: 'Case Coordinator',
+    portalLink: null,
+    missingDocsList: [],
     rbtName: rbt.rbtName,
     rbtEmail: rbt.rbtEmail,
     rbtPhone: rbt.rbtPhone,
@@ -215,7 +218,7 @@ export function buildStaffMergeFields(
     assessmentModality: null,
     staffName: staff.name?.trim() || staff.email || 'Rise & Shine Team',
     staffEmail: staff.email,
-    companyPhone: '(888) 898-4774',
+    companyPhone: '888-898-4774',
     companyEmail: 'info@riseandshineaba.com',
     companyName: 'Rise & Shine ABA',
   }
