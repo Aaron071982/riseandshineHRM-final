@@ -1,5 +1,10 @@
+import type { CrmRole, UserRole } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { userAudienceKeys } from '@/lib/org-training/audience'
+import {
+  ORG_TRAINING_CRM_ROLES,
+  ORG_TRAINING_USER_ROLES,
+  userAudienceKeys,
+} from '@/lib/org-training/audience'
 
 export type AudienceTrainingSummary = {
   audienceKey: string
@@ -32,6 +37,9 @@ const AUDIENCE_LABELS: Record<string, string> = {
   TRAINER: 'Trainers',
 }
 
+const USER_ROLE_SET = new Set<string>(ORG_TRAINING_USER_ROLES)
+const CRM_ROLE_SET = new Set<string>(ORG_TRAINING_CRM_ROLES)
+
 /**
  * Per-audience completion rollup for ACTIVE modules (required preferred first).
  * Used on the Client Services training manage hub.
@@ -57,16 +65,48 @@ export async function buildAudienceTrainingSummaries(): Promise<
     new Set(modules.flatMap((m) => m.audienceRoles.map((r) => r.toUpperCase())))
   )
 
+  // Prisma enums differ: never pass CRM roles into User.role (or vice versa).
+  const userRoleKeys = audienceKeys.filter((k) => USER_ROLE_SET.has(k)) as UserRole[]
+  const crmRoleKeys = audienceKeys.filter((k) => CRM_ROLE_SET.has(k)) as CrmRole[]
+
+  if (userRoleKeys.length === 0 && crmRoleKeys.length === 0) {
+    return audienceKeys.map((key) => ({
+      audienceKey: key,
+      label: AUDIENCE_LABELS[key] ?? key,
+      moduleCount: modules.filter((m) =>
+        m.audienceRoles.some((r) => r.toUpperCase() === key)
+      ).length,
+      peopleAssigned: 0,
+      peopleFullyComplete: 0,
+      modules: modules
+        .filter((m) => m.audienceRoles.some((r) => r.toUpperCase() === key))
+        .map((m) => ({
+          id: m.id,
+          title: m.title,
+          required: m.required,
+          assignedPeople: 0,
+          completedPeople: 0,
+        })),
+    }))
+  }
+
   const users = await prisma.user.findMany({
     where: {
       isActive: true,
       OR: [
-        { role: { in: audienceKeys as never[] } },
-        {
-          crmRoles: {
-            some: { revokedAt: null, role: { in: audienceKeys as never[] } },
-          },
-        },
+        ...(userRoleKeys.length ? [{ role: { in: userRoleKeys } }] : []),
+        ...(crmRoleKeys.length
+          ? [
+              {
+                crmRoles: {
+                  some: {
+                    revokedAt: null,
+                    role: { in: crmRoleKeys },
+                  },
+                },
+              },
+            ]
+          : []),
       ],
     },
     select: {
@@ -133,7 +173,6 @@ export async function buildAudienceTrainingSummaries(): Promise<
     })
   }
 
-  // RBTs first, then alphabetical
   out.sort((a, b) => {
     if (a.audienceKey === 'RBT') return -1
     if (b.audienceKey === 'RBT') return 1

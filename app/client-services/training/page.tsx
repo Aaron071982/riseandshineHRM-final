@@ -8,8 +8,13 @@ import { createOrgTrainingModule } from '@/lib/org-training/actions'
 import {
   listAllModulesForAdmin,
   listAssignedModulesForUser,
+  type OrgTrainingAssignedModule,
+  type OrgTrainingModuleListItem,
 } from '@/lib/org-training/load'
-import { buildAudienceTrainingSummaries } from '@/lib/org-training/rbtSummary'
+import {
+  buildAudienceTrainingSummaries,
+  type AudienceTrainingSummary,
+} from '@/lib/org-training/rbtSummary'
 import OrgTrainingManageHub from '@/components/org-training/OrgTrainingManageHub'
 import { redirect } from 'next/navigation'
 
@@ -40,15 +45,35 @@ export default async function ClientServicesTrainingPage({
   const canManage = canAuthorOrgTraining(sessionUser, crmUser)
   const canMatrix = canViewOrgTrainingMatrix(sessionUser, crmUser)
 
-  const [myModules, modules, summaries] = await Promise.all([
-    listAssignedModulesForUser({
+  let myModules: OrgTrainingAssignedModule[] = []
+  let modules: OrgTrainingModuleListItem[] = []
+  let summaries: AudienceTrainingSummary[] = []
+  let loadError: string | null = null
+
+  try {
+    myModules = await listAssignedModulesForUser({
       id: crmUser.id,
       role: crmUser.role,
       crmRoles: crmUser.crmRoles,
-    }),
-    canManage ? listAllModulesForAdmin() : Promise.resolve([]),
-    canManage ? buildAudienceTrainingSummaries() : Promise.resolve([]),
-  ])
+    })
+  } catch (err) {
+    console.error('[training] listAssignedModulesForUser failed', err)
+    loadError = 'Could not load your assigned training. Tables may not be migrated yet.'
+  }
+
+  if (canManage) {
+    try {
+      ;[modules, summaries] = await Promise.all([
+        listAllModulesForAdmin(),
+        buildAudienceTrainingSummaries(),
+      ])
+    } catch (err) {
+      console.error('[training] manage hub load failed', err)
+      loadError =
+        loadError ??
+        'Could not load training modules. Run the org training SQL migration if this persists.'
+    }
+  }
 
   return (
     <OrgTrainingManageHub
@@ -58,7 +83,7 @@ export default async function ClientServicesTrainingPage({
       myModules={myModules}
       summaries={summaries}
       createModuleAction={canManage ? createModuleAction : undefined}
-      error={params.error ?? null}
+      error={params.error ?? loadError}
     />
   )
 }
