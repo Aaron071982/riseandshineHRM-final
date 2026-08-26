@@ -230,7 +230,7 @@ describe('lib/crm/emails/templates branded render', () => {
     })
     expect(email?.html).toContain('Attached files')
     expect(email?.html).toContain('Parent-Welcome-Packet.pdf')
-    expect(email?.html).toContain('Links')
+    expect(email?.html).toContain('Downloads &amp; links')
     expect(email?.html).toContain('Sign consent')
     expect(email?.html).toContain('https://sign.example.com/abc')
   })
