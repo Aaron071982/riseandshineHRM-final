@@ -8,6 +8,12 @@ import {
   auditClientAction,
   type CrmAccessSubject,
 } from '@/lib/crm/access'
+import {
+  DEPT_SLUGS,
+  deptHref,
+  isDeptSlug,
+  type DeptSlug,
+} from '@/lib/crm/deptPaths'
 import { daysInStage, isStalled } from '@/lib/crm/thresholds'
 import { OWNER_DEPT_LABELS, canonicalOwnerDeptForStage } from '@/lib/crm/stages'
 import {
@@ -25,22 +31,8 @@ import {
   STAFFING_HOURS_UTILIZATION_THRESHOLD,
 } from '@/lib/crm/staffingUnderHours'
 
-export type DeptSlug =
-  | 'intake'
-  | 'clinical'
-  | 'authorization'
-  | 'staffing'
-  | 'case-coordination'
-  | 'billing'
-
-export const DEPT_SLUGS: readonly DeptSlug[] = [
-  'intake',
-  'clinical',
-  'authorization',
-  'staffing',
-  'case-coordination',
-  'billing',
-] as const
+export type { DeptSlug }
+export { DEPT_SLUGS, deptHref, isDeptSlug }
 
 export const DEPT_SLUG_TO_OWNER: Record<DeptSlug, ClientOwnerDept> = {
   intake: 'INTAKE',
@@ -67,14 +59,6 @@ export const DEPT_SLUG_TO_CRM_ROLE: Record<DeptSlug, CrmRole> = {
   staffing: 'STAFFING',
   'case-coordination': 'CASE_COORDINATION',
   billing: 'BILLING',
-}
-
-export function isDeptSlug(v: string): v is DeptSlug {
-  return (DEPT_SLUGS as readonly string[]).includes(v)
-}
-
-export function deptHref(slug: DeptSlug): string {
-  return `/client-services/dept/${slug}`
 }
 
 export function deptLabel(slug: DeptSlug): string {

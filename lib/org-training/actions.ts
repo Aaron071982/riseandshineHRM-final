@@ -56,7 +56,7 @@ export async function createOrgTrainingModule(input: {
   if (!title) return { ok: false, error: 'Title is required' }
 
   const audienceRoles = sanitizeAudienceRoles(input.audienceRoles ?? [])
-  const module = await prisma.orgTrainingModule.create({
+  const created = await prisma.orgTrainingModule.create({
     data: {
       title,
       description: input.description?.trim() || null,
@@ -71,17 +71,17 @@ export async function createOrgTrainingModule(input: {
   await writeAuditLog({
     actorUserId: user.id,
     entityType: 'OrgTrainingModule',
-    entityId: module.id,
+    entityId: created.id,
     action: 'CREATE',
     after: {
-      title: module.title,
-      audienceRoles: module.audienceRoles,
-      required: module.required,
+      title: created.title,
+      audienceRoles: created.audienceRoles,
+      required: created.required,
     },
   })
 
-  revalidateTrainingPaths(module.id)
-  return { ok: true, data: { id: module.id } }
+  revalidateTrainingPaths(created.id)
+  return { ok: true, data: { id: created.id } }
 }
 
 export async function updateOrgTrainingModule(
@@ -414,23 +414,23 @@ async function assertCanCompleteModule(moduleId: string, userId: string) {
     return { error: 'Unauthorized' as const, module: null, user: null }
   }
 
-  const module = await loadModuleDetail(moduleId)
-  if (!module || module.status !== 'ACTIVE') {
+  const trainingModule = await loadModuleDetail(moduleId)
+  if (!trainingModule || trainingModule.status !== 'ACTIVE') {
     return { error: 'Module not found' as const, module: null, user: null }
   }
 
   // Admins may preview but completion is for assigned audience only
   const crmRoles = await fetchUserCrmRoles(user.id)
   const keys = userAudienceKeys({ role: user.role, crmRoles })
-  if (!moduleAssignedToUser(module, keys) && !isAdmin(user)) {
+  if (!moduleAssignedToUser(trainingModule, keys) && !isAdmin(user)) {
     return { error: 'Not assigned to this module' as const, module: null, user: null }
   }
   // Admins who aren't in audience shouldn't write completion via this path unless assigned
-  if (!moduleAssignedToUser(module, keys)) {
+  if (!moduleAssignedToUser(trainingModule, keys)) {
     return { error: 'Not assigned to this module' as const, module: null, user: null }
   }
 
-  return { error: null, module, user }
+  return { error: null, module: trainingModule, user }
 }
 
 async function requestMeta() {

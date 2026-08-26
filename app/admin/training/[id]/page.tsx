@@ -16,8 +16,8 @@ export default async function AdminTrainingModulePage({
   if (!isAdmin(user)) redirect('/login')
 
   const { id } = await params
-  const module = await loadModuleDetail(id)
-  if (!module) redirect('/admin/training')
+  const trainingModule = await loadModuleDetail(id)
+  if (!trainingModule) redirect('/admin/training')
 
   return (
     <div className="space-y-4">
@@ -25,8 +25,8 @@ export default async function AdminTrainingModulePage({
         <Link href="/admin/training">← All modules</Link>
       </Button>
       <OrgTrainingModuleEditor
-        key={`${module.id}-${String(module.updatedAt)}`}
-        module={module}
+        key={`${trainingModule.id}-${String(trainingModule.updatedAt)}`}
+        module={trainingModule}
       />
     </div>
   )

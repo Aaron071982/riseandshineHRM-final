@@ -41,12 +41,12 @@ export default async function RbtOrgTrainingModulePage({
   }
 
   const { moduleId } = await params
-  const module = await loadModuleDetail(moduleId)
-  if (!module || module.status !== 'ACTIVE') notFound()
+  const trainingModule = await loadModuleDetail(moduleId)
+  if (!trainingModule || trainingModule.status !== 'ACTIVE') notFound()
 
   const crmRoles = await fetchUserCrmRoles(user.id)
   const keys = userAudienceKeys({ role: user.role, crmRoles })
-  if (!moduleAssignedToUser(module, keys)) {
+  if (!moduleAssignedToUser(trainingModule, keys)) {
     redirect('/rbt/org-training')
   }
 
@@ -54,7 +54,7 @@ export default async function RbtOrgTrainingModulePage({
 
   return (
     <OrgTrainingTakeModule
-      module={module}
+      module={trainingModule}
       completed={!!completion?.completed}
       completedAt={completion?.completedAt?.toISOString() ?? null}
       basePath="/rbt/org-training"

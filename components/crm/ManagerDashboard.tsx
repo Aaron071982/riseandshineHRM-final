@@ -7,7 +7,7 @@ import {
   STAGE_GROUP,
   STAGE_GROUP_LABELS,
 } from '@/lib/crm/stages'
-import { deptHref } from '@/lib/crm/departments'
+import { deptHref } from '@/lib/crm/deptPaths'
 import { EXPIRY_TONE_CLASS } from '@/components/crm/ProfilePicker'
 import { cn } from '@/lib/utils'
 

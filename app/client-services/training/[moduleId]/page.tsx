@@ -19,14 +19,14 @@ export default async function ClientServicesTrainingModulePage({
 }) {
   const user = await getClientServicesUser()
   const { moduleId } = await params
-  const module = await loadModuleDetail(moduleId)
-  if (!module || module.status !== 'ACTIVE') notFound()
+  const trainingModule = await loadModuleDetail(moduleId)
+  if (!trainingModule || trainingModule.status !== 'ACTIVE') notFound()
 
   const keys = userAudienceKeys({
     role: user.role,
     crmRoles: user.crmRoles,
   })
-  if (!moduleAssignedToUser(module, keys)) {
+  if (!moduleAssignedToUser(trainingModule, keys)) {
     redirect('/client-services/training')
   }
 
@@ -34,7 +34,7 @@ export default async function ClientServicesTrainingModulePage({
 
   return (
     <OrgTrainingTakeModule
-      module={module}
+      module={trainingModule}
       completed={!!completion?.completed}
       completedAt={completion?.completedAt?.toISOString() ?? null}
       basePath="/client-services/training"
