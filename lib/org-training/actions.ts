@@ -16,7 +16,7 @@ import {
 import { loadModuleDetail } from '@/lib/org-training/load'
 import type { OrgTrainingQuizQuestion } from '@/lib/org-training/types'
 import { toYouTubeNoCookieEmbed } from '@/lib/org-training/youtube'
-import { fetchUserCrmRoles } from '@/lib/crm/access'
+import { fetchUserCrmRoles, getClientServicesUser } from '@/lib/crm/access'
 
 export type OrgTrainingActionResult<T = void> =
   | ({ ok: true } & (T extends void ? object : { data: T }))
@@ -24,19 +24,30 @@ export type OrgTrainingActionResult<T = void> =
 
 async function requireAuthor() {
   const user = await getCurrentUser()
-  if (!canAuthorOrgTraining(user) || !user) {
-    return { user: null as null, error: 'Forbidden' as const }
+  if (!user) return { user: null as null, error: 'Forbidden' as const }
+  if (canAuthorOrgTraining(user)) return { user, error: null }
+
+  try {
+    const crm = await getClientServicesUser()
+    if (canAuthorOrgTraining(user, crm)) return { user, error: null }
+  } catch {
+    // not a CRM session
   }
-  return { user, error: null }
+
+  return { user: null as null, error: 'Forbidden' as const }
 }
 
 function revalidateTrainingPaths(moduleId?: string) {
   revalidatePath('/admin/training')
   revalidatePath('/admin/training/matrix')
-  revalidatePath('/rbt/org-training')
   revalidatePath('/client-services/training')
+  revalidatePath('/client-services/training/matrix')
+  revalidatePath('/rbt/org-training')
+  revalidatePath('/rbt/profile')
+  revalidatePath('/rbt/dashboard')
   if (moduleId) {
     revalidatePath(`/admin/training/${moduleId}`)
+    revalidatePath(`/client-services/training/manage/${moduleId}`)
     revalidatePath(`/rbt/org-training/${moduleId}`)
     revalidatePath(`/client-services/training/${moduleId}`)
   }

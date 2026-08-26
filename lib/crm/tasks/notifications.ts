@@ -314,6 +314,37 @@ export async function notifyTaskMention(input: {
   })
 }
 
+/** Manual nudge when a task still has no conversation updates. */
+export async function notifyTaskReminder(input: {
+  assigneeUserId: string
+  reminderFromName: string
+  taskTitle: string
+  clientLabel?: string | null
+  dueAt?: Date | null
+  from: TaskNotifySender
+}): Promise<{ sent: boolean; reason?: string }> {
+  if (input.assigneeUserId === input.from.id) {
+    return { sent: false, reason: 'Cannot remind yourself' }
+  }
+  const due = input.dueAt
+    ? `<p><strong>Due:</strong> ${input.dueAt.toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</p>`
+    : ''
+  const client = input.clientLabel
+    ? `<p><strong>Client:</strong> ${input.clientLabel}</p>`
+    : ''
+  return notifyUser({
+    toUserId: input.assigneeUserId,
+    subject: `Reminder: ${input.taskTitle}`,
+    html: staffTaskEmailShell(
+      'Task reminder',
+      `<p>${input.reminderFromName} sent you a reminder on <strong>${input.taskTitle}</strong>.</p>
+<p>There are still no updates on this task — please take a look when you can.</p>${client}${due}`
+    ),
+    from: input.from,
+    auditAction: 'TASK_NOTIFY_REMINDER',
+  })
+}
+
 /**
  * @deprecated Prefer bi-nightly digest. Kept for ad-hoc use; uses Resend primary.
  */

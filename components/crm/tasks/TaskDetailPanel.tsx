@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { ChevronDown, Pencil, Trash2, X } from 'lucide-react'
+import { Bell, ChevronDown, Pencil, Trash2, X } from 'lucide-react'
 import type { ClientOwnerDept, TeamTaskPriority, TeamTaskStatus } from '@prisma/client'
 import {
   addTeamTaskComment,
@@ -10,6 +10,7 @@ import {
   getTeamTask,
   requestTeamTaskExtension,
   reviewTeamTaskExtension,
+  sendTeamTaskReminder,
   toggleTeamTaskSubtask,
   updateTeamTask,
   updateTeamTaskStatus,
@@ -23,12 +24,12 @@ import {
   ownerDeptLabel,
 } from '@/lib/crm/tasks/constants'
 import { formatDueRelative } from '@/lib/crm/tasks/formatDue'
-import { formatMentionDisplay } from '@/lib/crm/tasks/mentions'
 import {
   TaskChatComposer,
   TaskChatThread,
   type ChatComment,
 } from '@/components/crm/tasks/TaskChatThread'
+import { useTaskMentions } from '@/components/crm/tasks/useTaskMentions'
 import { CrmAvatar } from '@/components/crm/shared/CrmAvatar'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { cn } from '@/lib/utils'
@@ -83,13 +84,19 @@ export function TaskDetailPanel({
   const [pending, startTransition] = useTransition()
   const [task, setTask] = useState<TaskDetail | null>(null)
   const [error, setError] = useState('')
-  const [comment, setComment] = useState('')
   const [subtask, setSubtask] = useState('')
   const [extDue, setExtDue] = useState('')
   const [extReason, setExtReason] = useState('')
   const [blockedReason, setBlockedReason] = useState('')
-  const [mentionQuery, setMentionQuery] = useState('')
   const [activityOpen, setActivityOpen] = useState(false)
+  const [reminderMsg, setReminderMsg] = useState('')
+  const {
+    draft: comment,
+    setDraft: setComment,
+    mentionMatches,
+    pickMention,
+    clearDraft: clearComment,
+  } = useTaskMentions(users)
   const [editing, setEditing] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [editTitle, setEditTitle] = useState('')
@@ -102,6 +109,8 @@ export function TaskDetailPanel({
 
   useEffect(() => {
     setActivityOpen(false)
+    setReminderMsg('')
+    clearComment()
     let cancelled = false
     void (async () => {
       const res = await getTeamTask(taskId)
@@ -112,6 +121,7 @@ export function TaskDetailPanel({
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset composer when switching tasks
   }, [taskId])
 
   const load = async () => {
@@ -205,16 +215,6 @@ export function TaskDetailPanel({
       onClose()
     })
   }
-
-  const mentionMatches = mentionQuery.trim()
-    ? users.filter((u) => {
-        const q = mentionQuery.toLowerCase()
-        return (
-          u.name?.toLowerCase().includes(q) ||
-          u.email?.toLowerCase().includes(q)
-        )
-      }).slice(0, 5)
-    : []
 
   const comments = task.comments as ChatComment[]
 
@@ -618,35 +618,62 @@ export function TaskDetailPanel({
           )}
 
           <section>
-            <h3 className="font-display text-sm font-semibold text-ink">Conversation</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-display text-sm font-semibold text-ink">Conversation</h3>
+              {canManageTask &&
+                comments.length === 0 &&
+                task.assignedToUserId &&
+                task.status !== 'DONE' && (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => {
+                      setReminderMsg('')
+                      startTransition(async () => {
+                        setError('')
+                        const res = await sendTeamTaskReminder(taskId)
+                        if (!res.ok) {
+                          setError(res.error)
+                          return
+                        }
+                        setReminderMsg('Reminder email sent to the assignee')
+                        await load()
+                        onUpdated()
+                      })
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--brand)]/30 bg-[var(--sunrise-soft)] px-2.5 py-1.5 text-xs font-medium text-[var(--brand)] transition hover:bg-[var(--sunrise-soft)]/80 disabled:opacity-50"
+                    title="Email the assignee a reminder (only when there are no updates yet)"
+                  >
+                    <Bell className="h-3.5 w-3.5" />
+                    Send reminder
+                  </button>
+                )}
+            </div>
+            {reminderMsg ? (
+              <p className="mt-2 text-xs text-[var(--green)]">{reminderMsg}</p>
+            ) : null}
             <div className="mt-3 space-y-3">
               <TaskChatThread comments={comments} currentUserId={currentUserId} />
               <TaskChatComposer
                 value={comment}
-                onChange={(v) => {
-                  setComment(v)
-                  const at = v.lastIndexOf('@')
-                  if (at >= 0 && !v.slice(at).includes(' ')) {
-                    setMentionQuery(v.slice(at + 1))
-                  } else {
-                    setMentionQuery('')
-                  }
-                }}
-                onSubmit={() =>
-                  run(async () => {
-                    await addTeamTaskComment(taskId, comment)
-                    setComment('')
+                onChange={setComment}
+                onSubmit={() => {
+                  if (!comment.trim()) return
+                  startTransition(async () => {
+                    setError('')
+                    const res = await addTeamTaskComment(taskId, comment)
+                    if (!res.ok) {
+                      setError(res.error)
+                      return
+                    }
+                    clearComment()
+                    await load()
+                    onUpdated()
                   })
-                }
+                }}
                 pending={pending}
                 mentionMatches={mentionMatches}
-                onPickMention={(u) => {
-                  const label = u.name || u.email || 'User'
-                  setComment((c) =>
-                    c.replace(/@[^@]*$/, formatMentionDisplay(label, u.id) + ' ')
-                  )
-                  setMentionQuery('')
-                }}
+                onPickMention={pickMention}
               />
             </div>
           </section>

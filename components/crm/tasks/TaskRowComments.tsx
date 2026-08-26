@@ -6,12 +6,12 @@ import {
   addTeamTaskComment,
   getTeamTask,
 } from '@/lib/crm/tasks/actions'
-import { formatMentionDisplay } from '@/lib/crm/tasks/mentions'
 import {
   TaskChatComposer,
   TaskChatThread,
   type ChatComment,
 } from '@/components/crm/tasks/TaskChatThread'
+import { useTaskMentions } from '@/components/crm/tasks/useTaskMentions'
 
 export function TaskRowComments({
   taskId,
@@ -34,11 +34,17 @@ export function TaskRowComments({
   const [comments, setComments] = useState<ChatComment[]>([])
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState('')
-  const [body, setBody] = useState('')
-  const [mentionQuery, setMentionQuery] = useState('')
+  const {
+    draft: body,
+    setDraft: setBody,
+    mentionMatches,
+    pickMention,
+    clearDraft,
+  } = useTaskMentions(users)
 
   useEffect(() => {
     if (!open) return
+    clearDraft()
     let cancelled = false
     ;(async () => {
       const res = await getTeamTask(taskId)
@@ -54,29 +60,8 @@ export function TaskRowComments({
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, taskId])
-
-  const mentionMatches = mentionQuery.trim()
-    ? users
-        .filter((u) => {
-          const q = mentionQuery.toLowerCase()
-          return (
-            u.name?.toLowerCase().includes(q) ||
-            u.email?.toLowerCase().includes(q)
-          )
-        })
-        .slice(0, 5)
-    : []
-
-  const onBodyChange = (v: string) => {
-    setBody(v)
-    const at = v.lastIndexOf('@')
-    if (at >= 0 && !v.slice(at).includes(' ')) {
-      setMentionQuery(v.slice(at + 1))
-    } else {
-      setMentionQuery('')
-    }
-  }
 
   const post = () => {
     if (!body.trim()) return
@@ -87,7 +72,7 @@ export function TaskRowComments({
         setError(res.error)
         return
       }
-      setBody('')
+      clearDraft()
       const refreshed = await getTeamTask(taskId)
       if (refreshed.ok) {
         setComments(refreshed.task.comments as ChatComment[])
@@ -136,17 +121,11 @@ export function TaskRowComments({
               />
               <TaskChatComposer
                 value={body}
-                onChange={onBodyChange}
+                onChange={setBody}
                 onSubmit={post}
                 pending={pending}
                 mentionMatches={mentionMatches}
-                onPickMention={(u) => {
-                  const label = u.name || u.email || 'User'
-                  setBody((c) =>
-                    c.replace(/@[^@]*$/, formatMentionDisplay(label, u.id) + ' ')
-                  )
-                  setMentionQuery('')
-                }}
+                onPickMention={pickMention}
               />
             </>
           )}

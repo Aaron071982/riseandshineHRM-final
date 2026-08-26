@@ -17,6 +17,7 @@ import {
   MessageCircle,
   GraduationCap,
   Award,
+  Library,
 } from 'lucide-react'
 import { useState, useEffect, createContext, useContext } from 'react'
 import Image from 'next/image'
@@ -32,6 +33,7 @@ export function useRBTMessageModal() {
 const baseNavItems = [
   { href: '/rbt/get-certified', label: 'Get Certified', icon: Award },
   { href: '/rbt/training', label: '40-Hour', icon: GraduationCap },
+  { href: '/rbt/org-training', label: 'Company', icon: Library },
   { href: '/rbt/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/rbt/tasks', label: 'My Tasks', icon: ClipboardList },
   { href: '/rbt/schedule', label: 'Schedule', icon: Calendar },
@@ -229,7 +231,9 @@ export default function RBTLayout({
                       ? '40hr'
                       : item.href === '/rbt/get-certified'
                         ? 'Cert'
-                        : item.label}
+                        : item.href === '/rbt/org-training'
+                          ? 'Train'
+                          : item.label}
                   </span>
                 </Link>
               )

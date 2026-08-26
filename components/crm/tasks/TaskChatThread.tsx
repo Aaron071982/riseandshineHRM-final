@@ -14,7 +14,7 @@ export type ChatComment = {
 
 function MentionHighlightedBody({ body }: { body: string }) {
   const text = renderMentionBody(body)
-  const parts = text.split(/(@[^\s@]+(?:\s+[^\s@]+)?)/g)
+  const parts = text.split(/(@[^\s@]+(?:\s+[A-Z][^\s@]*)?)/g)
   return (
     <p className="whitespace-pre-wrap text-sm leading-relaxed">
       {parts.map((part, i) =>
@@ -124,23 +124,44 @@ export function TaskChatComposer({
           placeholder={placeholder}
           className="w-full resize-none rounded-lg border-0 bg-transparent px-2 py-1.5 text-sm text-ink placeholder:text-faint focus:outline-none focus:ring-0"
           onKeyDown={(e) => {
+            if (e.key === 'Escape' && mentionMatches.length > 0) {
+              e.preventDefault()
+              return
+            }
             if (e.key === 'Enter' && !e.shiftKey) {
+              if (mentionMatches.length > 0) {
+                e.preventDefault()
+                onPickMention(mentionMatches[0]!)
+                return
+              }
               e.preventDefault()
               if (value.trim() && !pending) onSubmit()
             }
           }}
         />
         {mentionMatches.length > 0 && (
-          <ul className="absolute bottom-full z-20 mb-1 w-full overflow-hidden rounded-lg border border-line bg-surface shadow-lg">
+          <ul
+            className="absolute bottom-full z-20 mb-1 max-h-48 w-full overflow-y-auto rounded-lg border border-line bg-surface shadow-lg"
+            role="listbox"
+          >
             {mentionMatches.map((u) => (
               <li key={u.id}>
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--sunrise-soft)]"
-                  onClick={() => onPickMention(u)}
+                  // mousedown so pick fires before textarea blur steals the click
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    onPickMention(u)
+                  }}
                 >
                   <CrmAvatar name={u.name} email={u.email} size={24} seed={u.id} />
-                  <span>{u.name || u.email}</span>
+                  <span className="min-w-0 truncate">
+                    {u.name || u.email}
+                    {u.name && u.email ? (
+                      <span className="ml-1 text-xs text-quiet">{u.email}</span>
+                    ) : null}
+                  </span>
                 </button>
               </li>
             ))}
@@ -148,7 +169,9 @@ export function TaskChatComposer({
         )}
       </div>
       <div className="mt-1 flex items-center justify-between gap-2 px-1">
-        <span className="text-[10px] text-faint">Enter to send · Shift+Enter for newline</span>
+        <span className="text-[10px] text-faint">
+          @ to mention · Enter to send · Shift+Enter for newline
+        </span>
         <button
           type="button"
           disabled={pending || !value.trim()}

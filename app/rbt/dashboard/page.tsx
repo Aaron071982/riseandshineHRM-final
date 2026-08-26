@@ -11,6 +11,7 @@ import {
   FORTY_HOUR_RBT_COURSE_URL,
   sortRbtOnboardingSteps,
 } from '@/lib/onboarding/catalog'
+import { listAssignedModulesForUser } from '@/lib/org-training/load'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -424,6 +425,24 @@ async function RBTDashboardPageInner() {
     )
     .map((c) => (c as any).document?.title ?? '')
 
+  let orgTrainingOutstanding: { id: string; title: string }[] = []
+  try {
+    if (
+      rbtProfile.status === 'HIRED' ||
+      rbtProfile.status === 'ONBOARDING_COMPLETED'
+    ) {
+      const orgMods = await listAssignedModulesForUser({
+        id: user.id,
+        role: user.role,
+      })
+      orgTrainingOutstanding = orgMods
+        .filter((m) => m.required && !m.completed)
+        .map((m) => ({ id: m.id, title: m.title }))
+    }
+  } catch (err) {
+    logError('Failed to load org training for dashboard', err)
+  }
+
   try {
     return (
       <RBTDashboardHome
@@ -438,6 +457,7 @@ async function RBTDashboardPageInner() {
         upcomingShiftsCount={upcomingShifts.length}
         pendingUploadTitles={pendingUploadTitles}
         fortyHourIncomplete={fortyHourIncomplete}
+        orgTrainingOutstanding={orgTrainingOutstanding}
       />
     )
   } catch (error) {

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { requireAdminSession } from '@/lib/auth'
+import { cookies } from 'next/headers'
+import { validateSession } from '@/lib/auth'
+import { canAuthorOrgTraining } from '@/lib/org-training/access'
+import { fetchUserCrmRoles } from '@/lib/crm/access'
 import { TRAINING_MATERIALS_BUCKET } from '@/lib/constants'
 import { supabaseAdmin } from '@/lib/supabase'
 
@@ -49,8 +52,24 @@ function safeFileName(name: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireAdminSession()
-  if (auth.response) return auth.response
+  const cookieStore = await cookies()
+  const token = cookieStore.get('session')?.value
+  if (!token) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const user = await validateSession(token)
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const crmRoles = await fetchUserCrmRoles(user.id)
+  if (
+    !canAuthorOrgTraining(user, {
+      id: user.id,
+      crmRoles,
+    })
+  ) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   if (!supabaseAdmin) {
     return NextResponse.json({ error: 'Storage not configured' }, { status: 503 })

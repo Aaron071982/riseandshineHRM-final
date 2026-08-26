@@ -26,12 +26,13 @@ import {
   crmTaskAssigneeUserWhere,
 } from '@/lib/crm/tasks/assignees'
 import { writeAuditLog } from '@/lib/audit'
-import { parseMentionIds } from '@/lib/crm/tasks/mentions'
+import { parseMentionIds, renderMentionBody } from '@/lib/crm/tasks/mentions'
 import {
   notifyExtensionRequested,
   notifyTaskAssigned,
   notifyTaskCompleted,
   notifyTaskMention,
+  notifyTaskReminder,
 } from '@/lib/crm/tasks/notifications'
 
 export type ActionResult<T = void> =
@@ -625,12 +626,79 @@ export async function addTeamTaskComment(taskId: string, body: string) {
         mentionedUserId: mentionedId,
         mentionerName: user.name ?? user.email ?? 'A teammate',
         taskTitle: task.title,
-        commentPreview: trimmed,
+        commentPreview: renderMentionBody(trimmed),
         from: { id: user.id, email: user.email ?? null, name: user.name ?? null },
       })
     }
 
     revalidateTaskPaths(access.serviceClientId)
+    return { ok: true as const }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function sendTeamTaskReminder(taskId: string) {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanManageTeamTaskById(user, taskId)
+
+    const task = await prisma.teamTask.findFirst({
+      where: { id: taskId, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        dueAt: true,
+        assignedToUserId: true,
+        serviceClientId: true,
+        serviceClient: {
+          select: { firstName: true, lastName: true, clientCode: true },
+        },
+        _count: { select: { comments: { where: { deletedAt: null } } } },
+      },
+    })
+    if (!task) throw new CrmAccessError('Task not found', 404)
+
+    if (task.status === 'DONE') {
+      throw new CrmAccessError('Completed tasks do not need a reminder', 400)
+    }
+    if (!task.assignedToUserId) {
+      throw new CrmAccessError('Assign someone before sending a reminder', 400)
+    }
+    if (task._count.comments > 0) {
+      throw new CrmAccessError('This task already has conversation updates', 400)
+    }
+
+    const clientLabel = task.serviceClient
+      ? `${task.serviceClient.firstName} ${task.serviceClient.lastName} (${task.serviceClient.clientCode})`
+      : null
+
+    const result = await notifyTaskReminder({
+      assigneeUserId: task.assignedToUserId,
+      reminderFromName: user.name ?? user.email ?? 'A teammate',
+      taskTitle: task.title,
+      clientLabel,
+      dueAt: task.dueAt,
+      from: { id: user.id, email: user.email ?? null, name: user.name ?? null },
+    })
+
+    await logTaskActivity(
+      taskId,
+      user.id,
+      'REMINDER',
+      result.sent ? 'Reminder email sent' : `Reminder skipped: ${result.reason ?? 'unknown'}`,
+      task.serviceClientId
+    )
+
+    revalidateTaskPaths(task.serviceClientId)
+    if (!result.sent) {
+      return {
+        ok: false as const,
+        error: result.reason ?? 'Could not send reminder email',
+        status: 400,
+      }
+    }
     return { ok: true as const }
   } catch (err) {
     return fail(err)
@@ -753,23 +821,25 @@ export async function reviewTeamTaskExtension(
 
 export async function searchTaskMentionUsers(query: string) {
   try {
-    const user = await getClientServicesUser()
+    await getClientServicesUser()
     const q = query.trim().toLowerCase()
-    if (q.length < 2) return { ok: true as const, users: [] }
 
     const users = await prisma.user.findMany({
       where: {
         AND: [
           crmTaskAssigneeUserWhere(),
-          {
-            OR: [
-              { name: { contains: q, mode: 'insensitive' } },
-              { email: { contains: q, mode: 'insensitive' } },
-            ],
-          },
+          q.length === 0
+            ? {}
+            : {
+                OR: [
+                  { name: { contains: q, mode: 'insensitive' } },
+                  { email: { contains: q, mode: 'insensitive' } },
+                ],
+              },
         ],
       },
       select: { id: true, name: true, email: true },
+      orderBy: [{ name: 'asc' }, { email: 'asc' }],
       take: 8,
     })
 

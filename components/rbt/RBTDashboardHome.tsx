@@ -50,6 +50,8 @@ interface RBTDashboardHomeProps {
   /** Fillable PDFs that were downloaded but not yet uploaded (for reminder banner) */
   pendingUploadTitles?: string[]
   fortyHourIncomplete?: boolean
+  /** Required company (org) training still outstanding */
+  orgTrainingOutstanding?: { id: string; title: string }[]
 }
 
 export default function RBTDashboardHome({
@@ -64,10 +66,12 @@ export default function RBTDashboardHome({
   upcomingShiftsCount,
   pendingUploadTitles = [],
   fortyHourIncomplete = false,
+  orgTrainingOutstanding = [],
 }: RBTDashboardHomeProps) {
   const greeting = getTimeBasedGreeting()
   const showOnboarding = onboardingPercent < 100
   const showUploadReminder = pendingUploadTitles.length > 0
+  const showOrgTraining = orgTrainingOutstanding.length > 0
   const statusColors: Record<string, string> = {
     SCHEDULED: 'bg-blue-500',
     COMPLETED: 'bg-green-500',
@@ -99,6 +103,29 @@ export default function RBTDashboardHome({
               <Link href="/rbt/tasks">Continue other tasks</Link>
             </Button>
           </div>
+        </div>
+      )}
+
+      {showOrgTraining && (
+        <div className="rounded-xl border border-[#e36f1e]/40 bg-orange-50/80 px-4 py-3 dark:border-[var(--orange-primary)]/40 dark:bg-[var(--bg-elevated)]">
+          <p className="font-semibold text-gray-900 dark:text-[var(--text-primary)]">
+            Company training before you work
+          </p>
+          <p className="mt-1 text-sm text-gray-700 dark:text-[var(--text-secondary)]">
+            Finish these required modules — Rise & Shine assigned them for your role.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {orgTrainingOutstanding.map((m) => (
+              <li key={m.id}>
+                <Button asChild size="sm" variant="outline" className="w-full justify-start sm:w-auto">
+                  <Link href={`/rbt/org-training/${m.id}`}>{m.title}</Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <Button asChild size="sm" className="mt-3 bg-[#e36f1e] hover:bg-[#c95e18] text-white">
+            <Link href="/rbt/org-training">View all company training</Link>
+          </Button>
         </div>
       )}
 

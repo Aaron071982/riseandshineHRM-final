@@ -50,7 +50,7 @@ const standardMainNav: NavItem[] = [
   { href: '/admin/employees', label: 'Employees and Candidates', icon: Users },
   { href: '/admin/interviews', label: 'Interviews', icon: Calendar },
   { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
-  { href: '/admin/training', label: 'Training', icon: GraduationCap },
+  { href: '/client-services/training', label: 'Training', icon: GraduationCap },
 ]
 
 const documentsNavItem: NavItem = { href: '/admin/documents', label: 'Documents', icon: FileText }
@@ -84,7 +84,12 @@ function pathIsActive(pathname: string, href: string): boolean {
   if (href === '/schedule') return pathname.startsWith('/schedule')
   if (href === '/client-services') return pathname.startsWith('/client-services')
   if (href === '/admin/documents') return pathname.startsWith('/admin/documents')
-  if (href === '/admin/training') return pathname.startsWith('/admin/training')
+  if (href === '/client-services/training') {
+    return (
+      pathname.startsWith('/client-services/training') ||
+      pathname.startsWith('/admin/training')
+    )
+  }
   if (href === '/admin/employees') return pathname.startsWith('/admin/employees') || pathname.startsWith('/admin/rbts')
   return pathname === href
 }
@@ -153,7 +158,7 @@ export default function AdminLayout({
         { href: '/admin/employees', label: 'Employees and Candidates', icon: Users },
         { href: '/admin/interviews', label: 'Interviews', icon: Calendar },
         { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
-        { href: '/admin/training', label: 'Training', icon: GraduationCap },
+        { href: '/client-services/training', label: 'Training', icon: GraduationCap },
         { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
         { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
         { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },

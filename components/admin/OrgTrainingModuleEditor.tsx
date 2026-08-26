@@ -31,13 +31,18 @@ type ItemDraft = OrgTrainingItemInput & { clientKey: string }
 
 type Props = {
   module: OrgTrainingModuleDetail
+  /** Where “done” / cancel navigates; defaults to admin list. */
+  listHref?: string
 }
 
 function newClientKey() {
   return `k-${Math.random().toString(36).slice(2, 10)}`
 }
 
-export default function OrgTrainingModuleEditor({ module }: Props) {
+export default function OrgTrainingModuleEditor({
+  module,
+  listHref = '/client-services/training',
+}: Props) {
   const router = useRouter()
   const { showToast } = useToast()
   const [pending, startTransition] = useTransition()
