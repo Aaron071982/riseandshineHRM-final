@@ -41,6 +41,9 @@ export default function OrgTrainingTakeModule({
   const fileHref = (path: string) =>
     `/api/training/file/${path.split('/').map(encodeURIComponent).join('/')}`
 
+  const isVideoPath = (path: string) =>
+    /\.(mp4|webm|mov|m4v|avi)(\?|$)/i.test(path)
+
   const attest = () => {
     startTransition(async () => {
       const res = await attestOrgTrainingComplete(module.id)
@@ -153,14 +156,26 @@ export default function OrgTrainingTakeModule({
               </a>
             ) : null}
             {item.type === 'FILE' && item.storageObjectPath ? (
-              <a
-                href={fileHref(item.storageObjectPath)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-[#e36f1e] underline"
-              >
-                View file <ExternalLink className="h-3.5 w-3.5" />
-              </a>
+              isVideoPath(item.storageObjectPath) ? (
+                <video
+                  controls
+                  playsInline
+                  className="w-full max-h-[28rem] rounded-md bg-black"
+                  src={fileHref(item.storageObjectPath)}
+                >
+                  Your browser does not support video playback.
+                  <a href={fileHref(item.storageObjectPath)}>Download video</a>
+                </video>
+              ) : (
+                <a
+                  href={fileHref(item.storageObjectPath)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[#e36f1e] underline"
+                >
+                  View file <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )
             ) : null}
             {item.type === 'READING' && item.richTextContent ? (
               <div

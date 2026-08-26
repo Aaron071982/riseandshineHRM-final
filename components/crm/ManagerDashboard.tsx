@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { ReactNode } from 'react'
 import type { ManagerDashboardData } from '@/lib/crm/dashboard'
 import {
   OWNER_DEPT_LABELS,
@@ -25,8 +26,11 @@ const GROUP_BAR: Record<string, string> = {
 
 export default function ManagerDashboard({
   data,
+  opsSlot,
 }: {
   data: ManagerDashboardData
+  /** Charts / report links rendered under the pipeline funnel. */
+  opsSlot?: ReactNode
 }) {
   const { kpis, pipeline, queues, health, performance } = data
   const maxFunnel = Math.max(1, ...pipeline.byStage.map((s) => s.count))
@@ -72,8 +76,76 @@ export default function ManagerDashboard({
           label="Auth expiring ≤60d"
           value={kpis.authExpiring60}
           href={caseloadHref({ queue: 'auth_expiring' })}
+          urgent={kpis.authExpiring60 > 0}
         />
       </div>
+
+      {/* High priority: auth + RBT replacement */}
+      <section className="grid gap-3 lg:grid-cols-2">
+        <HealthCard title="Auth expiring">
+          {health.authExpiring.every((b) => b.items.length === 0) ? (
+            <Empty>No treatment auths expiring in the next 60 days.</Empty>
+          ) : (
+            <ul className="space-y-2">
+              {health.authExpiring.flatMap((b) =>
+                b.items.map((item) => {
+                  const tone =
+                    item.daysLeft <= 7
+                      ? 'urgent'
+                      : item.daysLeft <= 30
+                        ? 'warning'
+                        : 'info'
+                  return (
+                    <li key={`${item.clientId}-${item.expirationDate}`}>
+                      <Link
+                        href={`/client-services/clients/${item.clientId}?tab=authorization`}
+                        className="block rounded-lg border border-line px-2.5 py-2 hover:bg-line-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-ink">
+                            {item.clientName}
+                          </span>
+                          <span
+                            className={cn(
+                              'rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums',
+                              EXPIRY_TONE_CLASS[tone]
+                            )}
+                          >
+                            {item.daysLeft}d · ≤{b.band}
+                          </span>
+                        </div>
+                        <p className="text-xs text-quiet">
+                          {item.payerName} · {item.clientCode}
+                        </p>
+                      </Link>
+                    </li>
+                  )
+                })
+              )}
+            </ul>
+          )}
+        </HealthCard>
+
+        <HealthCard title="RBT replacement needed">
+          {health.rbtReplacement.length === 0 ? (
+            <Empty>No open RBT replacement alerts — nice.</Empty>
+          ) : (
+            <ul className="space-y-2">
+              {health.rbtReplacement.map((a) => (
+                <li key={a.alertId}>
+                  <Link
+                    href={`/client-services/clients/${a.clientId}?tab=staffing`}
+                    className="block rounded-lg border border-line px-2.5 py-2 hover:bg-line-2"
+                  >
+                    <div className="text-sm font-medium text-ink">{a.clientName}</div>
+                    <p className="text-xs text-quiet">{a.message}</p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </HealthCard>
+      </section>
 
       {/* Funnel */}
       <section className="rounded-xl border border-line bg-surface p-4">
@@ -122,6 +194,16 @@ export default function ManagerDashboard({
           })}
         </div>
       </section>
+
+      {/* Ops charts under funnel */}
+      {opsSlot ? (
+        <section className="space-y-3">
+          <h2 className="font-display text-base font-semibold text-ink">
+            Insights &amp; charts
+          </h2>
+          {opsSlot}
+        </section>
+      ) : null}
 
       {/* Department queues */}
       <section className="grid gap-3 lg:grid-cols-2">
@@ -253,72 +335,8 @@ export default function ManagerDashboard({
         />
       </section>
 
-      {/* Active health */}
-      <section className="grid gap-3 lg:grid-cols-3">
-        <HealthCard title="Auth expiring">
-          {health.authExpiring.every((b) => b.items.length === 0) ? (
-            <Empty>No treatment auths expiring in the next 60 days.</Empty>
-          ) : (
-            <ul className="space-y-2">
-              {health.authExpiring.flatMap((b) =>
-                b.items.map((item) => {
-                  const tone =
-                    item.daysLeft <= 7
-                      ? 'urgent'
-                      : item.daysLeft <= 30
-                        ? 'warning'
-                        : 'info'
-                  return (
-                    <li key={`${item.clientId}-${item.expirationDate}`}>
-                      <Link
-                        href={`/client-services/clients/${item.clientId}?tab=authorization`}
-                        className="block rounded-lg border border-line px-2.5 py-2 hover:bg-line-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-ink">
-                            {item.clientName}
-                          </span>
-                          <span
-                            className={cn(
-                              'rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums',
-                              EXPIRY_TONE_CLASS[tone]
-                            )}
-                          >
-                            {item.daysLeft}d · ≤{b.band}
-                          </span>
-                        </div>
-                        <p className="text-xs text-quiet">
-                          {item.payerName} · {item.clientCode}
-                        </p>
-                      </Link>
-                    </li>
-                  )
-                })
-              )}
-            </ul>
-          )}
-        </HealthCard>
-
-        <HealthCard title="RBT replacement needed">
-          {health.rbtReplacement.length === 0 ? (
-            <Empty>No open RBT replacement alerts — nice.</Empty>
-          ) : (
-            <ul className="space-y-2">
-              {health.rbtReplacement.map((a) => (
-                <li key={a.alertId}>
-                  <Link
-                    href={`/client-services/clients/${a.clientId}?tab=staffing`}
-                    className="block rounded-lg border border-line px-2.5 py-2 hover:bg-line-2"
-                  >
-                    <div className="text-sm font-medium text-ink">{a.clientName}</div>
-                    <p className="text-xs text-quiet">{a.message}</p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </HealthCard>
-
+      {/* Lower priority health */}
+      <section className="grid gap-3 lg:grid-cols-1">
         <HealthCard title="On break / service gaps">
           {health.onBreak.length === 0 ? (
             <Empty>No clients on hold or mid-break right now.</Empty>
@@ -390,7 +408,7 @@ export default function ManagerDashboard({
       <p className="text-xs text-faint">
         Owner depts:{' '}
         {Object.entries(OWNER_DEPT_LABELS)
-          .map(([k, v]) => `${v}`)
+          .map(([, v]) => `${v}`)
           .join(' · ')}
       </p>
     </div>

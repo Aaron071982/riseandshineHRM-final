@@ -9,37 +9,47 @@ export default function OrgTrainingModuleList({
   basePath,
   title = 'Training',
   subtitle,
+  emptyMessage,
+  hideHeader = false,
 }: {
   modules: OrgTrainingAssignedModule[]
   basePath: string
   title?: string
   subtitle?: string
+  emptyMessage?: string
+  hideHeader?: boolean
 }) {
   const required = modules.filter((m) => m.required)
   const doneRequired = required.filter((m) => m.completed).length
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
-          {title}
-        </h1>
-        {subtitle ? (
-          <p className="mt-1 text-sm text-gray-600 dark:text-[var(--text-secondary)]">
-            {subtitle}
-          </p>
-        ) : null}
-        {required.length > 0 ? (
-          <p className="mt-2 text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">
-            Required: {doneRequired}/{required.length} complete
-          </p>
-        ) : null}
-      </div>
+    <div className={hideHeader ? 'space-y-3' : 'mx-auto max-w-3xl space-y-6'}>
+      {!hideHeader ? (
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
+            {title}
+          </h1>
+          {subtitle ? (
+            <p className="mt-1 text-sm text-gray-600 dark:text-[var(--text-secondary)]">
+              {subtitle}
+            </p>
+          ) : null}
+          {required.length > 0 ? (
+            <p className="mt-2 text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">
+              Required: {doneRequired}/{required.length} complete
+            </p>
+          ) : null}
+        </div>
+      ) : required.length > 0 ? (
+        <p className="text-sm font-medium text-gray-700 dark:text-[var(--text-secondary)]">
+          Required: {doneRequired}/{required.length} complete
+        </p>
+      ) : null}
 
       {modules.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-gray-500">
-            No training modules assigned to you right now.
+            {emptyMessage ?? 'No training modules assigned to you right now.'}
           </CardContent>
         </Card>
       ) : (

@@ -308,7 +308,7 @@ export default function OrgTrainingModuleEditor({ module }: Props) {
               <Plus className="mr-1 h-3 w-3" /> Link
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={() => addItem('FILE')}>
-              <Plus className="mr-1 h-3 w-3" /> File
+              <Plus className="mr-1 h-3 w-3" /> File / video
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={() => addItem('READING')}>
               <Plus className="mr-1 h-3 w-3" /> Reading
@@ -380,9 +380,12 @@ export default function OrgTrainingModuleEditor({ module }: Props) {
                     ) : null}
                     <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[#e36f1e]">
                       <Upload className="h-4 w-4" />
-                      {uploadingKey === item.clientKey ? 'Uploading…' : 'Upload file'}
+                      {uploadingKey === item.clientKey
+                        ? 'Uploading…'
+                        : 'Upload PDF, image, or video (mp4)'}
                       <input
                         type="file"
+                        accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.txt,.mp4,.webm,.mov,.m4v,application/pdf,video/mp4,video/webm,video/quicktime"
                         className="hidden"
                         disabled={uploadingKey === item.clientKey}
                         onChange={(e) => {
@@ -391,6 +394,10 @@ export default function OrgTrainingModuleEditor({ module }: Props) {
                         }}
                       />
                     </label>
+                    <p className="text-xs text-gray-500">
+                      Videos up to 200MB (raise Supabase bucket limit if upload fails).
+                      YouTube links still use &quot;YouTube embed&quot; above.
+                    </p>
                   </div>
                 ) : null}
                 {item.type === 'READING' ? (

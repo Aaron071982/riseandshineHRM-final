@@ -20,32 +20,41 @@ const ESPRESSO = '#2f2318'
 const MUTED = '#8a7a6c'
 const SECONDARY = '#c45a1a'
 
-export function OpsOverviewCharts({ data }: { data: OpsOverviewData }) {
+export function OpsOverviewCharts({
+  data,
+  omitFunnel = false,
+}: {
+  data: OpsOverviewData
+  /** Dashboard already shows the pipeline funnel — skip the duplicate chart. */
+  omitFunnel?: boolean
+}) {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard
-          title="Pipeline funnel"
-          subtitle="LIVE clients by stage"
-          href="/client-services/operations/reports/pipeline-health"
-        >
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={data.funnel} margin={{ top: 8, right: 8, left: 0, bottom: 48 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ebe3da" />
-              <XAxis
-                dataKey="stage"
-                tick={{ fontSize: 10, fill: MUTED }}
-                interval={0}
-                angle={-35}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis tick={{ fontSize: 11, fill: MUTED }} allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="count" fill={ACCENT} name="Clients" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
+        {!omitFunnel ? (
+          <ChartCard
+            title="Pipeline funnel"
+            subtitle="LIVE clients by stage"
+            href="/client-services/operations/reports/pipeline-health"
+          >
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={data.funnel} margin={{ top: 8, right: 8, left: 0, bottom: 48 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ebe3da" />
+                <XAxis
+                  dataKey="stage"
+                  tick={{ fontSize: 10, fill: MUTED }}
+                  interval={0}
+                  angle={-35}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis tick={{ fontSize: 11, fill: MUTED }} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="count" fill={ACCENT} name="Clients" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        ) : null}
 
         <ChartCard
           title="Staffing gauge"

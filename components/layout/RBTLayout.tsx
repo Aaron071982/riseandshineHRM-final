@@ -11,7 +11,6 @@ import {
   Calendar,
   FileText,
   BookOpen,
-  ClipboardCheck,
   Timer,
   LogOut,
   User,
@@ -31,7 +30,6 @@ export function useRBTMessageModal() {
 
 const baseNavItems = [
   { href: '/rbt/training', label: '40-Hour', icon: GraduationCap },
-  { href: '/rbt/org-training', label: 'Training', icon: ClipboardCheck },
   { href: '/rbt/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/rbt/tasks', label: 'My Tasks', icon: ClipboardList },
   { href: '/rbt/schedule', label: 'Schedule', icon: Calendar },

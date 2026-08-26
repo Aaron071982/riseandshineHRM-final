@@ -6,9 +6,11 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
-const MAX_BYTES = 10 * 1024 * 1024
+/** Docs/images: 10MB. Video (mp4/webm/mov): 200MB — also raise bucket limit in Supabase. */
+const MAX_DOC_BYTES = 10 * 1024 * 1024
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024
 
-const ALLOWED_TYPES = new Set([
+const DOC_TYPES = new Set([
   'application/pdf',
   'image/png',
   'image/jpeg',
@@ -19,7 +21,14 @@ const ALLOWED_TYPES = new Set([
   'text/plain',
 ])
 
-const ALLOWED_EXTENSIONS = new Set([
+const VIDEO_TYPES = new Set([
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
+])
+
+const DOC_EXTENSIONS = new Set([
   'pdf',
   'png',
   'jpg',
@@ -29,6 +38,8 @@ const ALLOWED_EXTENSIONS = new Set([
   'docx',
   'txt',
 ])
+
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'm4v', 'avi'])
 
 function safeFileName(name: string): string {
   return name
@@ -51,15 +62,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'file required' }, { status: 400 })
   }
 
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: 'File must be under 10MB' }, { status: 400 })
-  }
-
   const mime = (file.type || '').toLowerCase()
   const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-  if (!ALLOWED_TYPES.has(mime) && !ALLOWED_EXTENSIONS.has(ext)) {
+  const isVideo = VIDEO_TYPES.has(mime) || VIDEO_EXTENSIONS.has(ext)
+  const isDoc = DOC_TYPES.has(mime) || DOC_EXTENSIONS.has(ext)
+
+  if (!isVideo && !isDoc) {
     return NextResponse.json(
-      { error: 'Allowed: PDF, Word, images, or plain text' },
+      {
+        error:
+          'Allowed: PDF, Word, images, plain text, or video (mp4, webm, mov)',
+      },
+      { status: 400 }
+    )
+  }
+
+  const max = isVideo ? MAX_VIDEO_BYTES : MAX_DOC_BYTES
+  if (file.size > max) {
+    return NextResponse.json(
+      {
+        error: isVideo
+          ? 'Video must be under 200MB'
+          : 'File must be under 10MB',
+      },
       { status: 400 }
     )
   }
@@ -74,14 +99,23 @@ export async function POST(request: NextRequest) {
   const { error: uploadError } = await supabaseAdmin.storage
     .from(TRAINING_MATERIALS_BUCKET)
     .upload(path, buffer, {
-      contentType: mime || 'application/octet-stream',
+      contentType: mime || (isVideo ? 'video/mp4' : 'application/octet-stream'),
       upsert: false,
     })
 
   if (uploadError) {
     console.error('[org-training upload]', uploadError)
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error:
+          uploadError.message?.includes('size') ||
+          uploadError.message?.includes('Payload')
+            ? 'Upload failed — raise the training-materials bucket file size limit in Supabase (e.g. 200MB for video).'
+            : 'Upload failed',
+      },
+      { status: 500 }
+    )
   }
 
-  return NextResponse.json({ storageObjectPath: path })
+  return NextResponse.json({ storageObjectPath: path, isVideo })
 }

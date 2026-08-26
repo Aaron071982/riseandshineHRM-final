@@ -8,7 +8,6 @@ import {
   ClipboardList,
   FolderOpen,
   LayoutDashboard,
-  LineChart,
   Network,
   Search as SearchIcon,
   Shield,
@@ -49,7 +48,6 @@ export default function ClientServicesLayout({
       { href: '/client-services/clients', label: 'Clients', icon: Users },
       { href: '/client-services/tasks', label: 'Tasks', icon: CheckSquare },
       { href: '/client-services/training', label: 'Training', icon: GraduationCap },
-      { href: '/client-services/operations', label: 'Operations', icon: LineChart },
       ...departmentNav.map((d) => ({
         href: d.href,
         label: d.label,
