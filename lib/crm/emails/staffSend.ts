@@ -35,6 +35,7 @@ import {
   loadTemplateFormAttachments,
   templateFormAttachmentMetas,
 } from '@/lib/crm/emails/templateFormAttachments'
+import { templateFormDownloadLinks } from '@/lib/crm/emails/parentFormDownloads'
 import { CRM_EMAIL_ATTACHMENTS_PREFIX } from '@/lib/constants'
 import {
   isConsentLineInitialed,
@@ -256,7 +257,11 @@ export async function previewStaffClientEmail(
   assertRbtAssignmentForClient(client, input.rbtAssignmentId)
 
   const attachments = validateAttachmentRefs(clientId, input.attachments ?? [])
-  const links = validateLinks(input.links ?? [])
+  const formDownloadLinks = templateFormDownloadLinks(input.template)
+  const links = validateLinks([
+    ...formDownloadLinks,
+    ...(input.links ?? []),
+  ])
   const formMetas = templateFormAttachmentMetas(input.template)
   const baseFields = buildStaffMergeFields(
     client,
@@ -378,7 +383,11 @@ export async function sendStaffClientEmail(
   }
 
   const attachments = validateAttachmentRefs(clientId, input.attachments ?? [])
-  const links = validateLinks(input.links ?? [])
+  const formDownloadLinks = templateFormDownloadLinks(input.template)
+  const links = validateLinks([
+    ...formDownloadLinks,
+    ...(input.links ?? []),
+  ])
   const templateForms = loadTemplateFormAttachments(input.template)
 
   if (!input.force && input.template !== 'MANUAL' && !isFullAccess(user)) {

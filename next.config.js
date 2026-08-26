@@ -62,6 +62,21 @@ const nextConfig = {
   images: {
     domains: ['localhost'],
   },
+  experimental: {
+    // Keep parent form PDFs available to serverless functions that attach them.
+    outputFileTracingIncludes: {
+      '/api/public/parent-forms/[slug]': [
+        './public/parent-forms/**/*',
+        './email-docs/**/*',
+        './assets/crm-parent-forms/**/*',
+      ],
+      '/*': [
+        './public/parent-forms/**/*',
+        './email-docs/**/*',
+        './assets/crm-parent-forms/**/*',
+      ],
+    },
+  },
   async headers() {
     return [
       {

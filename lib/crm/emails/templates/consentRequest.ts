@@ -21,7 +21,7 @@ export function renderConsentRequest(fields: StaffMergeFields): StaffEmailConten
     bodyHtml: `
       ${para(dearGreeting(fields))}
       ${para(`Now that ${child} is set up in our system, here is the next step — and it&apos;s the one that&apos;s genuinely in your hands. Completing it thoroughly is what lets us move everything else forward.`)}
-      ${para(`We&apos;ve attached two blank forms to this email for you to fill out:`)}
+      ${para(`We&apos;ve included two blank forms for you to fill out — use the orange download buttons below (and check your email attachments):`)}
       ${infoBlock('Forms attached', [
         `The <strong>Client Intake Form (Form 01)</strong> — this gives us everything we need to verify ${child}&apos;s insurance and request authorization for services.`,
         `The <strong>Consent &amp; Authorization Form (Form 02)</strong> — this gives us your permission to assess and treat ${child}, and to share with your insurance only what they require in order to pay for that care. You consent to each item separately; nothing in it is all-or-nothing.`,

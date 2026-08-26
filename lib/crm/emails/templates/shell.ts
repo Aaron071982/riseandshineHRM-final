@@ -89,7 +89,7 @@ function linksStrip(links: EmailLinkMeta[] | undefined): string {
     })
     .join('')
   return `
-    ${sectionRule('Links')}
+    ${sectionRule('Downloads & links')}
     <table role="presentation" cellpadding="0" cellspacing="0">${buttons}</table>`
 }
 
