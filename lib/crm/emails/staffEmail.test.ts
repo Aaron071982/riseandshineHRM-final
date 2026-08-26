@@ -137,19 +137,26 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email?.html).not.toContain('What to expect next')
   })
 
-  it('CONSENT_REQUEST is intake + consent with portal CTA', () => {
-    const email = renderStaffEmail('CONSENT_REQUEST', fields, {
-      links: [{ url: 'https://portal.example.com/abc', label: 'Open secure portal' }],
-    })
+  it('CONSENT_REQUEST is intake + consent with email-return instructions', () => {
+    const email = renderStaffEmail('CONSENT_REQUEST', fields)
     expect(email?.subject).toMatch(/intake, consent/)
     expect(email?.html).toContain('Client Intake Form (Form 01)')
     expect(email?.html).toContain('Consent &amp; Authorization Form (Form 02)')
-    expect(email?.html).toContain('https://portal.example.com/abc')
-    expect(email?.html).toContain('Open secure portal')
+    expect(email?.html).toContain('email the finished copies back')
+    expect(email?.html).toContain('info@riseandshineaba.com')
     expect(email?.html).toContain('Dear Maria Rivera,')
     expect(email?.html).toContain('Jordan Lee')
-    // Portal CTA is in body — not duplicated as a second "Links" strip entry alone
+    expect(email?.html).not.toContain('Open secure portal')
+    expect(email?.html).not.toContain('isn&apos;t encrypted')
+    expect(email?.html).not.toContain('don&apos;t email documents')
     expect(email?.html).not.toContain('How to complete consent')
+  })
+
+  it('WELCOME does not push a secure portal for forms', () => {
+    const email = renderStaffEmail('WELCOME', fields)
+    expect(email?.html).toContain('Intake and Consent forms')
+    expect(email?.html).not.toContain('secure link')
+    expect(email?.html).not.toContain('isn&apos;t encrypted')
   })
 
   it('DOCS_NEEDED nudge uses missing list and secure upload CTA', () => {

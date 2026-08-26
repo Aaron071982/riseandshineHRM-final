@@ -2472,6 +2472,7 @@ export async function previewClientEmail(
     to: string | null
     emailConsentOk: boolean
     suggestedCc?: string[]
+    templateAttachments?: { fileName: string; sizeBytes: number }[]
   }>
 > {
   try {
@@ -2485,6 +2486,7 @@ export async function previewClientEmail(
       to: preview.to,
       emailConsentOk: preview.emailConsentOk,
       suggestedCc: preview.suggestedCc,
+      templateAttachments: preview.templateAttachments,
     }
   } catch (err) {
     return fail(err)

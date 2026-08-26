@@ -39,10 +39,7 @@ const RENDERERS: Partial<
 }
 
 /** Templates that embed the first attached link as {{portalLink}} in the body. */
-const PORTAL_LINK_TEMPLATES = new Set<CommTemplate>([
-  'CONSENT_REQUEST',
-  'DOCS_NEEDED',
-])
+const PORTAL_LINK_TEMPLATES = new Set<CommTemplate>(['DOCS_NEEDED'])
 
 export function renderStaffEmail(
   template: CommTemplate,

@@ -136,9 +136,11 @@ export function EmailPanel({
   const isRbtAssigned = template === 'RBT_ASSIGNED'
   const isMeetAndGreet = template === 'MEET_AND_GREET'
   const isRbtPick = isRbtAssigned || isMeetAndGreet
-  const needsPortalLink =
-    template === 'CONSENT_REQUEST' || template === 'DOCS_NEEDED'
+  const needsPortalLink = template === 'DOCS_NEEDED'
   const needsConsentWarn = emailSend.emailConsentOk === false
+  const [templateAttachments, setTemplateAttachments] = useState<
+    { fileName: string; sizeBytes: number }[]
+  >([])
 
   const localPreviewLogoUrl =
     typeof window !== 'undefined'
@@ -161,10 +163,12 @@ export function EmailPanel({
       if (!res.ok) {
         setError(res.error)
         setPreviewHtml(null)
+        setTemplateAttachments([])
         return
       }
       setPreviewSubject(res.subject)
       setPreviewHtml(res.html.replaceAll(EMAIL_LOGO_URL, localPreviewLogoUrl))
+      setTemplateAttachments(res.templateAttachments ?? [])
       if (!isManual) setSubject(res.subject)
       if (
         template === 'MEET_AND_GREET' &&
@@ -558,11 +562,31 @@ export function EmailPanel({
               </div>
             </div>
             <p className="mt-1 text-xs text-quiet">
-              Client-tailored files (PHI) upload to private storage and ride the
-              Graph mailbox when sending is enabled. Blank forms and external
-              signing links can be pasted below. PDF, images, Office docs — up
-              to 5 files, 15&nbsp;MB each; up to 5 links.
+              Welcome and Intake &amp; Consent emails auto-attach blank PDF forms
+              from the server (parents fill them out and email them back). You can
+              still attach extra client files below. PDF, images, Office docs — up
+              to 5 extra files, 15&nbsp;MB each; up to 5 links.
             </p>
+            {templateAttachments.length > 0 ? (
+              <ul className="mt-2 space-y-1.5">
+                {templateAttachments.map((a) => (
+                  <li
+                    key={`template:${a.fileName}`}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-line bg-[var(--sunrise-soft)]/40 px-3 py-2 text-sm"
+                  >
+                    <span className="min-w-0 truncate text-ink">
+                      📎 {a.fileName}{' '}
+                      <span className="text-xs text-quiet">
+                        (auto-attached · {formatSize(a.sizeBytes)})
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-quiet">
+                      Included
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {attachments.length > 0 ? (
               <ul className="mt-2 space-y-1.5">
                 {attachments.map((a) => (
@@ -646,7 +670,7 @@ export function EmailPanel({
                   </li>
                 ))}
               </ul>
-            ) : attachments.length === 0 ? (
+            ) : attachments.length === 0 && templateAttachments.length === 0 ? (
               <p className="mt-2 rounded-lg border border-dashed border-line px-3 py-4 text-center text-xs text-quiet">
                 No files or links attached
               </p>
