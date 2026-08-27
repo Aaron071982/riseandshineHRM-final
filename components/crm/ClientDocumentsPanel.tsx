@@ -8,7 +8,7 @@ import {
   DOCUMENT_GROUP_LABELS,
   DOCUMENT_GROUP_ORDER,
 } from '@/lib/crm/documents'
-import { isStoredRequirementPath } from '@/lib/crm/requirementDocuments'
+import { isStoredRequirementPath } from '@/lib/crm/requirementDocuments.shared'
 import { STAGE_LABELS } from '@/lib/crm/stages'
 import { cn } from '@/lib/utils'
 

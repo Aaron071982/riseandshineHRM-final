@@ -1,4 +1,4 @@
-import { validateRequirementDocumentFile } from '@/lib/crm/requirementDocuments'
+import { validateRequirementDocumentFile } from '@/lib/crm/requirementDocuments.shared'
 
 export type RequirementUploadErrorCode =
   | 'validation'

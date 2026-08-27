@@ -7,7 +7,7 @@ import {
 import {
   isUploadableDocumentRequirement,
   type RequirementUploadRequirement,
-} from '@/lib/crm/requirementDocuments'
+} from '@/lib/crm/requirementDocuments.shared'
 import { prisma } from '@/lib/prisma'
 import type { SessionUser } from '@/lib/auth'
 

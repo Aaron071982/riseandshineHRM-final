@@ -4,7 +4,7 @@ import {
   isStoredRequirementPath,
   requirementDownloadFileName,
   validateRequirementDocumentFile,
-} from './requirementDocuments'
+} from './requirementDocuments.shared'
 
 describe('lib/crm/requirementDocuments', () => {
   it('isStoredRequirementPath accepts CRM and legacy client-services paths', () => {
