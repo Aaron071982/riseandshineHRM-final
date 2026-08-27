@@ -1,9 +1,10 @@
 import { cookies } from 'next/headers'
+import { runtimeEnvFlag } from '@/lib/env/runtimeFlag'
 import { MICROSOFT_GRAPH_TOKEN_COOKIE } from '@/lib/auth/microsoft'
 
 /** Whether real Microsoft Graph sendMail is enabled (M365 admin consent). */
 export function graphEmailEnabled(): boolean {
-  return process.env.GRAPH_EMAIL_ENABLED === 'true'
+  return runtimeEnvFlag('GRAPH_EMAIL_ENABLED')
 }
 
 export type GraphFileAttachment = {

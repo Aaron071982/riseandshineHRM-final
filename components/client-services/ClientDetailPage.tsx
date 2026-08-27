@@ -27,6 +27,10 @@ import {
 } from '@/lib/client-services/uiTheme'
 import type { ServiceBoardBucket } from '@/lib/client-services/serviceStatus'
 import { NY_BOROUGHS } from '@/lib/client-services/constants'
+import {
+  calendarDateKey,
+  formatCalendarDate,
+} from '@/lib/billing/calendarDate'
 import { cn } from '@/lib/utils'
 import AddressAutocomplete, {
   type StructuredAddress,
@@ -164,7 +168,9 @@ type EditForm = {
 
 function dateInput(v: string | null | undefined) {
   if (!v) return ''
-  return String(v).slice(0, 10)
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return ''
+  return calendarDateKey(d)
 }
 
 export default function ClientDetailPage({
@@ -669,7 +675,7 @@ export default function ClientDetailPage({
                   />
                 ) : (
                   display.dateOfBirth && (
-                    <span>· DOB {new Date(display.dateOfBirth + 'T12:00:00').toLocaleDateString()}</span>
+                    <span>· DOB {formatCalendarDate(display.dateOfBirth)}</span>
                   )
                 )}
                 {editing && f ? (
@@ -888,7 +894,7 @@ export default function ClientDetailPage({
                 style={authWarn ? { color: '#854F0B' } : undefined}
               >
                 {display.serviceEndDate
-                  ? new Date(display.serviceEndDate + 'T12:00:00').toLocaleDateString()
+                  ? formatCalendarDate(display.serviceEndDate)
                   : '—'}
               </span>
             )}

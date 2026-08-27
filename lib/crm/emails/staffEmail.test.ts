@@ -33,6 +33,13 @@ describe('lib/crm/emails/graphSend flag', () => {
     expect(graphEmailEnabled()).toBe(false)
     process.env.GRAPH_EMAIL_ENABLED = prev
   })
+
+  it('enables when env is true (trim/case tolerant)', () => {
+    const prev = process.env.GRAPH_EMAIL_ENABLED
+    process.env.GRAPH_EMAIL_ENABLED = ' True '
+    expect(graphEmailEnabled()).toBe(true)
+    process.env.GRAPH_EMAIL_ENABLED = prev
+  })
 })
 
 describe('greeting personalization', () => {

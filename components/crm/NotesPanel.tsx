@@ -17,6 +17,10 @@ import {
   updateClientPreferences,
 } from '@/lib/crm/actions'
 import { NY_BOROUGHS } from '@/lib/client-services/constants'
+import {
+  calendarDateKey,
+  formatCalendarDate,
+} from '@/lib/billing/calendarDate'
 import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { cn } from '@/lib/utils'
@@ -39,7 +43,7 @@ function toDateInputValue(d: string | Date | null): string {
   if (!d) return ''
   const date = new Date(d)
   if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
+  return calendarDateKey(date)
 }
 
 type OverviewClient = {
@@ -448,9 +452,7 @@ export function OverviewPanel({
     { label: 'Client code', value: client.clientCode },
     {
       label: 'Date of birth',
-      value: client.dateOfBirth
-        ? new Date(client.dateOfBirth).toLocaleDateString()
-        : '—',
+      value: client.dateOfBirth ? formatCalendarDate(client.dateOfBirth) : '—',
     },
     {
       label: 'Address',
@@ -486,13 +488,13 @@ export function OverviewPanel({
     {
       label: 'Inquiry received',
       value: client.inquiryReceivedAt
-        ? new Date(client.inquiryReceivedAt).toLocaleDateString()
+        ? formatCalendarDate(client.inquiryReceivedAt)
         : '—',
     },
     {
       label: 'Actual start',
       value: client.actualServiceStartDate
-        ? new Date(client.actualServiceStartDate).toLocaleDateString()
+        ? formatCalendarDate(client.actualServiceStartDate)
         : '—',
     },
   ]

@@ -1,4 +1,5 @@
 import { NY_BOROUGHS } from '@/lib/client-services/constants'
+import { parseCalendarDate } from '@/lib/billing/calendarDate'
 
 export type ParsedAddress = {
   addressLine: string | null
@@ -103,18 +104,9 @@ export function parseCsvStatus(raw: string | null | undefined): 'NEW' | 'ACTIVE'
 
 export function parseDateLoose(raw: string | null | undefined): Date | null {
   if (!raw?.trim()) return null
-  const s = raw.trim()
-  // MM/DD/YYYY
-  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (mdy) {
-    const m = Number(mdy[1])
-    const d = Number(mdy[2])
-    const y = Number(mdy[3])
-    const dt = new Date(Date.UTC(y, m - 1, d))
-    return Number.isNaN(dt.getTime()) ? null : dt
-  }
-  const iso = new Date(s)
-  return Number.isNaN(iso.getTime()) ? null : iso
+  const parsed = parseCalendarDate(raw.trim())
+  if (parsed) return parsed
+  return null
 }
 
 export function parseNumberLoose(raw: string | null | undefined): number | null {
@@ -140,8 +132,8 @@ export function ageFromDob(dob: Date | string | null | undefined): number | null
   const d = typeof dob === 'string' ? new Date(dob) : dob
   if (Number.isNaN(d.getTime())) return null
   const today = new Date()
-  let age = today.getFullYear() - d.getFullYear()
-  const m = today.getMonth() - d.getMonth()
-  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age -= 1
+  let age = today.getFullYear() - d.getUTCFullYear()
+  const m = today.getMonth() - d.getUTCMonth()
+  if (m < 0 || (m === 0 && today.getDate() < d.getUTCDate())) age -= 1
   return age
 }

@@ -185,6 +185,44 @@ export async function setOrgTrainingModuleStatus(
   return { ok: true }
 }
 
+export async function deleteOrgTrainingModule(
+  moduleId: string
+): Promise<OrgTrainingActionResult> {
+  const { user, error } = await requireAuthor()
+  if (error || !user) return { ok: false, error: error ?? 'Forbidden' }
+
+  const existing = await prisma.orgTrainingModule.findUnique({
+    where: { id: moduleId },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      audienceRoles: true,
+      _count: { select: { completions: true, items: true } },
+    },
+  })
+  if (!existing) return { ok: false, error: 'Module not found' }
+
+  await prisma.orgTrainingModule.delete({ where: { id: moduleId } })
+
+  await writeAuditLog({
+    actorUserId: user.id,
+    entityType: 'OrgTrainingModule',
+    entityId: moduleId,
+    action: 'DELETE',
+    before: {
+      title: existing.title,
+      status: existing.status,
+      audienceRoles: existing.audienceRoles,
+      completionCount: existing._count.completions,
+      itemCount: existing._count.items,
+    },
+  })
+
+  revalidateTrainingPaths()
+  return { ok: true }
+}
+
 export type OrgTrainingItemInput = {
   id?: string
   type: OrgTrainingItemType

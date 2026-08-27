@@ -15,6 +15,14 @@ export function parseCalendarDate(value: unknown): Date | null {
   const s = String(value).trim()
   if (!s) return null
 
+  // YYYY-MM-DD from HTML date inputs and ISO strings
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (iso) {
+    return new Date(
+      Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
+    )
+  }
+
   const parts = s.split(/[/-]/)
   if (parts.length >= 3) {
     const month = parseInt(parts[0], 10)

@@ -20,6 +20,7 @@ import type {
 } from '@prisma/client'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { parseCalendarDate } from '@/lib/billing/calendarDate'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit'
 import {
@@ -444,11 +445,7 @@ export async function createServiceClient(
       return { ok: false, error: `Client code ${clientCode} already exists` }
     }
 
-    const parseDate = (v?: string | null) => {
-      if (!v) return null
-      const d = new Date(v)
-      return Number.isNaN(d.getTime()) ? null : d
-    }
+    const parseDate = (v?: string | null) => parseCalendarDate(v)
 
     const now = new Date()
     const inquiryKeys = STAGE_GATE_REQUIREMENT_KEYS.INQUIRY
@@ -660,8 +657,7 @@ const REFERRAL_SOURCES = new Set<ClientReferralSource>([
 
 function parseOptionalDate(v?: string | null): Date | null {
   if (!v?.trim()) return null
-  const d = new Date(v)
-  return Number.isNaN(d.getTime()) ? null : d
+  return parseCalendarDate(v)
 }
 
 export type UpdateClientOverviewInput = {
@@ -1302,9 +1298,7 @@ export async function setPipelineStatus(
 // ─── Phase 3: Authorization / Staffing / Schedule / Communications ───────────
 
 function parseDate(value: string | null | undefined): Date | null {
-  if (!value) return null
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? null : d
+  return parseCalendarDate(value)
 }
 
 export async function searchRbtProfiles(query: string): Promise<

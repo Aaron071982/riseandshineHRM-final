@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { ORG_TRAINING_AUDIENCE_OPTIONS } from '@/lib/org-training/audience'
 import {
+  deleteOrgTrainingModule,
   setOrgTrainingModuleStatus,
   updateOrgTrainingModule,
   upsertOrgTrainingItems,
@@ -81,6 +82,7 @@ export default function OrgTrainingModuleEditor({
         ]
   )
   const [uploadingKey, setUploadingKey] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   const toggleAudience = (key: string) => {
     setAudienceRoles((prev) =>
@@ -152,6 +154,20 @@ export default function OrgTrainingModuleEditor({
       }
       setStatus(next)
       showToast(next === 'ACTIVE' ? 'Module activated' : 'Module archived', 'success')
+      router.refresh()
+    })
+  }
+
+  const deleteModule = () => {
+    startTransition(async () => {
+      const res = await deleteOrgTrainingModule(module.id)
+      if (!res.ok) {
+        showToast(res.error, 'error')
+        setConfirmDelete(false)
+        return
+      }
+      showToast('Module deleted', 'success')
+      router.push(listHref)
       router.refresh()
     })
   }
@@ -237,6 +253,42 @@ export default function OrgTrainingModuleEditor({
             <Button disabled={pending} onClick={() => setModuleStatus('ACTIVE')}>
               Activate
             </Button>
+          )}
+          {!confirmDelete ? (
+            <Button
+              variant="outline"
+              disabled={pending}
+              className="border-red-300 text-red-700 hover:bg-red-50"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 className="mr-1.5 h-4 w-4" />
+              Delete
+            </Button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2 py-1">
+              <span className="text-xs font-medium text-red-800">
+                Delete forever? Completions are removed too.
+              </span>
+              <Button
+                size="sm"
+                disabled={pending}
+                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={deleteModule}
+              >
+                {pending ? (
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                ) : null}
+                Yes, delete
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => setConfirmDelete(false)}
+              >
+                Cancel
+              </Button>
+            </div>
           )}
         </div>
       </div>

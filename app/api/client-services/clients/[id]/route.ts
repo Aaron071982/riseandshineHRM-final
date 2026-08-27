@@ -13,6 +13,7 @@ import {
 } from '@/lib/crm/access'
 import { logClientAccess } from '@/lib/client-services/audit'
 import { writeAuditLog } from '@/lib/audit'
+import { parseCalendarDate } from '@/lib/billing/calendarDate'
 import { ageFromDob } from '@/lib/client-services/parse'
 import { SERVICE_CLIENT_DOCUMENT_LABELS } from '@/lib/client-services/constants'
 import {
@@ -221,10 +222,10 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     data.status = data.status as ServiceClientStatus
   }
 
-  // Coerce date strings
+  // Coerce date strings (calendar dates — no timezone shift)
   for (const dk of ['dateOfBirth', 'serviceStartDate', 'serviceEndDate'] as const) {
     if (dk in data && data[dk]) {
-      data[dk] = new Date(String(data[dk]))
+      data[dk] = parseCalendarDate(String(data[dk]))
     } else if (dk in data && data[dk] === null) {
       data[dk] = null
     }

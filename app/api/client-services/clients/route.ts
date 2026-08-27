@@ -14,6 +14,7 @@ import { getClientSchedulePeriod } from '@/lib/client-services/schedulePeriod'
 import { caseloadQueueWhere, isClientStage } from '@/lib/crm/caseloadFilters'
 import { canonicalOwnerDeptForStage } from '@/lib/crm/stages'
 import { daysInStage, isStalled } from '@/lib/crm/thresholds'
+import { parseCalendarDate } from '@/lib/billing/calendarDate'
 import type { Prisma, ServiceClientStatus } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -291,11 +292,7 @@ export async function POST(request: NextRequest) {
     ['NEW', 'ACTIVE', 'ON_HOLD', 'DISCHARGED'].includes(statusRaw) ? statusRaw : 'NEW'
   ) as ServiceClientStatus
 
-  const parseDate = (v: unknown) => {
-    if (!v) return null
-    const d = new Date(String(v))
-    return Number.isNaN(d.getTime()) ? null : d
-  }
+  const parseDate = (v: unknown) => parseCalendarDate(v)
 
   const { SERVICE_CLIENT_DOCUMENT_TYPES } = await import('@/lib/client-services/constants')
   const { addClientTimelineNote, recordStatusChange } = await import(
