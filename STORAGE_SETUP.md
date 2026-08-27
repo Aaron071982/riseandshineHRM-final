@@ -85,14 +85,16 @@ In Supabase Dashboard:
 1. **Storage** → **Buckets** → **New Bucket**
 2. Name: `onboarding-documents`
 3. Public: **No** (private)
-4. File size limit: 15 MB (recommended)
-5. Allowed MIME types: `application/pdf` (and optionally `image/png`, `image/jpeg` for uploads)
+4. File size limit: **25 MB** (required for CRM client documents — IEPs, diagnostic evals, etc.)
+5. Allowed MIME types: PDF, PNG, JPEG, DOC/DOCX, XLS/XLSX, TXT (see `lib/crm/requirementDocuments.ts`)
 
 ### 2. Access pattern
 
-- **Upload:** server-side only via `supabaseAdmin` — [`app/api/onboarding/pdf/upload/route.ts`](app/api/onboarding/pdf/upload/route.ts)
+- **Upload (onboarding PDFs):** server-side via `supabaseAdmin` — [`app/api/onboarding/pdf/upload/route.ts`](app/api/onboarding/pdf/upload/route.ts)
+- **Upload (CRM client requirements):** browser → Supabase signed URL — [`upload-url` / `attach` API routes](app/api/client-services/clients/[id]/requirements/[requirementId]/)
 - **Download:** authenticated API routes only (RBT/admin), never public URLs — e.g. [`app/api/rbt/documents/company/[completionId]/download/route.ts`](app/api/rbt/documents/company/[completionId]/download/route.ts)
 - Paths stored on `onboarding_completions.signedPdfUrl` with `storageBucket = 'onboarding-documents'`
+- CRM client requirement documents (IEP, insurance card, etc.) use prefix `crm-client-documents/` in the same bucket — uploads go **browser → Supabase** via signed URLs (bypasses Vercel 4.5 MB limit); downloads stay server-gated with audit logs.
 
 ### 3. Security
 

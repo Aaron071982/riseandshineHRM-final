@@ -4,9 +4,8 @@ import { requireClientServicesSession } from '@/lib/client-services/access'
 import { auditClientAction, CrmAccessError } from '@/lib/crm/access'
 import {
   attachRequirementDocumentRecord,
-  uploadRequirementDocument,
+  MAX_REQUIREMENT_DOCUMENT_BYTES,
   validateRequirementDocumentFile,
-  VERCEL_UPLOAD_BODY_LIMIT_BYTES,
 } from '@/lib/crm/requirementDocuments'
 import { loadUploadableRequirement } from '@/lib/crm/requirementUploadAccess'
 
@@ -28,49 +27,47 @@ export async function POST(request: NextRequest, context: Ctx) {
       requirementId
     )
 
-    const form = await request.formData()
-    const file = form.get('file')
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'file required' }, { status: 400 })
+    let body: Record<string, unknown>
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
     }
 
-    if (file.size > VERCEL_UPLOAD_BODY_LIMIT_BYTES) {
+    const storagePath = String(body.storagePath ?? '').trim()
+    const fileName = String(body.fileName ?? '').trim()
+    const contentType = String(body.contentType ?? 'application/octet-stream').trim()
+    const sizeBytes = Number(body.sizeBytes)
+
+    if (!storagePath || !fileName) {
       return NextResponse.json(
-        {
-          error:
-            'File is too large for legacy upload (over 4.5 MB). Use the in-app Upload button, which sends files directly to storage.',
-        },
-        { status: 413 }
+        { error: 'storagePath and fileName are required' },
+        { status: 400 }
       )
+    }
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      return NextResponse.json({ error: 'sizeBytes is required' }, { status: 400 })
     }
 
     const check = validateRequirementDocumentFile({
-      name: file.name,
-      size: file.size,
-      type: file.type,
+      name: fileName,
+      size: sizeBytes,
+      type: contentType,
     })
     if (!check.ok) {
-      return NextResponse.json({ error: check.error }, { status: 400 })
+      const status = sizeBytes > MAX_REQUIREMENT_DOCUMENT_BYTES ? 413 : 400
+      return NextResponse.json({ error: check.error }, { status })
     }
-
-    const bytes = Buffer.from(await file.arrayBuffer())
-    const uploaded = await uploadRequirementDocument({
-      clientId,
-      requirementKey: requirement.key,
-      fileName: file.name,
-      contentType: file.type || 'application/octet-stream',
-      bytes,
-    })
 
     const updated = await attachRequirementDocumentRecord({
       requirementId: requirement.id,
       clientId,
       userId: user.id,
       requirementKey: requirement.key,
-      storagePath: uploaded.storagePath,
-      fileName: uploaded.fileName,
-      contentType: uploaded.contentType,
-      sizeBytes: uploaded.sizeBytes,
+      storagePath,
+      fileName,
+      contentType,
+      sizeBytes,
     })
 
     await auditClientAction({
@@ -85,9 +82,9 @@ export async function POST(request: NextRequest, context: Ctx) {
     if (err instanceof CrmAccessError) {
       return NextResponse.json({ error: err.message }, { status: err.status })
     }
-    console.error('[crm-requirements] upload', err)
+    console.error('[crm-requirements] attach', err)
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Upload failed' },
+      { error: err instanceof Error ? err.message : 'Could not attach file' },
       { status: 500 }
     )
   }

@@ -1,0 +1,80 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { requireClientServicesSession } from '@/lib/client-services/access'
+import { CrmAccessError } from '@/lib/crm/access'
+import {
+  createRequirementSignedUpload,
+  MAX_REQUIREMENT_DOCUMENT_BYTES,
+  validateRequirementDocumentFile,
+} from '@/lib/crm/requirementDocuments'
+import { loadUploadableRequirement } from '@/lib/crm/requirementUploadAccess'
+
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+type Ctx = { params: Promise<{ id: string; requirementId: string }> }
+
+export async function POST(request: NextRequest, context: Ctx) {
+  const auth = await requireClientServicesSession()
+  if (auth.response) return auth.response
+  const { user } = auth
+  const { id: clientId, requirementId } = await context.params
+
+  try {
+    const requirement = await loadUploadableRequirement(
+      user,
+      clientId,
+      requirementId
+    )
+
+    let body: Record<string, unknown>
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    }
+
+    const fileName = String(body.fileName ?? '').trim()
+    const contentType = String(body.contentType ?? 'application/octet-stream').trim()
+    const sizeBytes = Number(body.sizeBytes)
+
+    if (!fileName) {
+      return NextResponse.json({ error: 'fileName is required' }, { status: 400 })
+    }
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      return NextResponse.json({ error: 'sizeBytes is required' }, { status: 400 })
+    }
+
+    const check = validateRequirementDocumentFile({
+      name: fileName,
+      size: sizeBytes,
+      type: contentType,
+    })
+    if (!check.ok) {
+      const status = sizeBytes > MAX_REQUIREMENT_DOCUMENT_BYTES ? 413 : 400
+      return NextResponse.json({ error: check.error }, { status })
+    }
+
+    const signed = await createRequirementSignedUpload({
+      clientId,
+      requirementKey: requirement.key,
+      fileName,
+      contentType,
+    })
+
+    return NextResponse.json({
+      signedUrl: signed.signedUrl,
+      token: signed.token,
+      storagePath: signed.storagePath,
+      contentType: signed.contentType,
+    })
+  } catch (err) {
+    if (err instanceof CrmAccessError) {
+      return NextResponse.json({ error: err.message }, { status: err.status })
+    }
+    console.error('[crm-requirements] upload-url', err)
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Could not prepare upload' },
+      { status: 500 }
+    )
+  }
+}

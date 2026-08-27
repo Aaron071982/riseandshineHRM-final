@@ -6,11 +6,15 @@ import { Check, Loader2, Upload } from 'lucide-react'
 import type { ClientStage, RequirementGroup, RequirementStatus } from '@prisma/client'
 import { updateRequirement } from '@/lib/crm/actions'
 import {
+  uploadRequirementDocumentDirect,
+  RequirementUploadError,
+} from '@/lib/crm/requirementDocumentUpload.client'
+import {
   DOCUMENT_BY_KEY,
   DOCUMENT_GROUP_LABELS,
   DOCUMENT_GROUP_ORDER,
 } from '@/lib/crm/documents'
-import { isStoredRequirementPath } from '@/lib/crm/requirementDocuments'
+import { isStoredRequirementPath, validateRequirementDocumentFile } from '@/lib/crm/requirementDocuments'
 import { STAGE_LABELS } from '@/lib/crm/stages'
 import { cn } from '@/lib/utils'
 
@@ -73,6 +77,7 @@ function RequirementActions({
   fileInputs,
   onUpload,
   onMarkComplete,
+  uploadProgress,
 }: {
   req: Req
   canEdit: boolean
@@ -82,6 +87,7 @@ function RequirementActions({
   fileInputs: MutableRefObject<Record<string, HTMLInputElement | null>>
   onUpload: (requirementId: string, file: File) => Promise<void>
   onMarkComplete: () => void
+  uploadProgress: number | null
 }) {
   const fileLabel = displayFileLabel(req)
   const satisfied = SATISFIED_STATUSES.includes(req.status)
@@ -120,6 +126,19 @@ function RequirementActions({
           </button>
         </>
       )}
+      {busy && uploadProgress != null && (
+        <div className="w-full min-w-[8rem] basis-full">
+          <div className="h-1.5 overflow-hidden rounded-full bg-line">
+            <div
+              className="h-full rounded-full bg-brand transition-[width] duration-150"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+          <p className="mt-0.5 text-[10px] tabular-nums text-quiet">
+            Uploading… {uploadProgress}%
+          </p>
+        </div>
+      )}
       {!satisfied && (
         <button
           type="button"
@@ -149,6 +168,7 @@ export function RequirementsPanel({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [uploadingId, setUploadingId] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [error, setError] = useState('')
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -181,22 +201,33 @@ export function RequirementsPanel({
   const onUpload = async (requirementId: string, file: File) => {
     setError('')
     setUploadingId(requirementId)
+    setUploadProgress(0)
     try {
-      const form = new FormData()
-      form.append('file', file)
-      const res = await fetch(
-        `/api/client-services/clients/${clientId}/requirements/${requirementId}/upload`,
-        { method: 'POST', body: form, credentials: 'include' }
-      )
-      const data = (await res.json().catch(() => ({}))) as { error?: string }
-      if (!res.ok) {
-        throw new Error(data.error || 'Upload failed')
+      const precheck = validateRequirementDocumentFile({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      })
+      if (!precheck.ok) {
+        throw new RequirementUploadError(precheck.error, 'validation')
       }
+
+      await uploadRequirementDocumentDirect({
+        clientId,
+        requirementId,
+        file,
+        onProgress: setUploadProgress,
+      })
       router.refresh()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Upload failed')
+      if (e instanceof RequirementUploadError) {
+        setError(e.message)
+      } else {
+        setError(e instanceof Error ? e.message : 'Upload failed')
+      }
     } finally {
       setUploadingId(null)
+      setUploadProgress(null)
     }
   }
 
@@ -219,6 +250,7 @@ export function RequirementsPanel({
     const days = daysUntil(req.expiresAt)
     const fileLabel = displayFileLabel(req)
     const busy = uploadingId === req.id
+    const progress = busy ? uploadProgress : null
 
     return (
       <li key={req.id} className="px-3 py-2.5">
@@ -268,6 +300,7 @@ export function RequirementsPanel({
             fileInputs={fileInputs}
             onUpload={onUpload}
             onMarkComplete={() => markComplete(req.id)}
+            uploadProgress={progress}
           />
         </div>
       </li>

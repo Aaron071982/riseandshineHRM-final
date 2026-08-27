@@ -4,6 +4,11 @@ import {
   STORAGE_BUCKET,
 } from '@/lib/constants'
 import { supabaseAdmin } from '@/lib/supabase'
+import { computeExpiresAt } from '@/lib/crm/documents'
+import { prisma } from '@/lib/prisma'
+
+/** Vercel serverless request body cap — files above this must use direct-to-Supabase upload. */
+export const VERCEL_UPLOAD_BODY_LIMIT_BYTES = Math.floor(4.5 * 1024 * 1024)
 
 export const MAX_REQUIREMENT_DOCUMENT_BYTES = 25 * 1024 * 1024
 
@@ -76,7 +81,10 @@ export function validateRequirementDocumentFile(file: {
   const type = (file.type || 'application/octet-stream').toLowerCase()
   const ext = file.name.split('.').pop()?.toLowerCase()
   if (!ALLOWED_TYPES.has(type) && !ALLOWED_EXTENSIONS.has(ext ?? '')) {
-    return { ok: false, error: 'Unsupported file type' }
+    return {
+      ok: false,
+      error: 'Unsupported file type — use PDF, PNG, JPG, DOC, DOCX, XLS, XLSX, or TXT',
+    }
   }
   return { ok: true }
 }
@@ -125,6 +133,150 @@ export async function uploadRequirementDocument(input: {
     contentType,
     sizeBytes: input.bytes.length,
   }
+}
+
+export type RequirementSignedUpload = {
+  signedUrl: string
+  token: string
+  storagePath: string
+  contentType: string
+}
+
+/** Issue a short-lived signed URL so the browser can PUT bytes directly to Supabase. */
+export async function createRequirementSignedUpload(input: {
+  clientId: string
+  requirementKey: string
+  fileName: string
+  contentType: string
+}): Promise<RequirementSignedUpload> {
+  if (!supabaseAdmin) {
+    throw new Error('Storage not configured')
+  }
+  const storagePath = buildRequirementStoragePath(input)
+  const contentType = input.contentType || 'application/octet-stream'
+  const { data, error } = await supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .createSignedUploadUrl(storagePath, { upsert: false })
+  if (error || !data?.signedUrl) {
+    console.error('[crm-requirements] signed upload url failed', error)
+    throw new Error(
+      error?.message ||
+        'Could not prepare upload — confirm the storage bucket allows files up to 25 MB'
+    )
+  }
+  return {
+    signedUrl: data.signedUrl,
+    token: data.token,
+    storagePath: data.path ?? storagePath,
+    contentType,
+  }
+}
+
+export function assertRequirementStoragePath(
+  storagePath: string,
+  clientId: string,
+  requirementKey: string
+): { ok: true } | { ok: false; error: string } {
+  const prefix = `${CRM_CLIENT_REQUIREMENTS_PREFIX}/${clientId}/`
+  if (!storagePath.startsWith(prefix)) {
+    return { ok: false, error: 'Invalid storage path for this client' }
+  }
+  const safeKey = requirementKey.replace(/[^a-z0-9_-]/gi, '_')
+  const rest = storagePath.slice(prefix.length)
+  if (!rest.startsWith(`${safeKey}-`)) {
+    return { ok: false, error: 'Storage path does not match this requirement' }
+  }
+  return { ok: true }
+}
+
+export async function requirementObjectExists(storagePath: string): Promise<boolean> {
+  if (!supabaseAdmin) return false
+  const parts = storagePath.split('/')
+  const fileName = parts.pop()
+  if (!fileName) return false
+  const folder = parts.join('/')
+  const { data, error } = await supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .list(folder, { search: fileName, limit: 1 })
+  if (error) return false
+  return (data ?? []).some((row) => row.name === fileName)
+}
+
+export async function attachRequirementDocumentRecord(input: {
+  requirementId: string
+  clientId: string
+  userId: string
+  requirementKey: string
+  storagePath: string
+  fileName: string
+  contentType: string
+  sizeBytes: number
+}): Promise<{
+  id: string
+  key: string
+  label: string
+  status: string
+  fileName: string | null
+  fileSizeBytes: number | null
+  completedAt: Date | null
+}> {
+  const pathCheck = assertRequirementStoragePath(
+    input.storagePath,
+    input.clientId,
+    input.requirementKey
+  )
+  if (!pathCheck.ok) {
+    throw new Error(pathCheck.error)
+  }
+
+  const exists = await requirementObjectExists(input.storagePath)
+  if (!exists) {
+    throw new Error('Uploaded file not found in storage — try uploading again')
+  }
+
+  const now = new Date()
+  return prisma.clientRequirement.update({
+    where: { id: input.requirementId },
+    data: {
+      status: 'RECEIVED',
+      fileUrl: input.storagePath,
+      fileName: input.fileName,
+      fileContentType: input.contentType,
+      fileSizeBytes: input.sizeBytes,
+      completedAt: now,
+      completedByUserId: input.userId,
+      attestedAt: null,
+      attestedByUserId: null,
+      expiresAt: computeExpiresAt(input.requirementKey, now),
+    },
+    select: {
+      id: true,
+      key: true,
+      label: true,
+      status: true,
+      fileName: true,
+      fileSizeBytes: true,
+      completedAt: true,
+    },
+  })
+}
+
+export type RequirementUploadRequirement = {
+  id: string
+  key: string
+  serviceClientId: string
+  type: string
+  deletedAt: Date | null
+}
+
+export function isUploadableDocumentRequirement(
+  requirement: RequirementUploadRequirement | null
+): requirement is RequirementUploadRequirement & { type: 'DOCUMENT' } {
+  return (
+    !!requirement &&
+    requirement.deletedAt == null &&
+    requirement.type === 'DOCUMENT'
+  )
 }
 
 export async function downloadRequirementDocument(
