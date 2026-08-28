@@ -7,15 +7,15 @@ import { hasRiseAndShineMailbox } from '@/lib/crm/emails/mailbox'
 import {
   ACCENT,
   BODY_TEXT,
+  COMPANY_EMAIL,
   COMPANY_NAME,
+  COMPANY_PHONE_DISPLAY,
   EMAIL_LOGO_URL,
   MUTED_TEXT,
   RULE,
-  ctaButton,
   escapeHtml,
 } from '@/lib/crm/emails/templates/shell'
 import { sendGenericEmail } from '@/lib/email/core'
-import { makePublicUrl } from '@/lib/baseUrl'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit'
 import {
@@ -33,10 +33,6 @@ export type TaskNotifySender = {
 /** @deprecated Use taskEmailsEnabled from taskEmailConfig */
 export { taskEmailsEnabled as crmTaskEmailsEnabled } from '@/lib/crm/tasks/taskEmailConfig'
 
-function tasksHubUrl(): string {
-  return makePublicUrl('/client-services/tasks')
-}
-
 function formatDueLabel(dueAt: Date): string {
   return dueAt.toLocaleDateString('en-US', {
     weekday: 'short',
@@ -47,15 +43,12 @@ function formatDueLabel(dueAt: Date): string {
   })
 }
 
-/** Branded internal task email — logo, accent bar, solid CTA (Outlook-safe tables). */
+/** Branded internal task email — logo, accent bar, footer contact info only. */
 export function staffTaskEmailShell(
   title: string,
   bodyHtml: string,
-  options?: { ctaLabel?: string; ctaHref?: string }
+  _options?: { ctaLabel?: string; ctaHref?: string }
 ): string {
-  const ctaLabel = options?.ctaLabel ?? 'Open tasks'
-  const ctaHref = options?.ctaHref ?? tasksHubUrl()
-
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -93,7 +86,6 @@ export function staffTaskEmailShell(
               <div style="font-size:15px;line-height:1.65;color:${BODY_TEXT};">
                 ${bodyHtml}
               </div>
-              ${ctaButton(ctaLabel, ctaHref)}
             </td>
           </tr>
           <tr>
@@ -105,8 +97,11 @@ export function staffTaskEmailShell(
           </tr>
           <tr>
             <td style="padding:18px 32px;border-top:1px solid ${RULE};background:#fcfaf7;font-size:12px;color:${MUTED_TEXT};line-height:1.5;">
-              <strong style="color:${BODY_TEXT};">${COMPANY_NAME}</strong>
-              &nbsp;·&nbsp;Client Services
+              <strong style="color:${BODY_TEXT};">${COMPANY_NAME}</strong><br />
+              <a href="mailto:${COMPANY_EMAIL}" style="color:${ACCENT};text-decoration:none;">${COMPANY_EMAIL}</a>
+              &nbsp;·&nbsp;
+              <a href="tel:+18888984774" style="color:${ACCENT};text-decoration:none;">${COMPANY_PHONE_DISPLAY}</a><br />
+              <span style="font-size:12px;color:${MUTED_TEXT};margin-top:6px;display:inline-block;">Client Services</span>
             </td>
           </tr>
         </table>

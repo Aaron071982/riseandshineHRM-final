@@ -27,19 +27,6 @@ export function stageNotificationsTestSend(): boolean {
   return runtimeEnvFlag('STAGE_NOTIFICATIONS_TEST_SEND')
 }
 
-function appBaseUrl(): string {
-  const raw =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.APP_URL?.trim() ||
-    'https://hrm.riseandshineaba.com'
-  return raw.replace(/\/$/, '')
-}
-
-function clientDetailHref(clientId: string, tab?: string): string {
-  const base = `${appBaseUrl()}/client-services/clients/${clientId}`
-  return tab ? `${base}?tab=${tab}` : base
-}
-
 function triggerCopy(trigger: StageNotificationTrigger): {
   subject: string
   headline: string
@@ -114,13 +101,11 @@ function renderBody(params: {
   clientId: string
 }): { subject: string; html: string } {
   const copy = triggerCopy(params.trigger)
-  const href = clientDetailHref(params.clientId, copy.tab)
   const subject = `${copy.subject} (${params.clientCode})`
   const html = `
     <div style="font-family:system-ui,sans-serif;line-height:1.5;color:#1a1a1a">
       <p>${copy.headline}</p>
       <p><strong>Client ID:</strong> ${params.clientCode}</p>
-      <p><a href="${href}">Open in CRM</a></p>
       ${
         params.trigger === 'ACTIVE'
           ? '<p>Schedule is available on the Schedule tab in the client profile.</p>'

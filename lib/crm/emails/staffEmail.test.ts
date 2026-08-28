@@ -166,7 +166,7 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email?.html).not.toContain('isn&apos;t encrypted')
   })
 
-  it('DOCS_NEEDED nudge uses missing list and secure upload CTA', () => {
+  it('DOCS_NEEDED nudge uses missing list without upload links', () => {
     const email = renderStaffEmail(
       'DOCS_NEEDED',
       {
@@ -184,7 +184,8 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email?.html).toContain('gentle reminder')
     expect(email?.html).toContain('Insurance card — front and back')
     expect(email?.html).toContain('Physician referral')
-    expect(email?.html).toContain('https://portal.example.com/upload')
+    expect(email?.html).not.toContain('https://portal.example.com/upload')
+    expect(email?.html).not.toContain('Upload documents securely')
     expect(email?.html).not.toContain('Thank you for completing the consent')
     expect(email?.html).not.toContain('Reply with documents')
   })
@@ -230,16 +231,16 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(tele?.html).toContain('Telehealth')
   })
 
-  it('includes attachments and links in preview when provided', () => {
+  it('lists attachments but not download link buttons when provided', () => {
     const email = renderStaffEmail('WELCOME', fields, {
       attachments: [{ fileName: 'Parent-Welcome-Packet.pdf', sizeBytes: 2048 }],
       links: [{ url: 'https://sign.example.com/abc', label: 'Sign consent' }],
     })
     expect(email?.html).toContain('Attached files')
     expect(email?.html).toContain('Parent-Welcome-Packet.pdf')
-    expect(email?.html).toContain('Downloads &amp; links')
-    expect(email?.html).toContain('Sign consent')
-    expect(email?.html).toContain('https://sign.example.com/abc')
+    expect(email?.html).not.toContain('Downloads &amp; links')
+    expect(email?.html).not.toContain('Sign consent')
+    expect(email?.html).not.toContain('https://sign.example.com/abc')
   })
 
   it('renders journey timeline under the header with auto milestone', () => {

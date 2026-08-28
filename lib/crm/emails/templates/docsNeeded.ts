@@ -48,9 +48,8 @@ export function renderDocsNeeded(fields: StaffMergeFields): StaffEmailContent {
       ${para(`To continue moving forward, we still need a few documents from you. Right now, these are the items outstanding:`)}
       ${missingDocsHtml(fields)}
       ${para(`As soon as we have them, we can carry on with verifying insurance and requesting the approvals ${child} needs — so the sooner these come in, the sooner we can keep things moving on our end.`)}
-      ${para(`Please upload them securely here:`)}
+      ${para(`Please send documents back to us by email using the contact information below, or call us if you need help.`)}
       ${portalCta(fields.portalLink, 'Upload documents securely')}
-      ${para(`Please don&apos;t send documents or photos of insurance cards by text or standard email — neither is encrypted. The secure link above is the safe place for all of it. If you&apos;ve already sent something another way, just let us know and we&apos;ll move it into the protected record for you.`)}
       ${para(`If any of these are hard to get hold of — a referral that&apos;s missing a required detail, an evaluation you&apos;re still waiting on — please call us at <a href="tel:+18888984774" style="color:${ACCENT};text-decoration:none;">${phone}</a>. This is common, it&apos;s fixable, and we&apos;ll tell you exactly what to ask for. You don&apos;t have to sort it out alone.`)}
       ${coordinatorSignature(fields)}
     `,

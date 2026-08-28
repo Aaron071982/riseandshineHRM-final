@@ -1,9 +1,6 @@
 import type { StaffEmailContent, StaffMergeFields } from './types'
 import {
-  COMPANY_EMAIL,
-  COMPANY_PHONE,
   childName,
-  ctaButton,
   greeting,
   infoBlock,
   para,
@@ -38,8 +35,7 @@ export function renderRbtAssigned(fields: StaffMergeFields): StaffEmailContent {
           ? infoBlock(`${rbt ?? 'Your therapist'} — contact info`, contactLines)
           : para(`We will share your therapist&apos;s contact details shortly.`)
       }
-      ${para(`If you have scheduling questions in the meantime, reply to this email or call us at ${COMPANY_PHONE}.`)}
-      ${ctaButton('Reply with questions', `mailto:${fields.staffEmail || COMPANY_EMAIL}?subject=${encodeURIComponent(`Therapist for ${child}`)}`)}
+      ${para(`If you have scheduling questions in the meantime, contact us using the information below.`)}
       ${staffSignature(fields)}
     `,
   }

@@ -109,7 +109,7 @@ export function wrapStaffEmail(
   options?: WrapStaffEmailOptions
 ): string {
   const attachHtml = attachmentsStrip(options?.attachments)
-  const linkHtml = linksStrip(options?.links)
+  const linkHtml = ''
   const timelineHtml =
     !options?.internal && options?.template
       ? progressionTimelineForTemplate(options.template)
@@ -307,16 +307,12 @@ export function para(html: string): string {
 }
 
 export function portalCta(
-  portalLink: string | null | undefined,
-  label = 'Open your secure portal'
+  _portalLink: string | null | undefined,
+  _label = 'Open your secure portal'
 ): string {
-  const href = portalLink?.trim()
-  if (!href) {
-    return para(
-      `<em>A secure portal link will appear here once your coordinator includes it with this email.</em>`
-    )
-  }
-  return `${ctaButton(label, href)}${para(`Or copy this link: <a href="${escapeHtml(href)}" style="color:${ACCENT};word-break:break-all;">${escapeHtml(href)}</a>`)}`
+  return para(
+    `Please contact us using the phone number and email in the footer below if you need help sending documents securely.`
+  )
 }
 
 export { childName, childInitialLast } from './helpers'

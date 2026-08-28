@@ -1,8 +1,6 @@
 import type { StaffEmailContent, StaffMergeFields } from './types'
 import {
-  COMPANY_EMAIL,
   childName,
-  ctaButton,
   greeting,
   infoBlock,
   para,
@@ -40,8 +38,7 @@ export function renderAssessmentScheduled(
         'Bring any recent evaluations or school documents you want us to see.',
         'Write down your questions — we will make time for them.',
       ])}
-      ${para(`We will confirm details with you before the appointment. Reply if you need to reschedule.`)}
-      ${ctaButton('Ask a question', `mailto:${fields.staffEmail || COMPANY_EMAIL}?subject=${encodeURIComponent(`Assessment for ${child}`)}`)}
+      ${para(`We will confirm details with you before the appointment. Contact us using the information below if you need to reschedule.`)}
       ${staffSignature(fields)}
     `,
   }

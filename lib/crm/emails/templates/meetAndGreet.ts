@@ -3,7 +3,6 @@ import {
   COMPANY_EMAIL,
   COMPANY_PHONE,
   childName,
-  ctaButton,
   escapeHtml,
   greeting,
   infoBlock,
@@ -71,7 +70,7 @@ export function renderMeetAndGreet(fields: StaffMergeFields): StaffEmailContent 
       ${para(greeting(fields))}
       ${para(`We would like to schedule a short meet and greet so you can connect with ${child}&apos;s care team before services begin. This is a chance to ask questions and make sure everyone feels comfortable.`)}
       ${infoBlock('What happens next', [
-        'Reply with a few times that work this week, and we will confirm your visit.',
+        'Share a few times that work this week using the contact information below, and we will confirm your visit.',
         'Review the guide below — it walks through what to expect during the meet-and-greet.',
         'We will send the official Meet &amp; Greet form separately for you to review, complete, and sign.',
       ])}
@@ -151,8 +150,7 @@ export function renderMeetAndGreet(fields: StaffMergeFields): StaffEmailContent 
         </tr>
       </table>
 
-      ${para(`We look forward to working with your family and appreciate your partnership. If you have scheduling questions, reply to this email or call us at ${COMPANY_PHONE}.`)}
-      ${ctaButton('Share your availability', `mailto:${fields.staffEmail || COMPANY_EMAIL}?subject=${encodeURIComponent(`Meet and Greet for ${child}`)}`)}
+      ${para(`We look forward to working with your family and appreciate your partnership. If you have scheduling questions, contact us using the information below.`)}
       ${staffSignature(fields)}
     `,
   }
