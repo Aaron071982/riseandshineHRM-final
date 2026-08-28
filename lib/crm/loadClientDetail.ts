@@ -25,6 +25,17 @@ import {
   canAccessBillingSurface,
   canViewBillingDocuments,
 } from '@/lib/crm/billingAccess'
+import {
+  canLockClinicalAssessment,
+  canMarkTreatmentPlanComplete,
+  canUploadClinicalAssessmentArtifacts,
+  canViewClinicalAssessment,
+} from '@/lib/crm/clinicalAssessment/access'
+import {
+  getOrCreateCurrentClinicalAssessment,
+  listClinicalAssessmentVersions,
+} from '@/lib/crm/clinicalAssessment/storage'
+import { auditClinicalAssessmentView } from '@/lib/crm/clinicalAssessment/actions'
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
@@ -205,6 +216,23 @@ export async function loadClientCrmDetail(clientId: string) {
       : Promise.resolve(null),
   ])
 
+  const clinicalAssessmentVisible = canViewClinicalAssessment(user)
+  let clinicalAssessment = null as Awaited<
+    ReturnType<typeof getOrCreateCurrentClinicalAssessment>
+  > | null
+  let clinicalAssessmentVersions: Awaited<
+    ReturnType<typeof listClinicalAssessmentVersions>
+  > = []
+
+  if (clinicalAssessmentVisible) {
+    await auditClinicalAssessmentView(clientId)
+    clinicalAssessment = await getOrCreateCurrentClinicalAssessment({
+      clientId,
+      userId: user.id,
+    })
+    clinicalAssessmentVersions = await listClinicalAssessmentVersions(clientId)
+  }
+
   return {
     user,
     client,
@@ -234,6 +262,16 @@ export async function loadClientCrmDetail(clientId: string) {
       notes: billingNotes,
       authorizationTemplate,
     },
+    clinicalAssessment: clinicalAssessmentVisible
+      ? {
+          canView: true,
+          canUpload: canUploadClinicalAssessmentArtifacts(user),
+          canLock: canLockClinicalAssessment(user),
+          canMarkTreatmentPlan: canMarkTreatmentPlanComplete(user),
+          current: clinicalAssessment!,
+          versions: clinicalAssessmentVersions,
+        }
+      : { canView: false },
   }
 }
 

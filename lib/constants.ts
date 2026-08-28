@@ -179,6 +179,11 @@ export const CRM_CLIENT_REQUIREMENTS_PREFIX = 'crm-client-documents'
  */
 export const CRM_CLIENT_AUTH_TEMPLATES_PREFIX = 'crm-auth-templates'
 
+/**
+ * CRM locked clinical assessment artifacts (PHI) — private bucket path prefix.
+ */
+export const CRM_CLINICAL_ASSESSMENTS_PREFIX = 'crm-clinical-assessments'
+
 export { UserRole }
 
 export const USER_ROLE = {

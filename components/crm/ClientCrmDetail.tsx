@@ -11,6 +11,7 @@ import { NotesPanel, OverviewPanel } from '@/components/crm/NotesPanel'
 import { ActivityPanel } from '@/components/crm/ActivityPanel'
 import { AuthorizationPanel } from '@/components/crm/AuthorizationPanel'
 import { BillingAuthorizationPanel } from '@/components/crm/BillingAuthorizationPanel'
+import { ClinicalAssessmentPanel } from '@/components/crm/ClinicalAssessmentPanel'
 import { StaffingPanel } from '@/components/crm/StaffingPanel'
 import { SchedulePanel } from '@/components/crm/SchedulePanel'
 import { ClientDocumentsPanel } from '@/components/crm/ClientDocumentsPanel'
@@ -34,6 +35,7 @@ type TabId =
   | 'activity'
   | 'staffing'
   | 'authorization'
+  | 'assessment'
   | 'schedule'
   | 'email'
 
@@ -44,6 +46,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'notes', label: 'Notes' },
   { id: 'staffing', label: 'Staffing' },
   { id: 'authorization', label: 'Authorization' },
+  { id: 'assessment', label: 'Assessment' },
   { id: 'schedule', label: 'Schedule' },
   { id: 'email', label: 'Email' },
   { id: 'documents', label: 'Documents' },
@@ -71,8 +74,12 @@ export default function ClientCrmDetail({
     setTab(resolveTab(initialTab))
   }, [initialTab])
 
-  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit, teamTasks, taskUsers, billing } =
+  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit, teamTasks, taskUsers, billing, clinicalAssessment } =
     data
+
+  const visibleTabs = TABS.filter(
+    (t) => t.id !== 'assessment' || clinicalAssessment?.canView
+  )
 
   const runStageAction = (
     action: (opts: {
@@ -186,7 +193,7 @@ export default function ClientCrmDetail({
       />
 
       <div className="flex gap-1 overflow-x-auto border-b border-line pb-px">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -285,6 +292,19 @@ export default function ClientCrmDetail({
               paAutoSatisfied={!client.authRequired}
             />
           ))}
+        {tab === 'assessment' && clinicalAssessment?.canView && clinicalAssessment.current && (
+          <ClinicalAssessmentPanel
+            clientId={client.id}
+            clientCode={client.clientCode}
+            currentAssessment={clinicalAssessment.current}
+            versions={clinicalAssessment.versions}
+            canUpload={clinicalAssessment.canUpload}
+            canLock={clinicalAssessment.canLock}
+            canMarkTreatmentPlan={clinicalAssessment.canMarkTreatmentPlan}
+            treatmentPlanStatus={client.treatmentPlanStatus}
+            treatmentPlanCompletedAt={client.treatmentPlanCompletedAt}
+          />
+        )}
         {tab === 'schedule' && (
           <SchedulePanel
             clientId={client.id}
@@ -322,6 +342,7 @@ export type SerializeClientDetail = {
   canEdit: boolean
   emailSend: EmailSendContext & { allowedTemplates: CommTemplate[] }
   billing?: ClientCrmDetailData['billing']
+  clinicalAssessment?: ClientCrmDetailData['clinicalAssessment']
   client: ClientCrmDetailData['client']
   teamTasks: ClientCrmDetailData['teamTasks']
   taskUsers: ClientCrmDetailData['taskUsers']

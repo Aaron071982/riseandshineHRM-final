@@ -31,6 +31,7 @@ import {
   isFullAccess,
   getRequestIp,
   rethrowIfNextControlFlow,
+  assertCanViewClient,
 } from '@/lib/crm/access'
 import {
   canSetRbtTargetDate,
@@ -73,6 +74,9 @@ import {
 import {
   assertCanAccessBillingSurface,
 } from '@/lib/crm/billingAccess'
+import {
+  assertCanMarkTreatmentPlanComplete,
+} from '@/lib/crm/clinicalAssessment/access'
 import { ownershipPatchOnDeptChange } from '@/lib/crm/claims'
 import { authorizedHoursWarning } from '@/lib/schedule/hoursCheck'
 import { computeSessionBillability } from '@/lib/schedule/billability'
@@ -664,7 +668,12 @@ export async function updateTreatmentPlanStatus(
 ): Promise<ActionResult<{ treatmentPlanStatus: MilestoneStatus }>> {
   try {
     const user = await getClientServicesUser()
-    await assertCanEditClient(user, clientId)
+    await assertCanViewClient(user, clientId)
+    if (status === 'COMPLETE') {
+      assertCanMarkTreatmentPlanComplete(user)
+    } else {
+      await assertCanEditClient(user, clientId)
+    }
 
     const now = new Date()
     await prisma.serviceClient.update({
@@ -678,13 +687,23 @@ export async function updateTreatmentPlanStatus(
     await auditClientAction({
       userId: user.id,
       serviceClientId: clientId,
-      action: 'TREATMENT_PLAN_UPDATE',
+      action:
+        status === 'COMPLETE'
+          ? 'TREATMENT_PLAN_COMPLETE'
+          : 'TREATMENT_PLAN_UPDATE',
     })
     revalidateClient(clientId)
     return { ok: true, treatmentPlanStatus: status }
   } catch (err) {
     return fail(err)
   }
+}
+
+export async function markTreatmentPlanMade(
+  clientId: string,
+  made: boolean
+): Promise<ActionResult<{ treatmentPlanStatus: MilestoneStatus }>> {
+  return updateTreatmentPlanStatus(clientId, made ? 'COMPLETE' : 'NOT_STARTED')
 }
 
 export async function updateRbtTargetDate(

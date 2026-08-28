@@ -44,6 +44,7 @@ export const CRM_ROLE_LABELS: Record<CrmRole, string> = {
   MANAGEMENT: 'Management',
   INTAKE: 'Intake',
   CLINICAL: 'Clinical',
+  CLINICAL_SUPPORT: 'Clinical support',
   AUTHORIZATION: 'Authorization',
   STAFFING: 'Staffing',
   CASE_COORDINATION: 'Case coordination',

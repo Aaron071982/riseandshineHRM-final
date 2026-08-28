@@ -471,6 +471,11 @@ model User {
   clientBillingNotesDeleted ClientBillingNote[] @relation("ClientBillingNoteDeletedBy")
   clientAuthorizationTemplatesUploaded ClientAuthorizationTemplate[] @relation("ClientAuthorizationTemplateUploadedBy")
   clientAuthorizationTemplatesDeleted ClientAuthorizationTemplate[] @relation("ClientAuthorizationTemplateDeletedBy")
+  clinicalAssessmentsCreated ClientClinicalAssessment[] @relation("ClinicalAssessmentCreatedBy")
+  clinicalAssessmentsLocked ClientClinicalAssessment[] @relation("ClinicalAssessmentLockedBy")
+  clinicalAssessmentsUnlocked ClientClinicalAssessment[] @relation("ClinicalAssessmentUnlockedBy")
+  clinicalAssessmentArtifactsUploaded ClientClinicalAssessmentArtifact[] @relation("ClinicalAssessmentArtifactUploadedBy")
+  clinicalAssessmentArtifactsDeleted ClientClinicalAssessmentArtifact[] @relation("ClinicalAssessmentArtifactDeletedBy")
   clientCommunicationsDeleted  ClientCommunication[]     @relation("ClientCommunicationDeletedBy")
   clientAlertsDeleted          ClientAlert[]             @relation("ClientAlertDeletedBy")
   serviceClientNotesDeleted    ServiceClientNote[]       @relation("ServiceClientNoteDeletedBy")
@@ -2812,6 +2817,7 @@ enum CrmRole {
   MANAGEMENT
   INTAKE
   CLINICAL
+  CLINICAL_SUPPORT
   AUTHORIZATION
   STAFFING
   CASE_COORDINATION
@@ -3014,6 +3020,7 @@ model ServiceClient {
   claims              ClientClaim[]
   billingNotes        ClientBillingNote[]
   authorizationTemplates ClientAuthorizationTemplate[]
+  clinicalAssessments    ClientClinicalAssessment[]
 
   @@index([status])
   @@index([stage])
@@ -3392,6 +3399,74 @@ model ClientAuthorizationTemplate {
   @@index([serviceClientId, createdAt])
   @@index([deletedAt])
   @@map("client_authorization_templates")
+}
+
+enum AssessmentArtifactType {
+  INITIAL_REPORT
+  VINELAND_3
+  ATEC
+  FAST
+  JUSTIFICATION
+}
+
+enum ClinicalAssessmentLockState {
+  DRAFT
+  LOCKED
+}
+
+/// Mode B (upload) is live; Mode A (structured) is a future seam.
+enum ClinicalAssessmentCaptureMode {
+  UPLOAD
+  STRUCTURED
+}
+
+model ClientClinicalAssessment {
+  id               String                        @id @default(cuid())
+  serviceClientId  String
+  versionNumber    Int
+  isCurrentVersion Boolean                       @default(true)
+  captureMode      ClinicalAssessmentCaptureMode @default(UPLOAD)
+  lockState        ClinicalAssessmentLockState   @default(DRAFT)
+  lockedAt         DateTime?
+  lockedByUserId   String?
+  unlockedAt       DateTime?
+  unlockedByUserId String?
+  unlockReason     String?                       @db.Text
+  createdAt        DateTime                      @default(now())
+  createdByUserId  String
+  supersededAt     DateTime?
+
+  serviceClient  ServiceClient                      @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  createdByUser  User                               @relation("ClinicalAssessmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  lockedByUser   User?                              @relation("ClinicalAssessmentLockedBy", fields: [lockedByUserId], references: [id], onDelete: SetNull)
+  unlockedByUser User?                              @relation("ClinicalAssessmentUnlockedBy", fields: [unlockedByUserId], references: [id], onDelete: SetNull)
+  artifacts      ClientClinicalAssessmentArtifact[]
+
+  @@unique([serviceClientId, versionNumber])
+  @@index([serviceClientId, isCurrentVersion])
+  @@index([lockState])
+  @@map("client_clinical_assessments")
+}
+
+model ClientClinicalAssessmentArtifact {
+  id               String                 @id @default(cuid())
+  assessmentId     String
+  artifactType     AssessmentArtifactType
+  storagePath      String
+  contentType      String
+  sizeBytes        Int
+  uploadedAt       DateTime               @default(now())
+  uploadedByUserId String
+  deletedAt        DateTime?
+  deletedByUserId  String?
+
+  assessment     ClientClinicalAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  uploadedByUser User                     @relation("ClinicalAssessmentArtifactUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  deletedByUser  User?                    @relation("ClinicalAssessmentArtifactDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([assessmentId, artifactType])
+  @@index([deletedAt])
+  @@map("client_clinical_assessment_artifacts")
 }
 
 model TeamTask {

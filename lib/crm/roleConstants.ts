@@ -4,6 +4,7 @@ import type { ClientOwnerDept, CrmRole } from '@prisma/client'
 export const CRM_DEPARTMENT_ROLES: readonly CrmRole[] = [
   'INTAKE',
   'CLINICAL',
+  'CLINICAL_SUPPORT',
   'AUTHORIZATION',
   'STAFFING',
   'CASE_COORDINATION',
