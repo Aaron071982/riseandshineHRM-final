@@ -2961,6 +2961,8 @@ model ServiceClient {
   zip                  String?
   insuranceProvider    String?
   vobResult            String?
+  /// Plan-level prior-auth requirement from VOB (default true). Never derived from payerType.
+  authRequired         Boolean               @default(true)
   insuranceId          String?
   diagnosis            String?
   parentName           String?

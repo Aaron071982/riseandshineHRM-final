@@ -16,6 +16,7 @@ import { ClientDocumentsPanel } from '@/components/crm/ClientDocumentsPanel'
 import { ClientTasksPanel } from '@/components/crm/ClientTasksPanel'
 import { EmailPanel } from '@/components/crm/EmailPanel'
 import { advanceStage, setStage } from '@/lib/crm/actions'
+import type { StageWarningCode } from '@/lib/crm/stageWarnings'
 import { STAGE_LABELS } from '@/lib/crm/stages'
 import type { CommTemplate } from '@prisma/client'
 import type { ClientCrmDetailData } from '@/lib/crm/loadClientDetail'
@@ -72,6 +73,33 @@ export default function ClientCrmDetail({
   const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit, teamTasks, taskUsers } =
     data
 
+  const runStageAction = (
+    action: (opts: {
+      confirmed: true
+      warningOverrides?: StageWarningCode[]
+    }) => ReturnType<typeof advanceStage>
+  ) => {
+    startTransition(async () => {
+      let warningOverrides: StageWarningCode[] | undefined
+      for (;;) {
+        const res = await action({ confirmed: true, warningOverrides })
+        if (res.ok) {
+          router.refresh()
+          return
+        }
+        if (res.needsWarningConfirm && res.warnings?.length) {
+          const proceed = window.confirm(
+            res.warnings.map((w) => w.message).join('\n\n')
+          )
+          if (!proceed) return
+          warningOverrides = res.warnings.map((w) => w.code)
+          continue
+        }
+        return
+      }
+    })
+  }
+
   const onAdvance = () => {
     if (
       !window.confirm(
@@ -80,10 +108,7 @@ export default function ClientCrmDetail({
     ) {
       return
     }
-    startTransition(async () => {
-      const res = await advanceStage(client.id, { confirmed: true })
-      if (res.ok) router.refresh()
-    })
+    runStageAction((opts) => advanceStage(client.id, opts))
   }
 
   const onSetStage = (to: ClientStage) => {
@@ -95,10 +120,7 @@ export default function ClientCrmDetail({
     ) {
       return
     }
-    startTransition(async () => {
-      const res = await setStage(client.id, to, '', { confirmed: true })
-      if (res.ok) router.refresh()
-    })
+    runStageAction((opts) => setStage(client.id, to, '', opts))
   }
 
   const staffingRbts = client.btAssignments

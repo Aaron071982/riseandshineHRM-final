@@ -33,7 +33,6 @@ import {
   rethrowIfNextControlFlow,
 } from '@/lib/crm/access'
 import {
-  canAdvance,
   canSetRbtTargetDate,
   nextStage,
   REQUIREMENT_KEY_LABELS,
@@ -60,6 +59,16 @@ import { syncStageRequirements } from '@/lib/crm/syncStageRequirements'
 import { getClientSchedulePeriod } from '@/lib/client-services/schedulePeriod'
 import { restoreData, softDeleteData } from '@/lib/crm/softDelete'
 import { requireDestructiveConfirm } from '@/lib/crm/serverConfirm'
+import {
+  computeStageAdvanceWarnings,
+  type StageWarning,
+  type StageWarningCode,
+  warningsAcknowledged,
+} from '@/lib/crm/stageWarnings'
+import {
+  authRequiredFromVobOutcome,
+  parseVobOutcome,
+} from '@/lib/crm/vob'
 import { ownershipPatchOnDeptChange } from '@/lib/crm/claims'
 import { authorizedHoursWarning } from '@/lib/schedule/hoursCheck'
 import { computeSessionBillability } from '@/lib/schedule/billability'
@@ -86,7 +95,15 @@ function pipelineToLegacyStatus(pipeline: ClientPipelineStatus): ServiceClientSt
 
 export type ActionResult<T extends object = object> =
   | ({ ok: true } & T)
-  | { ok: false; error: string; blocked?: boolean; blockedBy?: string[]; status?: number }
+  | {
+      ok: false
+      error: string
+      blocked?: boolean
+      blockedBy?: string[]
+      status?: number
+      warnings?: import('@/lib/crm/stageWarnings').StageWarning[]
+      needsWarningConfirm?: boolean
+    }
 
 function fail(err: unknown): { ok: false; error: string; status?: number } {
   rethrowIfNextControlFlow(err)
@@ -98,6 +115,34 @@ function fail(err: unknown): { ok: false; error: string; status?: number } {
   }
   console.error('[crm] action failed', err)
   return { ok: false, error: 'Something went wrong' }
+}
+
+type StageTransitionOpts = {
+  confirmed?: boolean
+  warningOverrides?: StageWarningCode[]
+}
+
+async function assertStageWarningsOrProceed(
+  userId: string,
+  clientId: string,
+  warnings: StageWarning[],
+  opts: StageTransitionOpts | undefined
+): Promise<
+  | { ok: true }
+  | { ok: false; warnings: StageWarning[]; needsWarningConfirm: true }
+> {
+  if (warnings.length === 0) return { ok: true }
+  if (!warningsAcknowledged(warnings, opts?.warningOverrides)) {
+    return { ok: false, warnings, needsWarningConfirm: true }
+  }
+  for (const w of warnings) {
+    await auditClientAction({
+      userId,
+      serviceClientId: clientId,
+      action: `STAGE_WARNING_OVERRIDE:${w.code}`,
+    })
+  }
+  return { ok: true }
 }
 
 const ConsentLinesPatchSchema = z
@@ -150,7 +195,7 @@ export async function updateClientNextAction(
 
 export async function advanceStage(
   clientId: string,
-  opts?: { confirmed?: boolean }
+  opts?: StageTransitionOpts
 ): Promise<ActionResult<{ stage: ClientStage }>> {
   try {
     const user = await getClientServicesUser()
@@ -166,12 +211,38 @@ export async function advanceStage(
         requirements: { where: { deletedAt: null } },
         consent: true,
         referralCheck: true,
+        authorizations: {
+          where: { deletedAt: null },
+          select: { authType: true, status: true, deletedAt: true },
+        },
       },
     })
 
     const toStage = nextStage(client.stage)
     if (!toStage) {
       return { ok: false, error: 'Already at final stage' }
+    }
+
+    const warnings = computeStageAdvanceWarnings({
+      fromStage: client.stage,
+      toStage,
+      authRequired: client.authRequired,
+      treatmentPlanStatus: client.treatmentPlanStatus,
+      authorizations: client.authorizations,
+    })
+    const warnGate = await assertStageWarningsOrProceed(
+      user.id,
+      clientId,
+      warnings,
+      opts
+    )
+    if (!warnGate.ok) {
+      return {
+        ok: false,
+        error: 'Acknowledge warnings to proceed',
+        warnings: warnGate.warnings,
+        needsWarningConfirm: true,
+      }
     }
 
     const now = new Date()
@@ -280,7 +351,7 @@ export async function setStage(
   clientId: string,
   toStage: ClientStage,
   reason = '',
-  opts?: { confirmed?: boolean }
+  opts?: StageTransitionOpts
 ): Promise<ActionResult<{ stage: ClientStage }>> {
   try {
     const user = await getClientServicesUser()
@@ -295,11 +366,39 @@ export async function setStage(
 
     const client = await prisma.serviceClient.findUniqueOrThrow({
       where: { id: clientId },
-      include: { consent: true },
+      include: {
+        consent: true,
+        authorizations: {
+          where: { deletedAt: null },
+          select: { authType: true, status: true, deletedAt: true },
+        },
+      },
     })
 
     if (client.stage === toStage) {
       return { ok: true, stage: toStage }
+    }
+
+    const warnings = computeStageAdvanceWarnings({
+      fromStage: client.stage,
+      toStage,
+      authRequired: client.authRequired,
+      treatmentPlanStatus: client.treatmentPlanStatus,
+      authorizations: client.authorizations,
+    })
+    const warnGate = await assertStageWarningsOrProceed(
+      user.id,
+      clientId,
+      warnings,
+      opts
+    )
+    if (!warnGate.ok) {
+      return {
+        ok: false,
+        error: 'Acknowledge warnings to proceed',
+        warnings: warnGate.warnings,
+        needsWarningConfirm: true,
+      }
     }
 
     const now = new Date()
@@ -360,6 +459,7 @@ export async function setStage(
       serviceClientId: clientId,
       action: 'STAGE_CHANGE',
     })
+
     revalidateClient(clientId)
     return { ok: true, stage: toStage }
   } catch (err) {
@@ -516,6 +616,7 @@ export async function createServiceClient(
       serviceClientId: client.id,
       action: 'CREATE',
     })
+
     revalidatePath('/client-services')
     revalidatePath('/client-services/clients')
     return { ok: true, id: client.id, clientCode: client.clientCode }
@@ -1355,6 +1456,85 @@ export async function searchBcbaProfiles(query: string): Promise<
         email: r.email,
       })),
     }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function recordBenefitsVerification(
+  clientId: string,
+  input: { vobOutcome: string; notes?: string | null }
+): Promise<ActionResult<{ authRequired: boolean; vobResult: string }>> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+
+    const outcome = parseVobOutcome(input.vobOutcome)
+    if (!outcome) {
+      return {
+        ok: false,
+        error: 'vobOutcome must be PA_REQUIRED or NO_PA_REQUIRED',
+        status: 400,
+      }
+    }
+
+    const authRequired = authRequiredFromVobOutcome(outcome)
+    const notes = input.notes?.trim() || null
+
+    await prisma.$transaction(async (tx) => {
+      await tx.serviceClient.update({
+        where: { id: clientId },
+        data: {
+          vobResult: outcome,
+          authRequired,
+        },
+      })
+
+      if (!authRequired) {
+        const assessmentAuth = await tx.clientAuthorization.findFirst({
+          where: {
+            serviceClientId: clientId,
+            authType: 'ASSESSMENT',
+            deletedAt: null,
+          },
+          include: { lines: { where: { deletedAt: null } } },
+        })
+        if (assessmentAuth) {
+          await tx.clientAuthorizationLine.updateMany({
+            where: { authorizationId: assessmentAuth.id, deletedAt: null },
+            data: { authRequired: false },
+          })
+        }
+      }
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: `VOB_RECORDED:${outcome}`,
+    })
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: `AUTH_REQUIRED_SET:${authRequired ? 'true' : 'false'}`,
+    })
+    if (!authRequired) {
+      await auditClientAction({
+        userId: user.id,
+        serviceClientId: clientId,
+        action: 'PA_AUTO_SATISFIED',
+      })
+    }
+    if (notes) {
+      await auditClientAction({
+        userId: user.id,
+        serviceClientId: clientId,
+        action: 'VOB_NOTES_RECORDED',
+      })
+    }
+
+    revalidateClient(clientId)
+    return { ok: true, authRequired, vobResult: outcome }
   } catch (err) {
     return fail(err)
   }

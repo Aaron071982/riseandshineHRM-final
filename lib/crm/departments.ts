@@ -139,6 +139,8 @@ function mapRow(
       authType: 'ASSESSMENT' | 'TREATMENT'
       status: 'REQUESTED' | 'PENDING' | 'APPROVED' | 'DENIED' | 'EXPIRED'
     }[]
+    vobResult: string | null
+    authRequired: boolean
   }
 ): DepartmentQueueRow {
   const aging = {
@@ -146,14 +148,18 @@ function mapRow(
     stageEnteredAt: c.stageEnteredAt,
     rbtTargetDate: c.rbtTargetDate,
   }
-  const hasVob = Boolean(
-    c.authorizations.find((a) => a.authType === 'ASSESSMENT' && a.status === 'APPROVED')
-  )
+  const vobDone = Boolean(c.vobResult?.trim())
+  const assessmentAuth = c.authorizations.find((a) => a.authType === 'ASSESSMENT')
   const treatment = c.authorizations.find((a) => a.authType === 'TREATMENT')
+  const paSatisfied =
+    !c.authRequired || assessmentAuth?.status === 'APPROVED'
   let billingSubstep: string | null = null
   if (c.currentOwnerDept === 'BILLING') {
-    if (!hasVob || c.stage === 'BENEFITS') billingSubstep = 'Needs VOB'
-    else if (!treatment && c.stage === 'AUTHORIZATION') billingSubstep = 'VOB done / needs PA'
+    if (!vobDone || c.stage === 'BENEFITS') billingSubstep = 'Needs VOB'
+    else if (!paSatisfied && c.stage === 'AUTHORIZATION')
+      billingSubstep = 'VOB done / needs PA'
+    else if (!paSatisfied && c.stage === 'ASSESSMENT')
+      billingSubstep = 'VOB done / needs PA'
     else if (treatment?.status === 'REQUESTED' || treatment?.status === 'PENDING')
       billingSubstep = 'PA submitted / waiting'
     else if (treatment?.status === 'APPROVED') billingSubstep = 'PA approved'
@@ -196,6 +202,8 @@ const queueSelect = {
   nextAction: true,
   nextActionDueAt: true,
   rbtTargetDate: true,
+  vobResult: true,
+  authRequired: true,
   currentOwnerUser: { select: { name: true, email: true } },
   caseCoordinatorUser: { select: { name: true, email: true } },
   authorizations: {
