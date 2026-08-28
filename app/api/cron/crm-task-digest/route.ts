@@ -1,30 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertCrmCronOrResponse } from '@/lib/cron-auth'
 import { sendCrmTaskDigests } from '@/lib/crm/tasks/taskDigest'
-import { crmTaskEmailsEnabled } from '@/lib/crm/tasks/notifications'
+import { taskEmailsEnabled } from '@/lib/crm/tasks/taskEmailConfig'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 /**
- * Bi-nightly CRM staff task digest (Resend).
- * Schedule: 02:00 UTC every 2 days (vercel.json) — roughly every other night ET.
+ * Nightly CRM staff task digest (Resend).
+ * Schedule: 02:00 UTC daily — per-user cadence (default every 2 nights) from task_notification_logs.
  * Auth: Authorization: Bearer <CRON_SECRET>
- * Kill-switch: CRM_TASK_EMAILS_ENABLED=true required.
+ * Kill-switch: TASK_EMAILS_ENABLED=false (default).
  *
- * Audience: active users with a CrmRole and @riseandshineaba.com email.
- * Includes unread AdminNotifications + overdue / due-24h / open assigned TeamTasks.
- * Never emails RBT portal users without CRM roles.
+ * Task source: team_tasks (assigned, open statuses). Messages seam: admin_notifications unread count.
  */
 export async function GET(request: NextRequest) {
   const denied = assertCrmCronOrResponse(request)
   if (denied) return denied
 
-  if (!crmTaskEmailsEnabled()) {
+  if (!taskEmailsEnabled()) {
     return NextResponse.json({
       success: true,
       skipped: true,
-      reason: 'CRM_TASK_EMAILS_ENABLED is not true',
+      reason: 'TASK_EMAILS_ENABLED is false',
     })
   }
 

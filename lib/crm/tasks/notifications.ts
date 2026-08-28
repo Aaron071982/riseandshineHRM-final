@@ -18,6 +18,11 @@ import { sendGenericEmail } from '@/lib/email/core'
 import { makePublicUrl } from '@/lib/baseUrl'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit'
+import {
+  taskEmailsEnabled,
+  taskEmailsTestEmail,
+  taskEmailsTestSend,
+} from '@/lib/crm/tasks/taskEmailConfig'
 
 export type TaskNotifySender = {
   id: string
@@ -25,10 +30,8 @@ export type TaskNotifySender = {
   name?: string | null
 }
 
-/** Interactive + digest task emails. Off unless CRM_TASK_EMAILS_ENABLED=true. */
-export function crmTaskEmailsEnabled(): boolean {
-  return process.env.CRM_TASK_EMAILS_ENABLED === 'true'
-}
+/** @deprecated Use taskEmailsEnabled from taskEmailConfig */
+export { taskEmailsEnabled as crmTaskEmailsEnabled } from '@/lib/crm/tasks/taskEmailConfig'
 
 function tasksHubUrl(): string {
   return makePublicUrl('/client-services/tasks')
@@ -132,6 +135,20 @@ function taskDetailCard(rows: { label: string; value: string }[]): string {
 </table>`
 }
 
+async function resolveRecipientEmail(
+  toUserId: string
+): Promise<{ email: string | null; testMode: boolean }> {
+  const testEmail = taskEmailsTestEmail()
+  if (taskEmailsTestSend() && testEmail) {
+    return { email: testEmail, testMode: true }
+  }
+  const recipient = await prisma.user.findUnique({
+    where: { id: toUserId },
+    select: { email: true },
+  })
+  return { email: recipient?.email?.trim().toLowerCase() ?? null, testMode: false }
+}
+
 function htmlToText(html: string): string {
   return html
     .replace(/<style[^>]*>.*?<\/style>/gis, '')
@@ -153,7 +170,7 @@ async function notifyUser(input: {
   from: TaskNotifySender
   auditAction: string
 }): Promise<{ sent: boolean; reason?: string }> {
-  if (!crmTaskEmailsEnabled()) {
+  if (!taskEmailsEnabled()) {
     await writeAuditLog({
       actorUserId: input.from.id,
       entityType: 'TeamTaskNotify',
@@ -162,21 +179,17 @@ async function notifyUser(input: {
       after: {
         action: input.auditAction,
         status: 'SKIPPED',
-        reason: 'CRM_TASK_EMAILS_ENABLED is not true',
+        reason: 'TASK_EMAILS_ENABLED is false',
       },
     })
-    return { sent: false, reason: 'CRM_TASK_EMAILS_ENABLED is not true' }
+    return { sent: false, reason: 'TASK_EMAILS_ENABLED is false' }
   }
 
-  const recipient = await prisma.user.findUnique({
-    where: { id: input.toUserId },
-    select: { email: true, name: true },
-  })
-  const to = recipient?.email?.trim().toLowerCase()
+  const { email: to, testMode } = await resolveRecipientEmail(input.toUserId)
   if (!to) {
     return { sent: false, reason: 'Recipient has no email' }
   }
-  if (!hasRiseAndShineMailbox(to)) {
+  if (!testMode && !hasRiseAndShineMailbox(to)) {
     return { sent: false, reason: 'Recipient mailbox is not @riseandshineaba.com' }
   }
 
@@ -286,20 +299,16 @@ export async function notifyUserViaResend(input: {
   auditAction: string
   actorUserId?: string | null
 }): Promise<{ sent: boolean; reason?: string }> {
-  if (!crmTaskEmailsEnabled()) {
-    return { sent: false, reason: 'CRM_TASK_EMAILS_ENABLED is not true' }
+  if (!taskEmailsEnabled()) {
+    return { sent: false, reason: 'TASK_EMAILS_ENABLED is false' }
   }
   if (!process.env.RESEND_API_KEY) {
     return { sent: false, reason: 'RESEND_API_KEY not configured' }
   }
 
-  const recipient = await prisma.user.findUnique({
-    where: { id: input.toUserId },
-    select: { email: true },
-  })
-  const to = recipient?.email?.trim().toLowerCase()
+  const { email: to, testMode } = await resolveRecipientEmail(input.toUserId)
   if (!to) return { sent: false, reason: 'Recipient has no email' }
-  if (!hasRiseAndShineMailbox(to)) {
+  if (!testMode && !hasRiseAndShineMailbox(to)) {
     return { sent: false, reason: 'Recipient mailbox is not @riseandshineaba.com' }
   }
 
@@ -320,39 +329,6 @@ export async function notifyUserViaResend(input: {
   return ok ? { sent: true } : { sent: false, reason: 'Resend send failed' }
 }
 
-export async function notifyTaskAssigned(input: {
-  assigneeUserId: string | null
-  assignerName: string
-  taskTitle: string
-  clientLabel?: string | null
-  dueAt?: Date | null
-  from: TaskNotifySender
-}): Promise<void> {
-  if (!input.assigneeUserId || input.assigneeUserId === input.from.id) return
-  const assigner = escapeHtml(input.assignerName.trim() || 'A teammate')
-  const detail = taskDetailCard([
-    { label: 'Task', value: input.taskTitle },
-    ...(input.clientLabel
-      ? [{ label: 'Client', value: input.clientLabel }]
-      : []),
-    ...(input.dueAt
-      ? [{ label: 'Due', value: formatDueLabel(input.dueAt) }]
-      : []),
-  ])
-  await notifyUser({
-    toUserId: input.assigneeUserId,
-    subject: `Task assigned: ${input.taskTitle}`,
-    html: staffTaskEmailShell(
-      'New task assigned to you',
-      `<p style="margin:0 0 16px;">${assigner} assigned you a task.</p>
-${detail}
-<p style="margin:16px 0 0;font-size:14px;color:${MUTED_TEXT};">Open the tasks hub to update status, leave a note, or mark it done.</p>`
-    ),
-    from: input.from,
-    auditAction: 'TASK_NOTIFY_ASSIGNED',
-  })
-}
-
 export async function notifyTaskCompleted(input: {
   assignerUserId: string
   completerName: string
@@ -362,11 +338,10 @@ export async function notifyTaskCompleted(input: {
   if (input.assignerUserId === input.from.id) return
   await notifyUser({
     toUserId: input.assignerUserId,
-    subject: `Task completed: ${input.taskTitle}`,
+    subject: 'CRM task marked done',
     html: staffTaskEmailShell(
       'Task marked done',
-      `<p style="margin:0 0 16px;">${escapeHtml(input.completerName)} completed <strong>${escapeHtml(input.taskTitle)}</strong>.</p>
-${taskDetailCard([{ label: 'Task', value: input.taskTitle }])}`
+      `<p style="margin:0 0 16px;">A task you assigned was marked complete. Open My Tasks for details.</p>`
     ),
     from: input.from,
     auditAction: 'TASK_NOTIFY_COMPLETED',
@@ -385,14 +360,13 @@ export async function notifyExtensionRequested(input: {
   const reason = input.reason?.trim()
   await notifyUser({
     toUserId: input.assignerUserId,
-    subject: `Extension requested: ${input.taskTitle}`,
+    subject: 'CRM task extension requested',
     html: staffTaskEmailShell(
       'Due-date extension requested',
-      `<p style="margin:0 0 16px;">${escapeHtml(input.requesterName)} asked for more time on this task.</p>
+      `<p style="margin:0 0 16px;">An assignee requested a due-date extension.</p>
 ${taskDetailCard([
-  { label: 'Task', value: input.taskTitle },
   { label: 'Requested', value: formatDueLabel(input.requestedDueAt) },
-  ...(reason ? [{ label: 'Reason', value: reason }] : []),
+  ...(reason ? [{ label: 'Note', value: 'See task in app' }] : []),
 ])}`,
       { ctaLabel: 'Review request' }
     ),
@@ -409,15 +383,12 @@ export async function notifyTaskMention(input: {
   from: TaskNotifySender
 }): Promise<void> {
   if (input.mentionedUserId === input.from.id) return
-  const preview = escapeHtml(input.commentPreview.slice(0, 500))
   await notifyUser({
     toUserId: input.mentionedUserId,
-    subject: `You were mentioned on: ${input.taskTitle}`,
+    subject: 'You were mentioned on a CRM task',
     html: staffTaskEmailShell(
       'You were mentioned',
-      `<p style="margin:0 0 16px;">${escapeHtml(input.mentionerName)} mentioned you on <strong>${escapeHtml(input.taskTitle)}</strong>.</p>
-${taskDetailCard([{ label: 'Task', value: input.taskTitle }])}
-<blockquote style="margin:16px 0 0;padding:12px 14px;border-left:3px solid ${ACCENT};background:#fcfaf7;border-radius:0 8px 8px 0;font-size:14px;line-height:1.55;color:${BODY_TEXT};">${preview}</blockquote>`,
+      `<p style="margin:0 0 16px;">You were mentioned in a task conversation. Open the task in Client Services to read the thread.</p>`,
       { ctaLabel: 'Open conversation' }
     ),
     from: input.from,
@@ -439,15 +410,11 @@ export async function notifyTaskReminder(input: {
   }
   return notifyUser({
     toUserId: input.assigneeUserId,
-    subject: `Reminder: ${input.taskTitle}`,
+    subject: 'CRM task reminder',
     html: staffTaskEmailShell(
       'Task reminder',
-      `<p style="margin:0 0 16px;">${escapeHtml(input.reminderFromName)} sent you a reminder — this task still has no conversation updates.</p>
+      `<p style="margin:0 0 16px;">You have a task reminder — open My Tasks for details.</p>
 ${taskDetailCard([
-  { label: 'Task', value: input.taskTitle },
-  ...(input.clientLabel
-    ? [{ label: 'Client', value: input.clientLabel }]
-    : []),
   ...(input.dueAt
     ? [{ label: 'Due', value: formatDueLabel(input.dueAt) }]
     : []),
@@ -471,17 +438,11 @@ export async function notifyTaskDueSoon(input: {
 }): Promise<void> {
   await notifyUser({
     toUserId: input.assigneeUserId,
-    subject: `Due soon: ${input.taskTitle}`,
+    subject: 'CRM task due soon',
     html: staffTaskEmailShell(
       'Task due soon',
-      `<p style="margin:0 0 16px;">This task is coming up — please review it when you can.</p>
-${taskDetailCard([
-  { label: 'Task', value: input.taskTitle },
-  { label: 'Due', value: formatDueLabel(input.dueAt) },
-  ...(input.clientLabel
-    ? [{ label: 'Client', value: input.clientLabel }]
-    : []),
-])}`
+      `<p style="margin:0 0 16px;">You have a task due soon. Open My Tasks for details.</p>
+${taskDetailCard([{ label: 'Due', value: formatDueLabel(input.dueAt) }])}`
     ),
     from: input.from,
     auditAction: 'TASK_NOTIFY_DUE_SOON',

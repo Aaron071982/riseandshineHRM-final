@@ -29,11 +29,11 @@ import { writeAuditLog } from '@/lib/audit'
 import { parseMentionIds, renderMentionBody } from '@/lib/crm/tasks/mentions'
 import {
   notifyExtensionRequested,
-  notifyTaskAssigned,
   notifyTaskCompleted,
   notifyTaskMention,
   notifyTaskReminder,
 } from '@/lib/crm/tasks/notifications'
+import { queueAssignmentNotification } from '@/lib/crm/tasks/assignmentNotifyQueue'
 
 export type ActionResult<T = void> =
   | ({ ok: true } & (T extends void ? object : T))
@@ -279,15 +279,13 @@ export async function createTeamTask(input: {
     )
 
     if (assignedToUserId) {
-      void notifyTaskAssigned({
+      queueAssignmentNotification({
         assigneeUserId: assignedToUserId,
-        assignerName: user.name ?? user.email ?? 'A teammate',
-        taskTitle: title,
-        clientLabel: task.serviceClient
-          ? `${task.serviceClient.firstName} ${task.serviceClient.lastName}`
-          : null,
+        actorUserId: user.id,
+        serviceClientId: task.serviceClientId,
+        assignedDept: task.assignedDept,
+        priority: task.priority,
         dueAt,
-        from: { id: user.id, email: user.email ?? null, name: user.name ?? null },
       })
     }
 
@@ -446,6 +444,9 @@ export async function updateTeamTask(
         title: true,
         serviceClientId: true,
         assignedToUserId: true,
+        assignedDept: true,
+        priority: true,
+        dueAt: true,
       },
     })
 
@@ -456,21 +457,13 @@ export async function updateTeamTask(
       nextAssignee !== existing.assignedToUserId &&
       nextAssignee !== user.id
     ) {
-      const client = task.serviceClientId
-        ? await prisma.serviceClient.findUnique({
-            where: { id: task.serviceClientId },
-            select: { firstName: true, lastName: true },
-          })
-        : null
-      void notifyTaskAssigned({
+      queueAssignmentNotification({
         assigneeUserId: nextAssignee,
-        assignerName: user.name ?? user.email ?? 'A teammate',
-        taskTitle: title,
-        clientLabel: client
-          ? `${client.firstName} ${client.lastName}`
-          : null,
-        dueAt: dueAt ?? null,
-        from: { id: user.id, email: user.email ?? null, name: user.name ?? null },
+        actorUserId: user.id,
+        serviceClientId: task.serviceClientId,
+        assignedDept: task.assignedDept,
+        priority: task.priority,
+        dueAt: dueAt !== undefined ? dueAt : task.dueAt,
       })
     }
 
