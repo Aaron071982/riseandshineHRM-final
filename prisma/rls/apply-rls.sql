@@ -34,7 +34,7 @@ DECLARE
     'service_client_notes', 'client_access_logs', 'client_services_sessions',
     'client_service_breaks', 'client_rbt_breaks', 'service_client_status_history',
     'client_requirements', 'client_authorizations', 'client_authorization_lines',
-    'client_tasks', 'client_communications', 'client_alerts',
+    'team_tasks', 'client_communications', 'client_alerts',
     'client_consents', 'client_referral_checks',
     'schedule_import_batches', 'client_boroughs',
     'payroll_runs', 'payroll_run_entries',
@@ -53,7 +53,9 @@ DECLARE
     'oauth_clients', 'oauth_authorization_codes', 'oauth_access_tokens',
     'schedule_allowed_user', 'therapist', 'schedule_client', 'session_slot',
     -- CRM roles (privilege-escalation surface; was missing from earlier lists)
-    'user_crm_roles'
+    'user_crm_roles',
+    -- CRM training / ops (deny anon; app uses postgres/service_role)
+    'crm_training_videos', 'saved_queries'
   ];
 BEGIN
   FOREACH t IN ARRAY tables
@@ -94,11 +96,11 @@ DECLARE
     'service_client_notes', 'client_access_logs', 'client_services_sessions',
     'client_service_breaks', 'client_rbt_breaks', 'service_client_status_history',
     'client_requirements', 'client_authorizations', 'client_authorization_lines',
-    'client_tasks', 'client_communications', 'client_alerts',
+    'team_tasks', 'client_communications', 'client_alerts',
     'client_consents', 'client_referral_checks',
     'schedule_import_batches', 'client_boroughs', 'payroll_runs',
     'payroll_run_entries', 'company_documents', 'company_document_recipients',
-    'user_crm_roles'
+    'user_crm_roles', 'crm_training_videos', 'saved_queries'
   ];
 BEGIN
   FOREACH t IN ARRAY tables
@@ -130,13 +132,13 @@ DECLARE
     'service_client_notes', 'client_access_logs', 'client_services_sessions',
     'client_service_breaks', 'client_rbt_breaks', 'service_client_status_history',
     'client_requirements', 'client_authorizations', 'client_authorization_lines',
-    'client_tasks', 'client_communications', 'client_alerts',
+    'team_tasks', 'client_communications', 'client_alerts',
     'client_consents', 'client_referral_checks',
     'rbt_schedule_assignments', 'schedule_import_batches', 'client_boroughs',
     'rbt_pay_statements', 'rbt_pay_statement_sessions',
     'payroll_runs', 'payroll_run_entries',
     'company_documents', 'company_document_recipients',
-    'user_crm_roles'
+    'user_crm_roles', 'crm_training_videos', 'saved_queries'
   ];
 BEGIN
   FOREACH t IN ARRAY tables

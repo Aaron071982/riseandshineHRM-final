@@ -63,29 +63,40 @@ async function main() {
   const anonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
   if (supabaseUrl && anonKey) {
-    const res = await fetch(`${supabaseUrl.replace(/\/$/, '')}/rest/v1/user_crm_roles?select=id&limit=1`, {
-      headers: {
-        apikey: anonKey,
-        Authorization: `Bearer ${anonKey}`,
-      },
-    })
-    const body = await res.text()
-    console.log(`\nAnon REST user_crm_roles: HTTP ${res.status} body=${body.slice(0, 200)}`)
-    if (res.ok) {
-      try {
-        const parsed = JSON.parse(body) as unknown[]
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          console.error('✋ Anon key returned rows from user_crm_roles')
-          process.exitCode = 3
-        } else {
-          console.log('✓ Anon key returned no user_crm_roles rows')
-        }
-      } catch {
-        console.log('(could not parse anon body; treat as blocked if 401/empty)')
-      }
-    } else if (res.status === 401 || res.status === 403) {
-      console.log('✓ Anon key denied (expected)')
+    const base = supabaseUrl.replace(/\/$/, '')
+    const headers = {
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
     }
+
+    async function checkAnon(table: string) {
+      const res = await fetch(`${base}/rest/v1/${table}?select=id&limit=1`, {
+        headers,
+      })
+      const body = await res.text()
+      console.log(`\nAnon REST ${table}: HTTP ${res.status} body=${body.slice(0, 200)}`)
+      if (res.ok) {
+        try {
+          const parsed = JSON.parse(body) as unknown[]
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            console.error(`✋ Anon key returned rows from ${table}`)
+            process.exitCode = 3
+            return
+          }
+        } catch {
+          // blocked or non-json
+        }
+      }
+      if (res.status === 401 || res.status === 403) {
+        console.log(`✓ Anon key denied on ${table} (expected)`)
+      } else if (!res.ok) {
+        console.log(`✓ Anon key blocked on ${table} (HTTP ${res.status})`)
+      }
+    }
+
+    await checkAnon('user_crm_roles')
+    await checkAnon('crm_training_videos')
+    await checkAnon('saved_queries')
   } else {
     console.log('\n(Skipping anon REST check — NEXT_PUBLIC_SUPABASE_URL / anon key unset)')
   }
