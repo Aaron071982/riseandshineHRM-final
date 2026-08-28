@@ -59,6 +59,7 @@ import { PER_DOCUMENT_SIGNATURE_CONSENT_STATEMENT } from '@/lib/esign-constants'
 import { syncStageRequirements } from '@/lib/crm/syncStageRequirements'
 import { getClientSchedulePeriod } from '@/lib/client-services/schedulePeriod'
 import { restoreData, softDeleteData } from '@/lib/crm/softDelete'
+import { requireDestructiveConfirm } from '@/lib/crm/serverConfirm'
 import { ownershipPatchOnDeptChange } from '@/lib/crm/claims'
 import { authorizedHoursWarning } from '@/lib/schedule/hoursCheck'
 import { computeSessionBillability } from '@/lib/schedule/billability'
@@ -290,13 +291,18 @@ export async function advanceStage(clientId: string): Promise<
 export async function setStage(
   clientId: string,
   toStage: ClientStage,
-  reason: string
+  reason: string,
+  opts?: { confirmed?: boolean }
 ): Promise<ActionResult<{ stage: ClientStage }>> {
   try {
     const user = await getClientServicesUser()
     if (!isFullAccess(user)) {
       throw new CrmAccessError('Full access required to override stage', 403)
     }
+    requireDestructiveConfirm(
+      opts?.confirmed,
+      'Manual stage change requires confirmed: true'
+    )
     await assertCanEditClient(user, clientId)
 
     const client = await prisma.serviceClient.findUniqueOrThrow({
@@ -2473,6 +2479,11 @@ export async function previewClientEmail(
     const user = await getClientServicesUser()
     const { previewStaffClientEmail } = await import('@/lib/crm/emails/staffSend')
     const preview = await previewStaffClientEmail(user, clientId, input)
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: `EMAIL_PREVIEW:${input.template}`,
+    })
     return {
       ok: true,
       subject: preview.subject,
@@ -2505,12 +2516,17 @@ export async function sendClientEmail(
     links?: { url: string; label?: string }[]
     assessmentModality?: 'IN_HOME' | 'TELEHEALTH' | null
     rbtAssignmentId?: string | null
+    confirmed?: boolean
   }
 ): Promise<
   ActionResult<{ status: string; communicationId: string; reason?: string }>
 > {
   try {
     const user = await getClientServicesUser()
+    requireDestructiveConfirm(
+      input.confirmed,
+      'External email send requires confirmed: true'
+    )
     const { sendStaffClientEmail } = await import('@/lib/crm/emails/staffSend')
     const result = await sendStaffClientEmail(user, clientId, input)
     revalidateClient(clientId)
@@ -2561,13 +2577,18 @@ export async function resendJourneyEmail(
 
 /** Soft-delete a family record. Full-access only. Never hard-deletes. */
 export async function softDeleteServiceClient(
-  clientId: string
+  clientId: string,
+  opts?: { confirmed?: boolean }
 ): Promise<ActionResult<{ clientCode: string; name: string }>> {
   try {
     const user = await getClientServicesUser()
     if (!isFullAccess(user)) {
       throw new CrmAccessError('Full access required to delete a family record', 403)
     }
+    requireDestructiveConfirm(
+      opts?.confirmed,
+      'Family delete requires confirmed: true'
+    )
     await assertCanEditClient(user, clientId)
 
     const existing = await prisma.serviceClient.findFirst({

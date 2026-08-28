@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { validateSession, isAdmin } from '@/lib/auth'
 import { writeAuditLog } from '@/lib/audit'
+import { logClientAccess } from '@/lib/client-services/audit'
 import { validateCptCode, validateMinutes, validateUnits } from '@/lib/validation/clinical'
 import {
   assertCanViewClient,
@@ -80,6 +81,12 @@ export async function GET(request: NextRequest) {
     const logs = await prisma.clinicalServiceLog.findMany({
       where,
       orderBy: { serviceDate: 'desc' },
+    })
+
+    await logClientAccess({
+      userId: user.id,
+      serviceClientId: clientId ?? null,
+      action: clientId ? 'CLINICAL_LOGS_VIEW' : 'CLINICAL_LOGS_LIST',
     })
 
     return NextResponse.json(logs)

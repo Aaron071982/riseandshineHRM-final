@@ -1,15 +1,17 @@
 /**
  * Remove all payroll/billing cycle data (cycles, entries, sessions, hour confirmations).
  * Does NOT touch rbt_profiles.hourlyPayRate / artemisProviderName / payRateUpdated*.
- * Does NOT delete payroll_only_people (master list + their hourlyPayRate).
  *
- * Usage: npx tsx scripts/clear-billing-cycles.ts
+ * Usage: npx tsx scripts/clear-billing-cycles.ts [--confirm] [--prod-confirm]
  */
 import { PrismaClient } from '@prisma/client'
+import { assertWriteTarget } from '../lib/scripts/guard'
 
 const prisma = new PrismaClient()
 
 async function main() {
+  const target = assertWriteTarget({ allowProd: true })
+
   const [cycles, entries, sessions, confirmations, rbtsWithRate] = await Promise.all([
     prisma.billingCycle.count(),
     prisma.billingEntry.count(),
@@ -30,7 +32,11 @@ async function main() {
     return
   }
 
-  // Sessions + entries + confirmations cascade from cycles; delete children first for clarity.
+  if (target.dryRun) {
+    console.log(`\nDry run — would delete ${cycles} billing cycle(s) and related rows.`)
+    return
+  }
+
   await prisma.billingSession.deleteMany()
   await prisma.billingHoursConfirmation.deleteMany()
   await prisma.billingEntry.deleteMany()

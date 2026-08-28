@@ -416,7 +416,7 @@ export default function ClientDetailPage({
     setDeleting(true)
     setError('')
     try {
-      const res = await fetch(`/api/client-services/clients/${clientId}`, {
+      const res = await fetch(`/api/client-services/clients/${clientId}?confirmed=1`, {
         method: 'DELETE',
         credentials: 'include',
       })

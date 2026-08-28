@@ -1,83 +1,84 @@
+/**
+ * DESTRUCTIVE: wipes RBT/candidate users and related HR data.
+ * Usage: npx tsx scripts/clear-rbts.ts [--confirm] [--prod-confirm]
+ */
 import { PrismaClient } from '@prisma/client'
+import { assertWriteTarget } from '../lib/scripts/guard'
 
 const prisma = new PrismaClient()
 
 async function main() {
+  const target = assertWriteTarget({ allowProd: true })
   console.log('🧹 Starting RBT data cleanup...')
 
+  if (target.dryRun) {
+    const counts = await Promise.all([
+      prisma.interviewEmailLog.count(),
+      prisma.onboardingTask.count(),
+      prisma.timeEntry.count(),
+      prisma.shift.count(),
+      prisma.leaveRequest.count(),
+      prisma.interview.count(),
+      prisma.rBTProfile.count(),
+      prisma.user.count({ where: { role: { in: ['RBT', 'CANDIDATE'] } } }),
+    ])
+    console.log('Would delete (dry run):', {
+      interviewEmailLogs: counts[0],
+      onboardingTasks: counts[1],
+      timeEntries: counts[2],
+      shifts: counts[3],
+      leaveRequests: counts[4],
+      interviews: counts[5],
+      rbtProfiles: counts[6],
+      rbtCandidateUsers: counts[7],
+    })
+    return
+  }
+
   try {
-    // Delete all RBT-related data in the correct order to respect foreign key constraints
-    
-    // 1. Delete email logs (references RBTProfile)
     const emailLogsDeleted = await prisma.interviewEmailLog.deleteMany({})
     console.log(`✅ Deleted ${emailLogsDeleted.count} email logs`)
 
-    // 2. Delete onboarding tasks (references RBTProfile)
     const tasksDeleted = await prisma.onboardingTask.deleteMany({})
     console.log(`✅ Deleted ${tasksDeleted.count} onboarding tasks`)
 
-    // 3. Delete time entries (references RBTProfile and Shift)
     const timeEntriesDeleted = await prisma.timeEntry.deleteMany({})
     console.log(`✅ Deleted ${timeEntriesDeleted.count} time entries`)
 
-    // 4. Delete shifts (references RBTProfile)
     const shiftsDeleted = await prisma.shift.deleteMany({})
     console.log(`✅ Deleted ${shiftsDeleted.count} shifts`)
 
-    // 5. Delete leave requests (references RBTProfile)
     const leaveRequestsDeleted = await prisma.leaveRequest.deleteMany({})
     console.log(`✅ Deleted ${leaveRequestsDeleted.count} leave requests`)
 
-    // 6. Delete interviews (references RBTProfile)
     const interviewsDeleted = await prisma.interview.deleteMany({})
     console.log(`✅ Deleted ${interviewsDeleted.count} interviews`)
 
-    // 7. Get all RBT and CANDIDATE users (preserve ADMIN users)
     const rbtAndCandidateUsers = await prisma.user.findMany({
-      where: {
-        role: {
-          in: ['RBT', 'CANDIDATE'],
-        },
-      },
-      include: {
-        rbtProfile: true,
-        sessions: true,
-      },
+      where: { role: { in: ['RBT', 'CANDIDATE'] } },
+      include: { sessions: true },
     })
 
     console.log(`📋 Found ${rbtAndCandidateUsers.length} RBT/Candidate users to delete`)
 
-    // 8. Delete sessions for these users (will cascade, but being explicit)
     for (const user of rbtAndCandidateUsers) {
       if (user.sessions.length > 0) {
-        await prisma.session.deleteMany({
-          where: { userId: user.id },
-        })
+        await prisma.session.deleteMany({ where: { userId: user.id } })
       }
     }
 
-    // 9. Delete RBT profiles (this will cascade to related data, but we've already deleted most)
     const rbtProfilesDeleted = await prisma.rBTProfile.deleteMany({})
     console.log(`✅ Deleted ${rbtProfilesDeleted.count} RBT profiles`)
 
-    // 10. Delete RBT and CANDIDATE users (preserve ADMIN users)
     const usersDeleted = await prisma.user.deleteMany({
-      where: {
-        role: {
-          in: ['RBT', 'CANDIDATE'],
-        },
-      },
+      where: { role: { in: ['RBT', 'CANDIDATE'] } },
     })
     console.log(`✅ Deleted ${usersDeleted.count} RBT/Candidate users`)
 
-    // 11. Clean up orphaned OTP codes (optional, but good for cleanup)
     const otpCodesDeleted = await prisma.otpCode.deleteMany({})
     console.log(`✅ Deleted ${otpCodesDeleted.count} OTP codes`)
 
-    // 12. Verify ADMIN users are still present
-    const adminUsers = await prisma.user.findMany({
-      where: { role: 'ADMIN' },
-    })
+    const adminUsers = await prisma.user.findMany({ where: { role: 'ADMIN' } })
     console.log(`✅ Preserved ${adminUsers.length} admin users`)
 
     console.log('🎉 RBT data cleanup completed successfully!')
@@ -89,9 +90,7 @@ async function main() {
   }
 }
 
-main()
-  .catch((e) => {
-    console.error('Fatal error:', e)
-    process.exit(1)
-  })
-
+main().catch((e) => {
+  console.error('Fatal error:', e)
+  process.exit(1)
+})

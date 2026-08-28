@@ -120,7 +120,7 @@ export default function ClientCrmDetail({
     const reason = window.prompt('Reason for manual stage change?') || ''
     if (!reason.trim()) return
     startTransition(async () => {
-      const res = await setStage(client.id, to, reason)
+      const res = await setStage(client.id, to, reason, { confirmed: true })
       if (res.ok) router.refresh()
     })
   }

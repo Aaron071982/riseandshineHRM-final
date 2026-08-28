@@ -327,6 +327,7 @@ export function EmailPanel({
         subject: isManual ? subject : undefined,
         bodyHtml: isManual && manualBody.trim() ? manualBody : undefined,
         cc: cc.trim() || undefined,
+        confirmed: true,
         attachments,
         links: links.map(({ url, label }) => ({ url, label: label || undefined })),
         assessmentModality: isAssessment && assessmentModality ? assessmentModality : null,

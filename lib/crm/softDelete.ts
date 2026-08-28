@@ -7,7 +7,7 @@ export const FAMILY_SOFT_DELETE_TABLES = [
   'client_requirements',
   'client_authorizations',
   'client_authorization_lines',
-  'client_tasks',
+  'team_tasks',
   'client_communications',
   'client_alerts',
   'service_client_notes',

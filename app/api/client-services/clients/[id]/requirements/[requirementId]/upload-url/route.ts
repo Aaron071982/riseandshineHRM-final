@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getClientIpFromRequest } from '@/lib/client-ip'
 import { requireClientServicesSession } from '@/lib/client-services/access'
-import { CrmAccessError } from '@/lib/crm/access'
+import { auditClientAction, CrmAccessError } from '@/lib/crm/access'
 import {
   createRequirementSignedUpload,
   MAX_REQUIREMENT_DOCUMENT_BYTES,
@@ -59,6 +60,13 @@ export async function POST(request: NextRequest, context: Ctx) {
       requirementKey: requirement.key,
       fileName,
       contentType,
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: `REQUIREMENT_DOCUMENT_UPLOAD_URL:${requirement.key}`,
+      ip: getClientIpFromRequest(request),
     })
 
     return NextResponse.json({

@@ -292,6 +292,13 @@ export async function DELETE(request: NextRequest, context: Ctx) {
     return NextResponse.json({ error: 'Forbidden — delete requires full access' }, { status: 403 })
   }
 
+  if (request.nextUrl.searchParams.get('confirmed') !== '1') {
+    return NextResponse.json(
+      { error: 'Delete requires confirmed=1 query parameter after user confirmation' },
+      { status: 400 }
+    )
+  }
+
   const existing = await prisma.serviceClient.findFirst({
     where: { id, deletedAt: null },
     select: { id: true, firstName: true, lastName: true, clientCode: true },
