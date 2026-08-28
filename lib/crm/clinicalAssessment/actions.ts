@@ -16,8 +16,8 @@ import {
 } from '@/lib/crm/clinicalAssessment/access'
 import {
   getOrCreateCurrentClinicalAssessment,
-  missingAssessmentArtifactTypes,
 } from '@/lib/crm/clinicalAssessment/storage'
+import { missingAssessmentArtifactTypes } from '@/lib/crm/clinicalAssessment/artifacts.shared'
 import type { ActionResult } from '@/lib/crm/actions'
 
 function revalidateClient(clientId: string) {
@@ -57,7 +57,7 @@ export async function lockClinicalAssessment(
     if (missing.length > 0) {
       return {
         ok: false,
-        error: 'Upload all required artifacts before locking',
+        error: 'Upload the initial assessment report before locking',
         status: 400,
       }
     }

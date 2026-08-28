@@ -8,12 +8,22 @@ export const VERCEL_CLINICAL_ASSESSMENT_UPLOAD_BODY_LIMIT_BYTES = Math.floor(
   4.5 * 1024 * 1024
 )
 
+/** Required before Lock — composite initial assessment report only. */
 export const REQUIRED_ASSESSMENT_ARTIFACT_TYPES: readonly AssessmentArtifactType[] = [
   'INITIAL_REPORT',
+] as const
+
+/** Optional attachments when instruments are filed separately from the report. */
+export const OPTIONAL_ASSESSMENT_ARTIFACT_TYPES: readonly AssessmentArtifactType[] = [
   'VINELAND_3',
   'ATEC',
   'FAST',
   'JUSTIFICATION',
+] as const
+
+export const ALL_ASSESSMENT_ARTIFACT_TYPES: readonly AssessmentArtifactType[] = [
+  ...REQUIRED_ASSESSMENT_ARTIFACT_TYPES,
+  ...OPTIONAL_ASSESSMENT_ARTIFACT_TYPES,
 ] as const
 
 export const ASSESSMENT_ARTIFACT_LABELS: Record<AssessmentArtifactType, string> = {
@@ -68,7 +78,7 @@ export function parseAssessmentArtifactType(
 ): AssessmentArtifactType | null {
   const normalized = raw.trim().toUpperCase()
   if (
-    (REQUIRED_ASSESSMENT_ARTIFACT_TYPES as readonly string[]).includes(normalized)
+    (ALL_ASSESSMENT_ARTIFACT_TYPES as readonly string[]).includes(normalized)
   ) {
     return normalized as AssessmentArtifactType
   }
@@ -116,6 +126,13 @@ export function assertClinicalAssessmentStoragePath(input: {
   if (!input.storagePath.trim().startsWith(prefix)) {
     throw new Error('Invalid clinical assessment storage path')
   }
+}
+
+export function missingAssessmentArtifactTypes(
+  artifacts: { artifactType: AssessmentArtifactType }[]
+): AssessmentArtifactType[] {
+  const present = new Set(artifacts.map((a) => a.artifactType))
+  return REQUIRED_ASSESSMENT_ARTIFACT_TYPES.filter((t) => !present.has(t))
 }
 
 export function artifactDownloadLabel(artifactType: AssessmentArtifactType): string {

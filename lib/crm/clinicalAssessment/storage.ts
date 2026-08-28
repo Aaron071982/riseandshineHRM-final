@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import {
   assertClinicalAssessmentStoragePath,
   isStoredClinicalAssessmentPath,
-  REQUIRED_ASSESSMENT_ARTIFACT_TYPES,
+  missingAssessmentArtifactTypes,
   validateClinicalAssessmentFile,
 } from '@/lib/crm/clinicalAssessment/artifacts.shared'
 import type { AssessmentArtifactType } from '@prisma/client'
@@ -18,6 +18,9 @@ export {
   ASSESSMENT_ARTIFACT_LABELS,
   isStoredClinicalAssessmentPath,
   MAX_CLINICAL_ASSESSMENT_BYTES,
+  missingAssessmentArtifactTypes,
+  ALL_ASSESSMENT_ARTIFACT_TYPES,
+  OPTIONAL_ASSESSMENT_ARTIFACT_TYPES,
   parseAssessmentArtifactType,
   REQUIRED_ASSESSMENT_ARTIFACT_TYPES,
   validateClinicalAssessmentFile,
@@ -212,11 +215,4 @@ export async function listClinicalAssessmentVersions(clientId: string) {
       createdByUser: { select: { id: true, name: true, email: true } },
     },
   })
-}
-
-export function missingAssessmentArtifactTypes(
-  artifacts: { artifactType: AssessmentArtifactType }[]
-): AssessmentArtifactType[] {
-  const present = new Set(artifacts.map((a) => a.artifactType))
-  return REQUIRED_ASSESSMENT_ARTIFACT_TYPES.filter((t) => !present.has(t))
 }

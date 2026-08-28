@@ -13,6 +13,7 @@ import {
 import { markTreatmentPlanMade } from '@/lib/crm/actions'
 import {
   ASSESSMENT_ARTIFACT_LABELS,
+  OPTIONAL_ASSESSMENT_ARTIFACT_TYPES,
   REQUIRED_ASSESSMENT_ARTIFACT_TYPES,
 } from '@/lib/crm/clinicalAssessment/artifacts.shared'
 import { uploadClinicalAssessmentArtifact } from '@/lib/crm/clinicalAssessmentUpload.client'
@@ -81,7 +82,7 @@ export function ClinicalAssessmentPanel({
   const artifactByType = new Map(
     currentAssessment.artifacts.map((a) => [a.artifactType, a])
   )
-  const missing = REQUIRED_ASSESSMENT_ARTIFACT_TYPES.filter(
+  const missingRequired = REQUIRED_ASSESSMENT_ARTIFACT_TYPES.filter(
     (t) => !artifactByType.has(t)
   )
 
@@ -116,6 +117,69 @@ export function ClinicalAssessmentPanel({
       inline ? '?inline=1&branded=1' : '?branded=1'
     }`
 
+  const renderArtifactRow = (type: AssessmentArtifactType, required: boolean) => {
+    const artifact = artifactByType.get(type)
+    const busy = pending && uploadType === type
+    return (
+      <li key={type} className="flex flex-wrap items-center gap-3 px-3 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-ink">
+            {ASSESSMENT_ARTIFACT_LABELS[type]}
+          </p>
+          <p className="text-xs text-quiet">
+            {artifact
+              ? `On file · ${formatSize(artifact.sizeBytes)} · ${new Date(artifact.uploadedAt).toLocaleString()}`
+              : required
+                ? 'Required to lock'
+                : 'Optional'}
+          </p>
+        </div>
+        {artifact && (
+          <div className="flex items-center gap-1">
+            <a
+              href={downloadUrl(artifact.id, true)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs font-medium hover:bg-line-2"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Preview
+            </a>
+            <a
+              href={downloadUrl(artifact.id, false)}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs font-medium hover:bg-line-2"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download
+            </a>
+          </div>
+        )}
+        {canUpload && isDraft && (
+          <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-brand hover:underline">
+            {busy ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                {uploadPct ?? 0}%
+              </>
+            ) : (
+              'Upload'
+            )}
+            <input
+              ref={(el) => {
+                fileRefs.current[type] = el
+              }}
+              type="file"
+              accept={ARTIFACT_ACCEPT[type]}
+              disabled={pending}
+              className="sr-only"
+              onChange={(e) => onUpload(type, e.target.files?.[0] ?? null)}
+            />
+          </label>
+        )}
+      </li>
+    )
+  }
+
   return (
     <div className="space-y-8">
       {error && (
@@ -131,8 +195,9 @@ export function ClinicalAssessmentPanel({
               Clinical assessment (v{currentAssessment.versionNumber})
             </h3>
             <p className="mt-1 text-sm text-quiet">
-              Upload typed artifacts — locking makes this version immutable. Corrections
-              create a new version.
+              Upload the initial assessment report (PDF) to lock this version. Vineland,
+              ATEC, FAST, and justification are optional when filed separately. Locking
+              makes the record immutable — corrections create a new version.
             </p>
           </div>
           <span
@@ -157,82 +222,38 @@ export function ClinicalAssessmentPanel({
         )}
 
         <ul className="mt-4 divide-y divide-line rounded-lg border border-line">
-          {REQUIRED_ASSESSMENT_ARTIFACT_TYPES.map((type) => {
-            const artifact = artifactByType.get(type)
-            const busy = pending && uploadType === type
-            return (
-              <li key={type} className="flex flex-wrap items-center gap-3 px-3 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-ink">
-                    {ASSESSMENT_ARTIFACT_LABELS[type]}
-                  </p>
-                  <p className="text-xs text-quiet">
-                    {artifact
-                      ? `On file · ${formatSize(artifact.sizeBytes)} · ${new Date(artifact.uploadedAt).toLocaleString()}`
-                      : 'Required'}
-                  </p>
-                </div>
-                {artifact && (
-                  <div className="flex items-center gap-1">
-                    <a
-                      href={downloadUrl(artifact.id, true)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs font-medium hover:bg-line-2"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      Preview
-                    </a>
-                    <a
-                      href={downloadUrl(artifact.id, false)}
-                      className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs font-medium hover:bg-line-2"
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Download
-                    </a>
-                  </div>
-                )}
-                {canUpload && isDraft && (
-                  <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-brand hover:underline">
-                    {busy ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        {uploadPct ?? 0}%
-                      </>
-                    ) : (
-                      'Upload'
-                    )}
-                    <input
-                      ref={(el) => {
-                        fileRefs.current[type] = el
-                      }}
-                      type="file"
-                      accept={ARTIFACT_ACCEPT[type]}
-                      disabled={pending}
-                      className="sr-only"
-                      onChange={(e) => onUpload(type, e.target.files?.[0] ?? null)}
-                    />
-                  </label>
-                )}
-              </li>
-            )
-          })}
+          {REQUIRED_ASSESSMENT_ARTIFACT_TYPES.map((type) =>
+            renderArtifactRow(type, true)
+          )}
         </ul>
+
+        {OPTIONAL_ASSESSMENT_ARTIFACT_TYPES.length > 0 && (
+          <>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-quiet">
+              Optional attachments
+            </p>
+            <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
+              {OPTIONAL_ASSESSMENT_ARTIFACT_TYPES.map((type) =>
+                renderArtifactRow(type, false)
+              )}
+            </ul>
+          </>
+        )}
 
         {canLock && isDraft && (
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={pending || missing.length > 0}
+              disabled={pending || missingRequired.length > 0}
               onClick={() => setLockOpen(true)}
               className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-3.5 text-sm font-medium text-white hover:bg-brand-2 disabled:opacity-50"
             >
               <Lock className="h-4 w-4" />
               Lock assessment
             </button>
-            {missing.length > 0 && (
+            {missingRequired.length > 0 && (
               <p className="self-center text-xs text-quiet">
-                Missing: {missing.map((m) => ASSESSMENT_ARTIFACT_LABELS[m]).join(', ')}
+                Upload {ASSESSMENT_ARTIFACT_LABELS.INITIAL_REPORT} to lock
               </p>
             )}
           </div>
