@@ -16,26 +16,64 @@ export default function CaseloadPageClient({
   const stage = searchParams.get('stage')
   const queue = searchParams.get('queue')
   const initialGroup = searchParams.get('group') || 'all'
+  const initialDept = searchParams.get('dept')
 
   const [rows, setRows] = useState<CaseloadRow[]>([])
   const [group, setGroup] = useState(initialGroup)
+  const [dept, setDept] = useState<string | null>(initialDept)
+  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(
+    searchParams.get('attention') === '1'
+  )
   const [q, setQ] = useState(searchParams.get('q') || '')
   const [error, setError] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [pending, startTransition] = useTransition()
 
+  const syncUrl = useCallback(
+    (opts: {
+      q?: string
+      group?: string
+      dept?: string | null
+      attention?: boolean
+    }) => {
+      const params = new URLSearchParams()
+      const nextQ = opts.q ?? q
+      const nextGroup = opts.group ?? group
+      const nextDept = opts.dept !== undefined ? opts.dept : dept
+      const nextAttention =
+        opts.attention !== undefined ? opts.attention : needsAttentionOnly
+
+      if (nextQ) params.set('q', nextQ)
+      if (stage) params.set('stage', stage)
+      if (queue) params.set('queue', queue)
+      if (nextDept) params.set('dept', nextDept)
+      else if (nextGroup && nextGroup !== 'all' && !stage && !queue) {
+        params.set('group', nextGroup)
+      }
+      if (nextAttention) params.set('attention', '1')
+
+      const qs = params.toString()
+      router.replace(`/client-services/clients${qs ? `?${qs}` : ''}`, {
+        scroll: false,
+      })
+    },
+    [dept, group, needsAttentionOnly, q, queue, router, stage]
+  )
+
   const load = useCallback(
-    (opts?: { q?: string; group?: string }) => {
+    (opts?: { q?: string; group?: string; dept?: string | null }) => {
       startTransition(async () => {
         setError('')
         const params = new URLSearchParams()
         const query = opts?.q ?? q
         const g = opts?.group ?? group
+        const d = opts?.dept !== undefined ? opts.dept : dept
         if (query) params.set('q', query)
         if (stage) params.set('stage', stage)
         if (queue) params.set('queue', queue)
-        if (g && g !== 'all' && !stage && !queue) params.set('group', g)
+        if (d) params.set('dept', d)
+        else if (g && g !== 'all' && !stage && !queue) params.set('group', g)
 
         const res = await fetch(`/api/client-services/clients?${params}`, {
           credentials: 'include',
@@ -66,6 +104,10 @@ export default function CaseloadPageClient({
               daysInStage: c.daysInStage ?? 0,
               stalled: !!c.stalled,
               needsAttention: !!c.needsAttention,
+              actionOverdue: !!c.actionOverdue,
+              blocked: !!c.blocked,
+              missingDocs: !!c.missingDocs,
+              hasUnresolvedAlerts: !!c.hasUnresolvedAlerts,
               rbtName: c.rbtName,
               rbtProfileId: c.rbtProfileId,
               authExpirationDate: c.authExpirationDate
@@ -85,7 +127,7 @@ export default function CaseloadPageClient({
         )
       })
     },
-    [group, q, queue, stage]
+    [dept, group, q, queue, stage]
   )
 
   useEffect(() => {
@@ -98,16 +140,20 @@ export default function CaseloadPageClient({
       if (detail?.q != null) {
         setQ(detail.q)
         load({ q: detail.q })
+        syncUrl({ q: detail.q })
       }
     }
     window.addEventListener('cs-global-search', onSearch)
     return () => window.removeEventListener('cs-global-search', onSearch)
-  }, [load])
+  }, [load, syncUrl])
 
   const clearFilters = () => {
     setGroup('all')
+    setDept(null)
     setQ('')
+    setNeedsAttentionOnly(false)
     router.push('/client-services/clients')
+    load({ q: '', group: 'all', dept: null })
   }
 
   const onExport = async () => {
@@ -117,7 +163,10 @@ export default function CaseloadPageClient({
       if (q) params.set('q', q)
       if (stage) params.set('stage', stage)
       if (queue) params.set('queue', queue)
-      if (group && group !== 'all' && !stage && !queue) params.set('group', group)
+      if (dept) params.set('dept', dept)
+      else if (group && group !== 'all' && !stage && !queue) {
+        params.set('group', group)
+      }
       const res = await fetch(
         `/api/client-services/clients/export?${params}`,
         { credentials: 'include' }
@@ -148,7 +197,8 @@ export default function CaseloadPageClient({
             Caseload
           </h1>
           <p className="mt-0.5 text-sm text-quiet">
-            Stage, owner, next action, and attention signals across the journey.
+            Grouped by stage — owner, next action, and attention signals at a
+            glance.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -189,13 +239,26 @@ export default function CaseloadPageClient({
         stageFilter={stage}
         queueFilter={queue}
         groupFilter={group}
+        deptFilter={dept}
         onGroupChange={(g) => {
           setGroup(g)
+          setDept(null)
           if (stage || queue) {
             router.push(`/client-services/clients?group=${g}`)
           } else {
-            load({ group: g })
+            load({ group: g, dept: null })
+            syncUrl({ group: g, dept: null })
           }
+        }}
+        onDeptChange={(d) => {
+          setDept(d)
+          load({ dept: d })
+          syncUrl({ dept: d })
+        }}
+        needsAttentionOnly={needsAttentionOnly}
+        onNeedsAttentionChange={(on) => {
+          setNeedsAttentionOnly(on)
+          syncUrl({ attention: on })
         }}
         q={q}
         onClear={clearFilters}

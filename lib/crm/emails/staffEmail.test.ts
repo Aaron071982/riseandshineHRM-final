@@ -298,31 +298,21 @@ describe('lib/crm/emails/templates branded render', () => {
 })
 
 describe('template form PDF attachments', () => {
-  it('maps Welcome → WelcomePacket and Consent → Intake + Consent', () => {
+  it('maps Welcome → WelcomePacket; Consent request has no auto-attachments', () => {
     expect(templateFormSpecs('WELCOME').map((s) => s.fileName)).toEqual([
       'WelcomePacket.pdf',
     ])
-    expect(templateFormSpecs('CONSENT_REQUEST').map((s) => s.fileName)).toEqual([
-      'IntakeForm.pdf',
-      'ConsentForm.pdf',
-    ])
+    expect(templateFormSpecs('CONSENT_REQUEST')).toEqual([])
     expect(templateFormSpecs('DOCS_NEEDED')).toEqual([])
   })
 
-  it('loads PDF bytes from assets/crm-parent-forms', () => {
+  it('loads Welcome PDF bytes from assets/crm-parent-forms', () => {
     const welcome = loadTemplateFormAttachments('WELCOME')
     expect(welcome).toHaveLength(1)
     expect(welcome[0]!.fileName).toBe('WelcomePacket.pdf')
     expect(welcome[0]!.contentBytes.length).toBeGreaterThan(1000)
     expect(welcome[0]!.contentBytes.subarray(0, 4).toString()).toBe('%PDF')
 
-    const consent = loadTemplateFormAttachments('CONSENT_REQUEST')
-    expect(consent.map((c) => c.fileName)).toEqual([
-      'IntakeForm.pdf',
-      'ConsentForm.pdf',
-    ])
-    for (const f of consent) {
-      expect(f.contentBytes.subarray(0, 4).toString()).toBe('%PDF')
-    }
+    expect(loadTemplateFormAttachments('CONSENT_REQUEST')).toEqual([])
   })
 })

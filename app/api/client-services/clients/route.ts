@@ -11,7 +11,7 @@ import {
 } from '@/lib/client-services/serviceStatus'
 import { getUnlinkedScheduleClientNames } from '@/lib/client-services/scheduleSync'
 import { getClientSchedulePeriod } from '@/lib/client-services/schedulePeriod'
-import { caseloadQueueWhere, isClientStage } from '@/lib/crm/caseloadFilters'
+import { caseloadQueueWhere, caseloadDeptWhere, isClientStage } from '@/lib/crm/caseloadFilters'
 import { canonicalOwnerDeptForStage } from '@/lib/crm/stages'
 import { daysInStage, isStalled } from '@/lib/crm/thresholds'
 import { parseCalendarDate } from '@/lib/billing/calendarDate'
@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
   const stage = sp.get('stage')?.trim() || ''
   const queue = sp.get('queue')?.trim() || ''
   const group = sp.get('group')?.trim() || ''
+  const dept = sp.get('dept')?.trim() || ''
 
   const where: Prisma.ServiceClientWhereInput = {
     ...getVisibleClientsWhere(user),
@@ -60,6 +61,11 @@ export async function GET(request: NextRequest) {
     Object.assign(where, caseloadQueueWhere('active') ?? {})
   } else if (group === 'on_hold') {
     Object.assign(where, caseloadQueueWhere('on_hold') ?? {})
+  }
+
+  if (dept) {
+    const dw = caseloadDeptWhere(dept)
+    if (dw) Object.assign(where, dw)
   }
 
   if (status && ['NEW', 'ACTIVE', 'ON_HOLD', 'DISCHARGED'].includes(status)) {
@@ -107,11 +113,15 @@ export async function GET(request: NextRequest) {
         },
         teamTasks: {
           where: {
-            status: { in: ['TODO', 'IN_PROGRESS', 'BLOCKED'] },
-            dueAt: { lt: new Date() },
+            OR: [
+              {
+                status: { in: ['TODO', 'IN_PROGRESS', 'BLOCKED'] },
+                dueAt: { lt: new Date() },
+              },
+              { status: 'BLOCKED' },
+            ],
           },
-          select: { id: true },
-          take: 1,
+          select: { id: true, status: true },
         },
       },
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
@@ -141,8 +151,13 @@ export async function GET(request: NextRequest) {
       : primaryBt?.btName ?? null
     const days = daysInStage(c)
     const stalled = isStalled(c)
+    const hasOverdueTask = c.teamTasks.some((t) => t.status !== 'BLOCKED')
+    const blocked = c.teamTasks.some((t) => t.status === 'BLOCKED')
     const needsAttention =
-      stalled || c.alerts.length > 0 || c.teamTasks.length > 0
+      stalled || c.alerts.length > 0 || hasOverdueTask
+    const actionOverdue =
+      !!c.nextActionDueAt && c.nextActionDueAt.getTime() < Date.now()
+    const missingDocs = docsCollected < docsTotal
     const btNames =
       m.careTeamBtNames.length > 0 ? m.careTeamBtNames : m.scheduleBtNames
     return {
@@ -160,6 +175,10 @@ export async function GET(request: NextRequest) {
       daysInStage: days,
       stalled,
       needsAttention,
+      actionOverdue,
+      blocked,
+      missingDocs,
+      hasUnresolvedAlerts: c.alerts.length > 0,
       rbtName,
       rbtProfileId: primaryBt?.rbtProfileId ?? null,
       authExpirationDate: c.authorizations[0]?.expirationDate ?? null,

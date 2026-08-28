@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client'
+import type { Prisma, ClientOwnerDept } from '@prisma/client'
 import {
   PRE_ACTIVE_STAGES,
   STAFFING_STAGES,
@@ -155,6 +155,30 @@ export function isClientStage(value: string): value is ClientStage {
   return (
     PRE_ACTIVE_STAGES.includes(value as ClientStage) || value === 'ACTIVE'
   )
+}
+
+/** Caseload department queue lens → owner dept filter. */
+export function caseloadDeptOwner(dept: string): ClientOwnerDept | null {
+  switch (dept) {
+    case 'intake':
+      return 'INTAKE'
+    case 'case-coordination':
+      return 'CASE_COORDINATION'
+    case 'billing':
+      return 'BILLING'
+    case 'clinical':
+      return 'CLINICAL'
+    case 'staffing':
+      return 'STAFFING'
+    default:
+      return null
+  }
+}
+
+export function caseloadDeptWhere(dept: string): Prisma.ServiceClientWhereInput | null {
+  const owner = caseloadDeptOwner(dept)
+  if (!owner) return null
+  return { currentOwnerDept: owner }
 }
 
 export function contactAgingWhere(now = new Date()): Prisma.ServiceClientWhereInput {

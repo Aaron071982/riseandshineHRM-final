@@ -4,7 +4,7 @@ import { getClientIpFromRequest } from '@/lib/client-ip'
 import { requireClientServicesSession } from '@/lib/client-services/access'
 import { getVisibleClientsWhere } from '@/lib/crm/access'
 import { logClientAccess } from '@/lib/client-services/audit'
-import { caseloadQueueWhere, isClientStage } from '@/lib/crm/caseloadFilters'
+import { caseloadQueueWhere, caseloadDeptWhere, isClientStage } from '@/lib/crm/caseloadFilters'
 import { STAGE_LABELS } from '@/lib/crm/stages'
 import { assertRateLimit } from '@/lib/otp-rate-limit'
 import type { Prisma } from '@prisma/client'
@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
   const stage = sp.get('stage')?.trim() || ''
   const queue = sp.get('queue')?.trim() || ''
   const group = sp.get('group')?.trim() || ''
+  const dept = sp.get('dept')?.trim() || ''
 
   const where: Prisma.ServiceClientWhereInput = {
     ...getVisibleClientsWhere(user),
@@ -57,6 +58,11 @@ export async function GET(request: NextRequest) {
     Object.assign(where, caseloadQueueWhere('active') ?? {})
   } else if (group === 'on_hold') {
     Object.assign(where, caseloadQueueWhere('on_hold') ?? {})
+  }
+
+  if (dept) {
+    const dw = caseloadDeptWhere(dept)
+    if (dw) Object.assign(where, dw)
   }
 
   if (q) {

@@ -205,7 +205,9 @@ export default function ClientServicesLayout({
         window.dispatchEvent(
           new CustomEvent('cs-global-search', { detail: { q: search } })
         )
-        if (!pathname.startsWith('/client-services/clients')) {
+        const stayInPlace =
+          onCaseload || onDept || pathname === '/client-services/tasks'
+        if (!stayInPlace && !pathname.startsWith('/client-services/clients')) {
           router.push(
             `/client-services/clients${search ? `?q=${encodeURIComponent(search)}` : ''}`
           )

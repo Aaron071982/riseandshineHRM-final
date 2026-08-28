@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { ClientOwnerDept } from '@prisma/client'
@@ -18,6 +18,7 @@ import { OWNER_DEPT_LABELS, STAGE_LABELS } from '@/lib/crm/stages'
 import { OwnerDeptBadge } from '@/components/crm/StageStepper'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { STAFFING_HOURS_UTILIZATION_THRESHOLD } from '@/lib/crm/staffingUnderHoursShared'
+import { filterDepartmentQueueData } from '@/lib/crm/clientSearch'
 import { cn } from '@/lib/utils'
 
 const HANDOFF_DEPTS: ClientOwnerDept[] = [
@@ -528,22 +529,38 @@ export default function DepartmentQueueClient({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const isCc = data.slug === 'case-coordination'
+  const [searchQ, setSearchQ] = useState('')
+
+  useEffect(() => {
+    const onSearch = (e: Event) => {
+      const detail = (e as CustomEvent<{ q: string }>).detail
+      if (detail?.q != null) setSearchQ(detail.q)
+    }
+    window.addEventListener('cs-global-search', onSearch)
+    return () => window.removeEventListener('cs-global-search', onSearch)
+  }, [])
+
+  const view = useMemo(
+    () => filterDepartmentQueueData(data, searchQ),
+    [data, searchQ]
+  )
+
+  const isCc = view.slug === 'case-coordination'
   const [ccTab, setCcTab] = useState<'ready' | 'upcoming'>('ready')
 
   const claimedByOwner = useMemo(() => {
     const map = new Map<string, DepartmentQueueRow[]>()
-    for (const row of data.claimed) {
+    for (const row of view.claimed) {
       const key = row.ownerName ?? row.currentOwnerUserId ?? 'Unknown'
       const list = map.get(key) ?? []
       list.push(row)
       map.set(key, list)
     }
     return [...map.entries()]
-  }, [data.claimed])
+  }, [view.claimed])
 
   const billingBuckets = useMemo(() => {
-    if (data.slug !== 'billing' && data.slug !== 'authorization') return null
+    if (view.slug !== 'billing' && view.slug !== 'authorization') return null
     const order = [
       'Needs VOB',
       'VOB done / needs PA',
@@ -553,19 +570,19 @@ export default function DepartmentQueueClient({
     ] as const
     const map = new Map<string, DepartmentQueueRow[]>()
     for (const key of order) map.set(key, [])
-    for (const row of data.claimed) {
+    for (const row of view.claimed) {
       const key = row.billingSubstep ?? 'Needs VOB'
       const list = map.get(key) ?? []
       list.push(row)
       map.set(key, list)
     }
     return order.map((key) => ({ key, rows: map.get(key) ?? [] }))
-  }, [data.slug, data.claimed])
+  }, [view.slug, view.claimed])
 
   const ccCounts = useMemo(() => {
     if (!isCc) return { ready: 0, upcoming: 0 }
-    if (data.canAssignCc && data.coordinatorGroups) {
-      return data.coordinatorGroups.reduce(
+    if (view.canAssignCc && view.coordinatorGroups) {
+      return view.coordinatorGroups.reduce(
         (acc, group) => {
           acc.ready += group.ready.length
           acc.upcoming += group.upcoming.length
@@ -575,10 +592,10 @@ export default function DepartmentQueueClient({
       )
     }
     return {
-      ready: data.ready?.length ?? 0,
-      upcoming: data.upcoming?.length ?? 0,
+      ready: view.ready?.length ?? 0,
+      upcoming: view.upcoming?.length ?? 0,
     }
-  }, [isCc, data.canAssignCc, data.coordinatorGroups, data.ready, data.upcoming])
+  }, [isCc, view.canAssignCc, view.coordinatorGroups, view.ready, view.upcoming])
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null)
@@ -590,34 +607,41 @@ export default function DepartmentQueueClient({
   }
 
   const intakeCcAssign =
-    data.slug === 'intake' &&
-    data.canAssignCc &&
-    (data.caseCoordinators?.length ?? 0) > 0
+    view.slug === 'intake' &&
+    view.canAssignCc &&
+    (view.caseCoordinators?.length ?? 0) > 0
 
-  const isStaffing = data.slug === 'staffing'
+  const isStaffing = view.slug === 'staffing'
   const underHoursPct = Math.round(STAFFING_HOURS_UTILIZATION_THRESHOLD * 100)
 
   const unclaimedCount =
-    data.canManage && data.unclaimedFull
-      ? data.unclaimedFull.length
-      : data.unclaimed.length
+    view.canManage && view.unclaimedFull
+      ? view.unclaimedFull.length
+      : view.unclaimed.length
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-16">
       <div>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
-          {data.label} queue
+          {view.label} queue
         </h1>
         <p className="mt-0.5 text-sm text-quiet">
           {isCc
             ? 'Case coordinators are assigned by a manager. Upcoming is before therapist found; Ready starts at RBT assigned.'
-            : data.canManage
+            : view.canManage
               ? 'Full access — open any case without claiming. On Intake you can assign a case coordinator early.'
               : isStaffing
                 ? 'Claim cases in the staffing pipeline. Flagged active clients and those under authorized hours appear in separate sections below.'
                 : 'Claim a name from the pool to open the profile. You only see cases you have claimed.'}
         </p>
       </div>
+
+      {searchQ.trim() && (
+        <p className="rounded-lg border border-line bg-line-2/40 px-3 py-2 text-sm text-quiet">
+          Showing clients matching &ldquo;{searchQ.trim()}&rdquo; in this
+          queue. Clear the search box and press Enter to restore the full list.
+        </p>
+      )}
 
       {error && (
         <p className="rounded-lg bg-[var(--urgent-bg)] px-3 py-2 text-sm text-[var(--urgent)]">
@@ -627,27 +651,27 @@ export default function DepartmentQueueClient({
 
       {isCc ? (
         <>
-          {data.canAssignCc && data.unassignedCc && (
+          {view.canAssignCc && view.unassignedCc && (
             <section>
               <h2 className="mb-2 font-display text-base font-semibold text-ink">
-                Unassigned ({data.unassignedCc.length})
+                Unassigned ({view.unassignedCc.length})
               </h2>
               <p className="mb-2 text-xs text-quiet">
                 Name and stage only. Assign a case coordinator — they cannot self-claim.
               </p>
-              {data.unassignedCc.length === 0 ? (
+              {view.unassignedCc.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
                   No unassigned coordination cases.
                 </p>
               ) : (
                 <ul className="space-y-3">
-                  {data.unassignedCc.map((row) => (
+                  {view.unassignedCc.map((row) => (
                     <PoolCard
                       key={row.id}
                       row={row}
                       pending={pending}
-                      canOpenProfile={data.canManage}
-                      assignOptions={data.caseCoordinators ?? []}
+                      canOpenProfile={view.canManage}
+                      assignOptions={view.caseCoordinators ?? []}
                       onAssign={(userId) =>
                         run(() => assignCaseCoordinator(row.id, userId))
                       }
@@ -687,8 +711,8 @@ export default function DepartmentQueueClient({
             </div>
           </div>
 
-          {data.canAssignCc && data.coordinatorGroups ? (
-            data.coordinatorGroups.map((group) => (
+          {view.canAssignCc && view.coordinatorGroups ? (
+            view.coordinatorGroups.map((group) => (
               <div key={group.userId} className="space-y-4">
                 <h2 className="font-display text-lg font-semibold text-ink">
                   {group.name}
@@ -697,18 +721,18 @@ export default function DepartmentQueueClient({
                   <AssignedPile
                     title="Upcoming"
                     rows={group.upcoming}
-                    dept={data.dept}
-                    canManage={data.canManage}
-                    viewerUserId={data.viewerUserId}
+                    dept={view.dept}
+                    canManage={view.canManage}
+                    viewerUserId={view.viewerUserId}
                     empty="No assigned clients before RBT assigned."
                   />
                 ) : (
                   <AssignedPile
                     title="Ready"
                     rows={group.ready}
-                    dept={data.dept}
-                    canManage={data.canManage}
-                    viewerUserId={data.viewerUserId}
+                    dept={view.dept}
+                    canManage={view.canManage}
+                    viewerUserId={view.viewerUserId}
                     empty="No assigned clients at RBT assigned or later."
                   />
                 )}
@@ -717,10 +741,10 @@ export default function DepartmentQueueClient({
           ) : (
             <AssignedPile
               title={ccTab === 'upcoming' ? 'Upcoming' : 'Ready'}
-              rows={ccTab === 'upcoming' ? (data.upcoming ?? []) : (data.ready ?? [])}
-              dept={data.dept}
-              canManage={data.canManage}
-              viewerUserId={data.viewerUserId}
+              rows={ccTab === 'upcoming' ? (view.upcoming ?? []) : (view.ready ?? [])}
+              dept={view.dept}
+              canManage={view.canManage}
+              viewerUserId={view.viewerUserId}
               empty={
                 ccTab === 'upcoming'
                   ? 'No assigned clients before RBT assigned.'
@@ -736,7 +760,7 @@ export default function DepartmentQueueClient({
               Unclaimed ({unclaimedCount})
             </h2>
             <p className="mb-2 text-xs text-quiet">
-              {data.canManage
+              {view.canManage
                 ? 'Full case summary below — open any profile directly. Claiming is optional.'
                 : 'Name and current stage only. Claim to open the profile.'}
             </p>
@@ -746,18 +770,18 @@ export default function DepartmentQueueClient({
               </p>
             ) : (
               <ul className="space-y-3">
-                {data.canManage && data.unclaimedFull
-                  ? data.unclaimedFull.map((row) => (
+                {view.canManage && view.unclaimedFull
+                  ? view.unclaimedFull.map((row) => (
                       <CaseCard
                         key={row.id}
                         row={row}
-                        dept={data.dept}
-                        canManage={data.canManage}
-                        viewerUserId={data.viewerUserId}
+                        dept={view.dept}
+                        canManage={view.canManage}
+                        viewerUserId={view.viewerUserId}
                         mode="unclaimed"
                         onClaim={() => claimClient(row.id)}
                         assignCcOptions={
-                          intakeCcAssign ? (data.caseCoordinators ?? []) : undefined
+                          intakeCcAssign ? (view.caseCoordinators ?? []) : undefined
                         }
                         onAssignCc={
                           intakeCcAssign
@@ -766,7 +790,7 @@ export default function DepartmentQueueClient({
                         }
                       />
                     ))
-                  : data.unclaimed.map((row) => (
+                  : view.unclaimed.map((row) => (
                       <PoolCard
                         key={row.id}
                         row={row}
@@ -778,28 +802,28 @@ export default function DepartmentQueueClient({
             )}
           </section>
 
-          {isStaffing && data.needsMoreHoursActive && (
+          {isStaffing && view.needsMoreHoursActive && (
             <section>
               <h2 className="mb-2 font-display text-base font-semibold text-ink">
-                Needs more hours ({data.needsMoreHoursActive.length})
+                Needs more hours ({view.needsMoreHoursActive.length})
               </h2>
               <p className="mb-2 text-xs text-quiet">
                 Active clients flagged on the Staffing tab — assign additional
                 therapist hours or replacement coverage without changing stage.
               </p>
-              {data.needsMoreHoursActive.length === 0 ? (
+              {view.needsMoreHoursActive.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
                   No active clients flagged for additional coverage.
                 </p>
               ) : (
                 <ul className="space-y-3">
-                  {data.needsMoreHoursActive.map((row) => (
+                  {view.needsMoreHoursActive.map((row) => (
                     <CaseCard
                       key={row.id}
                       row={row}
-                      dept={data.dept}
-                      canManage={data.canManage}
-                      viewerUserId={data.viewerUserId}
+                      dept={view.dept}
+                      canManage={view.canManage}
+                      viewerUserId={view.viewerUserId}
                       mode="claimed"
                     />
                   ))}
@@ -808,29 +832,29 @@ export default function DepartmentQueueClient({
             </section>
           )}
 
-          {isStaffing && data.underHoursActive && (
+          {isStaffing && view.underHoursActive && (
             <section>
               <h2 className="mb-2 font-display text-base font-semibold text-ink">
-                Under authorized hours ({data.underHoursActive.length})
+                Under authorized hours ({view.underHoursActive.length})
               </h2>
               <p className="mb-2 text-xs text-quiet">
                 Active clients receiving less than {underHoursPct}% of authorized weekly
                 hours — add RBT coverage or schedule time even if another department
                 owns the case.
               </p>
-              {data.underHoursActive.length === 0 ? (
+              {view.underHoursActive.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
                   No active clients below {underHoursPct}% utilization.
                 </p>
               ) : (
                 <ul className="space-y-3">
-                  {data.underHoursActive.map((row) => (
+                  {view.underHoursActive.map((row) => (
                     <CaseCard
                       key={row.id}
                       row={row}
-                      dept={data.dept}
-                      canManage={data.canManage}
-                      viewerUserId={data.viewerUserId}
+                      dept={view.dept}
+                      canManage={view.canManage}
+                      viewerUserId={view.viewerUserId}
                       mode="claimed"
                     />
                   ))}
@@ -841,13 +865,13 @@ export default function DepartmentQueueClient({
 
           <section>
             <h2 className="mb-2 font-display text-base font-semibold text-ink">
-              {data.canManage
-                ? `Claimed in department (${data.claimed.length})`
-                : `My claimed work (${data.claimed.length})`}
+              {view.canManage
+                ? `Claimed in department (${view.claimed.length})`
+                : `My claimed work (${view.claimed.length})`}
             </h2>
-            {data.claimed.length === 0 ? (
+            {view.claimed.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line px-4 py-6 text-sm text-quiet">
-                {data.canManage
+                {view.canManage
                   ? 'No claimed cases in this department yet.'
                   : 'No claimed cases in this department. Claim from the pool to start work.'}
               </p>
@@ -863,12 +887,12 @@ export default function DepartmentQueueClient({
                         <CaseCard
                           key={row.id}
                           row={row}
-                          dept={data.dept}
-                          canManage={data.canManage}
-                          viewerUserId={data.viewerUserId}
+                          dept={view.dept}
+                          canManage={view.canManage}
+                          viewerUserId={view.viewerUserId}
                           mode="claimed"
                           assignCcOptions={
-                            intakeCcAssign ? (data.caseCoordinators ?? []) : undefined
+                            intakeCcAssign ? (view.caseCoordinators ?? []) : undefined
                           }
                           onAssignCc={
                             intakeCcAssign
@@ -883,7 +907,7 @@ export default function DepartmentQueueClient({
                 {!billingBuckets &&
                   claimedByOwner.map(([owner, rows]) => (
                   <div key={owner}>
-                    {data.canManage && (
+                    {view.canManage && (
                       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-quiet">
                         {owner}
                       </h3>
@@ -893,12 +917,12 @@ export default function DepartmentQueueClient({
                         <CaseCard
                           key={row.id}
                           row={row}
-                          dept={data.dept}
-                          canManage={data.canManage}
-                          viewerUserId={data.viewerUserId}
+                          dept={view.dept}
+                          canManage={view.canManage}
+                          viewerUserId={view.viewerUserId}
                           mode="claimed"
                           assignCcOptions={
-                            intakeCcAssign ? (data.caseCoordinators ?? []) : undefined
+                            intakeCcAssign ? (view.caseCoordinators ?? []) : undefined
                           }
                           onAssignCc={
                             intakeCcAssign
