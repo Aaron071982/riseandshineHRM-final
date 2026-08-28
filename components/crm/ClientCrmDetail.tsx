@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { ClientFiveFieldHeader } from '@/components/crm/ClientFiveFieldHeader'
 import { StageStepper } from '@/components/crm/StageStepper'
-import { TreatmentPlanTrack } from '@/components/crm/TreatmentPlanTrack'
 import { RequirementsPanel } from '@/components/crm/RequirementsPanel'
 import { NotesPanel, OverviewPanel } from '@/components/crm/NotesPanel'
 import { ActivityPanel } from '@/components/crm/ActivityPanel'
@@ -17,7 +16,7 @@ import { ClientDocumentsPanel } from '@/components/crm/ClientDocumentsPanel'
 import { ClientTasksPanel } from '@/components/crm/ClientTasksPanel'
 import { EmailPanel } from '@/components/crm/EmailPanel'
 import { advanceStage, setStage } from '@/lib/crm/actions'
-import { REQUIREMENT_KEY_LABELS } from '@/lib/crm/stages'
+import { STAGE_LABELS } from '@/lib/crm/stages'
 import type { CommTemplate } from '@prisma/client'
 import type { ClientCrmDetailData } from '@/lib/crm/loadClientDetail'
 import type { EmailSendContext } from '@/components/crm/EmailPanel'
@@ -65,13 +64,6 @@ export default function ClientCrmDetail({
   const router = useRouter()
   const [tab, setTab] = useState<TabId>(() => resolveTab(initialTab))
   const [pending, startTransition] = useTransition()
-  const [gateError, setGateError] = useState<string[]>(data.gate.blockedBy)
-  const [gateOk, setGateOk] = useState(data.gate.ok)
-
-  useEffect(() => {
-    setGateOk(data.gate.ok)
-    setGateError(data.gate.blockedBy)
-  }, [data.gate.ok, data.gate.blockedBy])
 
   useEffect(() => {
     setTab(resolveTab(initialTab))
@@ -80,50 +72,44 @@ export default function ClientCrmDetail({
   const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit, teamTasks, taskUsers } =
     data
 
-  const blockedLabels = useMemo(
-    () => gateError.map((k) => REQUIREMENT_KEY_LABELS[k] ?? k),
-    [gateError]
-  )
-
-  const staffingRbts = useMemo(
-    () =>
-      client.btAssignments
-        .filter((a) => a.status === 'ACTIVE')
-        .map((a) => ({
-          assignmentId: a.id,
-          label: a.rbtProfile
-            ? `${a.rbtProfile.firstName} ${a.rbtProfile.lastName}`.trim()
-            : a.btName?.trim() || 'Unnamed RBT',
-          isPrimary: a.isPrimary,
-        })),
-    [client.btAssignments]
-  )
-
   const onAdvance = () => {
+    if (
+      !window.confirm(
+        'Advance this client to the next stage? This updates ownership and pipeline history.'
+      )
+    ) {
+      return
+    }
     startTransition(async () => {
-      const res = await advanceStage(client.id)
-      if (!res.ok) {
-        if (res.blocked && res.blockedBy) {
-          setGateOk(false)
-          setGateError(res.blockedBy)
-        }
-        return
-      }
-      setGateOk(true)
-      setGateError([])
-      router.refresh()
+      const res = await advanceStage(client.id, { confirmed: true })
+      if (res.ok) router.refresh()
     })
   }
 
   const onSetStage = (to: ClientStage) => {
     if (to === client.stage) return
-    const reason = window.prompt('Reason for manual stage change?') || ''
-    if (!reason.trim()) return
+    if (
+      !window.confirm(
+        `Move this client to "${STAGE_LABELS[to]}"? This updates ownership and pipeline history.`
+      )
+    ) {
+      return
+    }
     startTransition(async () => {
-      const res = await setStage(client.id, to, reason, { confirmed: true })
+      const res = await setStage(client.id, to, '', { confirmed: true })
       if (res.ok) router.refresh()
     })
   }
+
+  const staffingRbts = client.btAssignments
+    .filter((a) => a.status === 'ACTIVE')
+    .map((a) => ({
+      assignmentId: a.id,
+      label: a.rbtProfile
+        ? `${a.rbtProfile.firstName} ${a.rbtProfile.lastName}`.trim()
+        : a.btName?.trim() || 'Unnamed RBT',
+      isPrimary: a.isPrimary,
+    }))
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 pb-16">
@@ -169,24 +155,11 @@ export default function ClientCrmDetail({
 
       <StageStepper
         stage={client.stage}
-        gate={{ ok: gateOk, blockedBy: gateError }}
-        blockedLabels={blockedLabels}
         onAdvance={onAdvance}
         advancing={pending}
         canEdit={canEdit}
         fullAccess={canOverrideStage}
         onSetStage={onSetStage}
-      />
-
-      <TreatmentPlanTrack
-        clientId={client.id}
-        status={client.treatmentPlanStatus}
-        completedAt={
-          client.treatmentPlanCompletedAt
-            ? new Date(client.treatmentPlanCompletedAt).toISOString()
-            : null
-        }
-        canEdit={canEdit}
       />
 
       <div className="flex gap-1 overflow-x-auto border-b border-line pb-px">
@@ -215,7 +188,6 @@ export default function ClientCrmDetail({
           <RequirementsPanel
             clientId={client.id}
             requirements={client.requirements}
-            currentStage={client.stage}
             canEdit={canEdit}
           />
         )}
@@ -308,7 +280,6 @@ export type SerializeClientDetail = {
   weeklyScheduleHours: number
   canOverrideStage: boolean
   canEdit: boolean
-  gate: { ok: boolean; blockedBy: string[] }
   emailSend: EmailSendContext & { allowedTemplates: CommTemplate[] }
   client: ClientCrmDetailData['client']
   teamTasks: ClientCrmDetailData['teamTasks']

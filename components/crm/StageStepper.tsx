@@ -6,7 +6,6 @@ import {
   STAGE_GROUP,
   STAGE_GROUP_LABELS,
   STAGE_LABELS,
-  type CanAdvanceResult,
 } from '@/lib/crm/stages'
 import type { ClientOwnerDept, ClientStage } from '@prisma/client'
 import { cn } from '@/lib/utils'
@@ -22,8 +21,6 @@ const DEPT_CHIP: Record<ClientOwnerDept, string> = {
 
 export function StageStepper({
   stage,
-  gate,
-  blockedLabels,
   onAdvance,
   advancing,
   canEdit,
@@ -31,8 +28,6 @@ export function StageStepper({
   onSetStage,
 }: {
   stage: ClientStage
-  gate: CanAdvanceResult
-  blockedLabels: string[]
   onAdvance: () => void
   advancing: boolean
   canEdit: boolean
@@ -80,14 +75,9 @@ export function StageStepper({
           {canEdit && currentIdx < LINEAR_STAGE_ORDER.length - 1 && (
             <button
               type="button"
-              disabled={advancing || !gate.ok}
+              disabled={advancing}
               onClick={onAdvance}
-              className={cn(
-                'inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-medium text-white',
-                gate.ok
-                  ? 'bg-brand hover:bg-brand-2'
-                  : 'cursor-not-allowed bg-faint'
-              )}
+              className="inline-flex h-9 items-center rounded-lg bg-brand px-3.5 text-sm font-medium text-white hover:bg-brand-2 disabled:opacity-50"
             >
               {advancing ? 'Advancing…' : 'Advance stage'}
             </button>
@@ -134,17 +124,6 @@ export function StageStepper({
           )
         })}
       </ol>
-
-      {!gate.ok && (
-        <div className="mt-4 rounded-lg border border-[color-mix(in_srgb,var(--amber)_35%,var(--line))] bg-[var(--amber-bg)] px-3 py-2.5 text-sm text-[var(--amber)]">
-          <p className="font-medium">Advance blocked — finish these first:</p>
-          <ul className="mt-1 list-inside list-disc text-[var(--ink)]">
-            {blockedLabels.map((label) => (
-              <li key={label}>{label}</li>
-            ))}
-          </ul>
-        </div>
-      )}
     </section>
   )
 }

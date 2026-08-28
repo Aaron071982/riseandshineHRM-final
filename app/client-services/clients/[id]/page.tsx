@@ -40,7 +40,6 @@ export default async function ClientServicesClientPage({
             weeklyScheduleHours: serialized.weeklyScheduleHours,
             canOverrideStage: serialized.canOverrideStage,
             canEdit: serialized.canEdit,
-            gate: serialized.gate,
             emailSend: serialized.emailSend,
             client: serialized.client,
             teamTasks: serialized.teamTasks,

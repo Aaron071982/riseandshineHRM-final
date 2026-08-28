@@ -148,11 +148,16 @@ export async function updateClientNextAction(
   }
 }
 
-export async function advanceStage(clientId: string): Promise<
-  ActionResult<{ stage: ClientStage } | { blocked: true; blockedBy: string[] }>
-> {
+export async function advanceStage(
+  clientId: string,
+  opts?: { confirmed?: boolean }
+): Promise<ActionResult<{ stage: ClientStage }>> {
   try {
     const user = await getClientServicesUser()
+    requireDestructiveConfirm(
+      opts?.confirmed,
+      'Stage advance requires confirmed: true'
+    )
     await assertCanEditClient(user, clientId)
 
     const client = await prisma.serviceClient.findUniqueOrThrow({
@@ -163,22 +168,6 @@ export async function advanceStage(clientId: string): Promise<
         referralCheck: true,
       },
     })
-
-    const gate = canAdvance(
-      {
-        stage: client.stage,
-        treatmentPlanStatus: client.treatmentPlanStatus,
-      },
-      client.requirements
-    )
-    if (!gate.ok) {
-      return {
-        ok: false,
-        error: 'Requirements incomplete.',
-        blocked: true,
-        blockedBy: gate.blockedBy,
-      }
-    }
 
     const toStage = nextStage(client.stage)
     if (!toStage) {
@@ -284,14 +273,13 @@ export async function advanceStage(clientId: string): Promise<
 }
 
 /**
- * Full-access free stage override (any → any). Gates are intentionally not
- * checked here so imported / incomplete clients remain editable. Coordinators
- * cannot call this — they must use advanceStage (gated).
+ * Full-access free stage override (any → any). Coordinators use advanceStage
+ * for the next linear step; full-access users may jump via this action.
  */
 export async function setStage(
   clientId: string,
   toStage: ClientStage,
-  reason: string,
+  reason = '',
   opts?: { confirmed?: boolean }
 ): Promise<ActionResult<{ stage: ClientStage }>> {
   try {
@@ -312,18 +300,6 @@ export async function setStage(
 
     if (client.stage === toStage) {
       return { ok: true, stage: toStage }
-    }
-
-    if (
-      toStage === 'ACTIVE' &&
-      client.treatmentPlanStatus !== 'COMPLETE'
-    ) {
-      return {
-        ok: false,
-        error: 'Treatment plan must be complete before Active',
-        blocked: true,
-        blockedBy: ['treatment_plan_complete'],
-      }
     }
 
     const now = new Date()

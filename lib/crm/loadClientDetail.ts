@@ -8,7 +8,7 @@ import {
   getVisibleClientsWhere,
   type CrmUser,
 } from '@/lib/crm/access'
-import { canAdvance, stageIndex } from '@/lib/crm/stages'
+import { stageIndex } from '@/lib/crm/stages'
 import { hoursBetween } from '@/lib/rbt-schedule/utils'
 import { allowedTemplatesForUser } from '@/lib/crm/emails/templatePolicy'
 import { graphEmailEnabled } from '@/lib/crm/emails/graphSend'
@@ -132,13 +132,6 @@ export async function loadClientCrmDetail(clientId: string) {
     action: 'VIEW',
   })
 
-  const gate = canAdvance(
-    {
-      stage: client.stage,
-      treatmentPlanStatus: client.treatmentPlanStatus,
-    },
-    client.requirements
-  )
   const daysInStage = daysSince(client.stageEnteredAt)
   const weeklyScheduleHours = client.scheduleAssignments.reduce(
     (sum, s) => sum + hoursBetween(s.startTime, s.endTime),
@@ -189,7 +182,6 @@ export async function loadClientCrmDetail(clientId: string) {
     client,
     teamTasks,
     taskUsers,
-    gate,
     daysInStage,
     weeklyScheduleHours,
     canEdit,

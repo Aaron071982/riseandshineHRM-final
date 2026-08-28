@@ -157,12 +157,10 @@ function RequirementActions({
 export function RequirementsPanel({
   clientId,
   requirements,
-  currentStage,
   canEdit,
 }: {
   clientId: string
   requirements: Req[]
-  currentStage: ClientStage
   canEdit: boolean
 }) {
   const router = useRouter()
@@ -240,7 +238,7 @@ export function RequirementsPanel({
       <div className="rounded-xl border border-dashed border-line bg-surface px-4 py-10 text-center">
         <p className="font-display text-base font-semibold text-ink">No requirements yet</p>
         <p className="mt-1 text-sm text-quiet">
-          Gate checklist items appear as this client moves through stages.
+          Requirement rows appear as this client moves through stages.
         </p>
       </div>
     )
@@ -259,9 +257,6 @@ export function RequirementsPanel({
             <div className="text-sm font-medium text-ink">{req.label}</div>
             <div className="text-xs text-quiet">
               {STAGE_LABELS[req.stage]}
-              {req.isRequiredToAdvance && req.stage === currentStage && (
-                <span className="ml-2 text-brand">Required to advance</span>
-              )}
               {days != null && (
                 <span
                   className={cn(
@@ -346,7 +341,7 @@ export function RequirementsPanel({
       {grouped.tasks.length > 0 && (
         <section>
           <h3 className="mb-2 font-display text-base font-semibold text-ink">
-            Stage checklist
+            Checklist items
           </h3>
           <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
             {grouped.tasks.map((req) => renderRow(req, false))}
