@@ -3530,6 +3530,41 @@ model SavedQuery {
   @@map("saved_queries")
 }
 
+enum StageNotificationRecipientType {
+  EMAIL
+  ROLE
+}
+
+/// Configurable stage-transition notification recipients (no PHI).
+model StageNotificationRecipient {
+  id            String                         @id @default(cuid())
+  triggerKey    String
+  recipientType StageNotificationRecipientType
+  email         String?
+  crmRole       CrmRole?
+  enabled       Boolean                        @default(true)
+  sortOrder     Int                            @default(0)
+  createdAt     DateTime                       @default(now())
+  updatedAt     DateTime                       @updatedAt
+
+  @@index([triggerKey, enabled])
+  @@map("stage_notification_recipients")
+}
+
+/// Idempotent send log for internal stage notifications (no PHI).
+model StageNotificationLog {
+  id              String       @id @default(cuid())
+  serviceClientId String
+  triggerKey      String
+  stage           ClientStage?
+  recipientCount  Int          @default(0)
+  sentAt          DateTime     @default(now())
+
+  @@unique([serviceClientId, triggerKey])
+  @@index([serviceClientId])
+  @@map("stage_notification_logs")
+}
+
 /// Org-wide compliance / department training (distinct from CRM checklist CrmTrainingModule
 /// and Artemis TrainingSession).
 

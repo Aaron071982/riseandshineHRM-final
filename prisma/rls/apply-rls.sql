@@ -55,7 +55,8 @@ DECLARE
     -- CRM roles (privilege-escalation surface; was missing from earlier lists)
     'user_crm_roles',
     -- CRM training / ops (deny anon; app uses postgres/service_role)
-    'crm_training_videos', 'saved_queries'
+    'crm_training_videos', 'saved_queries',
+    'stage_notification_recipients', 'stage_notification_logs'
   ];
 BEGIN
   FOREACH t IN ARRAY tables
@@ -100,7 +101,8 @@ DECLARE
     'client_consents', 'client_referral_checks',
     'schedule_import_batches', 'client_boroughs', 'payroll_runs',
     'payroll_run_entries', 'company_documents', 'company_document_recipients',
-    'user_crm_roles', 'crm_training_videos', 'saved_queries'
+    'user_crm_roles', 'crm_training_videos', 'saved_queries',
+    'stage_notification_recipients', 'stage_notification_logs'
   ];
 BEGIN
   FOREACH t IN ARRAY tables
@@ -138,7 +140,8 @@ DECLARE
     'rbt_pay_statements', 'rbt_pay_statement_sessions',
     'payroll_runs', 'payroll_run_entries',
     'company_documents', 'company_document_recipients',
-    'user_crm_roles', 'crm_training_videos', 'saved_queries'
+    'user_crm_roles', 'crm_training_videos', 'saved_queries',
+    'stage_notification_recipients', 'stage_notification_logs'
   ];
 BEGIN
   FOREACH t IN ARRAY tables

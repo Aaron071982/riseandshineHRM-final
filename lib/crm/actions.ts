@@ -336,6 +336,15 @@ export async function advanceStage(
       console.error('[crm] journey email after advance failed', emailErr)
     }
 
+    try {
+      const { maybeSendStageNotification } = await import(
+        '@/lib/crm/stageNotifications'
+      )
+      await maybeSendStageNotification(clientId, toStage, { actorUserId: user.id })
+    } catch (notifyErr) {
+      console.error('[crm] stage notification after advance failed', notifyErr)
+    }
+
     revalidateClient(clientId)
     return { ok: true, stage: toStage }
   } catch (err) {
@@ -459,6 +468,15 @@ export async function setStage(
       serviceClientId: clientId,
       action: 'STAGE_CHANGE',
     })
+
+    try {
+      const { maybeSendStageNotification } = await import(
+        '@/lib/crm/stageNotifications'
+      )
+      await maybeSendStageNotification(clientId, toStage, { actorUserId: user.id })
+    } catch (notifyErr) {
+      console.error('[crm] stage notification after setStage failed', notifyErr)
+    }
 
     revalidateClient(clientId)
     return { ok: true, stage: toStage }
@@ -616,6 +634,17 @@ export async function createServiceClient(
       serviceClientId: client.id,
       action: 'CREATE',
     })
+
+    try {
+      const { maybeSendStageNotificationForTrigger } = await import(
+        '@/lib/crm/stageNotifications'
+      )
+      await maybeSendStageNotificationForTrigger(client.id, 'NEW_CLIENT', {
+        actorUserId: user.id,
+      })
+    } catch (notifyErr) {
+      console.error('[crm] new-client stage notification failed', notifyErr)
+    }
 
     revalidatePath('/client-services')
     revalidatePath('/client-services/clients')
