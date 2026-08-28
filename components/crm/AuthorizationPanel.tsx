@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import type { AuthStatus, AuthType } from '@prisma/client'
 import {
@@ -41,6 +41,9 @@ type Auth = {
   expirationDate: string | Date | null
   renderingProvider: string | null
   notes: string | null
+  submittedDate?: string | Date | null
+  sentToInsuranceAt?: string | Date | null
+  sentToInsuranceByUser?: { name: string | null; email: string | null } | null
   lines: Line[]
 }
 
@@ -56,10 +59,20 @@ export function AuthorizationPanel({
   clientId,
   authorizations,
   canEdit,
+  authRequired,
+  paAutoSatisfied,
+  billingCanEdit,
+  onSendToInsurance,
+  sentInsuranceMeta,
 }: {
   clientId: string
   authorizations: Auth[]
   canEdit: boolean
+  authRequired?: boolean
+  paAutoSatisfied?: boolean
+  billingCanEdit?: boolean
+  onSendToInsurance?: (authorizationId: string) => void
+  sentInsuranceMeta?: (auth: Auth) => ReactNode
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -133,6 +146,17 @@ export function AuthorizationPanel({
           </button>
         )}
       </div>
+
+      {paAutoSatisfied && (
+        <p className="rounded-lg bg-[var(--green-bg)] px-3 py-2 text-sm text-[var(--green)]">
+          Assessment PA is auto-satisfied — VOB recorded no prior authorization required.
+        </p>
+      )}
+      {authRequired === true && !paAutoSatisfied && (
+        <p className="rounded-lg bg-[var(--amber-bg)] px-3 py-2 text-sm text-[var(--amber)]">
+          Prior authorization is required for this plan (VOB: PA required).
+        </p>
+      )}
 
       {showForm && (
         <div className="grid gap-2 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2">
@@ -208,6 +232,9 @@ export function AuthorizationPanel({
         title="Assessment"
         items={assessment}
         canEdit={canEdit}
+        billingCanEdit={billingCanEdit}
+        onSendToInsurance={onSendToInsurance}
+        sentInsuranceMeta={sentInsuranceMeta}
         pending={pending}
         startTransition={startTransition}
         setError={setError}
@@ -217,6 +244,9 @@ export function AuthorizationPanel({
         title="Treatment"
         items={treatment}
         canEdit={canEdit}
+        billingCanEdit={billingCanEdit}
+        onSendToInsurance={onSendToInsurance}
+        sentInsuranceMeta={sentInsuranceMeta}
         pending={pending}
         startTransition={startTransition}
         setError={setError}
@@ -230,6 +260,9 @@ function AuthGroup({
   title,
   items,
   canEdit,
+  billingCanEdit,
+  onSendToInsurance,
+  sentInsuranceMeta,
   pending,
   startTransition,
   setError,
@@ -238,6 +271,9 @@ function AuthGroup({
   title: string
   items: Auth[]
   canEdit: boolean
+  billingCanEdit?: boolean
+  onSendToInsurance?: (authorizationId: string) => void
+  sentInsuranceMeta?: (auth: Auth) => ReactNode
   pending: boolean
   startTransition: (fn: () => void) => void
   setError: (s: string) => void
@@ -252,6 +288,9 @@ function AuthGroup({
           key={auth.id}
           auth={auth}
           canEdit={canEdit}
+          billingCanEdit={billingCanEdit}
+          onSendToInsurance={onSendToInsurance}
+          sentInsuranceMeta={sentInsuranceMeta}
           pending={pending}
           startTransition={startTransition}
           setError={setError}
@@ -265,6 +304,9 @@ function AuthGroup({
 function AuthCard({
   auth,
   canEdit,
+  billingCanEdit,
+  onSendToInsurance,
+  sentInsuranceMeta,
   pending,
   startTransition,
   setError,
@@ -272,6 +314,9 @@ function AuthCard({
 }: {
   auth: Auth
   canEdit: boolean
+  billingCanEdit?: boolean
+  onSendToInsurance?: (authorizationId: string) => void
+  sentInsuranceMeta?: (auth: Auth) => ReactNode
   pending: boolean
   startTransition: (fn: () => void) => void
   setError: (s: string) => void
@@ -316,7 +361,9 @@ function AuthCard({
           <p className="text-xs text-quiet">
             Rendering: {auth.renderingProvider || '—'}
           </p>
+          {sentInsuranceMeta?.(auth)}
         </div>
+        <div className="flex flex-col items-end gap-2">
         {canEdit && (
           <select
             disabled={pending}
@@ -339,6 +386,17 @@ function AuthCard({
             ))}
           </select>
         )}
+        {billingCanEdit && onSendToInsurance && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => onSendToInsurance(auth.id)}
+            className="h-8 rounded-lg border border-[var(--urgent)] px-2.5 text-xs font-medium text-[var(--urgent)] hover:bg-[var(--urgent-bg)] disabled:opacity-50"
+          >
+            Send to insurance
+          </button>
+        )}
+        </div>
       </div>
 
       <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
@@ -359,6 +417,10 @@ function AuthCard({
               </div>
             </div>
             <UnitsBar used={line.unitsUsed} authorized={line.unitsAuthorized} />
+            <div className="text-[11px] tabular-nums text-quiet">
+              Req {line.unitsRequested ?? '—'} · Appr {line.unitsApproved ?? '—'} · Used{' '}
+              {line.unitsUsed}
+            </div>
             {line.isUnderApproved && (
               <span className="rounded bg-[var(--urgent-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--urgent)]">
                 Under-approved

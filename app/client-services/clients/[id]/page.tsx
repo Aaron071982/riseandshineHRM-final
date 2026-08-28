@@ -41,6 +41,7 @@ export default async function ClientServicesClientPage({
             canOverrideStage: serialized.canOverrideStage,
             canEdit: serialized.canEdit,
             emailSend: serialized.emailSend,
+            billing: serialized.billing,
             client: serialized.client,
             teamTasks: serialized.teamTasks,
             taskUsers: serialized.taskUsers,

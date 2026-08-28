@@ -21,6 +21,10 @@ import {
   parseConsentLines,
 } from '@/lib/crm/consent'
 import { teamTaskVisibilityWhere } from '@/lib/crm/tasks/access'
+import {
+  canAccessBillingSurface,
+  canViewBillingDocuments,
+} from '@/lib/crm/billingAccess'
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
@@ -68,7 +72,12 @@ export async function loadClientCrmDetail(clientId: string) {
       authorizations: {
         where: { deletedAt: null },
         orderBy: { createdAt: 'desc' },
-        include: { lines: { where: { deletedAt: null }, orderBy: { cptCode: 'asc' } } },
+        include: {
+          lines: { where: { deletedAt: null }, orderBy: { cptCode: 'asc' } },
+          sentToInsuranceByUser: {
+            select: { id: true, name: true, email: true },
+          },
+        },
       },
       btAssignments: {
         where: { deletedAt: null },
@@ -155,7 +164,7 @@ export async function loadClientCrmDetail(clientId: string) {
     !!consentLive &&
     isConsentLineInitialed(parseConsentLines(consentLive.lines), 'comm_email')
 
-  const [teamTasks, taskUsers] = await Promise.all([
+  const [teamTasks, taskUsers, billingNotes, authorizationTemplate] = await Promise.all([
     prisma.teamTask.findMany({
       where: {
         AND: [
@@ -175,6 +184,25 @@ export async function loadClientCrmDetail(clientId: string) {
       },
     }),
     loadCrmTaskAssigneeUsers(),
+    canAccessBillingSurface(user)
+      ? prisma.clientBillingNote.findMany({
+          where: { serviceClientId: clientId, deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+          include: {
+            author: { select: { id: true, name: true, email: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canAccessBillingSurface(user)
+      ? prisma.clientAuthorizationTemplate.findFirst({
+          where: { serviceClientId: clientId, deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          include: {
+            uploadedByUser: { select: { id: true, name: true, email: true } },
+          },
+        })
+      : Promise.resolve(null),
   ])
 
   return {
@@ -198,6 +226,13 @@ export async function loadClientCrmDetail(clientId: string) {
       graphEnabled: graphEmailEnabled(),
       hasMailbox: hasRiseAndShineMailbox(user.email),
       emailConsentOk,
+    },
+    billing: {
+      canAccess: canAccessBillingSurface(user),
+      canEdit: canEdit && canAccessBillingSurface(user),
+      documentsAvailable: canViewBillingDocuments(client.stage),
+      notes: billingNotes,
+      authorizationTemplate,
     },
   }
 }

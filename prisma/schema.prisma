@@ -466,6 +466,11 @@ model User {
   clientRequirementsDeleted    ClientRequirement[]       @relation("ClientRequirementDeletedBy")
   clientAuthorizationsDeleted  ClientAuthorization[]     @relation("ClientAuthorizationDeletedBy")
   clientAuthorizationLinesDeleted ClientAuthorizationLine[] @relation("ClientAuthorizationLineDeletedBy")
+  clientAuthorizationsSentToInsurance ClientAuthorization[] @relation("ClientAuthorizationSentToInsuranceBy")
+  clientBillingNotesAuthored ClientBillingNote[] @relation("ClientBillingNoteAuthor")
+  clientBillingNotesDeleted ClientBillingNote[] @relation("ClientBillingNoteDeletedBy")
+  clientAuthorizationTemplatesUploaded ClientAuthorizationTemplate[] @relation("ClientAuthorizationTemplateUploadedBy")
+  clientAuthorizationTemplatesDeleted ClientAuthorizationTemplate[] @relation("ClientAuthorizationTemplateDeletedBy")
   clientCommunicationsDeleted  ClientCommunication[]     @relation("ClientCommunicationDeletedBy")
   clientAlertsDeleted          ClientAlert[]             @relation("ClientAlertDeletedBy")
   serviceClientNotesDeleted    ServiceClientNote[]       @relation("ServiceClientNoteDeletedBy")
@@ -3007,6 +3012,8 @@ model ServiceClient {
   communications      ClientCommunication[]
   alerts              ClientAlert[]
   claims              ClientClaim[]
+  billingNotes        ClientBillingNote[]
+  authorizationTemplates ClientAuthorizationTemplate[]
 
   @@index([status])
   @@index([stage])
@@ -3307,6 +3314,8 @@ model ClientAuthorization {
   denialClass       AuthDenialClass?
   proofOfSubmissionDocId String?
   payerCallLogRef   String?
+  sentToInsuranceAt DateTime?
+  sentToInsuranceByUserId String?
   notes             String?    @db.Text
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
@@ -3315,6 +3324,7 @@ model ClientAuthorization {
 
   serviceClient ServiceClient             @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
   lines         ClientAuthorizationLine[]
+  sentToInsuranceByUser User?             @relation("ClientAuthorizationSentToInsuranceBy", fields: [sentToInsuranceByUserId], references: [id], onDelete: SetNull)
   deletedByUser User?                     @relation("ClientAuthorizationDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
 
   @@index([serviceClientId])
@@ -3343,6 +3353,45 @@ model ClientAuthorizationLine {
   @@index([authorizationId])
   @@index([deletedAt])
   @@map("client_authorization_lines")
+}
+
+model ClientBillingNote {
+  id              String   @id @default(cuid())
+  serviceClientId String
+  authorId        String
+  body            String   @db.Text
+  createdAt       DateTime @default(now())
+  deletedAt       DateTime?
+  deletedByUserId String?
+
+  serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  author        User          @relation("ClientBillingNoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  deletedByUser User?         @relation("ClientBillingNoteDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([serviceClientId, createdAt])
+  @@index([deletedAt])
+  @@map("client_billing_notes")
+}
+
+model ClientAuthorizationTemplate {
+  id               String   @id @default(cuid())
+  serviceClientId  String
+  fileName         String
+  storagePath      String
+  contentType      String
+  sizeBytes        Int
+  uploadedByUserId String
+  createdAt        DateTime @default(now())
+  deletedAt        DateTime?
+  deletedByUserId  String?
+
+  serviceClient  ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  uploadedByUser User          @relation("ClientAuthorizationTemplateUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  deletedByUser  User?         @relation("ClientAuthorizationTemplateDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([serviceClientId, createdAt])
+  @@index([deletedAt])
+  @@map("client_authorization_templates")
 }
 
 model TeamTask {

@@ -35,6 +35,7 @@ import {
 import {
   canSetRbtTargetDate,
   nextStage,
+  previousStage,
   REQUIREMENT_KEY_LABELS,
   STAGE_DEFAULT_OWNER_DEPT,
   STAGE_GATE_REQUIREMENT_KEYS,
@@ -69,6 +70,9 @@ import {
   authRequiredFromVobOutcome,
   parseVobOutcome,
 } from '@/lib/crm/vob'
+import {
+  assertCanAccessBillingSurface,
+} from '@/lib/crm/billingAccess'
 import { ownershipPatchOnDeptChange } from '@/lib/crm/claims'
 import { authorizedHoursWarning } from '@/lib/schedule/hoursCheck'
 import { computeSessionBillability } from '@/lib/schedule/billability'
@@ -1560,10 +1564,222 @@ export async function recordBenefitsVerification(
         serviceClientId: clientId,
         action: 'VOB_NOTES_RECORDED',
       })
+      try {
+        await prisma.clientBillingNote.create({
+          data: {
+            serviceClientId: clientId,
+            authorId: user.id,
+            body: `VOB (${outcome}): ${notes}`,
+          },
+        })
+      } catch (noteErr) {
+        console.warn('[crm] VOB billing note create skipped', noteErr)
+      }
     }
 
     revalidateClient(clientId)
     return { ok: true, authRequired, vobResult: outcome }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function sendAuthorizationToInsurance(
+  authorizationId: string,
+  opts?: { confirmed?: boolean }
+): Promise<ActionResult<{ authorizationId: string }>> {
+  try {
+    const user = await getClientServicesUser()
+    assertCanAccessBillingSurface(user)
+    requireDestructiveConfirm(
+      opts?.confirmed,
+      'Send to insurance requires confirmed: true — this records an irreversible external PHI transmission event'
+    )
+
+    const auth = await prisma.clientAuthorization.findFirst({
+      where: { id: authorizationId, deletedAt: null },
+      select: {
+        id: true,
+        authType: true,
+        serviceClientId: true,
+        status: true,
+        sentToInsuranceAt: true,
+      },
+    })
+    if (!auth) {
+      return { ok: false, error: 'Authorization not found', status: 404 }
+    }
+
+    await assertCanEditClient(user, auth.serviceClientId)
+
+    const now = new Date()
+    await prisma.clientAuthorization.update({
+      where: { id: auth.id },
+      data: {
+        status: auth.status === 'APPROVED' ? auth.status : 'PENDING',
+        submittedDate: auth.sentToInsuranceAt ? undefined : now,
+        sentToInsuranceAt: now,
+        sentToInsuranceByUserId: user.id,
+      },
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: auth.serviceClientId,
+      action: `AUTH_SENT_TO_INSURANCE:${auth.authType}`,
+    })
+
+    revalidateClient(auth.serviceClientId)
+    return { ok: true, authorizationId: auth.id }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function createBillingNote(
+  clientId: string,
+  body: string
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const user = await getClientServicesUser()
+    assertCanAccessBillingSurface(user)
+    await assertCanEditClient(user, clientId)
+
+    const trimmed = body.trim()
+    if (!trimmed) {
+      return { ok: false, error: 'Note cannot be empty', status: 400 }
+    }
+    if (trimmed.length > 10000) {
+      return { ok: false, error: 'Note is too long', status: 400 }
+    }
+
+    const note = await prisma.clientBillingNote.create({
+      data: {
+        serviceClientId: clientId,
+        authorId: user.id,
+        body: trimmed,
+      },
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'BILLING_NOTE_CREATED',
+    })
+
+    revalidateClient(clientId)
+    return { ok: true, id: note.id }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function sendClientBackFromBilling(
+  clientId: string,
+  opts?: { confirmed?: boolean; reason?: string | null }
+): Promise<ActionResult<{ stage: ClientStage }>> {
+  try {
+    const user = await getClientServicesUser()
+    assertCanAccessBillingSurface(user)
+    requireDestructiveConfirm(
+      opts?.confirmed,
+      'Send back requires confirmed: true'
+    )
+    await assertCanEditClient(user, clientId)
+
+    const client = await prisma.serviceClient.findUniqueOrThrow({
+      where: { id: clientId },
+      select: {
+        id: true,
+        stage: true,
+        status: true,
+        stageEnteredAt: true,
+        currentOwnerDept: true,
+        caseCoordinatorUserId: true,
+        pipelineStatus: true,
+        actualServiceStartDate: true,
+      },
+    })
+
+    const toStage = previousStage(client.stage)
+    if (!toStage) {
+      return { ok: false, error: 'Already at earliest stage' }
+    }
+
+    const now = new Date()
+    const durationSeconds = client.stageEnteredAt
+      ? Math.max(0, Math.floor((now.getTime() - client.stageEnteredAt.getTime()) / 1000))
+      : null
+    const ownerPatch = ownershipPatchOnDeptChange({
+      fromDept: client.currentOwnerDept,
+      toDept: STAGE_DEFAULT_OWNER_DEPT[toStage],
+      caseCoordinatorUserId: client.caseCoordinatorUserId,
+    })
+
+    await prisma.$transaction(async (tx) => {
+      await tx.serviceClientStatusHistory.create({
+        data: {
+          serviceClientId: clientId,
+          fromStage: client.stage,
+          toStage,
+          fromStatus: client.status,
+          toStatus: client.status,
+          durationSeconds,
+          reason: opts?.reason?.trim() || 'Billing send-back',
+          changedBy: user.id,
+        },
+      })
+
+      await tx.serviceClient.update({
+        where: { id: clientId },
+        data: {
+          stage: toStage,
+          stageEnteredAt: now,
+          currentOwnerDept: ownerPatch.currentOwnerDept,
+          ...(ownerPatch.deptChanged
+            ? { currentOwnerUserId: ownerPatch.currentOwnerUserId ?? null }
+            : {}),
+        },
+      })
+
+      if (ownerPatch.shouldReleaseClaimGrants) {
+        await tx.clientClaim.updateMany({
+          where: {
+            serviceClientId: clientId,
+            releasedAt: null,
+            source: 'CLAIM',
+          },
+          data: { releasedAt: now, releasedByUserId: user.id },
+        })
+      }
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: `BILLING_SEND_BACK:${client.stage}->${toStage}`,
+    })
+
+    revalidateClient(clientId)
+    return { ok: true, stage: toStage }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
+export async function confirmClientFromBilling(
+  clientId: string,
+  opts?: StageTransitionOpts
+): Promise<ActionResult<{ stage: ClientStage }>> {
+  try {
+    const user = await getClientServicesUser()
+    assertCanAccessBillingSurface(user)
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'BILLING_CONFIRM_ADVANCE',
+    })
+    return advanceStage(clientId, opts)
   } catch (err) {
     return fail(err)
   }

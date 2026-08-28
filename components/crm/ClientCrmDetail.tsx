@@ -10,6 +10,7 @@ import { RequirementsPanel } from '@/components/crm/RequirementsPanel'
 import { NotesPanel, OverviewPanel } from '@/components/crm/NotesPanel'
 import { ActivityPanel } from '@/components/crm/ActivityPanel'
 import { AuthorizationPanel } from '@/components/crm/AuthorizationPanel'
+import { BillingAuthorizationPanel } from '@/components/crm/BillingAuthorizationPanel'
 import { StaffingPanel } from '@/components/crm/StaffingPanel'
 import { SchedulePanel } from '@/components/crm/SchedulePanel'
 import { ClientDocumentsPanel } from '@/components/crm/ClientDocumentsPanel'
@@ -70,7 +71,7 @@ export default function ClientCrmDetail({
     setTab(resolveTab(initialTab))
   }, [initialTab])
 
-  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit, teamTasks, taskUsers } =
+  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit, teamTasks, taskUsers, billing } =
     data
 
   const runStageAction = (
@@ -260,13 +261,30 @@ export default function ClientCrmDetail({
             canEdit={canEdit}
           />
         )}
-        {tab === 'authorization' && (
-          <AuthorizationPanel
-            clientId={client.id}
-            authorizations={client.authorizations}
-            canEdit={canEdit}
-          />
-        )}
+        {tab === 'authorization' &&
+          (billing?.canAccess ? (
+            <BillingAuthorizationPanel
+              clientId={client.id}
+              stage={client.stage}
+              authorizations={client.authorizations}
+              canEdit={canEdit}
+              billingCanEdit={billing.canEdit}
+              authRequired={client.authRequired}
+              vobResult={client.vobResult}
+              documentsAvailable={billing.documentsAvailable}
+              requirements={client.requirements}
+              billingNotes={billing.notes}
+              authorizationTemplate={billing.authorizationTemplate}
+            />
+          ) : (
+            <AuthorizationPanel
+              clientId={client.id}
+              authorizations={client.authorizations}
+              canEdit={canEdit}
+              authRequired={client.authRequired}
+              paAutoSatisfied={!client.authRequired}
+            />
+          ))}
         {tab === 'schedule' && (
           <SchedulePanel
             clientId={client.id}
@@ -303,6 +321,7 @@ export type SerializeClientDetail = {
   canOverrideStage: boolean
   canEdit: boolean
   emailSend: EmailSendContext & { allowedTemplates: CommTemplate[] }
+  billing?: ClientCrmDetailData['billing']
   client: ClientCrmDetailData['client']
   teamTasks: ClientCrmDetailData['teamTasks']
   taskUsers: ClientCrmDetailData['taskUsers']

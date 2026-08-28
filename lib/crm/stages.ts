@@ -378,6 +378,15 @@ export function nextStage(stage: ClientStage): ClientStage | null {
   return LINEAR_STAGE_ORDER[i + 1]
 }
 
+/** Previous linear pipeline stage (skips TREATMENT_PLAN). */
+export function previousStage(stage: ClientStage): ClientStage | null {
+  let from = stage
+  if (from === 'TREATMENT_PLAN') from = 'AUTHORIZATION'
+  const i = LINEAR_STAGE_ORDER.indexOf(from)
+  if (i <= 0) return null
+  return LINEAR_STAGE_ORDER[i - 1]
+}
+
 /** Stages at or after Authorization may set rbtTargetDate. */
 export function canSetRbtTargetDate(stage: ClientStage): boolean {
   const i = stageIndex(stage)

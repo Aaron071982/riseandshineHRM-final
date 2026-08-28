@@ -174,6 +174,11 @@ export const CRM_EMAIL_ATTACHMENTS_PREFIX = 'crm-email-attachments'
  */
 export const CRM_CLIENT_REQUIREMENTS_PREFIX = 'crm-client-documents'
 
+/**
+ * CRM PA authorization templates (PHI) — private bucket path prefix inside STORAGE_BUCKET.
+ */
+export const CRM_CLIENT_AUTH_TEMPLATES_PREFIX = 'crm-auth-templates'
+
 export { UserRole }
 
 export const USER_ROLE = {
