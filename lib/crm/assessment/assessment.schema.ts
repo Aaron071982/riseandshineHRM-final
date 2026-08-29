@@ -184,27 +184,22 @@ export const goalRowColumnBSchema = z.object({
 })
 
 /** §3.11 Treatment goals */
+export const goalDomainColumnASchema = z.object({
+  analysisNarrative: z.string().optional().default(BEHAVIOR_REDUCTION_ANALYSIS_DEFAULT),
+  rows: z.array(goalRowColumnASchema).default([]),
+})
+
+export const goalDomainWithLevelColumnASchema = z.object({
+  currentLevel: optionalTextSchema,
+  rows: z.array(goalRowColumnASchema).default([]),
+})
+
 export const goalsSchema = z.object({
-  behaviorReduction: z.object({
-    analysisNarrative: z.string().optional().default(BEHAVIOR_REDUCTION_ANALYSIS_DEFAULT),
-    rows: z.array(goalRowColumnASchema).default([]),
-  }),
-  communication: z.object({
-    currentLevel: optionalTextSchema,
-    rows: z.array(goalRowColumnASchema).default([]),
-  }),
-  social: z.object({
-    currentLevel: optionalTextSchema,
-    rows: z.array(goalRowColumnASchema).default([]),
-  }),
-  adaptive: z.object({
-    currentLevel: optionalTextSchema,
-    rows: z.array(goalRowColumnASchema).default([]),
-  }),
-  livingSelfHelp: z.object({
-    currentLevel: optionalTextSchema,
-    rows: z.array(goalRowColumnASchema).default([]),
-  }),
+  behaviorReduction: goalDomainColumnASchema.default({}),
+  communication: goalDomainWithLevelColumnASchema.default({}),
+  social: goalDomainWithLevelColumnASchema.default({}),
+  adaptive: goalDomainWithLevelColumnASchema.default({}),
+  livingSelfHelp: goalDomainWithLevelColumnASchema.default({}),
 })
 
 /** §3.12 Parent Training */
