@@ -18,6 +18,11 @@ import {
   getOrCreateCurrentClinicalAssessment,
 } from '@/lib/crm/clinicalAssessment/storage'
 import { missingAssessmentArtifactTypes } from '@/lib/crm/clinicalAssessment/artifacts.shared'
+import { saveAssessmentDetailsRecord } from '@/lib/crm/clinicalAssessment/details'
+import type {
+  AssessmentDetailsInput,
+  AssessmentDetailsRecord,
+} from '@/lib/crm/clinicalAssessment/details.shared'
 import type { ActionResult } from '@/lib/crm/actions'
 
 function revalidateClient(clientId: string) {
@@ -183,6 +188,7 @@ export async function createClinicalAssessmentVersion(
           versionNumber: nextVersion,
           isCurrentVersion: true,
           createdByUserId: user.id,
+          details: { create: {} },
         },
       })
     })
@@ -213,4 +219,49 @@ export async function auditClinicalAssessmentView(clientId: string): Promise<voi
     serviceClientId: clientId,
     action: 'ASSESSMENT_VIEW',
   })
+}
+
+export async function saveClinicalAssessmentDetails(
+  clientId: string,
+  assessmentId: string,
+  payload: AssessmentDetailsInput
+): Promise<ActionResult<{ details: AssessmentDetailsRecord }>> {
+  try {
+    const user = await getClientServicesUser()
+    assertCanUploadClinicalAssessmentArtifacts(user)
+    await assertCanViewClient(user, clientId)
+
+    const assessment = await prisma.clientClinicalAssessment.findFirst({
+      where: {
+        id: assessmentId,
+        serviceClientId: clientId,
+        isCurrentVersion: true,
+      },
+      select: { id: true, lockState: true },
+    })
+    if (!assessment) {
+      return { ok: false, error: 'Assessment not found', status: 404 }
+    }
+    if (assessment.lockState !== 'DRAFT') {
+      return { ok: false, error: 'Assessment is locked', status: 400 }
+    }
+
+    const details = await saveAssessmentDetailsRecord({
+      assessmentId,
+      clientId,
+      userId: user.id,
+      payload,
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: 'ASSESSMENT_DETAILS_SAVED',
+    })
+
+    revalidateClient(clientId)
+    return { ok: true, details }
+  } catch (err) {
+    return fail(err)
+  }
 }

@@ -10,6 +10,7 @@ import {
   missingAssessmentArtifactTypes,
   validateClinicalAssessmentFile,
 } from '@/lib/crm/clinicalAssessment/artifacts.shared'
+import { ensureAssessmentDetailsForAssessment } from '@/lib/crm/clinicalAssessment/details'
 import type { AssessmentArtifactType } from '@prisma/client'
 
 export {
@@ -171,6 +172,25 @@ export async function attachClinicalAssessmentArtifactRecord(input: {
   })
 }
 
+export async function createClinicalAssessmentGraphSignedUrl(
+  storagePath: string,
+  ttlSeconds = 60
+): Promise<string> {
+  if (!supabaseAdmin) {
+    throw new Error('Storage not configured')
+  }
+  if (!isStoredClinicalAssessmentPath(storagePath)) {
+    throw new Error('Invalid storage path')
+  }
+  const { data, error } = await supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .createSignedUrl(storagePath, ttlSeconds)
+  if (error || !data?.signedUrl) {
+    throw new Error('Could not sign graph URL')
+  }
+  return data.signedUrl
+}
+
 export async function getOrCreateCurrentClinicalAssessment(input: {
   clientId: string
   userId: string
@@ -185,9 +205,25 @@ export async function getOrCreateCurrentClinicalAssessment(input: {
         where: { deletedAt: null },
         orderBy: { artifactType: 'asc' },
       },
+      details: true,
     },
   })
-  if (current) return current
+  if (current) {
+    if (!current.details) {
+      await ensureAssessmentDetailsForAssessment(current.id)
+      return prisma.clientClinicalAssessment.findFirstOrThrow({
+        where: { id: current.id },
+        include: {
+          artifacts: {
+            where: { deletedAt: null },
+            orderBy: { artifactType: 'asc' },
+          },
+          details: true,
+        },
+      })
+    }
+    return current
+  }
 
   return prisma.clientClinicalAssessment.create({
     data: {
@@ -195,12 +231,14 @@ export async function getOrCreateCurrentClinicalAssessment(input: {
       versionNumber: 1,
       isCurrentVersion: true,
       createdByUserId: input.userId,
+      details: { create: {} },
     },
     include: {
       artifacts: {
         where: { deletedAt: null },
         orderBy: { artifactType: 'asc' },
       },
+      details: true,
     },
   })
 }
@@ -211,6 +249,7 @@ export async function listClinicalAssessmentVersions(clientId: string) {
     orderBy: { versionNumber: 'desc' },
     include: {
       artifacts: { where: { deletedAt: null }, orderBy: { artifactType: 'asc' } },
+      details: true,
       lockedByUser: { select: { id: true, name: true, email: true } },
       createdByUser: { select: { id: true, name: true, email: true } },
     },

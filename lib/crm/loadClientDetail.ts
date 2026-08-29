@@ -36,6 +36,18 @@ import {
   listClinicalAssessmentVersions,
 } from '@/lib/crm/clinicalAssessment/storage'
 import { auditClinicalAssessmentView } from '@/lib/crm/clinicalAssessment/actions'
+import { mapAssessmentDetailsRow } from '@/lib/crm/clinicalAssessment/details.shared'
+import type { AssessmentDetailsRecord } from '@/lib/crm/clinicalAssessment/details.shared'
+
+type ClinicalAssessmentWithDetails = Omit<
+  Awaited<ReturnType<typeof getOrCreateCurrentClinicalAssessment>>,
+  'details'
+> & { details: AssessmentDetailsRecord | null }
+
+type ClinicalAssessmentVersionWithDetails = Omit<
+  Awaited<ReturnType<typeof listClinicalAssessmentVersions>>[number],
+  'details'
+> & { details: AssessmentDetailsRecord | null }
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
@@ -217,20 +229,26 @@ export async function loadClientCrmDetail(clientId: string) {
   ])
 
   const clinicalAssessmentVisible = canViewClinicalAssessment(user)
-  let clinicalAssessment = null as Awaited<
-    ReturnType<typeof getOrCreateCurrentClinicalAssessment>
-  > | null
-  let clinicalAssessmentVersions: Awaited<
-    ReturnType<typeof listClinicalAssessmentVersions>
-  > = []
+  let clinicalAssessment: ClinicalAssessmentWithDetails | null = null
+  let clinicalAssessmentVersions: ClinicalAssessmentVersionWithDetails[] = []
 
   if (clinicalAssessmentVisible) {
     await auditClinicalAssessmentView(clientId)
-    clinicalAssessment = await getOrCreateCurrentClinicalAssessment({
+    const rawAssessment = await getOrCreateCurrentClinicalAssessment({
       clientId,
       userId: user.id,
     })
-    clinicalAssessmentVersions = await listClinicalAssessmentVersions(clientId)
+    clinicalAssessment = {
+      ...rawAssessment,
+      details: rawAssessment.details
+        ? mapAssessmentDetailsRow(rawAssessment.details)
+        : null,
+    }
+    const rawVersions = await listClinicalAssessmentVersions(clientId)
+    clinicalAssessmentVersions = rawVersions.map((v) => ({
+      ...v,
+      details: v.details ? mapAssessmentDetailsRow(v.details) : null,
+    }))
   }
 
   return {

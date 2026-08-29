@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, Eye, Loader2, Lock } from 'lucide-react'
 import type { AssessmentArtifactType, MilestoneStatus } from '@prisma/client'
+import { AssessmentDetailsPanel } from '@/components/crm/AssessmentDetailsPanel'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import {
   createClinicalAssessmentVersion,
@@ -17,6 +18,7 @@ import {
   REQUIRED_ASSESSMENT_ARTIFACT_TYPES,
 } from '@/lib/crm/clinicalAssessment/artifacts.shared'
 import { uploadClinicalAssessmentArtifact } from '@/lib/crm/clinicalAssessmentUpload.client'
+import type { AssessmentDetailsRecord } from '@/lib/crm/clinicalAssessment/details.shared'
 import { cn } from '@/lib/utils'
 
 type Artifact = {
@@ -35,9 +37,12 @@ type AssessmentVersion = {
   lockedAt: string | Date | null
   createdAt: string | Date
   artifacts: Artifact[]
+  details?: AssessmentDetailsRecord | null
   lockedByUser?: { name: string | null; email: string | null } | null
   createdByUser?: { name: string | null; email: string | null } | null
 }
+
+const GRAPH_TYPES: AssessmentArtifactType[] = ['VINELAND_3', 'ATEC', 'FAST']
 
 const ARTIFACT_ACCEPT: Record<AssessmentArtifactType, string> = {
   INITIAL_REPORT: '.pdf',
@@ -85,6 +90,11 @@ export function ClinicalAssessmentPanel({
   const missingRequired = REQUIRED_ASSESSMENT_ARTIFACT_TYPES.filter(
     (t) => !artifactByType.has(t)
   )
+  const graphArtifacts = currentAssessment.artifacts.filter((a) =>
+    GRAPH_TYPES.includes(a.artifactType)
+  )
+  const assembledDownloadUrl = `/api/client-services/clients/${clientId}/clinical-assessment/${currentAssessment.id}/assembled-download`
+  const hasReport = artifactByType.has('INITIAL_REPORT')
 
   const onUpload = (type: AssessmentArtifactType, file: File | null) => {
     if (!file || !canUpload || !isDraft) return
@@ -188,6 +198,15 @@ export function ClinicalAssessmentPanel({
         </p>
       )}
 
+      <AssessmentDetailsPanel
+        clientId={clientId}
+        assessmentId={currentAssessment.id}
+        details={currentAssessment.details ?? null}
+        graphArtifacts={graphArtifacts}
+        canEdit={canUpload}
+        isDraft={isDraft}
+      />
+
       <section className="rounded-xl border border-line bg-surface p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -238,6 +257,34 @@ export function ClinicalAssessmentPanel({
               )}
             </ul>
           </>
+        )}
+
+        {hasReport && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-line-2/40 px-3 py-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink">Assembled clinical record</p>
+              <p className="text-xs text-quiet">
+                Branded summary, graph images, and full report in one PDF (generated on
+                download — may be large).
+              </p>
+            </div>
+            <a
+              href={`${assembledDownloadUrl}?inline=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium hover:bg-line-2"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Preview summary PDF
+            </a>
+            <a
+              href={assembledDownloadUrl}
+              className="inline-flex h-8 items-center gap-1 rounded-lg bg-brand px-2.5 text-xs font-medium text-white hover:bg-brand-2"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download assembled PDF
+            </a>
+          </div>
         )}
 
         {canLock && isDraft && (

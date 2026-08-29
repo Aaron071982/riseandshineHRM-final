@@ -478,6 +478,7 @@ model User {
   clinicalAssessmentsUnlocked ClientClinicalAssessment[] @relation("ClinicalAssessmentUnlockedBy")
   clinicalAssessmentArtifactsUploaded ClientClinicalAssessmentArtifact[] @relation("ClinicalAssessmentArtifactUploadedBy")
   clinicalAssessmentArtifactsDeleted ClientClinicalAssessmentArtifact[] @relation("ClinicalAssessmentArtifactDeletedBy")
+  clinicalAssessmentDetailsUpdated ClientClinicalAssessmentDetails[] @relation("ClinicalAssessmentDetailsUpdatedBy")
   clientCommunicationsDeleted  ClientCommunication[]     @relation("ClientCommunicationDeletedBy")
   clientAlertsDeleted          ClientAlert[]             @relation("ClientAlertDeletedBy")
   serviceClientNotesDeleted    ServiceClientNote[]       @relation("ServiceClientNoteDeletedBy")
@@ -3443,6 +3444,7 @@ model ClientClinicalAssessment {
   lockedByUser   User?                              @relation("ClinicalAssessmentLockedBy", fields: [lockedByUserId], references: [id], onDelete: SetNull)
   unlockedByUser User?                              @relation("ClinicalAssessmentUnlockedBy", fields: [unlockedByUserId], references: [id], onDelete: SetNull)
   artifacts      ClientClinicalAssessmentArtifact[]
+  details        ClientClinicalAssessmentDetails?
 
   @@unique([serviceClientId, versionNumber])
   @@index([serviceClientId, isCurrentVersion])
@@ -3469,6 +3471,69 @@ model ClientClinicalAssessmentArtifact {
   @@index([assessmentId, artifactType])
   @@index([deletedAt])
   @@map("client_clinical_assessment_artifacts")
+}
+
+model ClientClinicalAssessmentDetails {
+  id           String @id @default(cuid())
+  assessmentId String @unique
+
+  patientName         String?
+  dob                 DateTime?
+  age                 String?
+  diagnosis           String?
+  comorbidDiagnosis   String?
+  reportDate          DateTime?
+  assessorName        String?
+  assessorCredentials String?
+  referringProvider   String?
+  npi                 String?
+
+  hrs97151      String?
+  hrs97153      String?
+  hrs97155      String?
+  hrs97156      String?
+  hrs97157      String?
+  servicePeriod String?
+  locations     Json?
+
+  reasonForAssessment  String? @db.Text
+  interferingBehaviors String? @db.Text
+  targetBehavior1      String?
+  targetBehavior2      String?
+  targetBehavior3      String?
+  medications          String? @db.Text
+  allergies            String? @db.Text
+  reassessmentDate     DateTime?
+
+  riskFactors      Json?
+  riskFactorsOther String?
+
+  vinelandDate       DateTime?
+  atecDate           DateTime?
+  fastDate           DateTime?
+  vinelandCommScore  String?
+  vinelandSocScore   String?
+
+  goalAreas Json?
+
+  speech  String?
+  ot      String?
+  pt      String?
+  teacher String?
+  pcp     String?
+
+  bcbaName   String?
+  bcbaDate   DateTime?
+  parentName String?
+  parentDate DateTime?
+
+  updatedAt       DateTime @updatedAt
+  updatedByUserId String?
+
+  assessment    ClientClinicalAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  updatedByUser User?                    @relation("ClinicalAssessmentDetailsUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("client_clinical_assessment_details")
 }
 
 model TeamTask {
