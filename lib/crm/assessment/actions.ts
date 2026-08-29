@@ -16,10 +16,8 @@ import {
 } from '@/lib/crm/assessment/access'
 import { auditTreatmentAssessmentAction } from '@/lib/crm/assessment/audit'
 import {
-  ASSESSMENT_SECTION_KEYS,
   assessmentSectionSchemas,
   defaultAssessmentSections,
-  parseAssessmentPatch,
   safeParseAssessmentPatch,
   type AssessmentSectionKey,
 } from '@/lib/crm/assessment/assessment.schema'
@@ -437,5 +435,3 @@ export async function auditTreatmentAssessmentView(serviceClientId: string) {
     detail: 'VIEW',
   })
 }
-
-export { ASSESSMENT_SECTION_KEYS, parseAssessmentPatch }
