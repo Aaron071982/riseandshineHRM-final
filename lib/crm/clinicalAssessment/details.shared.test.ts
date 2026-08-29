@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_DIAGNOSIS,
   assessmentDetailsHasSafetyFlags,
+  formatDetailDate,
   groupHasContent,
   normalizeAssessmentDetailsInput,
 } from '@/lib/crm/clinicalAssessment/details.shared'
@@ -26,10 +27,15 @@ describe('normalizeAssessmentDetailsInput', () => {
       riskFactors: ['SIB', 'Elopement'],
       goalAreas: ['Communication'],
     })
-    expect(out.dob?.toISOString().slice(0, 10)).toBe('2020-01-15')
+    expect(out.dob?.toISOString()).toBe('2020-01-15T00:00:00.000Z')
     expect(out.locations).toEqual(['Home', 'School'])
     expect(out.riskFactors).toEqual(['SIB', 'Elopement'])
     expect(out.goalAreas).toEqual(['Communication'])
+  })
+
+  it('formats calendar dates without timezone shift', () => {
+    const out = normalizeAssessmentDetailsInput({ dob: '2020-01-01' })
+    expect(formatDetailDate(out.dob)).toBe('Jan 1, 2020')
   })
 })
 

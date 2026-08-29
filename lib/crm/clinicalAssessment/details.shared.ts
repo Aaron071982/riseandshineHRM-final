@@ -1,5 +1,7 @@
 /** Curated key-details snapshot — no parsing, nearly all fields optional. */
 
+import { parseCalendarDate } from '@/lib/billing/calendarDate'
+
 export const DEFAULT_DIAGNOSIS = 'F84.0 Autism Spectrum Disorder'
 
 export const SERVICE_LOCATION_OPTIONS = [
@@ -129,9 +131,7 @@ export type AssessmentDetailsRecord = {
 }
 
 function parseDate(raw: string | null | undefined): Date | null {
-  if (!raw?.trim()) return null
-  const d = new Date(raw)
-  return Number.isNaN(d.getTime()) ? null : d
+  return parseCalendarDate(raw)
 }
 
 function trimOrNull(raw: string | null | undefined): string | null {
@@ -345,6 +345,6 @@ export function formatDetailDate(d: Date | null): string {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
-    timeZone: 'America/New_York',
+    timeZone: 'UTC',
   })
 }

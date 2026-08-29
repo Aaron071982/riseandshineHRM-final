@@ -17,6 +17,7 @@ import {
   type AssessmentDetailsInput,
   type AssessmentDetailsRecord,
 } from '@/lib/crm/clinicalAssessment/details.shared'
+import { calendarDateKey } from '@/lib/billing/calendarDate'
 import { cn } from '@/lib/utils'
 
 type GraphArtifact = {
@@ -29,7 +30,7 @@ function toInputDate(value: Date | string | null | undefined): string {
   if (!value) return ''
   const d = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(d.getTime())) return ''
-  return d.toISOString().slice(0, 10)
+  return calendarDateKey(d)
 }
 
 function recordToForm(d: AssessmentDetailsRecord | null): AssessmentDetailsInput {
