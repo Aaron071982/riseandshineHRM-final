@@ -4,23 +4,50 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   applyMentionPick,
   getActiveMentionQuery,
+  TASK_MENTION_DEPTS,
 } from '@/lib/crm/tasks/mentions'
 import { searchTaskMentionUsers } from '@/lib/crm/tasks/actions'
+import { ownerDeptLabel } from '@/lib/crm/tasks/constants'
+import type { ClientOwnerDept } from '@prisma/client'
 
-export type MentionUser = {
+export type MentionTarget = {
+  kind: 'user' | 'dept'
   id: string
-  name: string | null
-  email: string | null
+  name: string
+  email?: string | null
+  dept?: ClientOwnerDept
 }
 
 /**
  * Shared @mention state for task chat composers.
- * Shows matches on bare `@` (not only after 1+ characters).
+ * Supports multiple people and department pools in one message.
  */
-export function useTaskMentions(seedUsers: MentionUser[]) {
+export function useTaskMentions(
+  seedUsers: Array<
+    | MentionTarget
+    | { id: string; name: string | null; email: string | null }
+  >
+) {
   const [draft, setDraft] = useState('')
   const [activeQuery, setActiveQuery] = useState<string | null>(null)
-  const [remoteUsers, setRemoteUsers] = useState<MentionUser[] | null>(null)
+  const [remoteUsers, setRemoteUsers] = useState<MentionTarget[] | null>(null)
+
+  const seedUserTargets = useMemo(
+    (): MentionTarget[] =>
+      seedUsers
+        .map((u) =>
+          'kind' in u
+            ? u
+            : {
+                kind: 'user' as const,
+                id: u.id,
+                name: u.name || u.email || 'User',
+                email: u.email,
+              }
+        )
+        .filter((u): u is MentionTarget => u.kind === 'user'),
+    [seedUsers]
+  )
 
   const onDraftChange = (v: string) => {
     setDraft(v)
@@ -33,7 +60,6 @@ export function useTaskMentions(seedUsers: MentionUser[]) {
       return
     }
     const q = activeQuery.trim()
-    // Prefer live search once the user has typed a letter; otherwise use seed list
     if (q.length < 1) {
       setRemoteUsers(null)
       return
@@ -42,7 +68,14 @@ export function useTaskMentions(seedUsers: MentionUser[]) {
     const t = window.setTimeout(() => {
       void searchTaskMentionUsers(q).then((res) => {
         if (cancelled || !res.ok) return
-        setRemoteUsers(res.users)
+        setRemoteUsers(
+          res.users.map((u) => ({
+            kind: 'user' as const,
+            id: u.id,
+            name: u.name || u.email || 'User',
+            email: u.email,
+          }))
+        )
       })
     }, 150)
     return () => {
@@ -51,23 +84,37 @@ export function useTaskMentions(seedUsers: MentionUser[]) {
     }
   }, [activeQuery])
 
-  const mentionMatches = useMemo(() => {
+  const mentionMatches = useMemo((): MentionTarget[] => {
     if (activeQuery === null) return []
     const q = activeQuery.trim().toLowerCase()
-    const pool = remoteUsers && remoteUsers.length > 0 ? remoteUsers : seedUsers
-    const filtered = !q
-      ? pool
-      : pool.filter(
+
+    const deptMatches: MentionTarget[] = TASK_MENTION_DEPTS.filter((dept) => {
+      if (!q) return true
+      const label = ownerDeptLabel(dept).toLowerCase()
+      return label.includes(q) || dept.toLowerCase().replace(/_/g, ' ').includes(q)
+    }).map((dept) => ({
+      kind: 'dept' as const,
+      id: `dept:${dept}`,
+      name: ownerDeptLabel(dept),
+      dept,
+    }))
+
+    const userPool =
+      remoteUsers && remoteUsers.length > 0 ? remoteUsers : seedUserTargets
+    const userMatches = (!q
+      ? userPool
+      : userPool.filter(
           (u) =>
-            u.name?.toLowerCase().includes(q) ||
+            u.name.toLowerCase().includes(q) ||
             u.email?.toLowerCase().includes(q)
         )
-    return filtered.slice(0, 8)
-  }, [activeQuery, remoteUsers, seedUsers])
+    ).slice(0, 6)
 
-  const pickMention = (u: MentionUser) => {
-    const label = u.name || u.email || 'User'
-    setDraft((c) => applyMentionPick(c, label, u.id))
+    return [...userMatches, ...deptMatches].slice(0, 10)
+  }, [activeQuery, remoteUsers, seedUserTargets])
+
+  const pickMention = (target: MentionTarget) => {
+    setDraft((c) => applyMentionPick(c, target.name, target.id))
     setActiveQuery(null)
     setRemoteUsers(null)
   }

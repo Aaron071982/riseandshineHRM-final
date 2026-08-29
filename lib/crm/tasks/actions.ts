@@ -26,7 +26,8 @@ import {
   crmTaskAssigneeUserWhere,
 } from '@/lib/crm/tasks/assignees'
 import { writeAuditLog } from '@/lib/audit'
-import { parseMentionIds, renderMentionBody } from '@/lib/crm/tasks/mentions'
+import { parseMentionTargets, renderMentionBody } from '@/lib/crm/tasks/mentions'
+import { resolveDeptMentionUserIds } from '@/lib/crm/tasks/mentionRecipients'
 import {
   notifyExtensionRequested,
   notifyTaskCompleted,
@@ -595,26 +596,32 @@ export async function addTeamTaskComment(taskId: string, body: string) {
     const trimmed = body.trim()
     if (!trimmed) throw new CrmAccessError('Comment cannot be empty', 400)
 
-    const mentions = parseMentionIds(trimmed)
+    const { userIds, depts, tokens } = parseMentionTargets(trimmed)
 
     await prisma.teamTaskComment.create({
       data: {
         teamTaskId: taskId,
         authorUserId: user.id,
         body: trimmed,
-        mentionsJson: mentions,
+        mentionsJson: tokens,
       },
     })
 
     await logTaskActivity(taskId, user.id, 'COMMENT', trimmed.slice(0, 200), access.serviceClientId)
 
-    for (const mentionedId of mentions) {
-      if (mentionedId === user.id) continue
-      const task = await prisma.teamTask.findUnique({
-        where: { id: taskId },
-        select: { title: true },
-      })
-      if (!task) continue
+    const notifyIds = new Set<string>(userIds)
+    for (const dept of depts) {
+      const memberIds = await resolveDeptMentionUserIds(dept)
+      for (const memberId of memberIds) notifyIds.add(memberId)
+    }
+
+    const task = await prisma.teamTask.findUnique({
+      where: { id: taskId },
+      select: { title: true },
+    })
+
+    for (const mentionedId of notifyIds) {
+      if (mentionedId === user.id || !task) continue
       void notifyTaskMention({
         mentionedUserId: mentionedId,
         mentionerName: user.name ?? user.email ?? 'A teammate',
