@@ -51,9 +51,14 @@ export default function FillablePdfFlow({
   const handleDownload = async () => {
     onDownload?.()
     try {
-      const url = document.pdfUrl || rbtOnboardingPdfUrl(document.id)
+      const url = rbtOnboardingPdfUrl(document.id, { download: true })
       const res = await fetch(url, { credentials: 'include' })
       if (!res.ok) {
+        showToast('PDF not available', 'error')
+        return
+      }
+      const contentType = res.headers.get('content-type') || ''
+      if (!contentType.includes('pdf')) {
         showToast('PDF not available', 'error')
         return
       }

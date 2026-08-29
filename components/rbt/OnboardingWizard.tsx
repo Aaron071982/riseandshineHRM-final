@@ -41,6 +41,7 @@ type StepRow = {
   isComplete: boolean
   isLocked: boolean
   completionStatus: string
+  downloadedAt: string | null
   hrTask?: {
     id: string
     status: string
@@ -197,6 +198,21 @@ export default function OnboardingWizard({
     }
   }, [refresh, showToast, currentIndex, progress?.steps.length])
 
+  const markDownloaded = useCallback(
+    async (documentId: string) => {
+      try {
+        await fetch(`/api/rbt/onboarding/completions/${documentId}/downloaded`, {
+          method: 'PATCH',
+          credentials: 'include',
+        })
+        await refresh()
+      } catch {
+        /* non-blocking — download still succeeded */
+      }
+    },
+    [refresh]
+  )
+
   if (loading || !progress) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -348,7 +364,11 @@ export default function OnboardingWizard({
           ) : current.isComplete ? (
             <p className="text-green-700">This step is complete.</p>
           ) : (
-            <StepFlow current={current} onComplete={onStepComplete} />
+            <StepFlow
+              current={current}
+              onComplete={onStepComplete}
+              onMarkDownloaded={() => markDownloaded(current.documentId)}
+            />
           )}
         </CardContent>
       </Card>
@@ -370,7 +390,15 @@ export default function OnboardingWizard({
   )
 }
 
-function StepFlow({ current, onComplete }: { current: StepRow; onComplete: () => void }) {
+function StepFlow({
+  current,
+  onComplete,
+  onMarkDownloaded,
+}: {
+  current: StepRow
+  onComplete: () => void
+  onMarkDownloaded: () => void
+}) {
   const doc = {
     id: current.documentId,
     title: current.title,
@@ -406,9 +434,20 @@ function StepFlow({ current, onComplete }: { current: StepRow; onComplete: () =>
     return (
       <DownloadReuploadFlow
         document={doc}
-        completion={undefined}
+        completion={{
+          id: current.documentId,
+          documentId: current.documentId,
+          status:
+            current.completionStatus === 'COMPLETED'
+              ? 'COMPLETED'
+              : current.completionStatus === 'IN_PROGRESS'
+                ? 'IN_PROGRESS'
+                : 'NOT_STARTED',
+          completedAt: null,
+          downloadedAt: current.downloadedAt,
+        }}
         onComplete={onComplete}
-        onDownload={() => {}}
+        onDownload={onMarkDownloaded}
       />
     )
   }

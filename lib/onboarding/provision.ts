@@ -16,6 +16,37 @@ async function loadPdfBase64(filename: string | null): Promise<string | null> {
   return buffer.toString('base64')
 }
 
+/** Load blank template bytes from repo catalog (fallback when DB pdfData is empty). */
+export async function loadCatalogPdfBytes(slug: string): Promise<Buffer | null> {
+  const entry = ONBOARDING_CATALOG.find((e) => e.slug === slug)
+  if (!entry?.file) return null
+  const filePath = join(PDF_FOLDER, entry.file)
+  if (!existsSync(filePath)) return null
+  return readFile(filePath)
+}
+
+/** Resolve onboarding PDF bytes for authenticated server routes. */
+export async function resolveOnboardingPdfBytes(doc: {
+  slug: string
+  pdfData: string | null
+  pdfUrl: string | null
+}): Promise<Buffer | null> {
+  if (doc.pdfData) {
+    return Buffer.from(doc.pdfData, 'base64')
+  }
+  if (doc.pdfUrl) {
+    try {
+      const res = await fetch(doc.pdfUrl, { redirect: 'follow' })
+      if (res.ok) {
+        return Buffer.from(await res.arrayBuffer())
+      }
+    } catch (e) {
+      console.error('[onboarding] pdfUrl fetch failed', doc.slug, e)
+    }
+  }
+  return loadCatalogPdfBytes(doc.slug)
+}
+
 /** Upsert all 32 catalog documents (global). */
 export async function seedOnboardingCatalog(): Promise<{ upserted: number; missingFiles: string[] }> {
   const missingFiles: string[] = []

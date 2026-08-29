@@ -38,6 +38,7 @@ export async function GET() {
         isLocked: s.isLocked,
         isAvailable: s.isAvailable,
         completionStatus: s.completion?.status ?? 'NOT_STARTED',
+        downloadedAt: s.completion?.downloadedAt?.toISOString() ?? null,
       })),
     })
   } catch (e) {

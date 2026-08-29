@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
+import { rbtOnboardingPdfUrl } from '@/lib/onboarding/pdf'
 import RbtCompanyDistDocs from '@/components/rbt/RbtCompanyDistDocs'
 
 type MyDoc = {
@@ -303,22 +304,15 @@ export default function RBTDocumentsPage() {
                         <FileText className="w-5 h-5 text-[#e36f1e] shrink-0" />
                         <p className="font-medium truncate">{form.title}</p>
                       </div>
-                      {form.pdfUrl ? (
-                        <Button variant="outline" size="sm" asChild>
-                          <a
-                            href={form.pdfUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Download className="w-4 h-4 mr-1" />
-                            Download
-                          </a>
-                        </Button>
-                      ) : (
-                        <span className="text-sm text-gray-500">
-                          Available in My Tasks
-                        </span>
-                      )}
+                      <Button variant="outline" size="sm" asChild>
+                        <a
+                          href={rbtOnboardingPdfUrl(form.id, { download: true })}
+                          download
+                        >
+                          <Download className="w-4 h-4 mr-1" />
+                          Download
+                        </a>
+                      </Button>
                     </li>
                   ))}
                 </ul>

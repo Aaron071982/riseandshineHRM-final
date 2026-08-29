@@ -46,7 +46,7 @@ export default function OnboardingPdfViewer({
       setError(null)
       setEmbedUrl(null)
       try {
-        const url = pdfUrl || rbtOnboardingPdfUrl(documentId)
+        const url = rbtOnboardingPdfUrl(documentId)
         const res = await fetch(url, { credentials: 'include' })
         if (!res.ok) {
           setError('PDF not available')
