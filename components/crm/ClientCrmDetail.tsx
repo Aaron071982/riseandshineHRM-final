@@ -11,7 +11,7 @@ import { NotesPanel, OverviewPanel } from '@/components/crm/NotesPanel'
 import { ActivityPanel } from '@/components/crm/ActivityPanel'
 import { AuthorizationPanel } from '@/components/crm/AuthorizationPanel'
 import { BillingAuthorizationPanel } from '@/components/crm/BillingAuthorizationPanel'
-import { ClinicalAssessmentPanel } from '@/components/crm/ClinicalAssessmentPanel'
+import { TreatmentAssessmentPanel } from '@/components/crm/assessment/TreatmentAssessmentPanel'
 import { StaffingPanel } from '@/components/crm/StaffingPanel'
 import { SchedulePanel } from '@/components/crm/SchedulePanel'
 import { ClientDocumentsPanel } from '@/components/crm/ClientDocumentsPanel'
@@ -74,11 +74,11 @@ export default function ClientCrmDetail({
     setTab(resolveTab(initialTab))
   }, [initialTab])
 
-  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit, teamTasks, taskUsers, billing, clinicalAssessment } =
+  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit, teamTasks, taskUsers, billing, treatmentAssessment } =
     data
 
   const visibleTabs = TABS.filter(
-    (t) => t.id !== 'assessment' || clinicalAssessment?.canView
+    (t) => t.id !== 'assessment' || treatmentAssessment?.canView
   )
 
   const runStageAction = (
@@ -292,17 +292,14 @@ export default function ClientCrmDetail({
               paAutoSatisfied={!client.authRequired}
             />
           ))}
-        {tab === 'assessment' && clinicalAssessment?.canView && clinicalAssessment.current && (
-          <ClinicalAssessmentPanel
+        {tab === 'assessment' && treatmentAssessment?.canView && (
+          <TreatmentAssessmentPanel
             clientId={client.id}
             clientCode={client.clientCode}
-            currentAssessment={clinicalAssessment.current}
-            versions={clinicalAssessment.versions}
-            canUpload={clinicalAssessment.canUpload}
-            canLock={clinicalAssessment.canLock}
-            canMarkTreatmentPlan={clinicalAssessment.canMarkTreatmentPlan}
-            treatmentPlanStatus={client.treatmentPlanStatus}
-            treatmentPlanCompletedAt={client.treatmentPlanCompletedAt}
+            assessments={treatmentAssessment.assessments ?? []}
+            hasAssessmentOnFile={treatmentAssessment.hasAssessmentOnFile ?? false}
+            canEdit={treatmentAssessment.canEdit ?? false}
+            canUpload={treatmentAssessment.canUpload ?? false}
           />
         )}
         {tab === 'schedule' && (
@@ -342,7 +339,7 @@ export type SerializeClientDetail = {
   canEdit: boolean
   emailSend: EmailSendContext & { allowedTemplates: CommTemplate[] }
   billing?: ClientCrmDetailData['billing']
-  clinicalAssessment?: ClientCrmDetailData['clinicalAssessment']
+  treatmentAssessment?: ClientCrmDetailData['treatmentAssessment']
   client: ClientCrmDetailData['client']
   teamTasks: ClientCrmDetailData['teamTasks']
   taskUsers: ClientCrmDetailData['taskUsers']

@@ -479,6 +479,9 @@ model User {
   clinicalAssessmentArtifactsUploaded ClientClinicalAssessmentArtifact[] @relation("ClinicalAssessmentArtifactUploadedBy")
   clinicalAssessmentArtifactsDeleted ClientClinicalAssessmentArtifact[] @relation("ClinicalAssessmentArtifactDeletedBy")
   clinicalAssessmentDetailsUpdated ClientClinicalAssessmentDetails[] @relation("ClinicalAssessmentDetailsUpdatedBy")
+  treatmentAssessmentsCreated    ClientTreatmentAssessment[] @relation("TreatmentAssessmentCreatedBy")
+  treatmentAssessmentsUpdated    ClientTreatmentAssessment[] @relation("TreatmentAssessmentUpdatedBy")
+  treatmentAssessmentAttachmentsUploaded ClientTreatmentAssessmentAttachment[] @relation("TreatmentAssessmentAttachmentUploadedBy")
   clientCommunicationsDeleted  ClientCommunication[]     @relation("ClientCommunicationDeletedBy")
   clientAlertsDeleted          ClientAlert[]             @relation("ClientAlertDeletedBy")
   serviceClientNotesDeleted    ServiceClientNote[]       @relation("ServiceClientNoteDeletedBy")
@@ -3024,6 +3027,7 @@ model ServiceClient {
   billingNotes        ClientBillingNote[]
   authorizationTemplates ClientAuthorizationTemplate[]
   clinicalAssessments    ClientClinicalAssessment[]
+  treatmentAssessments   ClientTreatmentAssessment[]
 
   @@index([status])
   @@index([stage])
@@ -3534,6 +3538,87 @@ model ClientClinicalAssessmentDetails {
   updatedByUser User?                    @relation("ClinicalAssessmentDetailsUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@map("client_clinical_assessment_details")
+}
+
+/// Full initial assessment & treatment plan form (replaces legacy upload-only tab over time).
+enum TreatmentAssessmentStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  SIGNED
+}
+
+enum TreatmentAssessmentSource {
+  FORM
+  UPLOAD
+}
+
+model ClientTreatmentAssessment {
+  id               String                    @id @default(cuid())
+  serviceClientId  String
+  status           TreatmentAssessmentStatus @default(DRAFT)
+  source           TreatmentAssessmentSource @default(FORM)
+  assessmentType   String                    @default("INITIAL")
+  reportDate       DateTime?                 @db.Date
+
+  summary           Json?
+  treatmentRequest  Json?
+  locationSchedule  Json?
+  bioPsychosocial   Json?
+  instruments       Json?
+  presentLevels     Json?
+  environmental     Json?
+  responseToTx      Json?
+  interventions     Json?
+  behaviors         Json?
+  goals             Json?
+  parentTraining    Json?
+  servicesProtocols Json?
+  transitionPlan    Json?
+  coordination      Json?
+  recommendations   Json?
+  crisisPlan        Json?
+  signatures        Json?
+
+  completedAt DateTime?
+  signedAt    DateTime?
+
+  createdByUserId String
+  updatedByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  serviceClient ServiceClient                       @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  createdByUser User                                @relation("TreatmentAssessmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedByUser User?                               @relation("TreatmentAssessmentUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  attachments   ClientTreatmentAssessmentAttachment[]
+
+  @@index([serviceClientId])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("assessments")
+}
+
+model ClientTreatmentAssessmentAttachment {
+  id           String    @id @default(cuid())
+  assessmentId String
+  sectionKey   String
+  kind         String
+  storagePath  String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  uploadedByUserId String
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  assessment     ClientTreatmentAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  uploadedByUser User                      @relation("TreatmentAssessmentAttachmentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([assessmentId])
+  @@index([deletedAt])
+  @@map("assessment_attachments")
 }
 
 model TeamTask {

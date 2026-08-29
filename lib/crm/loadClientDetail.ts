@@ -26,28 +26,17 @@ import {
   canViewBillingDocuments,
 } from '@/lib/crm/billingAccess'
 import {
-  canLockClinicalAssessment,
-  canMarkTreatmentPlanComplete,
-  canUploadClinicalAssessmentArtifacts,
-  canViewClinicalAssessment,
-} from '@/lib/crm/clinicalAssessment/access'
+  canEditTreatmentAssessment,
+  canUploadTreatmentAssessmentFiles,
+  canViewTreatmentAssessment,
+} from '@/lib/crm/assessment/access'
 import {
-  getOrCreateCurrentClinicalAssessment,
-  listClinicalAssessmentVersions,
-} from '@/lib/crm/clinicalAssessment/storage'
-import { auditClinicalAssessmentView } from '@/lib/crm/clinicalAssessment/actions'
-import { mapAssessmentDetailsRow } from '@/lib/crm/clinicalAssessment/details.shared'
-import type { AssessmentDetailsRecord } from '@/lib/crm/clinicalAssessment/details.shared'
-
-type ClinicalAssessmentWithDetails = Omit<
-  Awaited<ReturnType<typeof getOrCreateCurrentClinicalAssessment>>,
-  'details'
-> & { details: AssessmentDetailsRecord | null }
-
-type ClinicalAssessmentVersionWithDetails = Omit<
-  Awaited<ReturnType<typeof listClinicalAssessmentVersions>>[number],
-  'details'
-> & { details: AssessmentDetailsRecord | null }
+  auditTreatmentAssessmentView,
+} from '@/lib/crm/assessment/actions'
+import {
+  hasCompletedTreatmentAssessment,
+  listTreatmentAssessments,
+} from '@/lib/crm/assessment/load'
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
@@ -228,27 +217,14 @@ export async function loadClientCrmDetail(clientId: string) {
       : Promise.resolve(null),
   ])
 
-  const clinicalAssessmentVisible = canViewClinicalAssessment(user)
-  let clinicalAssessment: ClinicalAssessmentWithDetails | null = null
-  let clinicalAssessmentVersions: ClinicalAssessmentVersionWithDetails[] = []
+  const treatmentAssessmentVisible = canViewTreatmentAssessment(user)
+  let treatmentAssessments: Awaited<ReturnType<typeof listTreatmentAssessments>> = []
+  let hasAssessmentOnFile = false
 
-  if (clinicalAssessmentVisible) {
-    await auditClinicalAssessmentView(clientId)
-    const rawAssessment = await getOrCreateCurrentClinicalAssessment({
-      clientId,
-      userId: user.id,
-    })
-    clinicalAssessment = {
-      ...rawAssessment,
-      details: rawAssessment.details
-        ? mapAssessmentDetailsRow(rawAssessment.details)
-        : null,
-    }
-    const rawVersions = await listClinicalAssessmentVersions(clientId)
-    clinicalAssessmentVersions = rawVersions.map((v) => ({
-      ...v,
-      details: v.details ? mapAssessmentDetailsRow(v.details) : null,
-    }))
+  if (treatmentAssessmentVisible) {
+    await auditTreatmentAssessmentView(clientId)
+    treatmentAssessments = await listTreatmentAssessments(clientId)
+    hasAssessmentOnFile = await hasCompletedTreatmentAssessment(clientId)
   }
 
   return {
@@ -280,14 +256,13 @@ export async function loadClientCrmDetail(clientId: string) {
       notes: billingNotes,
       authorizationTemplate,
     },
-    clinicalAssessment: clinicalAssessmentVisible
+    treatmentAssessment: treatmentAssessmentVisible
       ? {
           canView: true,
-          canUpload: canUploadClinicalAssessmentArtifacts(user),
-          canLock: canLockClinicalAssessment(user),
-          canMarkTreatmentPlan: canMarkTreatmentPlanComplete(user),
-          current: clinicalAssessment!,
-          versions: clinicalAssessmentVersions,
+          canEdit: canEditTreatmentAssessment(user),
+          canUpload: canUploadTreatmentAssessmentFiles(user),
+          hasAssessmentOnFile,
+          assessments: treatmentAssessments,
         }
       : { canView: false },
   }

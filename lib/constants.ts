@@ -184,6 +184,15 @@ export const CRM_CLIENT_AUTH_TEMPLATES_PREFIX = 'crm-auth-templates'
  */
 export const CRM_CLINICAL_ASSESSMENTS_PREFIX = 'crm-clinical-assessments'
 
+/** Private Supabase bucket for treatment assessment files (PHI). */
+export const ASSESSMENT_FILES_BUCKET = 'assessment-files'
+
+/**
+ * Treatment assessment uploads (PHI) — path inside ASSESSMENT_FILES_BUCKET:
+ * clients/{serviceClientId}/assessments/{assessmentId}/{sectionKey}/{uuid}-{filename}
+ */
+export const ASSESSMENT_FILES_PREFIX = 'clients'
+
 export { UserRole }
 
 export const USER_ROLE = {
