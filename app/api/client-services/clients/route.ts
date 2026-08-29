@@ -400,5 +400,12 @@ export async function POST(request: NextRequest) {
     ip: getClientIpFromRequest(request),
   })
 
+  try {
+    const { notifyNewClientCreated } = await import('@/lib/crm/stageNotifications')
+    await notifyNewClientCreated(client.id, user.id)
+  } catch (notifyErr) {
+    console.error('[crm] new-client stage notification failed', notifyErr)
+  }
+
   return NextResponse.json({ client }, { status: 201 })
 }

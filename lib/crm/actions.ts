@@ -644,12 +644,8 @@ export async function createServiceClient(
     })
 
     try {
-      const { maybeSendStageNotificationForTrigger } = await import(
-        '@/lib/crm/stageNotifications'
-      )
-      await maybeSendStageNotificationForTrigger(client.id, 'NEW_CLIENT', {
-        actorUserId: user.id,
-      })
+      const { notifyNewClientCreated } = await import('@/lib/crm/stageNotifications')
+      await notifyNewClientCreated(client.id, user.id)
     } catch (notifyErr) {
       console.error('[crm] new-client stage notification failed', notifyErr)
     }

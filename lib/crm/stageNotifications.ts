@@ -27,6 +27,58 @@ export function stageNotificationsTestSend(): boolean {
   return runtimeEnvFlag('STAGE_NOTIFICATIONS_TEST_SEND')
 }
 
+function formatNotificationTimestamp(d: Date): string {
+  return d.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  })
+}
+
+function formatAddedByLabel(user: {
+  name: string | null
+  email: string | null
+} | null | undefined): string {
+  if (!user) return 'Unknown user'
+  const name = user.name?.trim()
+  const email = user.email?.trim()
+  if (name && email) return `${name} (${email})`
+  return name || email || 'Unknown user'
+}
+
+export function buildNewClientNotificationEmail(input: {
+  clientCode: string
+  clientName: string
+  addedAt: Date
+  addedBy: string
+}): { subject: string; html: string } {
+  const subject = `New client added (${input.clientCode})`
+  const html = `
+    <div style="font-family:system-ui,sans-serif;line-height:1.5;color:#1a1a1a">
+      <p>A new client was added to the CRM.</p>
+      <table style="border-collapse:collapse;margin-top:12px">
+        <tr><td style="padding:4px 12px 4px 0;color:#555;vertical-align:top"><strong>Name</strong></td><td style="padding:4px 0">${escapeHtml(input.clientName)}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#555;vertical-align:top"><strong>Client ID</strong></td><td style="padding:4px 0">${escapeHtml(input.clientCode)}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#555;vertical-align:top"><strong>Date &amp; time</strong></td><td style="padding:4px 0">${escapeHtml(formatNotificationTimestamp(input.addedAt))}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;color:#555;vertical-align:top"><strong>Added by</strong></td><td style="padding:4px 0">${escapeHtml(input.addedBy)}</td></tr>
+      </table>
+    </div>
+  `.trim()
+  return { subject, html }
+}
+
+function escapeHtml(raw: string): string {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
 function triggerCopy(trigger: StageNotificationTrigger): {
   subject: string
   headline: string
@@ -99,7 +151,19 @@ function renderBody(params: {
   trigger: StageNotificationTrigger
   clientCode: string
   clientId: string
+  clientName?: string
+  addedAt?: Date
+  addedBy?: string
 }): { subject: string; html: string } {
+  if (params.trigger === 'NEW_CLIENT' && params.clientName && params.addedAt && params.addedBy) {
+    return buildNewClientNotificationEmail({
+      clientCode: params.clientCode,
+      clientName: params.clientName,
+      addedAt: params.addedAt,
+      addedBy: params.addedBy,
+    })
+  }
+
   const copy = triggerCopy(params.trigger)
   const subject = `${copy.subject} (${params.clientCode})`
   const html = `
@@ -144,10 +208,26 @@ export async function maybeSendStageNotificationForTrigger(
 
   const client = await prisma.serviceClient.findUnique({
     where: { id: clientId },
-    select: { clientCode: true, deletedAt: true },
+    select: {
+      clientCode: true,
+      firstName: true,
+      lastName: true,
+      createdAt: true,
+      deletedAt: true,
+      createdByUser: { select: { name: true, email: true } },
+    },
   })
   if (!client || client.deletedAt) {
     return { sent: false, reason: 'client not found' }
+  }
+
+  let actorLabel = formatAddedByLabel(client.createdByUser)
+  if (actorLabel === 'Unknown user' && opts?.actorUserId) {
+    const actor = await prisma.user.findUnique({
+      where: { id: opts.actorUserId },
+      select: { name: true, email: true },
+    })
+    actorLabel = formatAddedByLabel(actor)
   }
 
   let recipients = await resolveRecipientEmails(trigger)
@@ -169,6 +249,9 @@ export async function maybeSendStageNotificationForTrigger(
     trigger,
     clientCode: client.clientCode,
     clientId,
+    clientName: `${client.firstName} ${client.lastName}`.trim(),
+    addedAt: client.createdAt,
+    addedBy: actorLabel,
   })
 
   let sentCount = 0
@@ -193,6 +276,20 @@ export async function maybeSendStageNotificationForTrigger(
   })
 
   return { sent: sentCount > 0 }
+}
+
+export async function notifyNewClientCreated(
+  clientId: string,
+  actorUserId: string
+): Promise<{ sent: boolean; reason?: string }> {
+  try {
+    return await maybeSendStageNotificationForTrigger(clientId, 'NEW_CLIENT', {
+      actorUserId,
+    })
+  } catch (err) {
+    console.error('[crm] new-client notification failed', err)
+    return { sent: false, reason: 'send failed' }
+  }
 }
 
 export async function maybeSendStageNotification(
