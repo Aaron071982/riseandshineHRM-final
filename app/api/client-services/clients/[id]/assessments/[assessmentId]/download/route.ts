@@ -61,6 +61,7 @@ export async function GET(request: NextRequest, context: Ctx) {
       `/client-services/clients/${clientId}/assessments/${assessmentId}/print`,
       request.nextUrl.origin
     )
+    printUrl.searchParams.set('auto', '1')
     return NextResponse.redirect(printUrl)
   } catch (err) {
     if (err instanceof CrmAccessError) {

@@ -157,11 +157,11 @@ export function AssessmentFormClient({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`/client-services/clients/${clientId}/assessments/${assessmentId}/print`}
+              href={`/client-services/clients/${clientId}/assessments/${assessmentId}/print?auto=1`}
               target="_blank"
               className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas"
             >
-              Print / PDF
+              Download PDF
             </Link>
             {canEdit && source === 'FORM' && status !== 'COMPLETED' && status !== 'SIGNED' && (
               <button type="button" onClick={onComplete} disabled={pending} className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand/90 disabled:opacity-50">

@@ -1,0 +1,314 @@
+/* Branded assessment print / Save-as-PDF layout */
+
+.assessment-print-root {
+  --rs-orange: #e7692c;
+  --rs-ink: #2a2019;
+  --rs-muted: #6b5e54;
+  --rs-cream: #faf8f5;
+  background: var(--rs-cream);
+  color: var(--rs-ink);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-size: 11pt;
+  line-height: 1.45;
+  min-height: 100vh;
+}
+
+.assessment-print-root * {
+  box-sizing: border-box;
+}
+
+.assessment-print-toolbar {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  gap: 8px;
+}
+
+.assessment-print-toolbar button {
+  background: var(--rs-orange);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.assessment-print-toolbar button.secondary {
+  background: #fff;
+  border: 1px solid #ddd;
+  color: var(--rs-ink);
+}
+
+/* Fixed chrome repeats on every printed page */
+.print-running-header,
+.print-running-footer {
+  display: none;
+}
+
+.print-body {
+  margin: 0 auto;
+  max-width: 8.5in;
+  padding: 24px 32px 72px;
+}
+
+.print-title-block {
+  align-items: flex-end;
+  border-bottom: 3px solid var(--rs-orange);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+}
+
+.print-title-brand {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+}
+
+.print-title-brand img {
+  height: 52px;
+  object-fit: contain;
+  width: 52px;
+}
+
+.print-title-brand h1 {
+  color: var(--rs-orange);
+  font-family: 'Bricolage Grotesque', Georgia, serif;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.print-title-brand p {
+  color: var(--rs-muted);
+  font-size: 11pt;
+  margin: 4px 0 0;
+}
+
+.print-title-meta {
+  color: var(--rs-muted);
+  font-size: 9pt;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.section-band {
+  background: var(--rs-orange);
+  break-after: avoid;
+  color: #fff;
+  font-family: 'Bricolage Grotesque', Georgia, serif;
+  font-size: 11pt;
+  font-weight: 700;
+  margin: 22px 0 12px;
+  padding: 8px 14px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.section-block {
+  break-inside: avoid-page;
+  margin-bottom: 14px;
+}
+
+.section-block.page-break-before {
+  break-before: page;
+  page-break-before: always;
+}
+
+.field-grid {
+  display: grid;
+  gap: 6px 16px;
+  grid-template-columns: 190px 1fr;
+  margin-bottom: 4px;
+}
+
+.field-label {
+  font-weight: 600;
+}
+
+.field-value {
+  word-break: break-word;
+}
+
+.prose-block {
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+}
+
+.subheading {
+  font-size: 10.5pt;
+  font-weight: 700;
+  margin: 12px 0 6px;
+}
+
+.print-table {
+  border-collapse: collapse;
+  font-size: 9pt;
+  margin: 8px 0 14px;
+  width: 100%;
+}
+
+.print-table th,
+.print-table td {
+  border: 1px solid #d8d0c8;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.print-table th {
+  background: #f3ede6;
+  font-weight: 700;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.print-image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+
+.print-image-grid img {
+  border: 1px solid #ddd;
+  max-height: 220px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.signature-card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  padding: 14px;
+}
+
+.signature-card h4 {
+  color: var(--rs-orange);
+  font-size: 11pt;
+  margin: 0 0 4px;
+}
+
+.signature-purpose {
+  color: var(--rs-muted);
+  font-size: 9pt;
+  margin: 0 0 10px;
+}
+
+.signature-img {
+  border-bottom: 1px solid #ccc;
+  margin: 8px 0;
+  max-height: 72px;
+  max-width: 280px;
+  object-fit: contain;
+}
+
+.checkbox-line {
+  font-family: ui-monospace, monospace;
+  font-size: 10pt;
+  margin: 2px 0;
+}
+
+@media print {
+  @page {
+    margin: 0.85in 0.65in 0.85in 0.65in;
+    size: letter;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .assessment-print-root {
+    background: #fff !important;
+  }
+
+  .no-print,
+  .assessment-print-toolbar {
+    display: none !important;
+  }
+
+  .print-running-header {
+    align-items: center;
+    border-bottom: 2px solid var(--rs-orange);
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    left: 0;
+    padding: 0 0.65in 8px;
+    position: fixed;
+    right: 0;
+    top: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-running-header .brand-mini {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+  }
+
+  .print-running-header img {
+    height: 28px;
+    width: 28px;
+  }
+
+  .print-running-header .brand-mini span {
+    color: var(--rs-orange);
+    font-family: 'Bricolage Grotesque', Georgia, serif;
+    font-size: 13pt;
+    font-weight: 700;
+  }
+
+  .print-running-header .doc-label {
+    color: var(--rs-muted);
+    font-size: 8pt;
+  }
+
+  .print-running-footer {
+    align-items: center;
+    bottom: 0;
+    color: var(--rs-muted);
+    display: flex;
+    font-size: 8.5pt;
+    justify-content: space-between;
+    left: 0;
+    padding: 0 0.65in;
+    position: fixed;
+    right: 0;
+  }
+
+  .print-running-footer .page-num::after {
+    content: 'Page ' counter(page) ' of ' counter(pages);
+  }
+
+  .print-body {
+    padding-top: 0.35in;
+    padding-bottom: 0.35in;
+  }
+
+  .print-title-block {
+    break-after: avoid;
+  }
+
+  .section-band {
+    break-after: avoid;
+    break-inside: avoid;
+  }
+
+  .signature-card,
+  .print-image-grid img {
+    break-inside: avoid;
+  }
+}

@@ -180,12 +180,18 @@ export default function ClientServicesLayout({
               { label: 'Client Services' },
             ]
 
+  const onAssessmentPrint = /\/assessments\/[^/]+\/print\/?$/.test(pathname)
+
   if (!elevated) {
     return (
       <div className="sunrise-shell min-h-screen bg-[var(--bg)] text-ink">
         <div className="mx-auto max-w-lg px-4 py-16">{children}</div>
       </div>
     )
+  }
+
+  if (onAssessmentPrint) {
+    return <div className="min-h-screen bg-[var(--bg)]">{children}</div>
   }
 
   return (

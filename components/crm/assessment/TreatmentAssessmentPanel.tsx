@@ -118,7 +118,7 @@ export function TreatmentAssessmentPanel({
     if (a.source === 'UPLOAD') {
       return `/api/client-services/clients/${clientId}/assessments/${a.id}/download`
     }
-    return `/client-services/clients/${clientId}/assessments/${a.id}/print`
+    return `/client-services/clients/${clientId}/assessments/${a.id}/print?auto=1`
   }
 
   return (

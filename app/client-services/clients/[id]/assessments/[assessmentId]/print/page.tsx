@@ -32,6 +32,8 @@ export default async function AssessmentPrintPage({ params }: Props) {
 
   return (
     <AssessmentPrintView
+      clientId={clientId}
+      assessmentId={assessmentId}
       client={data.client}
       sections={sections}
       attachments={data.assessment.attachments}
