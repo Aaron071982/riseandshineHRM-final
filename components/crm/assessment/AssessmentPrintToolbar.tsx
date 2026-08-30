@@ -19,21 +19,27 @@ export function AssessmentPrintToolbar({
 
   return (
     <div className="assessment-print-toolbar no-print">
-      <button type="button" onClick={() => window.print()}>
-        Save as PDF / Print
-      </button>
-      <button
-        type="button"
-        className="secondary"
-        onClick={() =>
-          window.open(
-            `/client-services/clients/${clientId}/assessments/${assessmentId}`,
-            '_self'
-          )
-        }
-      >
-        Back to form
-      </button>
+      <p className="print-hint">
+        In the print dialog, enable <strong>Background graphics</strong> so
+        orange headers and charts print correctly.
+      </p>
+      <div className="toolbar-actions">
+        <button type="button" onClick={() => window.print()}>
+          Save as PDF / Print
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() =>
+            window.open(
+              `/client-services/clients/${clientId}/assessments/${assessmentId}`,
+              '_self'
+            )
+          }
+        >
+          Back to form
+        </button>
+      </div>
     </div>
   )
 }

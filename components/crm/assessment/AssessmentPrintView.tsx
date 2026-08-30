@@ -1,4 +1,3 @@
-import Image from 'next/image'
 import { formatCalendarDate } from '@/lib/billing/calendarDate'
 import {
   ASSESSOR_CREDENTIALS_SUFFIX,
@@ -90,240 +89,283 @@ export function AssessmentPrintView(props: Props) {
 
   return (
     <>
-      <div className="print-running-header">
-        <div className="brand-mini">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/new-real-logo.png" alt="" />
-          <span>Rise & Shine</span>
-        </div>
-        <span className="doc-label">Initial Assessment and Treatment Plan</span>
-      </div>
-      <div className="print-running-footer">
-        <span>{clientName}</span>
-        <span className="page-num" />
-      </div>
-
       <AssessmentPrintToolbar
         clientId={props.clientId}
         assessmentId={props.assessmentId}
       />
 
-      <div className="print-body">
-        <div className="print-title-block">
-          <div className="print-title-brand">
-            <Image
-              src="/new-real-logo.png"
-              alt="Rise & Shine"
-              width={52}
-              height={52}
-              priority
-            />
-            <div>
-              <h1>Rise & Shine</h1>
-              <p>Initial Assessment and Treatment Plan</p>
-            </div>
-          </div>
-          <div className="print-title-meta">
-            <div>
-              {clientName} · {props.client.clientCode}
-            </div>
-            <div>
-              {props.status.replace('_', ' ')} · {props.source}
-            </div>
-          </div>
-        </div>
+      <table className="print-layout-table">
+        <thead>
+          <tr>
+            <td>
+              <div className="print-page-header">
+                <div className="brand-mini">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/new-real-logo.png" alt="" />
+                  <span>Rise & Shine</span>
+                </div>
+                <span className="doc-label">Initial Assessment and Treatment Plan</span>
+              </div>
+            </td>
+          </tr>
+        </thead>
+        <tfoot>
+          <tr>
+            <td>
+              <div className="print-page-footer">
+                <span>{clientName}</span>
+                <span className="page-num" />
+              </div>
+            </td>
+          </tr>
+        </tfoot>
+        <tbody>
+          <tr>
+            <td>
+              <div className="print-body">
+                <div className="print-cover-block">
+                  <div>
+                    <h1>{clientName}</h1>
+                    <p className="print-client-code">{props.client.clientCode}</p>
+                  </div>
+                  <div className="print-title-meta">
+                    <div>Initial Assessment and Treatment Plan</div>
+                    <div>
+                      {props.status.replace('_', ' ')} · {props.source}
+                    </div>
+                  </div>
+                </div>
 
-        <div className="section-band">Initial Assessment Summary</div>
-        <Field label="Patient Name" value={s.patientName} />
-        <Field label="Parent Name" value={s.parentName} />
-        <Field label="Diagnosis" value={s.diagnosis} />
-        <Field label="Comorbid Diagnosis" value={s.comorbidDiagnosis} />
-        <Field label="Date of Birth" value={dobDisplay} />
-        <Field label="Age" value={s.age} />
-        <Field label="Referring Provider" value={s.referringProvider} />
-        <Field label="NPI" value={s.npi} />
-        <Field label="Report Date" value={s.reportDate} />
-        <Field
-          label="Assessor Name"
-          value={`${s.assessorName || ''}${ASSESSOR_CREDENTIALS_SUFFIX}`.trim()}
-        />
-        <Field label="Assessor Email" value={s.assessorEmail} />
-        <Field label="Assessor Phone" value={s.assessorPhone} />
+                <PrintSection title="Initial Assessment Summary">
+                  <Field label="Patient Name" value={s.patientName} />
+                  <Field label="Parent Name" value={s.parentName} />
+                  <Field label="Diagnosis" value={s.diagnosis} />
+                  <Field label="Comorbid Diagnosis" value={s.comorbidDiagnosis} />
+                  <Field label="Date of Birth" value={dobDisplay} />
+                  <Field label="Age" value={s.age} />
+                  <Field label="Referring Provider" value={s.referringProvider} />
+                  <Field label="NPI" value={s.npi} />
+                  <Field label="Report Date" value={s.reportDate} />
+                  <Field
+                    label="Assessor Name"
+                    value={`${s.assessorName || ''}${ASSESSOR_CREDENTIALS_SUFFIX}`.trim()}
+                  />
+                  <Field label="Assessor Email" value={s.assessorEmail} />
+                  <Field label="Assessor Phone" value={s.assessorPhone} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Treatment Requests</div>
-        <p className="prose-block">{TREATMENT_REQUESTS_INTRO}</p>
-        <Field label="97151 — Initial assessment (hrs per auth period)" value={props.sections.treatmentRequest.hrs97151} />
-        <Field label="97153 — Direct 1:1 ABA (initial weekly hrs)" value={props.sections.treatmentRequest.hrs97153Initial} />
-        <Field label="97155 — BCBA supervision (initial weekly hrs)" value={props.sections.treatmentRequest.hrs97155Initial} />
-        <Field label="97156 — Parent / caregiver training" value={props.sections.treatmentRequest.hrs97156} />
-        <Field label="97157 — Group parent training (monthly hrs)" value={props.sections.treatmentRequest.hrs97157} />
-        <Field label="Service Period" value={props.sections.treatmentRequest.servicePeriod} />
+                <PrintSection title="Treatment Requests" pageBreak>
+                  <p className="prose-block">{TREATMENT_REQUESTS_INTRO}</p>
+                  <Field label="97151 — Initial assessment (hrs per auth period)" value={props.sections.treatmentRequest.hrs97151} />
+                  <Field label="97153 — Direct 1:1 ABA (initial weekly hrs)" value={props.sections.treatmentRequest.hrs97153Initial} />
+                  <Field label="97155 — BCBA supervision (initial weekly hrs)" value={props.sections.treatmentRequest.hrs97155Initial} />
+                  <Field label="97156 — Parent / caregiver training" value={props.sections.treatmentRequest.hrs97156} />
+                  <Field label="97157 — Group parent training (monthly hrs)" value={props.sections.treatmentRequest.hrs97157} />
+                  <Field label="Service Period" value={props.sections.treatmentRequest.servicePeriod} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Location of Services & Schedule</div>
-        <p className="prose-block">{LOCATION_OF_SERVICES_INTRO}</p>
-        <p className="prose-block">{LOCATION_OF_SERVICES_BACB_QUOTE}</p>
-        <Field label="Primary Locations" value={locations || 'None selected'} />
-        <ScheduleTable rows={props.sections.locationSchedule.scheduleRows} />
+                <PrintSection title="Location of Services & Schedule" pageBreak>
+                  <p className="prose-block">{LOCATION_OF_SERVICES_INTRO}</p>
+                  <p className="prose-block">{LOCATION_OF_SERVICES_BACB_QUOTE}</p>
+                  <Field label="Primary Locations" value={locations || 'None selected'} />
+                  <ScheduleTable rows={props.sections.locationSchedule.scheduleRows} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Bio-Psychosocial Information</div>
-        <BioField label="General Information" value={props.sections.bioPsychosocial.generalInformation} />
-        <BioField label="Family structure" value={props.sections.bioPsychosocial.familyStructure} />
-        <BioField label="Developmental history" value={props.sections.bioPsychosocial.developmentalHistory} />
-        <BioField label="Medical History" value={props.sections.bioPsychosocial.medicalHistory} />
-        <BioField label="Reason for Assessment" value={props.sections.bioPsychosocial.reasonForAssessment} />
-        <BioField label="Medications" value={props.sections.bioPsychosocial.medications} />
-        <BioField label="Allergies" value={props.sections.bioPsychosocial.allergies} />
-        <BioField label="Family history of autism" value={props.sections.bioPsychosocial.familyHistoryOfAutism} />
-        <BioField label="Educational Setting" value={props.sections.bioPsychosocial.educationalSetting} />
-        <BioField label="Parent Level of Involvement & Family Support System" value={props.sections.bioPsychosocial.parentInvolvement} />
+                <PrintSection title="Bio-Psychosocial Information" pageBreak>
+                  <BioField label="General Information" value={props.sections.bioPsychosocial.generalInformation} />
+                  <BioField label="Family structure" value={props.sections.bioPsychosocial.familyStructure} />
+                  <BioField label="Developmental history" value={props.sections.bioPsychosocial.developmentalHistory} />
+                  <BioField label="Medical History" value={props.sections.bioPsychosocial.medicalHistory} />
+                  <BioField label="Reason for Assessment" value={props.sections.bioPsychosocial.reasonForAssessment} />
+                  <BioField label="Medications" value={props.sections.bioPsychosocial.medications} />
+                  <BioField label="Allergies" value={props.sections.bioPsychosocial.allergies} />
+                  <BioField label="Family history of autism" value={props.sections.bioPsychosocial.familyHistoryOfAutism} />
+                  <BioField label="Educational Setting" value={props.sections.bioPsychosocial.educationalSetting} />
+                  <BioField label="Parent Level of Involvement & Family Support System" value={props.sections.bioPsychosocial.parentInvolvement} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Instruments & Methods</div>
-        <Block title="Family/caregiver(s) interview" text={props.sections.instruments.familyCaregiverInterview} />
-        <Block title="Records reviewed" text={props.sections.instruments.recordsReviewed} />
-        <Field label="Vineland completed by parent on" value={props.sections.instruments.vinelandCompletedDate} />
-        <Block title="Behavior Assessment (FAST)" text={props.sections.instruments.fastAssessment} />
-        <Block title="Autism Treatment Evaluation Checklist (ATEC)" text={props.sections.instruments.atecAssessment} />
-        <Block title="Observation 1" text={props.sections.instruments.observation1} />
-        <Block title="Observation 2" text={props.sections.instruments.observation2} />
-        <Block title="Preference Assessment" text={props.sections.instruments.preferenceAssessment} />
+                <PrintSection title="Instruments & Methods" pageBreak>
+                  <Block title="Family/caregiver(s) interview" text={props.sections.instruments.familyCaregiverInterview} />
+                  <Block title="Records reviewed" text={props.sections.instruments.recordsReviewed} />
+                  <Field label="Vineland completed by parent on" value={props.sections.instruments.vinelandCompletedDate} />
+                  <Block title="Behavior Assessment (FAST)" text={props.sections.instruments.fastAssessment} />
+                  <Block title="Autism Treatment Evaluation Checklist (ATEC)" text={props.sections.instruments.atecAssessment} />
+                  <Block title="Observation 1" text={props.sections.instruments.observation1} />
+                  <Block title="Observation 2" text={props.sections.instruments.observation2} />
+                  <Block title="Preference Assessment" text={props.sections.instruments.preferenceAssessment} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Present Levels of Performance</div>
-        {(['vineland', 'atec', 'fast'] as const).map((key) => (
-          <div key={key} className="section-block">
-            <p className="subheading">{key === 'vineland' ? 'Vineland' : key.toUpperCase()}</p>
-            {key === 'vineland' && (
-              <Field label="Date" value={props.sections.presentLevels.vineland.date} />
-            )}
-            <AttachmentImages
-              attachments={attachmentsFor(`present_levels.${key}`)}
-              urls={props.attachmentUrls}
-            />
-            <Block title="Interpretation" text={props.sections.presentLevels[key].interpretation} />
-          </div>
-        ))}
-        <AttachmentImages
-          attachments={attachmentsFor('present_levels.extra')}
-          urls={props.attachmentUrls}
-          label="Additional attachments"
-        />
+                <PrintSection title="Present Levels of Performance" pageBreak>
+                  {(['vineland', 'atec', 'fast'] as const).map((key) => (
+                    <div key={key} className="section-block">
+                      <p className="subheading">{key === 'vineland' ? 'Vineland' : key.toUpperCase()}</p>
+                      {key === 'vineland' && (
+                        <Field label="Date" value={props.sections.presentLevels.vineland.date} />
+                      )}
+                      <AttachmentImages
+                        attachments={attachmentsFor(`present_levels.${key}`)}
+                        urls={props.attachmentUrls}
+                      />
+                      <Block title="Interpretation" text={props.sections.presentLevels[key].interpretation} />
+                    </div>
+                  ))}
+                  <AttachmentImages
+                    attachments={attachmentsFor('present_levels.extra')}
+                    urls={props.attachmentUrls}
+                    label="Additional attachments"
+                  />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Environmental Barriers</div>
-        <Block text={props.sections.environmental.barriers} />
+                <PrintSection title="Environmental Barriers" pageBreak>
+                  <Block text={props.sections.environmental.barriers} />
+                </PrintSection>
 
-        <div className="section-band">Response to Treatment</div>
-        <Block text={props.sections.responseToTx.narrative} />
+                <PrintSection title="Response to Treatment">
+                  <Block text={props.sections.responseToTx.narrative} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">97155 Interventions & Barriers to Treatment</div>
-        <Block text={props.sections.interventions.narrative || INTERVENTIONS_97155_DEFAULT} />
+                <PrintSection title="97155 Interventions & Barriers to Treatment" pageBreak>
+                  <Block text={props.sections.interventions.narrative || INTERVENTIONS_97155_DEFAULT} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Functional Behavior Assessment & BIP</div>
-        {props.sections.behaviors.blocks.map((b, i) => (
-          <div key={b.id} className="section-block">
-            <p className="subheading">Behavior {i + 1}</p>
-            <Field label="Operational Definition" value={b.operationalDefinition} />
-            <Field label="Severity" value={b.severity} />
-            <Field label="Example" value={b.example} />
-            <Field label="Non-example" value={b.nonExample} />
-            <Field label="Hypothesized Function" value={b.hypothesizedFunction} />
-            <Field label="Onset" value={b.onset} />
-            <Field label="Offset" value={b.offset} />
-            <Field label="Measurement" value={b.measurement} />
-            <Block title="Baseline Measurement/Graph" text={b.baselineMeasurement} />
-            <AttachmentImages
-              attachments={attachmentsFor(`behaviors[${i}]`)}
-              urls={props.attachmentUrls}
-            />
-            <Block title="Intervention Plans" text={b.interventionPlans} />
-            <Block title="Prevention Strategies" text={b.preventionStrategies} />
-            <Block title="Replacement Strategies" text={b.replacementStrategies} />
-            <Block title="Response Strategies" text={b.responseStrategies} />
-            <Block title="Antecedents / Setting Events" text={b.antecedentsSettingEvents} />
-          </div>
-        ))}
+                <PrintSection title="Functional Behavior Assessment & BIP" pageBreak>
+                  {props.sections.behaviors.blocks.map((b, i) => (
+                    <div key={b.id} className="section-block">
+                      <p className="subheading">Behavior {i + 1}</p>
+                      <Field label="Operational Definition" value={b.operationalDefinition} />
+                      <Field label="Severity" value={b.severity} />
+                      <Field label="Example" value={b.example} />
+                      <Field label="Non-example" value={b.nonExample} />
+                      <Field label="Hypothesized Function" value={b.hypothesizedFunction} />
+                      <Field label="Onset" value={b.onset} />
+                      <Field label="Offset" value={b.offset} />
+                      <Field label="Measurement" value={b.measurement} />
+                      <Block title="Baseline Measurement/Graph" text={b.baselineMeasurement} />
+                      <AttachmentImages
+                        attachments={attachmentsFor(`behaviors[${i}]`)}
+                        urls={props.attachmentUrls}
+                      />
+                      <Block title="Intervention Plans" text={b.interventionPlans} />
+                      <Block title="Prevention Strategies" text={b.preventionStrategies} />
+                      <Block title="Replacement Strategies" text={b.replacementStrategies} />
+                      <Block title="Response Strategies" text={b.responseStrategies} />
+                      <Block title="Antecedents / Setting Events" text={b.antecedentsSettingEvents} />
+                    </div>
+                  ))}
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Treatment Goals</div>
-        <Block text={props.sections.goals.behaviorReduction.analysisNarrative} />
-        <GoalTableA title="Behavior Reduction Goals" rows={props.sections.goals.behaviorReduction.rows} />
-        <Block title="Current level of communication skills" text={props.sections.goals.communication.currentLevel} />
-        <GoalTableA title="Communication Goals" rows={props.sections.goals.communication.rows} />
-        <Block title="Current level of social skills" text={props.sections.goals.social.currentLevel} />
-        <GoalTableA title="Social Interaction & Social Communication Goals" rows={props.sections.goals.social.rows} />
-        <Block title="Current level of adaptive skills" text={props.sections.goals.adaptive.currentLevel} />
-        <GoalTableA title="Adaptive Skills" rows={props.sections.goals.adaptive.rows} />
-        <Block title="Current level of living / self-help skills" text={props.sections.goals.livingSelfHelp.currentLevel} />
-        <GoalTableA title="Living / Self-Help Skills" rows={props.sections.goals.livingSelfHelp.rows} />
+                <PrintSection title="Treatment Goals" pageBreak>
+                  <Block text={props.sections.goals.behaviorReduction.analysisNarrative} />
+                  <GoalTableA title="Behavior Reduction Goals" rows={props.sections.goals.behaviorReduction.rows} />
+                  <Block title="Current level of communication skills" text={props.sections.goals.communication.currentLevel} />
+                  <GoalTableA title="Communication Goals" rows={props.sections.goals.communication.rows} />
+                  <Block title="Current level of social skills" text={props.sections.goals.social.currentLevel} />
+                  <GoalTableA title="Social Interaction & Social Communication Goals" rows={props.sections.goals.social.rows} />
+                  <Block title="Current level of adaptive skills" text={props.sections.goals.adaptive.currentLevel} />
+                  <GoalTableA title="Adaptive Skills" rows={props.sections.goals.adaptive.rows} />
+                  <Block title="Current level of living / self-help skills" text={props.sections.goals.livingSelfHelp.currentLevel} />
+                  <GoalTableA title="Living / Self-Help Skills" rows={props.sections.goals.livingSelfHelp.rows} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Parent Training</div>
-        <Block text={props.sections.parentTraining.summaryNarrative} />
-        <GoalTableB title="Parent Training Goals" rows={props.sections.parentTraining.summaryGoals} />
-        <Block text={props.sections.parentTraining.groupClinicalRationale} />
-        <GoalTableB title="Group Parent Training Goals" rows={props.sections.parentTraining.groupGoals} />
-        <p className="prose-block">{GROUP_PARENT_TRAINING_GRAPHS_NOTE}</p>
+                <PrintSection title="Parent Training" pageBreak>
+                  <Block text={props.sections.parentTraining.summaryNarrative} />
+                  <GoalTableB title="Parent Training Goals" rows={props.sections.parentTraining.summaryGoals} />
+                  <Block text={props.sections.parentTraining.groupClinicalRationale} />
+                  <GoalTableB title="Group Parent Training Goals" rows={props.sections.parentTraining.groupGoals} />
+                  <p className="prose-block">{GROUP_PARENT_TRAINING_GRAPHS_NOTE}</p>
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Services Protocols & Details</div>
-        <Block text={props.sections.servicesProtocols.directionOfTechnician} />
-        <Block text={props.sections.servicesProtocols.coordinationOfCare} />
-        <Block title="Coordination contacts" text={props.sections.servicesProtocols.coordinationContacts} />
-        <Block text={props.sections.servicesProtocols.parentTraining} />
-        <Block text={props.sections.servicesProtocols.groupParentTraining} />
-        <Block text={props.sections.servicesProtocols.reAssessment} />
-        <Block text={props.sections.servicesProtocols.generalizationTransition} />
+                <PrintSection title="Services Protocols & Details" pageBreak>
+                  <Block text={props.sections.servicesProtocols.directionOfTechnician} />
+                  <Block text={props.sections.servicesProtocols.coordinationOfCare} />
+                  <Block title="Coordination contacts" text={props.sections.servicesProtocols.coordinationContacts} />
+                  <Block text={props.sections.servicesProtocols.parentTraining} />
+                  <Block text={props.sections.servicesProtocols.groupParentTraining} />
+                  <Block text={props.sections.servicesProtocols.reAssessment} />
+                  <Block text={props.sections.servicesProtocols.generalizationTransition} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Transition Plan</div>
-        <Block text={props.sections.transitionPlan.maintenanceGeneralization} />
-        <Block text={props.sections.transitionPlan.transitionPlanNarrative} />
-        <Block text={props.sections.transitionPlan.communicationCriteria} />
-        <Block text={props.sections.transitionPlan.socialCriteria} />
-        <TransitionTable rows={props.sections.transitionPlan.criteriaRows} />
-        <Block text={props.sections.transitionPlan.dischargeNarrative} />
+                <PrintSection title="Transition Plan" pageBreak>
+                  <Block text={props.sections.transitionPlan.maintenanceGeneralization} />
+                  <Block text={props.sections.transitionPlan.transitionPlanNarrative} />
+                  <Block text={props.sections.transitionPlan.communicationCriteria} />
+                  <Block text={props.sections.transitionPlan.socialCriteria} />
+                  <TransitionTable rows={props.sections.transitionPlan.criteriaRows} />
+                  <Block text={props.sections.transitionPlan.dischargeNarrative} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Coordination with Team</div>
-        <ContactBlock label="Speech Therapist" contact={props.sections.coordination.speechTherapist} />
-        <ContactBlock label="Occupational Therapist" contact={props.sections.coordination.occupationalTherapist} />
-        <ContactBlock label="Class teacher" contact={props.sections.coordination.classTeacher} />
-        <ContactBlock label="Physical Therapist" contact={props.sections.coordination.physicalTherapist} />
-        <ContactBlock label="Primary care provider" contact={props.sections.coordination.primaryCareProvider} />
-        <Block text={props.sections.coordination.treatmentPlanReview} />
+                <PrintSection title="Coordination with Team" pageBreak>
+                  <ContactBlock label="Speech Therapist" contact={props.sections.coordination.speechTherapist} />
+                  <ContactBlock label="Occupational Therapist" contact={props.sections.coordination.occupationalTherapist} />
+                  <ContactBlock label="Class teacher" contact={props.sections.coordination.classTeacher} />
+                  <ContactBlock label="Physical Therapist" contact={props.sections.coordination.physicalTherapist} />
+                  <ContactBlock label="Primary care provider" contact={props.sections.coordination.primaryCareProvider} />
+                  <Block text={props.sections.coordination.treatmentPlanReview} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Recommendations for Treatment</div>
-        <Block text={props.sections.recommendations.narrative} />
+                <PrintSection title="Recommendations for Treatment" pageBreak>
+                  <Block text={props.sections.recommendations.narrative} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Emergency Response / Crisis Plan</div>
-        <p className="subheading">Please check risk factors as applicable:</p>
-        {CRISIS_RISK_FACTOR_OPTIONS.map((key) => {
-          const checked = props.sections.crisisPlan.riskFactors[key as keyof typeof props.sections.crisisPlan.riskFactors]
-          return (
-            <p key={key} className="checkbox-line">
-              {checked ? '☒' : '☐'} {CRISIS_LABELS[key]}
-            </p>
-          )
-        })}
-        {props.sections.crisisPlan.riskFactors.other && props.sections.crisisPlan.riskFactors.otherText && (
-          <Field label="Other (specify)" value={props.sections.crisisPlan.riskFactors.otherText} />
-        )}
-        <Block text={CRISIS_ESCALATION_INSTRUCTIONS} />
+                <PrintSection title="Emergency Response / Crisis Plan" pageBreak>
+                  <p className="subheading">Please check risk factors as applicable:</p>
+                  {CRISIS_RISK_FACTOR_OPTIONS.map((key) => {
+                    const checked = props.sections.crisisPlan.riskFactors[key as keyof typeof props.sections.crisisPlan.riskFactors]
+                    return (
+                      <p key={key} className="checkbox-line">
+                        {checked ? '☒' : '☐'} {CRISIS_LABELS[key]}
+                      </p>
+                    )
+                  })}
+                  {props.sections.crisisPlan.riskFactors.other && props.sections.crisisPlan.riskFactors.otherText && (
+                    <Field label="Other (specify)" value={props.sections.crisisPlan.riskFactors.otherText} />
+                  )}
+                  <Block text={CRISIS_ESCALATION_INSTRUCTIONS} />
+                </PrintSection>
 
-        <div className="section-band section-block page-break-before">Signatures</div>
-        {SIGNATURE_BLOCKS.map(({ key, title, purpose }) => {
-          const sig = props.sections.signatures[key]
-          return (
-            <div key={key} className="signature-card">
-              <h4>{title}</h4>
-              <p className="signature-purpose">{purpose}</p>
-              <Field label="Name" value={sig.name} always />
-              <Field label="Credentials" value={sig.credentials || (key === 'bcba' ? 'BCBA/LBA' : undefined)} always />
-              {sig.signatureData ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={sig.signatureData} alt={`${title} signature`} className="signature-img" />
-              ) : (
-                <Field label="Signature (typed)" value={sig.signatureTypedName} always />
-              )}
-              <Field label="Date" value={sig.date} always />
-            </div>
-          )
-        })}
-      </div>
+                <PrintSection title="Signatures" pageBreak>
+                  {SIGNATURE_BLOCKS.map(({ key, title, purpose }) => {
+                    const sig = props.sections.signatures[key]
+                    return (
+                      <div key={key} className="signature-card">
+                        <h4>{title}</h4>
+                        <p className="signature-purpose">{purpose}</p>
+                        <Field label="Name" value={sig.name} always />
+                        <Field label="Credentials" value={sig.credentials || (key === 'bcba' ? 'BCBA/LBA' : undefined)} always />
+                        {sig.signatureData ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={sig.signatureData} alt={`${title} signature`} className="signature-img" />
+                        ) : (
+                          <Field label="Signature (typed)" value={sig.signatureTypedName} always />
+                        )}
+                        <Field label="Date" value={sig.date} always />
+                      </div>
+                    )
+                  })}
+                </PrintSection>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </>
+  )
+}
+
+function PrintSection({
+  title,
+  pageBreak,
+  children,
+}: {
+  title: string
+  pageBreak?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <section className={`print-section${pageBreak ? ' page-break-before' : ''}`}>
+      <div className="section-band">{title}</div>
+      {children}
+    </section>
   )
 }
 
