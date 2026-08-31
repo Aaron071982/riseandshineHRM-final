@@ -52,6 +52,8 @@ export type StaffMergeFields = {
   companyPhone: string
   companyEmail: string
   companyName: string
+  /** Internal care-team emails (BCBA, BTs, coordinator) for CASE_COORDINATION. */
+  teamStaffEmails: string[]
 }
 
 export type RenderedStaffEmail = {

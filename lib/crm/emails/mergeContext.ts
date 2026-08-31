@@ -181,6 +181,7 @@ export function buildStaffMergeFields(
 ): StaffMergeFields {
   const rbt = resolvePrimaryRbtContact(client, options?.rbtAssignmentId)
   const bcba = client.bcbaProfile
+  const teamStaffEmails = collectTeamStaffEmails(client)
 
   return {
     childFirstName: client.firstName,
@@ -221,7 +222,27 @@ export function buildStaffMergeFields(
     companyPhone: '888-898-4774',
     companyEmail: 'info@riseandshineaba.com',
     companyName: 'Rise & Shine ABA',
+    teamStaffEmails,
   }
+}
+
+function collectTeamStaffEmails(
+  client: NonNullable<Awaited<ReturnType<typeof loadStaffEmailMergeContext>>>
+): string[] {
+  const emails = new Set<string>()
+  const add = (email: string | null | undefined) => {
+    const e = email?.trim().toLowerCase()
+    if (e && e.includes('@')) emails.add(e)
+  }
+  add(client.bcbaProfile?.email)
+  add(client.caseCoordinatorUser?.email)
+  for (const a of client.scheduleAssignments) {
+    add(a.rbtProfile?.email)
+  }
+  for (const a of client.btAssignments) {
+    add(a.rbtProfile?.email)
+  }
+  return [...emails]
 }
 
 export function parseCcList(raw: string | null | undefined): string[] {

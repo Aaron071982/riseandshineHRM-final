@@ -5,6 +5,7 @@ import { renderBenefitsUpdate } from './benefitsUpdate'
 import { renderConsentRequest } from './consentRequest'
 import { renderDocsNeeded } from './docsNeeded'
 import { renderMeetAndGreet } from './meetAndGreet'
+import { renderCaseCoordination } from './caseCoordination'
 import { renderRbtAssigned } from './rbtAssigned'
 import { renderReadyForStaffing } from './readyForStaffing'
 import { renderScheduleConfirmed } from './scheduleConfirmed'
@@ -35,6 +36,7 @@ const RENDERERS: Partial<
   RBT_ASSIGNED: renderRbtAssigned,
   SCHEDULE_CONFIRMED: renderScheduleConfirmed,
   MEET_AND_GREET: renderMeetAndGreet,
+  CASE_COORDINATION: renderCaseCoordination,
   ...LEGACY_RENDERERS,
 }
 
@@ -106,6 +108,7 @@ export function staffTemplateLabel(template: CommTemplate): string {
     RBT_ASSIGNED: 'RBT assigned',
     SCHEDULE_CONFIRMED: 'Schedule confirmed',
     MEET_AND_GREET: 'Meet & greet',
+    CASE_COORDINATION: 'Case coordination (team)',
     CASE_COORDINATION_FORM: 'Case coordination form (legacy)',
     MANUAL: 'Manual / freeform',
     INQUIRY_ACK: 'Inquiry acknowledgment',

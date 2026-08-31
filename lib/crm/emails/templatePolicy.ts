@@ -13,6 +13,7 @@ export const STAFF_EMAIL_TEMPLATES: CommTemplate[] = [
   'RBT_ASSIGNED',
   'SCHEDULE_CONFIRMED',
   'MEET_AND_GREET',
+  'CASE_COORDINATION',
   'CASE_COORDINATION_FORM',
   'MANUAL',
 ]
@@ -25,6 +26,7 @@ const ROLE_TEMPLATES: Partial<Record<CrmRole, CommTemplate[]>> = {
   CASE_COORDINATION: [
     'CONSENT_REQUEST',
     'MEET_AND_GREET',
+    'CASE_COORDINATION',
     'SCHEDULE_CONFIRMED',
     'RBT_ASSIGNED',
   ],

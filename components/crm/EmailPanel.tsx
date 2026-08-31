@@ -171,7 +171,7 @@ export function EmailPanel({
       setTemplateAttachments(res.templateAttachments ?? [])
       if (!isManual) setSubject(res.subject)
       if (
-        template === 'MEET_AND_GREET' &&
+        (template === 'MEET_AND_GREET' || template === 'CASE_COORDINATION') &&
         !ccTouched &&
         res.suggestedCc?.length
       ) {

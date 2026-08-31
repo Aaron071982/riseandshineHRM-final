@@ -482,6 +482,9 @@ model User {
   treatmentAssessmentsCreated    ClientTreatmentAssessment[] @relation("TreatmentAssessmentCreatedBy")
   treatmentAssessmentsUpdated    ClientTreatmentAssessment[] @relation("TreatmentAssessmentUpdatedBy")
   treatmentAssessmentAttachmentsUploaded ClientTreatmentAssessmentAttachment[] @relation("TreatmentAssessmentAttachmentUploadedBy")
+  caseCoordinationsCreated       ClientCaseCoordination[] @relation("CaseCoordinationCreatedBy")
+  caseCoordinationsUpdated       ClientCaseCoordination[] @relation("CaseCoordinationUpdatedBy")
+  caseCoordinationsConfirmed     ClientCaseCoordination[] @relation("CaseCoordinationConfirmedBy")
   clientCommunicationsDeleted  ClientCommunication[]     @relation("ClientCommunicationDeletedBy")
   clientAlertsDeleted          ClientAlert[]             @relation("ClientAlertDeletedBy")
   serviceClientNotesDeleted    ServiceClientNote[]       @relation("ServiceClientNoteDeletedBy")
@@ -2748,6 +2751,8 @@ enum CommTemplate {
   SCHEDULE_CONFIRMED
   SERVICES_STARTED
   MEET_AND_GREET
+  /// Internal team assignment letter (BCBA, BTs, coordinator).
+  CASE_COORDINATION
   /// Retired from compose UI; kept so prod `db push` does not drop the PG enum value.
   CC_INTRODUCTION
   CASE_COORDINATION_FORM
@@ -3028,6 +3033,7 @@ model ServiceClient {
   authorizationTemplates ClientAuthorizationTemplate[]
   clinicalAssessments    ClientClinicalAssessment[]
   treatmentAssessments   ClientTreatmentAssessment[]
+  caseCoordinations      ClientCaseCoordination[]
 
   @@index([status])
   @@index([stage])
@@ -3551,6 +3557,36 @@ enum TreatmentAssessmentStatus {
 enum TreatmentAssessmentSource {
   FORM
   UPLOAD
+}
+
+enum CaseCoordinationStatus {
+  DRAFT
+  CONFIRMED
+}
+
+model ClientCaseCoordination {
+  id                String                  @id @default(cuid())
+  serviceClientId   String                  @map("service_client_id")
+  status            CaseCoordinationStatus  @default(DRAFT)
+  overrides         Json?
+  confirmedByUserId String?                 @map("confirmed_by")
+  confirmedAt       DateTime?               @map("confirmed_at")
+  pdfPath           String?                 @map("pdf_path")
+  createdByUserId   String                  @map("created_by")
+  updatedByUserId   String?                 @map("updated_by")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+  deletedAt         DateTime?               @map("deleted_at")
+
+  serviceClient   ServiceClient @relation(fields: [serviceClientId], references: [id], onDelete: Cascade)
+  createdByUser   User          @relation("CaseCoordinationCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedByUser   User?         @relation("CaseCoordinationUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  confirmedByUser User?         @relation("CaseCoordinationConfirmedBy", fields: [confirmedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([serviceClientId])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("case_coordination")
 }
 
 model ClientTreatmentAssessment {

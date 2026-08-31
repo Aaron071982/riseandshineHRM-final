@@ -129,6 +129,11 @@ describe('lib/crm/emails/templates branded render', () => {
     companyPhone: '888-898-4774',
     companyEmail: 'info@riseandshineaba.com',
     companyName: 'Rise & Shine ABA',
+    teamStaffEmails: [
+      'sam@riseandshineaba.com',
+      'pat@riseandshineaba.com',
+      'jordan@riseandshineaba.com',
+    ],
   }
 
   it('WELCOME uses v1 packet voice and Dear greeting', () => {

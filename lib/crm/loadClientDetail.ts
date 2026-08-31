@@ -37,6 +37,8 @@ import {
   hasCompletedTreatmentAssessment,
   listTreatmentAssessments,
 } from '@/lib/crm/assessment/load'
+import { canViewCaseCoordination } from '@/lib/crm/caseCoordination/access'
+import { loadCaseCoordinationPanelData } from '@/lib/crm/caseCoordination/actions'
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
@@ -227,6 +229,11 @@ export async function loadClientCrmDetail(clientId: string) {
     hasAssessmentOnFile = await hasCompletedTreatmentAssessment(clientId)
   }
 
+  const caseCoordinationVisible = canViewCaseCoordination(user)
+  const caseCoordination = caseCoordinationVisible
+    ? await loadCaseCoordinationPanelData(clientId)
+    : null
+
   return {
     user,
     client,
@@ -263,6 +270,15 @@ export async function loadClientCrmDetail(clientId: string) {
           canUpload: canUploadTreatmentAssessmentFiles(user),
           hasAssessmentOnFile,
           assessments: treatmentAssessments,
+        }
+      : { canView: false },
+    caseCoordination: caseCoordinationVisible
+      ? {
+          canView: true,
+          canEdit: caseCoordination?.canEdit ?? false,
+          canConfirm: caseCoordination?.canConfirm ?? false,
+          record: caseCoordination?.record ?? null,
+          document: caseCoordination?.document ?? null,
         }
       : { canView: false },
   }

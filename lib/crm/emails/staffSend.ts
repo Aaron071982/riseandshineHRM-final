@@ -22,6 +22,8 @@ import {
   mergeCcLists,
   parseCcList,
 } from '@/lib/crm/emails/mergeContext'
+import { caseCoordinationTeamCcEmails } from '@/lib/crm/emails/templates/caseCoordination'
+import { auditCaseCoordinationAction } from '@/lib/crm/caseCoordination/audit'
 import { buildMissingDocsList } from '@/lib/crm/emails/missingDocs'
 import { renderStaffEmail } from '@/lib/crm/emails/templates'
 import type { AssessmentModality } from '@/lib/crm/emails/templates/types'
@@ -301,7 +303,11 @@ export async function previewStaffClientEmail(
       client.consent && !client.consent.deletedAt ? client.consent : null
     ),
     suggestedCc:
-      input.template === 'MEET_AND_GREET' ? meetAndGreetCcEmails(fields) : [],
+      input.template === 'MEET_AND_GREET'
+        ? meetAndGreetCcEmails(fields)
+        : input.template === 'CASE_COORDINATION'
+          ? caseCoordinationTeamCcEmails(fields)
+          : [],
     templateAttachments: formMetas,
   }
 }
@@ -374,7 +380,11 @@ export async function sendStaffClientEmail(
   )
 
   const autoCc =
-    input.template === 'MEET_AND_GREET' ? meetAndGreetCcEmails(fields) : []
+    input.template === 'MEET_AND_GREET'
+      ? meetAndGreetCcEmails(fields)
+      : input.template === 'CASE_COORDINATION'
+        ? caseCoordinationTeamCcEmails(fields)
+        : []
   const ccList = mergeCcLists(parseCcList(input.cc), autoCc)
   for (const cc of ccList) {
     if (!isValidEmail(cc)) {
@@ -579,6 +589,14 @@ export async function sendStaffClientEmail(
     serviceClientId: clientId,
     action: `EMAIL_SEND:${input.template}${extras}:TO:${to}`,
   })
+
+  if (input.template === 'CASE_COORDINATION') {
+    await auditCaseCoordinationAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: `EMAIL_SEND:full PHI disclosure — recipients:${mergeCcLists([to], ccList).join(',')}`,
+    })
+  }
 
   return { status: 'SENT', communicationId: row.id }
 }

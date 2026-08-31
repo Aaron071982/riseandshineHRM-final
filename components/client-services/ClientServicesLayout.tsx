@@ -181,6 +181,7 @@ export default function ClientServicesLayout({
             ]
 
   const onAssessmentPrint = /\/assessments\/[^/]+\/print\/?$/.test(pathname)
+  const onCaseCoordinationPrint = /\/case-coordination\/[^/]+\/print\/?$/.test(pathname)
 
   if (!elevated) {
     return (
@@ -190,7 +191,7 @@ export default function ClientServicesLayout({
     )
   }
 
-  if (onAssessmentPrint) {
+  if (onAssessmentPrint || onCaseCoordinationPrint) {
     return <div className="min-h-screen bg-[var(--bg)]">{children}</div>
   }
 
