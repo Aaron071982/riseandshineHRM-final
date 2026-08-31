@@ -12,6 +12,7 @@ import {
   isStoredRequirementPath,
   requirementDownloadFileName,
 } from '@/lib/crm/requirementDocuments'
+import { buildContentDisposition } from '@/lib/http/contentDisposition'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest, context: Ctx) {
     const wantInline =
       request.nextUrl.searchParams.get('inline') === '1' ||
       request.nextUrl.searchParams.get('preview') === '1'
-    const disposition = wantInline ? 'inline' : 'attachment'
+    const dispositionType = wantInline ? 'inline' : 'attachment'
 
     await auditClientAction({
       userId: user.id,
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest, context: Ctx) {
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         'Content-Type': requirement.fileContentType || contentType,
-        'Content-Disposition': `${disposition}; filename="${downloadName.replace(/"/g, '')}"`,
+        'Content-Disposition': buildContentDisposition(dispositionType, downloadName),
         'Content-Length': bytes.length.toString(),
         'Cache-Control': 'private, no-store',
       },

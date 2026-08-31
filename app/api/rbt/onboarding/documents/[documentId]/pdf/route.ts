@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { resolveOnboardingPdfBytes } from '@/lib/onboarding/provision'
+import { buildContentDisposition } from '@/lib/http/contentDisposition'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,12 +36,12 @@ export async function GET(
 
     const filename = `${doc.slug || 'document'}.pdf`
     const download = request.nextUrl.searchParams.get('download') === '1'
-    const disposition = download ? 'attachment' : 'inline'
+    const dispositionType = download ? 'attachment' : 'inline'
 
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `${disposition}; filename="${filename.replace(/"/g, '')}"`,
+        'Content-Disposition': buildContentDisposition(dispositionType, filename),
         'Content-Length': buf.length.toString(),
         'Cache-Control': 'private, no-store',
       },

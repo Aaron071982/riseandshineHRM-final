@@ -12,6 +12,7 @@ import { assertCanViewClinicalAssessment } from '@/lib/crm/clinicalAssessment/ac
 import { artifactDownloadLabel } from '@/lib/crm/clinicalAssessment/artifacts.shared'
 import { wrapClinicalAssessmentDownload } from '@/lib/crm/clinicalAssessment/brandedDownload'
 import { downloadClinicalAssessmentArtifact } from '@/lib/crm/clinicalAssessment/storage'
+import { buildContentDisposition } from '@/lib/http/contentDisposition'
 import { prisma } from '@/lib/prisma'
 import { NOT_DELETED } from '@/lib/crm/softDelete'
 
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest, context: Ctx) {
     })
 
     const downloadName = `${artifactDownloadLabel(artifact.artifactType)}_v${artifact.assessment.versionNumber}.pdf`
-    const disposition = wantInline ? 'inline' : 'attachment'
+    const dispositionType = wantInline ? 'inline' : 'attachment'
 
     await auditClientAction({
       userId: user.id,
@@ -89,7 +90,7 @@ export async function GET(request: NextRequest, context: Ctx) {
     return new NextResponse(new Uint8Array(wrapped.bytes), {
       headers: {
         'Content-Type': wrapped.contentType,
-        'Content-Disposition': `${disposition}; filename="${downloadName.replace(/"/g, '')}"`,
+        'Content-Disposition': buildContentDisposition(dispositionType, downloadName),
         'Content-Length': wrapped.bytes.length.toString(),
         'Cache-Control': 'private, no-store',
       },

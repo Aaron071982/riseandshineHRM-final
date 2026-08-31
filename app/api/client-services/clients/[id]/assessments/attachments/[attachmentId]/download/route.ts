@@ -7,6 +7,7 @@ import {
 } from '@/lib/crm/access'
 import { assertCanViewTreatmentAssessment } from '@/lib/crm/assessment/access'
 import { downloadAssessmentFile } from '@/lib/crm/assessment/storage'
+import { buildContentDisposition } from '@/lib/http/contentDisposition'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -39,14 +40,15 @@ export async function GET(request: NextRequest, context: Ctx) {
 
     const { bytes, contentType } = await downloadAssessmentFile(attachment.storagePath)
     const download = request.nextUrl.searchParams.get('download') === '1'
-    const disposition = download
-      ? `attachment; filename="${attachment.fileName.replace(/"/g, '')}"`
-      : 'inline'
+    const dispositionType = download ? 'attachment' : 'inline'
 
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': disposition,
+        'Content-Disposition': buildContentDisposition(
+          dispositionType,
+          attachment.fileName
+        ),
         'Cache-Control': 'private, no-store',
       },
     })

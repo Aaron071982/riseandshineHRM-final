@@ -8,6 +8,7 @@ import {
 import { assertCanViewTreatmentAssessment } from '@/lib/crm/assessment/access'
 import { downloadAssessmentFile } from '@/lib/crm/assessment/storage'
 import { UPLOADED_PDF_SECTION_KEY } from '@/lib/crm/assessment/storagePaths'
+import { buildContentDisposition } from '@/lib/http/contentDisposition'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest, context: Ctx) {
       return new NextResponse(new Uint8Array(bytes), {
         headers: {
           'Content-Type': contentType,
-          'Content-Disposition': `attachment; filename="${pdf.fileName.replace(/"/g, '')}"`,
+          'Content-Disposition': buildContentDisposition('attachment', pdf.fileName),
           'Cache-Control': 'private, no-store',
         },
       })

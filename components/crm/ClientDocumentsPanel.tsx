@@ -9,6 +9,7 @@ import {
   DOCUMENT_GROUP_ORDER,
 } from '@/lib/crm/documents'
 import { isStoredRequirementPath } from '@/lib/crm/requirementDocuments.shared'
+import { parseContentDispositionFileName } from '@/lib/http/contentDisposition'
 import { STAGE_LABELS } from '@/lib/crm/stages'
 import { cn } from '@/lib/utils'
 
@@ -144,10 +145,9 @@ export function ClientDocumentsPanel({
     }
     const blob = await res.blob()
     const disposition = res.headers.get('Content-Disposition')
-    const match = disposition?.match(/filename="?([^";]+)"?/)
     return {
       blob,
-      fileName: match?.[1] ?? null,
+      fileName: parseContentDispositionFileName(disposition),
       contentType: res.headers.get('Content-Type'),
     }
   }

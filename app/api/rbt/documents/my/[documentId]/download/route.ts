@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { supabaseAdmin, RESUMES_STORAGE_BUCKET, STORAGE_BUCKET } from '@/lib/supabase'
+import { buildContentDisposition } from '@/lib/http/contentDisposition'
 
 export async function GET(
   _request: NextRequest,
@@ -49,7 +50,7 @@ export async function GET(
     return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': document.fileType,
-        'Content-Disposition': `attachment; filename="${document.fileName}"`,
+        'Content-Disposition': buildContentDisposition('attachment', document.fileName),
         'Content-Length': fileBuffer.length.toString(),
       },
     })

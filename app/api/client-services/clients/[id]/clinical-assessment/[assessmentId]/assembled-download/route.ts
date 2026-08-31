@@ -11,6 +11,7 @@ import {
 import { assertCanViewClinicalAssessment } from '@/lib/crm/clinicalAssessment/access'
 import { buildAssembledClinicalAssessmentPdf } from '@/lib/crm/clinicalAssessment/assembledDownload'
 import { mapAssessmentDetailsRow } from '@/lib/crm/clinicalAssessment/details.shared'
+import { buildContentDisposition } from '@/lib/http/contentDisposition'
 import { prisma } from '@/lib/prisma'
 import { NOT_DELETED } from '@/lib/crm/softDelete'
 
@@ -72,13 +73,13 @@ export async function GET(request: NextRequest, context: Ctx) {
     })
 
     const wantInline = request.nextUrl.searchParams.get('inline') === '1'
-    const disposition = wantInline ? 'inline' : 'attachment'
+    const dispositionType = wantInline ? 'inline' : 'attachment'
     const fileName = `Clinical_Assessment_v${assessment.versionNumber}_${client.clientCode}.pdf`
 
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `${disposition}; filename="${fileName.replace(/"/g, '')}"`,
+        'Content-Disposition': buildContentDisposition(dispositionType, fileName),
         'Content-Length': bytes.length.toString(),
         'Cache-Control': 'private, no-store',
       },
