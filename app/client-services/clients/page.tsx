@@ -1,16 +1,12 @@
 import { Suspense } from 'react'
-import { cookies } from 'next/headers'
-import { validateSession } from '@/lib/auth'
-import { isClientServicesFullAccessEmail } from '@/lib/client-services/constants'
+import { getClientServicesPageUser, canCreateServiceClient } from '@/lib/crm/access'
 import CaseloadPageClient from '@/components/crm/CaseloadPageClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ClientServicesCaseloadPage() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('session')?.value
-  const user = token ? await validateSession(token) : null
-  const canImport = isClientServicesFullAccessEmail(user?.email)
+  const user = await getClientServicesPageUser()
+  const canCreate = user ? canCreateServiceClient(user) : false
 
   return (
     <Suspense
@@ -20,7 +16,7 @@ export default async function ClientServicesCaseloadPage() {
         </div>
       }
     >
-      <CaseloadPageClient canCreate={canImport} />
+      <CaseloadPageClient canCreate={canCreate} />
     </Suspense>
   )
 }

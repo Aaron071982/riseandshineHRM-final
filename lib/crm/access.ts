@@ -102,6 +102,21 @@ export function isFullAccess(user: CrmAccessSubject): boolean {
   return isClientServicesFullAccessEmail(user.email)
 }
 
+/** Create clients at INQUIRY — intake staff, management, super-admin, or break-glass allowlist. */
+export function canCreateServiceClient(user: CrmAccessSubject): boolean {
+  if (isFullAccess(user)) return true
+  return getUserCrmRoles(user).includes('INTAKE')
+}
+
+export function assertCanCreateServiceClient(user: CrmAccessSubject): void {
+  if (!canCreateServiceClient(user)) {
+    throw new CrmAccessError(
+      'Intake or management access required to create clients',
+      403
+    )
+  }
+}
+
 /** Department CrmRoles the user holds (excludes SUPER_ADMIN / MANAGEMENT). */
 export function getUserDepartments(user: CrmAccessSubject): CrmRole[] {
   return getUserCrmRoles(user).filter((r) =>

@@ -24,6 +24,7 @@ import { parseCalendarDate } from '@/lib/billing/calendarDate'
 import { prisma } from '@/lib/prisma'
 import { writeAuditLog } from '@/lib/audit'
 import {
+  assertCanCreateServiceClient,
   assertCanEditClient,
   auditClientAction,
   CrmAccessError,
@@ -520,9 +521,7 @@ export async function createServiceClient(
 ): Promise<ActionResult<{ id: string; clientCode: string }>> {
   try {
     const user = await getClientServicesUser()
-    if (!isFullAccess(user)) {
-      throw new CrmAccessError('Full access required to create clients', 403)
-    }
+    assertCanCreateServiceClient(user)
 
     const firstName = input.firstName?.trim()
     const lastName = input.lastName?.trim()

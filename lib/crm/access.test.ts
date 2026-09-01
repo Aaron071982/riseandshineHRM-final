@@ -4,6 +4,7 @@ import {
   canAccessCrmSchedule,
   canActAsOwningDepartment,
   canAccessDepartment,
+  canCreateServiceClient,
   canEditClientRecord,
   canViewClientRecord,
   getUserDepartments,
@@ -65,6 +66,19 @@ describe('lib/crm/access Phase 17 claim-scoped', () => {
   it('MANAGEMENT role is full-access without allowlist', () => {
     expect(isFullAccess(management)).toBe(true)
     expect(getVisibleClientsWhere(management)).toEqual({ deletedAt: null })
+    expect(canCreateServiceClient(management)).toBe(true)
+  })
+
+  it('INTAKE can create clients without full caseload access', () => {
+    expect(isFullAccess(intakeOnly)).toBe(false)
+    expect(canCreateServiceClient(intakeOnly)).toBe(true)
+  })
+
+  it('department roles without intake cannot create clients', () => {
+    expect(canCreateServiceClient(coordinator)).toBe(false)
+    expect(canCreateServiceClient(staffing)).toBe(false)
+    expect(canCreateServiceClient(noAccess)).toBe(false)
+    expect(canCreateServiceClient(allowlisted)).toBe(true)
   })
 
   it('SUPER_ADMIN CRM role is super-admin and full-access', () => {
