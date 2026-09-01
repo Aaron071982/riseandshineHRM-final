@@ -12,6 +12,7 @@ import {
   sortRbtOnboardingSteps,
 } from '@/lib/onboarding/catalog'
 import { listAssignedModulesForUser } from '@/lib/org-training/load'
+import { rethrowIfNextControlFlow } from '@/lib/crm/access'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -73,6 +74,7 @@ export default async function RBTDashboardPage() {
   try {
     return await RBTDashboardPageInner()
   } catch (error) {
+    rethrowIfNextControlFlow(error)
     logError('Unexpected error in RBT dashboard', error)
     return (
       <div className="container mx-auto p-6 max-w-4xl">
@@ -233,11 +235,15 @@ async function RBTDashboardPageInner() {
   const expectedTaskCount = needsFortyHourCourse ? 8 : 7
 
   if (rbtProfileForTasks?.status === 'HIRED' && user.rbtProfileId && onboardingTasks.length > 0) {
-    await ensureSocialSecurityOnboardingTask(prisma, user.rbtProfileId)
-    onboardingTasks = await prisma.onboardingTask.findMany({
-      where: { rbtProfileId: user.rbtProfileId },
-      orderBy: { sortOrder: 'asc' },
-    })
+    try {
+      await ensureSocialSecurityOnboardingTask(prisma, user.rbtProfileId)
+      onboardingTasks = await prisma.onboardingTask.findMany({
+        where: { rbtProfileId: user.rbtProfileId },
+        orderBy: { sortOrder: 'asc' },
+      })
+    } catch (error) {
+      logError('Failed to ensure Social Security onboarding task', error)
+    }
   }
 
   const hasFortyHourTask = onboardingTasks.some((t) => t.taskType === 'FORTY_HOUR_COURSE_CERTIFICATE')

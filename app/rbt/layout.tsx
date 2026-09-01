@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { rethrowIfNextControlFlow } from '@/lib/crm/access'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,6 +48,7 @@ export default async function RBTLayoutWrapper({
       </RBTLayout>
     )
   } catch (e) {
+    rethrowIfNextControlFlow(e)
     console.error('RBT layout: session validation failed', e)
     redirect('/')
   }
