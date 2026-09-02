@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, isAdmin } from '@/lib/auth'
+import { MCP_OAUTH_SCOPE_STRING } from '@/lib/mcp/scopes'
 import {
   AUTH_CODE_TTL_SECONDS,
   generateSecureToken,
-  MCP_OAUTH_SCOPE,
 } from '@/lib/oauth/crypto'
 import { clientAllowsRedirectUri } from '@/lib/oauth/redirect'
 import { logOAuthEvent } from '@/lib/oauth/audit'
@@ -27,7 +27,7 @@ function parseAuthorizeParams(request: NextRequest): AuthorizeParams | { error: 
   const clientId = sp.get('client_id') ?? ''
   const redirectUri = sp.get('redirect_uri') ?? ''
   const responseType = sp.get('response_type') ?? ''
-  const scope = sp.get('scope') ?? MCP_OAUTH_SCOPE
+  const scope = sp.get('scope') ?? MCP_OAUTH_SCOPE_STRING
   const state = sp.get('state') ?? ''
   const codeChallenge = sp.get('code_challenge') ?? ''
   const codeChallengeMethod = sp.get('code_challenge_method') ?? ''
@@ -65,6 +65,7 @@ function consentHtml(params: AuthorizeParams, clientName: string): string {
     code_challenge_method: params.codeChallengeMethod,
   })
   const scopes = params.scope.split(/\s+/).filter(Boolean)
+  const includesPhi = scopes.includes('mcp:phi')
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -77,6 +78,7 @@ function consentHtml(params: AuthorizeParams, clientName: string): string {
     h1 { font-size: 1.25rem; margin-bottom: 8px; }
     p { color: #444; line-height: 1.5; }
     ul { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; }
+    .phi { background: #fef6f6; border-color: #fecaca; }
     .actions { display: flex; gap: 12px; margin-top: 24px; }
     button { flex: 1; padding: 12px 16px; border-radius: 8px; font-size: 1rem; cursor: pointer; border: none; }
     .approve { background: #e36f1e; color: #fff; }
@@ -88,10 +90,19 @@ function consentHtml(params: AuthorizeParams, clientName: string): string {
   <p><strong>${escapeHtml(clientName)}</strong> is requesting access to your Rise &amp; Shine HRM.</p>
   <p>This will allow Claude to:</p>
   <ul>
-    <li>Read HRM data (onboarding status, pipeline stats, BT lookups)</li>
-    <li>Add internal notes to profiles (only after you confirm each note)</li>
+    <li>Read HR pipeline data (onboarding status, BT lookups, idle hires)</li>
+    <li>Add internal notes to BT profiles (only after you confirm each note)</li>
   </ul>
-  <p>Scopes: ${escapeHtml(scopes.join(', ') || MCP_OAUTH_SCOPE)}</p>
+  ${
+    includesPhi
+      ? `<ul class="phi">
+    <li><strong>Client PHI (mcp:phi):</strong> read client names, service addresses, schedules, assessment/doc status, staffing needs, and related CRM metadata</li>
+    <li>Write client staffing flags and client notes when you explicitly confirm</li>
+  </ul>
+  <p><strong>Client data will be sent to Claude on each relevant tool call.</strong> Only approve if you accept this for your account.</p>`
+      : ''
+  }
+  <p>Scopes: ${escapeHtml(scopes.join(', ') || MCP_OAUTH_SCOPE_STRING)}</p>
   <form method="post" action="/api/oauth/authorize?${q.toString()}">
     <div class="actions">
       <button type="submit" name="decision" value="approve" class="approve">Approve</button>
@@ -212,7 +223,7 @@ export async function POST(request: NextRequest) {
       redirectUri: parsed.redirectUri,
       codeChallenge: parsed.codeChallenge,
       codeChallengeMethod: parsed.codeChallengeMethod,
-      scope: parsed.scope || MCP_OAUTH_SCOPE,
+      scope: parsed.scope || MCP_OAUTH_SCOPE_STRING,
       expiresAt,
       approvedByUserId: user.id,
     },

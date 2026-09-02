@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { requireClientServicesSession } from '@/lib/client-services/access'
 import { auditClientAction, canAccessDepartment } from '@/lib/crm/access'
-import { geocodeServiceClientsMissingCoords } from '@/lib/crm/therapistClientMap/geocodeClients'
+import { refreshMapGeocodes } from '@/lib/crm/therapistClientMap/geocodeClients'
 
 export const maxDuration = 300
 
 /**
  * POST /api/client-services/clients/geocode-all
- * Batch-geocode LIVE service clients with addresses but no cached lat/lng.
+ * Refresh map pins: invalidate bad coordinates, then geocode clients + therapists.
  */
 export async function POST() {
   const auth = await requireClientServicesSession()
@@ -22,16 +22,16 @@ export async function POST() {
   }
 
   try {
-    const result = await geocodeServiceClientsMissingCoords()
+    const result = await refreshMapGeocodes()
 
     await auditClientAction({
       userId: user.id,
-      action: `CLIENT_GEOCODE_ALL:geocoded=${result.geocoded}:failed=${result.failed}`,
+      action: `MAP_GEOCODE_REFRESH:clients=${result.clients.geocoded}:therapists=${result.therapists.geocoded}:invalidated=${result.clients.invalidated + result.therapists.invalidated}`,
     })
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error('[client-geocode-all]', error)
-    return NextResponse.json({ error: 'Client geocode batch failed' }, { status: 500 })
+    console.error('[map-geocode-refresh]', error)
+    return NextResponse.json({ error: 'Map geocode refresh failed' }, { status: 500 })
   }
 }

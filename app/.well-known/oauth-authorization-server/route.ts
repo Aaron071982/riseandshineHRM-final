@@ -1,3 +1,4 @@
+import { MCP_OAUTH_SCOPES } from '@/lib/mcp/scopes'
 import { oauthEndpoints } from '@/lib/oauth/crypto'
 import { logOAuthRoute, oauthJsonResponse, oauthOptionsResponse } from '@/lib/oauth/http'
 
@@ -19,6 +20,7 @@ export async function GET() {
     grant_types_supported: ['authorization_code'],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
+    scopes_supported: [...MCP_OAUTH_SCOPES],
   }
   logOAuthRoute('authorization-server', { method: 'GET', issuer: body.issuer })
   return oauthJsonResponse(body)

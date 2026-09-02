@@ -13,7 +13,8 @@
  *   - Bulk operations
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { assertMcpAuth } from '@/lib/mcp-auth'
+import { resolveMcpAuth } from '@/lib/mcp-auth'
+import { runWithMcpAuth } from '@/lib/mcp/context'
 import { handleMcpProtocolRequest } from '@/lib/mcp/httpHandler'
 import { logMcpRequest, oauthOptionsResponse, withCors } from '@/lib/oauth/http'
 
@@ -35,16 +36,18 @@ async function withCorsResponse(response: Response): Promise<Response> {
 }
 
 async function handleMcpRequest(request: NextRequest): Promise<Response> {
-  const denied = await assertMcpAuth(request)
-  if (denied) {
+  const authResult = await resolveMcpAuth(request)
+  if ('error' in authResult) {
     logMcpRequest(request, 'unauthorized')
-    return denied
+    return authResult.error
   }
 
   logMcpRequest(request, 'authorized')
 
   try {
-    const response = await handleMcpProtocolRequest(request)
+    const response = await runWithMcpAuth(authResult.context, () =>
+      handleMcpProtocolRequest(request)
+    )
     return withCorsResponse(response)
   } catch (err) {
     console.error('[mcp] request failed:', err)

@@ -1,4 +1,13 @@
 import { logMcpToolCall } from '@/lib/mcp/audit'
+import { requireMcpAuthContext } from '@/lib/mcp/context'
+import {
+  checkToolScopeAccess,
+  scopeDenialMessage,
+} from '@/lib/mcp/scopes'
+import {
+  isImplementedMcpTool,
+  type McpV1ToolName,
+} from '@/lib/mcp/toolNames'
 import { addCandidateNote } from '@/lib/mcp/tools/addCandidateNote'
 import { findIdleHires } from '@/lib/mcp/tools/findIdleHires'
 import { getOnboardingStatus } from '@/lib/mcp/tools/getOnboardingStatus'
@@ -6,15 +15,8 @@ import { getPipelineStats } from '@/lib/mcp/tools/getPipelineStats'
 import { lookupBt } from '@/lib/mcp/tools/lookupBt'
 import type { ToolResult } from '@/lib/mcp/types'
 
-export const MCP_TOOL_NAMES = [
-  'get_onboarding_status',
-  'get_pipeline_stats',
-  'find_idle_hires',
-  'lookup_bt',
-  'add_candidate_note',
-] as const
-
-export type McpToolName = (typeof MCP_TOOL_NAMES)[number]
+export { MCP_V1_TOOL_NAMES as MCP_TOOL_NAMES } from '@/lib/mcp/toolNames'
+export type { McpV1ToolName as McpToolName } from '@/lib/mcp/toolNames'
 
 export const MCP_TOOL_DEFINITIONS = [
   {
@@ -85,7 +87,10 @@ export const MCP_TOOL_DEFINITIONS = [
   },
 ] as const
 
-async function executeTool(name: McpToolName, args: Record<string, unknown>): Promise<ToolResult> {
+async function executeTool(
+  name: McpV1ToolName,
+  args: Record<string, unknown>
+): Promise<ToolResult> {
   switch (name) {
     case 'get_onboarding_status':
       return getOnboardingStatus({
@@ -112,17 +117,59 @@ export async function callMcpTool(
   name: string,
   args: Record<string, unknown> = {}
 ): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
-  if (!MCP_TOOL_NAMES.includes(name as McpToolName)) {
-    throw new Error(`Tool not allowed: ${name}`)
+  const auth = requireMcpAuthContext()
+
+  const access = checkToolScopeAccess({
+    toolName: name,
+    grantedScopes: auth.scopes,
+    authMethod: auth.method,
+  })
+  if (!access.allowed) {
+    const message = scopeDenialMessage(access.reason)
+    await logMcpToolCall({
+      toolName: name,
+      args,
+      resultSummary: { error: true, reason: access.reason },
+      authMethod: auth.method,
+      clientId: auth.clientId,
+      tokenHashPrefix: auth.tokenHash?.slice(0, 8),
+    })
+    return {
+      content: [{ type: 'text', text: `Error: ${message}` }],
+      isError: true,
+    }
   }
 
-  const toolName = name as McpToolName
+  if (!isImplementedMcpTool(name)) {
+    const message = `Tool not implemented yet: ${name}`
+    await logMcpToolCall({
+      toolName: name,
+      args,
+      resultSummary: { error: true, message },
+      authMethod: auth.method,
+      clientId: auth.clientId,
+      tokenHashPrefix: auth.tokenHash?.slice(0, 8),
+    })
+    return {
+      content: [{ type: 'text', text: `Error: ${message}` }],
+      isError: true,
+    }
+  }
+
+  const toolName = name
+  const auditMeta = {
+    authMethod: auth.method,
+    clientId: auth.clientId,
+    tokenHashPrefix: auth.tokenHash?.slice(0, 8),
+  }
+
   try {
     const result = await executeTool(toolName, args)
     await logMcpToolCall({
       toolName,
       args,
       resultSummary: result.summary,
+      ...auditMeta,
     })
     return {
       content: [{ type: 'text', text: result.text }],
@@ -133,6 +180,7 @@ export async function callMcpTool(
       toolName,
       args,
       resultSummary: { error: true, message },
+      ...auditMeta,
     })
     return {
       content: [{ type: 'text', text: `Error: ${message}` }],

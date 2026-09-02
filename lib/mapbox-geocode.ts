@@ -3,6 +3,9 @@
  * Uses Geocoding v5 mapbox.places endpoint.
  */
 
+import { getStateBboxParam } from '@/lib/crm/therapistClientMap/coverageStates'
+import { validateMapCoordinates } from '@/lib/crm/therapistClientMap/coordinateValidation'
+
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? ''
 
 const US_LAT_MIN = 24
@@ -89,7 +92,9 @@ export async function geocodeAddressWithFallbacks(
     const query = parts.join(', ').trim()
     if (!query) continue
 
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=us&limit=1`
+    const bbox = getStateBboxParam(s)
+    const bboxParam = bbox ? `&bbox=${bbox}` : ''
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&country=us&limit=1${bboxParam}`
     const urlRedacted = url.replace(MAPBOX_TOKEN, '***')
 
     try {
@@ -101,6 +106,11 @@ export async function geocodeAddressWithFallbacks(
       }
       const coords = parseCoords(data)
       if (coords) {
+        const validation = validateMapCoordinates(coords.lat, coords.lng, s || null)
+        if (!validation.valid) {
+          if (debugLog) debugLog(fmt.name, urlRedacted, data, validation.reason)
+          continue
+        }
         if (debugLog) debugLog(fmt.name, urlRedacted, data)
         return { ...coords, formatUsed: fmt.name }
       }

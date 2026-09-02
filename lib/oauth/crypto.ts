@@ -1,7 +1,9 @@
 import crypto from 'crypto'
 import { getPublicBaseUrl, makePublicUrl } from '@/lib/baseUrl'
 
-export const MCP_OAUTH_SCOPE = 'mcp:read mcp:write'
+import { MCP_OAUTH_SCOPE_STRING } from '@/lib/mcp/scopes'
+
+export { MCP_OAUTH_SCOPE_STRING as MCP_OAUTH_SCOPE }
 export const ACCESS_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60 // 30 days
 export const AUTH_CODE_TTL_SECONDS = 60
 

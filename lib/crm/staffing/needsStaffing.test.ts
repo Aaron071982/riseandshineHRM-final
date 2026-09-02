@@ -5,8 +5,8 @@ import {
   type ClientStaffingSnapshot,
 } from '@/lib/crm/staffing/needsStaffing'
 import {
-  clientMarkerColor,
-  clientStatusLabel,
+  clientMarkerFromStage,
+  clientStaffingNote,
   therapistMarkerColor,
 } from '@/lib/crm/therapistClientMap/markerColors'
 
@@ -64,16 +64,16 @@ describe('classifyClientStaffingNeed', () => {
 })
 
 describe('markerColors', () => {
-  it('maps therapist hiring stage to green or blue', () => {
+  it('maps therapist hiring stage to green or red', () => {
     expect(therapistMarkerColor('HIRED')).toBe('green')
     expect(therapistMarkerColor('ONBOARDING_COMPLETED')).toBe('green')
-    expect(therapistMarkerColor('REACH_OUT')).toBe('blue')
+    expect(therapistMarkerColor('REACH_OUT')).toBe('red')
   })
 
-  it('maps client staffing need to orange or black', () => {
-    expect(clientMarkerColor(true)).toBe('orange')
-    expect(clientMarkerColor(false)).toBe('black')
-    expect(clientStatusLabel(true, ['losing_staff_soon'])).toMatch(/Losing staff/)
-    expect(clientStatusLabel(false, [])).toMatch(/settled/)
+  it('maps client CRM stage to stage-group colors', () => {
+    expect(clientMarkerFromStage('ACTIVE').markerColor).toBe('ACTIVE')
+    expect(clientMarkerFromStage('RBT_SEARCH').markerColor).toBe('STAFFING')
+    expect(clientStaffingNote(true, ['losing_staff_soon'])).toMatch(/Losing staff/)
+    expect(clientStaffingNote(false, [])).toBeNull()
   })
 })

@@ -1,5 +1,11 @@
-import type { RBTStatus } from '@prisma/client'
+import type { ClientStage, RBTStatus } from '@prisma/client'
 import type { NeedsStaffingReason } from '@/lib/crm/staffing/needsStaffing'
+import {
+  STAGE_GROUP,
+  STAGE_GROUP_LABELS,
+  STAGE_LABELS,
+  type StageGroupId,
+} from '@/lib/crm/stages'
 import type {
   ClientMarkerColor,
   TherapistMarkerColor,
@@ -7,12 +13,26 @@ import type {
 
 const HIRED_STATUSES: readonly RBTStatus[] = ['HIRED', 'ONBOARDING_COMPLETED']
 
+/** Hex colors aligned with CRM stage-group accents in globals.css */
+export const CLIENT_STAGE_GROUP_HEX: Record<StageGroupId, string> = {
+  INTAKE: '#2a6ae0',
+  CLINICAL_AUTH: '#1f9a3a',
+  STAFFING: '#e85a1c',
+  COORDINATION: '#c97a00',
+  ACTIVE: '#2f9e44',
+}
+
+export const THERAPIST_MARKER_HEX: Record<TherapistMarkerColor, string> = {
+  green: '#16a34a',
+  red: '#dc2626',
+}
+
 export function therapistMarkerColor(status: RBTStatus): TherapistMarkerColor {
-  return HIRED_STATUSES.includes(status) ? 'green' : 'blue'
+  return HIRED_STATUSES.includes(status) ? 'green' : 'red'
 }
 
 export function therapistStatusLabel(status: RBTStatus): string {
-  if (status === 'HIRED' || status === 'ONBOARDING_COMPLETED') return 'Hired'
+  if (HIRED_STATUSES.includes(status)) return 'Actively working'
   if (
     status === 'TO_INTERVIEW' ||
     status === 'INTERVIEW_SCHEDULED' ||
@@ -28,18 +48,34 @@ export function therapistStatusLabel(status: RBTStatus): string {
     return 'Reach-out pipeline'
   }
   if (status === 'STALLED') return 'Stalled'
-  return 'Hiring pipeline'
+  return 'Not actively working'
 }
 
-export function clientMarkerColor(needsStaffing: boolean): ClientMarkerColor {
-  return needsStaffing ? 'orange' : 'black'
+export function clientMarkerFromStage(stage: ClientStage): {
+  stageGroup: StageGroupId
+  markerColor: ClientMarkerColor
+  markerHex: string
+  statusLabel: string
+} {
+  const stageGroup = STAGE_GROUP[stage]
+  return {
+    stageGroup,
+    markerColor: stageGroup,
+    markerHex: CLIENT_STAGE_GROUP_HEX[stageGroup],
+    statusLabel: STAGE_LABELS[stage],
+  }
 }
 
-export function clientStatusLabel(
+export function clientStageGroupLabel(stageGroup: StageGroupId): string {
+  return STAGE_GROUP_LABELS[stageGroup]
+}
+
+/** Detail panel helper when staffing flags apply. */
+export function clientStaffingNote(
   needsStaffing: boolean,
   reasons: NeedsStaffingReason[]
-): string {
-  if (!needsStaffing) return 'Staffed / settled'
+): string | null {
+  if (!needsStaffing) return null
   if (reasons.includes('losing_staff_soon')) return 'Losing staff soon'
   if (reasons.includes('understaffed')) return 'Needs more hours'
   if (reasons.includes('unstaffed')) return 'Needs staffing'

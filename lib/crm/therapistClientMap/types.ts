@@ -1,8 +1,9 @@
 import type { NeedsStaffingReason } from '@/lib/crm/staffing/needsStaffing'
 import type { RBTStatus } from '@prisma/client'
+import type { StageGroupId } from '@/lib/crm/stages'
 
-export type TherapistMarkerColor = 'green' | 'blue'
-export type ClientMarkerColor = 'orange' | 'black'
+export type TherapistMarkerColor = 'green' | 'red'
+export type ClientMarkerColor = StageGroupId
 
 export type MapTherapistEntity = {
   entityType: 'therapist'
@@ -10,6 +11,7 @@ export type MapTherapistEntity = {
   name: string
   status: RBTStatus
   markerColor: TherapistMarkerColor
+  markerHex: string
   statusLabel: string
   state: string | null
   city: string | null
@@ -41,7 +43,9 @@ export type MapClientEntity = {
   clientCode: string
   name: string
   stage: string
+  stageGroup: StageGroupId
   markerColor: ClientMarkerColor
+  markerHex: string
   needsStaffing: boolean
   needsStaffingReasons: NeedsStaffingReason[]
   statusLabel: string
@@ -52,24 +56,26 @@ export type MapClientEntity = {
   assignments: MapClientAssignment[]
 }
 
-export type UnmappedEntity = {
+export type ExcludedMapEntity = {
   entityType: 'therapist' | 'client'
   id: string
   name: string
   addressSummary: string
+  reason: string
 }
 
 export type TherapistClientMapData = {
   therapists: MapTherapistEntity[]
   clients: MapClientEntity[]
   assignmentPairs: MapAssignmentPair[]
-  unmapped: UnmappedEntity[]
+  excluded: ExcludedMapEntity[]
   stats: {
     therapistTotal: number
     therapistMapped: number
     clientTotal: number
     clientMapped: number
     clientsNeedingStaffing: number
+    excludedCount: number
   }
 }
 

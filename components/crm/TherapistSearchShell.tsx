@@ -34,6 +34,38 @@ export default function TherapistSearchShell({
     },
   ]
 
+  if (view === 'map') {
+    return (
+      <div className="-mx-4 -my-6 flex h-[calc(100vh-3.75rem)] min-h-0 flex-col sm:-mx-6 lg:-mx-8">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-white/90 px-3 py-2 backdrop-blur-sm sm:px-4">
+          <nav
+            className="flex gap-1 rounded-lg border border-line bg-surface p-0.5"
+            aria-label="Therapist search views"
+          >
+            {tabs.map((tab) => (
+              <Link
+                key={tab.id}
+                href={tab.href}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                  view === tab.id
+                    ? 'bg-[var(--espresso)] text-white shadow-sm'
+                    : 'text-ink hover:bg-line-2'
+                )}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </nav>
+          <p className="hidden text-xs text-quiet sm:block">
+            ● clients by CRM stage · ▲ therapists green = working, red = not
+          </p>
+        </div>
+        <div className="relative min-h-0 flex-1">{mapContent}</div>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-16">
       <header>
@@ -69,7 +101,7 @@ export default function TherapistSearchShell({
         ))}
       </nav>
 
-      {view === 'map' ? mapContent : searchContent}
+      {searchContent}
     </div>
   )
 }
