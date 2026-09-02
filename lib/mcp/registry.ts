@@ -1,94 +1,47 @@
 import { logMcpToolCall } from '@/lib/mcp/audit'
 import { requireMcpAuthContext } from '@/lib/mcp/context'
+import { MCP_TOOL_DEFINITIONS } from '@/lib/mcp/definitions'
 import {
   checkToolScopeAccess,
   scopeDenialMessage,
 } from '@/lib/mcp/scopes'
-import {
-  isImplementedMcpTool,
-  type McpV1ToolName,
-} from '@/lib/mcp/toolNames'
+import { isImplementedMcpTool, type McpToolName } from '@/lib/mcp/toolNames'
 import { addCandidateNote } from '@/lib/mcp/tools/addCandidateNote'
+import {
+  getAssessmentStatus,
+  listAssessments,
+} from '@/lib/mcp/tools/assessments'
+import {
+  addClientNote,
+  getClientSchedule,
+  getClientSummary,
+  listClients,
+  lookupClient,
+} from '@/lib/mcp/tools/clients'
 import { findIdleHires } from '@/lib/mcp/tools/findIdleHires'
 import { getOnboardingStatus } from '@/lib/mcp/tools/getOnboardingStatus'
 import { getPipelineStats } from '@/lib/mcp/tools/getPipelineStats'
 import { lookupBt } from '@/lib/mcp/tools/lookupBt'
+import {
+  getAuthorizationsExpiring,
+  getEmailActivity,
+  getMissingDocuments,
+  getReassessmentsDue,
+  getWeeklySummaryStats,
+} from '@/lib/mcp/tools/ops'
+import {
+  findNearestTherapists,
+  flagStaffing,
+  getClientsNeedingStaffingTool,
+  getStaffCaseload,
+} from '@/lib/mcp/tools/staffingTools'
 import type { ToolResult } from '@/lib/mcp/types'
 
-export { MCP_V1_TOOL_NAMES as MCP_TOOL_NAMES } from '@/lib/mcp/toolNames'
-export type { McpV1ToolName as McpToolName } from '@/lib/mcp/toolNames'
-
-export const MCP_TOOL_DEFINITIONS = [
-  {
-    name: 'get_onboarding_status',
-    description:
-      'Returns hired RBTs and their onboarding progress, including who is stuck and which documents or tasks they are missing.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        stuckOnly: {
-          type: 'boolean',
-          description: 'If true, only return RBTs stuck more than 7 days in onboarding.',
-        },
-        minDaysStuck: {
-          type: 'number',
-          description: 'Filter by minimum days in current onboarding state.',
-        },
-      },
-    },
-  },
-  {
-    name: 'get_pipeline_stats',
-    description:
-      'Returns live pipeline and operational statistics: candidate counts by status, hired count, actively working count, idle hires, onboarding completion rate, upcoming interviews count.',
-    inputSchema: { type: 'object', properties: {} },
-  },
-  {
-    name: 'find_idle_hires',
-    description:
-      'Returns hired RBTs who are NOT actively working — they have status HIRED but no active client assignments. These need client matching.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        includeNotTrained: {
-          type: 'boolean',
-          description:
-            'Include RBTs who have not completed Artemis training (default: false, excludes untrained).',
-        },
-      },
-    },
-  },
-  {
-    name: 'lookup_bt',
-    description: 'Look up a specific BT or candidate by name or email and return their full details.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Name or email to search.',
-        },
-      },
-      required: ['query'],
-    },
-  },
-  {
-    name: 'add_candidate_note',
-    description:
-      'Adds an internal note to a candidate\'s or BT\'s profile timeline. Used to flag follow-ups. This writes a permanent note to the profile. Only call after the user has explicitly confirmed.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        rbtProfileId: { type: 'string', description: 'RBT profile ID.' },
-        note: { type: 'string', description: 'Note text to save on the profile.' },
-      },
-      required: ['rbtProfileId', 'note'],
-    },
-  },
-] as const
+export { MCP_TOOL_DEFINITIONS }
+export { MCP_TOOL_NAMES, type McpToolName } from '@/lib/mcp/toolNames'
 
 async function executeTool(
-  name: McpV1ToolName,
+  name: McpToolName,
   args: Record<string, unknown>
 ): Promise<ToolResult> {
   switch (name) {
@@ -107,6 +60,85 @@ async function executeTool(
       return addCandidateNote({
         rbtProfileId: String(args.rbtProfileId ?? ''),
         note: String(args.note ?? ''),
+      })
+    case 'lookup_client':
+      return lookupClient({ query: String(args.query ?? '') })
+    case 'list_clients':
+      return listClients({
+        stage: typeof args.stage === 'string' ? args.stage : undefined,
+        state: typeof args.state === 'string' ? args.state : undefined,
+        needs_staffing: args.needs_staffing === true,
+        missing_docs: args.missing_docs === true,
+        limit: typeof args.limit === 'number' ? args.limit : undefined,
+        cursor: typeof args.cursor === 'string' ? args.cursor : undefined,
+      })
+    case 'get_client_summary':
+      return getClientSummary({ client: String(args.client ?? '') })
+    case 'get_client_schedule':
+      return getClientSchedule({ client: String(args.client ?? '') })
+    case 'get_clients_needing_staffing':
+      return getClientsNeedingStaffingTool()
+    case 'get_staff_caseload':
+      return getStaffCaseload({ staff: String(args.staff ?? '') })
+    case 'find_nearest_therapists':
+      return findNearestTherapists({
+        client: String(args.client ?? ''),
+        only_available: args.only_available !== false,
+        include_capacity: args.include_capacity !== false,
+      })
+    case 'flag_staffing':
+      return flagStaffing({
+        client: typeof args.client === 'string' ? args.client : undefined,
+        rbtProfileId: typeof args.rbtProfileId === 'string' ? args.rbtProfileId : undefined,
+        staff: typeof args.staff === 'string' ? args.staff : undefined,
+        reason: typeof args.reason === 'string' ? args.reason : undefined,
+        expected_end_date:
+          typeof args.expected_end_date === 'string' ? args.expected_end_date : undefined,
+        last_day: typeof args.last_day === 'string' ? args.last_day : undefined,
+        departure_note:
+          typeof args.departure_note === 'string' ? args.departure_note : undefined,
+      })
+    case 'add_client_note':
+      return addClientNote({
+        client: String(args.client ?? ''),
+        note: String(args.note ?? ''),
+      })
+    case 'get_assessment_status':
+      return getAssessmentStatus({ client: String(args.client ?? '') })
+    case 'list_assessments':
+      return listAssessments({
+        status: typeof args.status === 'string' ? args.status : undefined,
+        started_after: typeof args.started_after === 'string' ? args.started_after : undefined,
+        limit: typeof args.limit === 'number' ? args.limit : undefined,
+        cursor: typeof args.cursor === 'string' ? args.cursor : undefined,
+      })
+    case 'get_missing_documents':
+      return getMissingDocuments({
+        client: typeof args.client === 'string' ? args.client : undefined,
+      })
+    case 'get_authorizations_expiring':
+      return getAuthorizationsExpiring({
+        days: typeof args.days === 'number' ? args.days : undefined,
+      })
+    case 'get_reassessments_due':
+      return getReassessmentsDue()
+    case 'get_email_activity':
+      return getEmailActivity({
+        sender: typeof args.sender === 'string' ? args.sender : undefined,
+        template: typeof args.template === 'string' ? args.template : undefined,
+        client: typeof args.client === 'string' ? args.client : undefined,
+        date_range:
+          args.date_range === 'week_to_date' || args.date_range === 'last_full_week'
+            ? args.date_range
+            : undefined,
+        from: typeof args.from === 'string' ? args.from : undefined,
+        to: typeof args.to === 'string' ? args.to : undefined,
+        limit: typeof args.limit === 'number' ? args.limit : undefined,
+        cursor: typeof args.cursor === 'string' ? args.cursor : undefined,
+      })
+    case 'get_weekly_summary_stats':
+      return getWeeklySummaryStats({
+        week: typeof args.week === 'string' ? args.week : undefined,
       })
     default:
       throw new Error(`Unknown tool: ${name}`)
@@ -141,22 +173,13 @@ export async function callMcpTool(
   }
 
   if (!isImplementedMcpTool(name)) {
-    const message = `Tool not implemented yet: ${name}`
-    await logMcpToolCall({
-      toolName: name,
-      args,
-      resultSummary: { error: true, message },
-      authMethod: auth.method,
-      clientId: auth.clientId,
-      tokenHashPrefix: auth.tokenHash?.slice(0, 8),
-    })
+    const message = `Tool not implemented: ${name}`
     return {
       content: [{ type: 'text', text: `Error: ${message}` }],
       isError: true,
     }
   }
 
-  const toolName = name
   const auditMeta = {
     authMethod: auth.method,
     clientId: auth.clientId,
@@ -164,9 +187,9 @@ export async function callMcpTool(
   }
 
   try {
-    const result = await executeTool(toolName, args)
+    const result = await executeTool(name, args)
     await logMcpToolCall({
-      toolName,
+      toolName: name,
       args,
       resultSummary: result.summary,
       ...auditMeta,
@@ -177,7 +200,7 @@ export async function callMcpTool(
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Tool execution failed'
     await logMcpToolCall({
-      toolName,
+      toolName: name,
       args,
       resultSummary: { error: true, message },
       ...auditMeta,

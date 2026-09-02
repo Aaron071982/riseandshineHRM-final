@@ -1,5 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { getActiveWorkingStats } from '@/lib/rbt/activeWorking'
+import { getPipelineCounts } from '@/lib/crm/dashboard'
+import { getMcpCrmUser } from '@/lib/mcp/crmUser'
+import { STAGE_LABELS } from '@/lib/crm/stages'
 
 const PIPELINE_STATUSES = [
   'NEW',
@@ -23,6 +26,7 @@ export async function getPipelineStats(): Promise<ToolResult> {
     activeStats,
     hiredWithTasks,
     upcomingInterviews,
+    clientPipeline,
   ] = await Promise.all([
     prisma.rBTProfile.groupBy({ by: ['status'], _count: true }),
     prisma.rBTProfile.count({ where: { status: 'HIRED' } }),
@@ -39,6 +43,7 @@ export async function getPipelineStats(): Promise<ToolResult> {
         status: { not: 'CANCELED' },
       },
     }),
+    getPipelineCounts(await getMcpCrmUser()),
   ])
 
   const statusMap = statusCounts.reduce(
@@ -63,13 +68,17 @@ export async function getPipelineStats(): Promise<ToolResult> {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([status, count]) => `  ${status}: ${count}`)
 
+  const clientStageLines = clientPipeline.byStage
+    .filter((s) => s.count > 0)
+    .map((s) => `  ${s.label}: ${s.count}${s.stalled ? ` (${s.stalled} stalled)` : ''}`)
+
   const text = [
     '# Pipeline & Operations Summary',
     '',
-    '## Candidates by status',
+    '## HR — Candidates by status',
     ...statusLines,
     '',
-    '## Key metrics',
+    '## HR — Key metrics',
     `  Hired RBTs: ${hiredRBTs}`,
     `  In pipeline: ${inPipeline}`,
     `  Actively working: ${activeStats.activelyWorking}`,
@@ -77,6 +86,15 @@ export async function getPipelineStats(): Promise<ToolResult> {
     `  Onboarding completed (status): ${onboardingComplete}`,
     `  Onboarding completion rate: ${onboardingCompletionRatePercent}%`,
     `  Upcoming interviews: ${upcomingInterviews}`,
+    '',
+    '## CRM — Clients by stage (LIVE)',
+    ...clientStageLines,
+    '',
+    '## CRM — Client pipeline totals',
+    `  In pipeline: ${clientPipeline.inPipeline}`,
+    `  Active: ${clientPipeline.active}`,
+    `  On hold: ${clientPipeline.onHold}`,
+    `  Total LIVE+pipeline tracked: ${clientPipeline.total}`,
   ].join('\n')
 
   return {
@@ -88,6 +106,9 @@ export async function getPipelineStats(): Promise<ToolResult> {
       idleHires: activeStats.idleHires,
       upcomingInterviews,
       onboardingCompletionRatePercent,
+      clientInPipeline: clientPipeline.inPipeline,
+      clientActive: clientPipeline.active,
+      clientTotal: clientPipeline.total,
     },
   }
 }

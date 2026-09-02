@@ -38,7 +38,17 @@ https://www.riseandshinehrm.com/api/mcp
    - If not logged in → `/login` → OTP → back to authorize
    - **Only ADMIN users** can approve
 5. Consent screen: **Approve** or **Deny**
-6. Claude exchanges the code at `/api/oauth/token` (PKCE verified) and receives a 30-day access token.
+6. Claude exchanges the code at `/api/oauth/token` (PKCE verified) and receives a 30-day access token with scopes `mcp:read mcp:write mcp:phi`.
+
+## Scopes
+
+| Scope | Purpose |
+|-------|---------|
+| `mcp:read` | HR pipeline and onboarding read tools |
+| `mcp:write` | `add_candidate_note` |
+| `mcp:phi` | Client Services CRM tools (client records, staffing, assessments, operational reports) |
+
+CRM tools are blocked unless the OAuth token includes `mcp:phi`. The static `MCP_API_KEY` fallback cannot access PHI tools.
 
 ## Test the connection
 

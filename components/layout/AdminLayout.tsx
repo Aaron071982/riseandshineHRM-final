@@ -25,6 +25,7 @@ import {
   LineChart,
   FileText,
   Shield,
+  Plug,
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
@@ -57,6 +58,8 @@ const documentsNavItem: NavItem = { href: '/admin/documents', label: 'Documents'
 
 const secondaryBaseWithoutDocs: NavItem[] = [
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
+  { href: '/admin/mcp-activity', label: 'MCP Activity', icon: Plug },
+  { href: '/admin/mcp-connections', label: 'MCP Connections', icon: Plug },
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
   { href: '/admin/org-chart', label: 'Company hierarchy', icon: Network },
@@ -84,6 +87,8 @@ function pathIsActive(pathname: string, href: string): boolean {
   if (href === '/schedule') return pathname.startsWith('/schedule')
   if (href === '/client-services') return pathname.startsWith('/client-services')
   if (href === '/admin/documents') return pathname.startsWith('/admin/documents')
+  if (href === '/admin/mcp-activity') return pathname.startsWith('/admin/mcp-activity')
+  if (href === '/admin/mcp-connections') return pathname.startsWith('/admin/mcp-connections')
   if (href === '/client-services/training') {
     return (
       pathname.startsWith('/client-services/training') ||
@@ -160,6 +165,8 @@ export default function AdminLayout({
         { href: '/admin/onboarding', label: 'Onboarding', icon: FileCheck },
         { href: '/client-services/training', label: 'Training', icon: GraduationCap },
         { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
+        { href: '/admin/mcp-activity', label: 'MCP Activity', icon: Plug },
+        { href: '/admin/mcp-connections', label: 'MCP Connections', icon: Plug },
         { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
         { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
         { href: '/admin/org-chart', label: 'Company hierarchy', icon: Network },
