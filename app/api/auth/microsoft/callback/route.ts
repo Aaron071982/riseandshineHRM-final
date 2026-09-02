@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSession } from '@/lib/auth'
-import { getPostLoginPath, normalizeLoginRole } from '@/lib/auth/postLogin'
+import {
+  CLIENT_SERVICES_HOME_PATH,
+  getPostLoginPath,
+  normalizeLoginRole,
+  shouldRedirectAdminToCrm,
+} from '@/lib/auth/postLogin'
 import {
   MICROSOFT_GRAPH_TOKEN_COOKIE,
   MICROSOFT_NONCE_COOKIE,
@@ -17,6 +22,10 @@ import {
   normalizeMicrosoftEmail,
 } from '@/lib/auth/microsoft'
 import { bootstrapCrmSuperAdmins } from '@/lib/crm/bootstrapRoles'
+import {
+  grantClientServicesElevatedAccess,
+  setElevatedSessionCookie,
+} from '@/lib/client-services/access'
 import { isFullAdminLoginEmail } from '@/lib/constants'
 import { prisma } from '@/lib/prisma'
 
@@ -135,17 +144,19 @@ export async function GET(request: NextRequest) {
     console.warn('[auth][microsoft] bootstrapCrmSuperAdmins failed', err)
   })
 
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    null
+
   const sessionToken = await createSession(user.id, {
     device: 'OAuth',
     browser: request.headers.get('user-agent') || null,
-    ipAddress:
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      request.headers.get('x-real-ip') ||
-      null,
+    ipAddress: ip,
   })
 
   const loginRole = normalizeLoginRole(user.role)
-  const redirectTo = getPostLoginPath(loginRole) ?? '/admin/dashboard'
+  const redirectTo = getPostLoginPath(loginRole, email) ?? '/admin/dashboard'
   const response = NextResponse.redirect(new URL(redirectTo, request.url), { status: 302 })
   const secure = process.env.NODE_ENV === 'production'
 
@@ -163,6 +174,18 @@ export async function GET(request: NextRequest) {
     maxAge: Math.max(60, Number(tokenJson.expires_in ?? 3600)),
     path: '/',
   })
+
+  if (
+    shouldRedirectAdminToCrm(email, loginRole) &&
+    redirectTo === CLIENT_SERVICES_HOME_PATH
+  ) {
+    const csToken = await grantClientServicesElevatedAccess({
+      userId: user.id,
+      ip,
+    })
+    setElevatedSessionCookie(response, csToken)
+  }
+
   response.cookies.delete(MICROSOFT_PKCE_COOKIE)
   response.cookies.delete(MICROSOFT_STATE_COOKIE)
   response.cookies.delete(MICROSOFT_NONCE_COOKIE)

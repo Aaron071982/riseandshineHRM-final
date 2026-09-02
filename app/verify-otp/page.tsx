@@ -64,7 +64,7 @@ export default function VerifyOTPPage() {
       const redirectTo =
         typeof data.redirectTo === 'string' && data.redirectTo.startsWith('/')
           ? data.redirectTo
-          : getPostLoginPath(data.role)
+          : getPostLoginPath(data.role, email)
       if (redirectTo) {
         window.location.href = redirectTo
         return

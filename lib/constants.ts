@@ -100,6 +100,31 @@ export function isFullAdminLoginEmail(email: string | null | undefined): boolean
 }
 
 /**
+ * Admins who land on the HRM admin dashboard after login.
+ * All other admins default to Client Services (CRM).
+ */
+const DEFAULT_HRM_DEFAULT_ADMIN_LOGIN_EMAILS = [
+  'irsal@riseandshineaba.com',
+  'tisha@riseandshineaba.com',
+] as const
+
+export function getHrmDefaultAdminLoginEmails(): string[] {
+  const fromEnv = process.env.HRM_DEFAULT_ADMIN_LOGIN_EMAILS?.trim()
+  if (fromEnv) {
+    return fromEnv
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+  }
+  return [...DEFAULT_HRM_DEFAULT_ADMIN_LOGIN_EMAILS]
+}
+
+export function isHrmDefaultAdminLoginEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  return getHrmDefaultAdminLoginEmails().includes(email.trim().toLowerCase())
+}
+
+/**
  * HR admins who should NOT see Billing, Payroll, Operations, or Documents.
  * They still get full ADMIN access to everything else (schedule, employees, etc.).
  */

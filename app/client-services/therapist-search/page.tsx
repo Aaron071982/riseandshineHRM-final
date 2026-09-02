@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import {
   auditClientAction,
   canAccessDepartment,
@@ -6,13 +7,15 @@ import {
 } from '@/lib/crm/access'
 import { loadTherapistSearchClient } from '@/lib/crm/therapistSearchData'
 import TherapistSearchClient from '@/components/crm/TherapistSearchClient'
+import TherapistSearchShell from '@/components/crm/TherapistSearchShell'
+import TherapistClientMapClient from '@/components/crm/TherapistClientMapClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function TherapistSearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ clientId?: string }>
+  searchParams: Promise<{ clientId?: string; view?: string }>
 }) {
   const user = await getClientServicesPageUser()
   if (!user) return null
@@ -30,12 +33,20 @@ export default async function TherapistSearchPage({
     )
   }
 
-  await auditClientAction({
-    userId: user.id,
-    action: 'THERAPIST_SEARCH_PAGE_VIEW',
-  })
+  const { clientId, view } = await searchParams
 
-  const { clientId } = await searchParams
+  if (view === 'map') {
+    await auditClientAction({
+      userId: user.id,
+      action: 'THERAPIST_CLIENT_MAP_VIEW',
+    })
+  } else {
+    await auditClientAction({
+      userId: user.id,
+      action: 'THERAPIST_SEARCH_PAGE_VIEW',
+    })
+  }
+
   let client = null
   if (clientId) {
     try {
@@ -55,5 +66,18 @@ export default async function TherapistSearchPage({
     }
   }
 
-  return <TherapistSearchClient client={client} />
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-quiet">
+          Loading…
+        </div>
+      }
+    >
+      <TherapistSearchShell
+        searchContent={<TherapistSearchClient client={client} embedded />}
+        mapContent={<TherapistClientMapClient />}
+      />
+    </Suspense>
+  )
 }

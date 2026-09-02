@@ -490,6 +490,7 @@ model User {
   serviceClientNotesDeleted    ServiceClientNote[]       @relation("ServiceClientNoteDeletedBy")
   serviceClientBtAssignmentsDeleted ServiceClientBtAssignment[] @relation("ServiceClientBtAssignmentDeletedBy")
   rbtScheduleAssignmentsDeleted RbtScheduleAssignment[]  @relation("RbtScheduleAssignmentDeletedBy")
+  rbtScheduleReplacementsFlagged RbtScheduleAssignment[] @relation("RbtScheduleReplacementFlaggedBy")
   clientClaims                  ClientClaim[]            @relation("ClientClaimUser")
   clientClaimsOpened            ClientClaim[]            @relation("ClientClaimClaimedBy")
   clientClaimsReleased          ClientClaim[]            @relation("ClientClaimReleasedBy")
@@ -794,6 +795,12 @@ model RBTProfile {
   payrollName                 String?
   payRateUpdatedAt            DateTime?
   payRateUpdatedBy            String?
+  /// Staff departing — cascades needs_replacement on active schedule assignments.
+  departing                   Boolean                    @default(false)
+  departureLastDay            DateTime?                  @map("last_day") @db.Date
+  departureNote               String?                    @map("departure_note") @db.Text
+  departureFlaggedByUserId    String?                    @map("departure_flagged_by")
+  departureFlaggedAt          DateTime?                  @map("departure_flagged_at")
   billingEntries              BillingEntry[]
   billingHoursConfirmations   BillingHoursConfirmation[]
   emailBlastSendLogs          EmailBlastSendLog[]
@@ -1546,12 +1553,20 @@ model RbtScheduleAssignment {
   updatedAt      DateTime                 @updatedAt
   deletedAt      DateTime?
   deletedByUserId String?
+  /// Replacement needed before expected end (Part A staffing flags).
+  needsReplacement            Boolean                  @default(false) @map("needs_replacement")
+  replacementReason           String?                  @map("replacement_reason") @db.Text
+  expectedEndDate             DateTime?                @map("expected_end_date") @db.Date
+  replacementFlaggedByUserId    String?                  @map("flagged_by")
+  replacementFlaggedAt        DateTime?                @map("flagged_at")
+  replacementResolvedAt       DateTime?                @map("resolved_at")
 
   rbtProfile    RBTProfile          @relation(fields: [rbtProfileId], references: [id], onDelete: Cascade)
   createdByUser User                @relation("RbtScheduleAssignmentCreatedBy", fields: [createdBy], references: [id])
   importBatch   ScheduleImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   serviceClient ServiceClient?       @relation(fields: [serviceClientId], references: [id], onDelete: SetNull)
   deletedByUser User?               @relation("RbtScheduleAssignmentDeletedBy", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+  replacementFlaggedByUser User?    @relation("RbtScheduleReplacementFlaggedBy", fields: [replacementFlaggedByUserId], references: [id], onDelete: SetNull)
 
   @@index([rbtProfileId, isActive])
   @@index([rbtProfileId, dayOfWeek])
@@ -1562,6 +1577,7 @@ model RbtScheduleAssignment {
   @@index([reviewStatus])
   @@index([serviceClientId])
   @@index([deletedAt])
+  @@index([needsReplacement, replacementResolvedAt])
   @@map("rbt_schedule_assignments")
 }
 
@@ -2981,6 +2997,9 @@ model ServiceClient {
   borough              String?
   state                String?
   zip                  String?
+  /// Geocoded service address (Mapbox); cached after first successful geocode.
+  latitude             Float?
+  longitude            Float?
   insuranceProvider    String?
   vobResult            String?
   /// Plan-level prior-auth requirement from VOB (default true). Never derived from payerType.

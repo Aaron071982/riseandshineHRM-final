@@ -168,6 +168,20 @@ export function clearElevatedSessionCookie(response: NextResponse): void {
   })
 }
 
+/** Mint an elevated CS session after verified login (Microsoft OAuth / OTP). */
+export async function grantClientServicesElevatedAccess(input: {
+  userId: string
+  ip?: string | null
+}): Promise<string> {
+  const token = await createElevatedSession(input.userId, input.ip)
+  await logClientAccess({
+    userId: input.userId,
+    action: 'SECTION_ENTRY',
+    ip: input.ip ?? null,
+  })
+  return token
+}
+
 /** Sync check for layouts — returns user if elevated session is valid. */
 export async function getElevatedClientServicesUser(): Promise<SessionUser | null> {
   const cookieStore = await cookies()

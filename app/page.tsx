@@ -14,7 +14,7 @@ export default async function Home() {
     if (sessionToken) {
       const user = await validateSession(sessionToken)
       if (user) {
-        const dest = getPostLoginPath(user.role)
+        const dest = getPostLoginPath(user.role, user.email)
         if (dest) redirect(dest)
       }
     }

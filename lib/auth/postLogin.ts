@@ -1,7 +1,11 @@
 import type { SessionUserRole } from '@/lib/auth'
+import { isHrmDefaultAdminLoginEmail } from '@/lib/constants'
 
 /** Prisma UserRole values plus optional legacy/custom strings we accept at login. */
 export type LoginRole = SessionUserRole | 'PAYROLL'
+
+/** Default landing page for Client Services (CRM). */
+export const CLIENT_SERVICES_HOME_PATH = '/client-services'
 
 /**
  * Roles that may log in without the hired-RBT CANDIDATE gate.
@@ -32,8 +36,24 @@ export function normalizeLoginRole(role: string | null | undefined): string {
   return (role ?? '').toUpperCase()
 }
 
-/** Post-login redirect for verify-otp page and home page. */
-export function getPostLoginPath(role: string | null | undefined): string | null {
+/** Admins who should land in CRM instead of the HRM admin dashboard after login. */
+export function shouldRedirectAdminToCrm(
+  email: string | null | undefined,
+  role: string | null | undefined
+): boolean {
+  if (normalizeLoginRole(role) !== 'ADMIN') return false
+  return !isHrmDefaultAdminLoginEmail(email)
+}
+
+/** Post-login redirect for verify-otp page, home page, and Microsoft OAuth. */
+export function getPostLoginPath(
+  role: string | null | undefined,
+  email?: string | null
+): string | null {
+  if (shouldRedirectAdminToCrm(email, role)) {
+    return CLIENT_SERVICES_HOME_PATH
+  }
+
   switch (normalizeLoginRole(role)) {
     case 'ADMIN':
       return '/admin/dashboard'

@@ -111,8 +111,10 @@ function formatDriveTime(minutes: number | null): string {
 
 export default function TherapistSearchClient({
   client,
+  embedded = false,
 }: {
   client: SearchClient | null
+  embedded?: boolean
 }) {
   const [address, setAddress] = useState(client?.addressLine ?? '')
   const [city, setCity] = useState(client?.city ?? '')
@@ -198,19 +200,35 @@ export default function TherapistSearchClient({
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-16">
-      <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
-          Staffing
+    <div className={embedded ? 'space-y-6' : 'mx-auto max-w-6xl space-y-6 pb-16'}>
+      {!embedded && (
+        <header>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
+            Staffing
+          </p>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
+            Therapist Search
+          </h1>
+          <p className="mt-1 text-sm text-quiet">
+            Closest placeable RBTs, ranked primarily by drive time. Preferences
+            lightly nudge nearby matches and never hide candidates.
+          </p>
+        </header>
+      )}
+
+      {embedded && (
+        <p className="text-sm text-quiet">
+          Rank hired, placeable RBTs by drive time for a client address. For the
+          full staffing picture, switch to{' '}
+          <a
+            href="/client-services/therapist-search?view=map"
+            className="font-semibold text-brand hover:underline"
+          >
+            Staff &amp; client map
+          </a>
+          .
         </p>
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
-          Therapist Search
-        </h1>
-        <p className="mt-1 text-sm text-quiet">
-          Closest placeable RBTs, ranked primarily by drive time. Preferences
-          lightly nudge nearby matches and never hide candidates.
-        </p>
-      </header>
+      )}
 
       {client && (
         <section className="rounded-xl border border-line bg-[var(--sunrise-soft)] px-4 py-3">

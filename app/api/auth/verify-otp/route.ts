@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTPEmail, isActiveOtpLocked } from '@/lib/email-otp'
 import { createSession } from '@/lib/auth'
+import { getClientIpFromRequest } from '@/lib/client-ip'
 import { getOtpTestCode, isOtpTestAccount, isFullAdminLoginEmail } from '@/lib/constants'
 import { isOtpBypassEnvironment } from '@/lib/auth/otpBypass'
 import {
@@ -9,11 +10,17 @@ import {
 } from '@/lib/otp-rate-limit'
 import { provisionBillingLoginIfNeeded, shouldProvisionBillingLogin } from '@/lib/billing-portal-users'
 import {
+  CLIENT_SERVICES_HOME_PATH,
   getPostLoginPath,
   isDirectLoginRole,
   normalizeLoginRole,
   roleAllowedInOtpResponse,
+  shouldRedirectAdminToCrm,
 } from '@/lib/auth/postLogin'
+import {
+  grantClientServicesElevatedAccess,
+  setElevatedSessionCookie,
+} from '@/lib/client-services/access'
 import { prisma } from '@/lib/prisma'
 
 
@@ -378,10 +385,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const redirectTo = getPostLoginPath(roleNormalized, user.email)
+
     const response = NextResponse.json({
       success: true,
       role: roleNormalized,
-      redirectTo: getPostLoginPath(roleNormalized),
+      redirectTo,
       userId: user.id,
     })
     // Set cookie on the response we return so it is always sent (avoids redirect-to-home bug)
@@ -392,6 +401,18 @@ export async function POST(request: NextRequest) {
       maxAge: 30 * 24 * 60 * 60, // 30 days
       path: '/',
     })
+
+    if (
+      redirectTo === CLIENT_SERVICES_HOME_PATH &&
+      shouldRedirectAdminToCrm(user.email, roleNormalized)
+    ) {
+      const csToken = await grantClientServicesElevatedAccess({
+        userId: user.id,
+        ip: getClientIpFromRequest(request),
+      })
+      setElevatedSessionCookie(response, csToken)
+    }
+
     return response
   } catch (error: unknown) {
     const err = error as { message?: string; code?: string; meta?: unknown; stack?: string }
