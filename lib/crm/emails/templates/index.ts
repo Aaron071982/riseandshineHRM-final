@@ -11,6 +11,10 @@ import { renderReadyForStaffing } from './readyForStaffing'
 import { renderScheduleConfirmed } from './scheduleConfirmed'
 import { renderWelcome } from './welcome'
 import { LEGACY_RENDERERS } from './legacy'
+import { RENDERERS_ES } from './es'
+import {
+  normalizeEmailLocale,
+} from '@/lib/crm/emails/locale'
 import {
   htmlToPlainText,
   wrapStaffEmail,
@@ -48,7 +52,9 @@ export function renderStaffEmail(
   fields: StaffMergeFields,
   overrides?: StaffEmailRenderOverrides
 ): RenderedStaffEmail | null {
-  const base = RENDERERS[template]
+  const locale = normalizeEmailLocale(overrides?.locale)
+  const base =
+    locale === 'es' ? RENDERERS_ES[template] : RENDERERS[template]
   if (!base && template !== 'MANUAL') return null
 
   const links = overrides?.links ?? []
@@ -68,7 +74,11 @@ export function renderStaffEmail(
   let innerHtml: string
 
   if (template === 'MANUAL' && overrides?.bodyHtml) {
-    subject = overrides.subject?.trim() || `Message regarding ${fields.childFirstName}`
+    subject =
+      overrides.subject?.trim() ||
+      (locale === 'es'
+        ? `Mensaje sobre ${fields.childFirstName}`
+        : `Message regarding ${fields.childFirstName}`)
     innerHtml = overrides.bodyHtml
   } else if (base) {
     const rendered = base(mergedFields)
@@ -87,6 +97,7 @@ export function renderStaffEmail(
     attachments: overrides?.attachments,
     links: linksForShell?.length ? linksForShell : undefined,
     template,
+    locale,
   })
   return {
     template,
@@ -118,6 +129,8 @@ export function staffTemplateLabel(template: CommTemplate): string {
 }
 
 export type { StaffMergeFields, RenderedStaffEmail, StaffEmailRenderOverrides } from './types'
+export type { EmailLocale } from '@/lib/crm/emails/locale'
+export { DEFAULT_EMAIL_LOCALE, normalizeEmailLocale } from '@/lib/crm/emails/locale'
 export type { EmailAttachmentMeta, EmailLinkMeta } from './shell'
 export { EMAIL_LOGO_URL } from './shell'
 export {

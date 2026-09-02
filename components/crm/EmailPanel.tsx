@@ -128,6 +128,7 @@ export function EmailPanel({
   const [rbtAssignmentId, setRbtAssignmentId] = useState('')
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewSubject, setPreviewSubject] = useState('')
+  const [emailLocale, setEmailLocale] = useState<'en' | 'es'>('en')
   const [consentAcknowledged, setConsentAcknowledged] = useState(false)
   const [ccTouched, setCcTouched] = useState(false)
 
@@ -159,6 +160,7 @@ export function EmailPanel({
         assessmentModality: isAssessment && assessmentModality ? assessmentModality : null,
         rbtAssignmentId:
           isRbtPick && rbtAssignmentId ? rbtAssignmentId : null,
+        locale: emailLocale,
       })
       if (!res.ok) {
         setError(res.error)
@@ -192,6 +194,7 @@ export function EmailPanel({
     attachments,
     links,
     ccTouched,
+    emailLocale,
   ])
 
   useEffect(() => {
@@ -333,6 +336,7 @@ export function EmailPanel({
         assessmentModality: isAssessment && assessmentModality ? assessmentModality : null,
         rbtAssignmentId:
           isRbtPick && rbtAssignmentId ? rbtAssignmentId : null,
+        locale: emailLocale,
       })
       if (!res.ok) {
         setError(res.error)
@@ -424,6 +428,18 @@ export function EmailPanel({
                   {staffTemplateLabel(t)}
                 </option>
               ))}
+            </select>
+          </label>
+
+          <label className="text-xs text-quiet">
+            Language / Idioma
+            <select
+              value={emailLocale}
+              onChange={(e) => setEmailLocale(e.target.value as 'en' | 'es')}
+              className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
+            >
+              <option value="en">English</option>
+              <option value="es">Español</option>
             </select>
           </label>
 

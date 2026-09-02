@@ -1,4 +1,5 @@
 import type { CommTemplate } from '@prisma/client'
+import type { EmailLocale } from '@/lib/crm/emails/locale'
 
 export type ScheduleSlotRow = {
   dayOfWeek: number
@@ -74,4 +75,5 @@ export type StaffEmailRenderOverrides = {
   attachments?: import('./shell').EmailAttachmentMeta[]
   links?: import('./shell').EmailLinkMeta[]
   assessmentModality?: AssessmentModality | null
+  locale?: EmailLocale
 }

@@ -1,4 +1,8 @@
 import type { CommTemplate } from '@prisma/client'
+import {
+  DEFAULT_EMAIL_LOCALE,
+  type EmailLocale,
+} from '@/lib/crm/emails/locale'
 import { progressionTimelineForTemplate } from './milestones'
 
 export const COMPANY_NAME = 'Rise & Shine ABA'
@@ -33,6 +37,7 @@ export type WrapStaffEmailOptions = {
   template?: CommTemplate
   /** Ops / internal digests — no journey timeline, quieter footer. */
   internal?: boolean
+  locale?: EmailLocale
 }
 
 export function escapeHtml(s: string): string {
@@ -61,8 +66,12 @@ export function sectionRule(label?: string): string {
 </table>`
 }
 
-function attachmentsStrip(attachments: EmailAttachmentMeta[] | undefined): string {
+function attachmentsStrip(
+  attachments: EmailAttachmentMeta[] | undefined,
+  locale: EmailLocale
+): string {
   if (!attachments?.length) return ''
+  const label = locale === 'es' ? 'Archivos adjuntos' : 'Attached files'
   const rows = attachments
     .map((a) => {
       const size = formatFileSize(a.sizeBytes)
@@ -74,7 +83,7 @@ function attachmentsStrip(attachments: EmailAttachmentMeta[] | undefined): strin
     })
     .join('')
   return `
-    ${sectionRule('Attached files')}
+    ${sectionRule(label)}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>`
 }
 
@@ -108,18 +117,31 @@ export function wrapStaffEmail(
   bodyHtml: string,
   options?: WrapStaffEmailOptions
 ): string {
-  const attachHtml = attachmentsStrip(options?.attachments)
+  const locale = options?.locale ?? DEFAULT_EMAIL_LOCALE
+  const attachHtml = attachmentsStrip(options?.attachments, locale)
   const linkHtml = ''
   const timelineHtml =
     !options?.internal && options?.template
-      ? progressionTimelineForTemplate(options.template)
+      ? progressionTimelineForTemplate(options.template, locale)
       : ''
+  const tagline =
+    locale === 'es'
+      ? 'Apoyando a su familia en cada paso'
+      : 'Supporting your family every step of the way'
   const footerNote = options?.internal
-    ? 'Internal operations summary — not for forwarding to families.'
-    : 'Confidential family communication — please do not forward without permission.'
+    ? locale === 'es'
+      ? 'Resumen interno de operaciones — no reenviar a las familias.'
+      : 'Internal operations summary — not for forwarding to families.'
+    : locale === 'es'
+      ? 'Comunicación confidencial con la familia — no reenvíe sin permiso.'
+      : 'Confidential family communication — please do not forward without permission.'
+  const footerSubtitle =
+    locale === 'es'
+      ? 'Servicios al Cliente de Rise &amp; Shine ABA'
+      : 'Rise &amp; Shine ABA Client Services'
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -143,7 +165,7 @@ export function wrapStaffEmail(
                   </td>
                   <td style="vertical-align:middle;">
                     <div style="font-size:20px;font-weight:700;color:${BODY_TEXT};letter-spacing:-0.02em;line-height:1.2;">${COMPANY_NAME}</div>
-                    <div style="font-size:13px;color:${MUTED_TEXT};margin-top:5px;line-height:1.4;">Supporting your family every step of the way</div>
+                    <div style="font-size:13px;color:${MUTED_TEXT};margin-top:5px;line-height:1.4;">${tagline}</div>
                   </td>
                 </tr>
               </table>
@@ -168,7 +190,7 @@ export function wrapStaffEmail(
           </tr>
         </table>
         <div style="max-width:700px;margin:16px auto 0;font-size:11px;color:#a89888;line-height:1.4;text-align:center;">
-          Rise &amp; Shine ABA Client Services
+          ${footerSubtitle}
         </div>
       </td>
     </tr>
@@ -233,35 +255,58 @@ export function parentFirstNameFromFull(
   return first || null
 }
 
-export function greeting(fields: {
-  parentName?: string | null
-  parentFirstName?: string | null
-}): string {
+export function greeting(
+  fields: {
+    parentName?: string | null
+    parentFirstName?: string | null
+  },
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
+): string {
   const first =
     fields.parentFirstName?.trim() ||
     parentFirstNameFromFull(fields.parentName ?? null)
+  if (locale === 'es') {
+    return first ? `Hola ${first},` : 'Hola,'
+  }
   return first ? `Hi ${first},` : 'Hi there,'
 }
 
 /** v1 voice: "Dear {{parentName}}," */
-export function dearGreeting(fields: {
-  parentName?: string | null
-  parentFirstName?: string | null
-}): string {
+export function dearGreeting(
+  fields: {
+    parentName?: string | null
+    parentFirstName?: string | null
+  },
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
+): string {
   const full = fields.parentName?.trim()
-  if (full) return `Dear ${escapeHtml(full)},`
+  if (full) {
+    return locale === 'es'
+      ? `Estimado/a ${escapeHtml(full)},`
+      : `Dear ${escapeHtml(full)},`
+  }
   const first =
     fields.parentFirstName?.trim() ||
     parentFirstNameFromFull(fields.parentName ?? null)
-  return first ? `Dear ${escapeHtml(first)},` : 'Dear Parent/Guardian,'
+  if (first) {
+    return locale === 'es'
+      ? `Estimado/a ${escapeHtml(first)},`
+      : `Dear ${escapeHtml(first)},`
+  }
+  return locale === 'es'
+    ? 'Estimado/a padre/madre o tutor/a,'
+    : 'Dear Parent/Guardian,'
 }
 
-export function staffSignature(fields: {
-  staffName: string
-  staffEmail: string | null
-}): string {
+export function staffSignature(
+  fields: {
+    staffName: string
+    staffEmail: string | null
+  },
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
+): string {
   const lines = [
-    'Warm regards,',
+    locale === 'es' ? 'Saludos cordiales,' : 'Warm regards,',
     `<strong>${escapeHtml(fields.staffName)}</strong>`,
     COMPANY_NAME,
   ]
@@ -274,24 +319,34 @@ export function staffSignature(fields: {
 }
 
 /** Welcome packet closing. */
-export function teamSignature(): string {
-  return `<p style="margin:28px 0 0;font-size:14px;color:${BODY_TEXT};line-height:1.55;">With warmth and dedication,<br /><strong>The Rise &amp; Shine ABA Team</strong></p>`
+export function teamSignature(locale: EmailLocale = DEFAULT_EMAIL_LOCALE): string {
+  const closing =
+    locale === 'es'
+      ? 'Con cariño y dedicación,<br /><strong>El equipo de Rise &amp; Shine ABA</strong>'
+      : 'With warmth and dedication,<br /><strong>The Rise &amp; Shine ABA Team</strong>'
+  return `<p style="margin:28px 0 0;font-size:14px;color:${BODY_TEXT};line-height:1.55;">${closing}</p>`
 }
 
 /** Coordinator closing for intake / nudge emails. */
-export function coordinatorSignature(fields: {
-  coordinatorName?: string | null
-  coordinatorTitle?: string | null
-  staffName?: string
-  companyPhone?: string
-}): string {
+export function coordinatorSignature(
+  fields: {
+    coordinatorName?: string | null
+    coordinatorTitle?: string | null
+    staffName?: string
+    companyPhone?: string
+  },
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
+): string {
   const name =
     fields.coordinatorName?.trim() ||
     fields.staffName?.trim() ||
-    'The Rise & Shine ABA Team'
-  const title = fields.coordinatorTitle?.trim() || 'Case Coordinator'
+    (locale === 'es' ? 'El equipo de Rise & Shine ABA' : 'The Rise & Shine ABA Team')
+  const title =
+    fields.coordinatorTitle?.trim() ||
+    (locale === 'es' ? 'Coordinador(a) de caso' : 'Case Coordinator')
   const phone = fields.companyPhone?.trim() || COMPANY_PHONE_DISPLAY
-  return `<p style="margin:28px 0 0;font-size:14px;color:${BODY_TEXT};line-height:1.55;">Warmly,<br /><strong>${escapeHtml(name)}</strong>, ${escapeHtml(title)}<br />Rise &amp; Shine ABA · ${escapeHtml(phone)}</p>`
+  const closing = locale === 'es' ? 'Con cariño,' : 'Warmly,'
+  return `<p style="margin:28px 0 0;font-size:14px;color:${BODY_TEXT};line-height:1.55;">${closing}<br /><strong>${escapeHtml(name)}</strong>, ${escapeHtml(title)}<br />Rise &amp; Shine ABA · ${escapeHtml(phone)}</p>`
 }
 
 export function officePhone(fields: { companyPhone?: string }): string {
@@ -308,11 +363,14 @@ export function para(html: string): string {
 
 export function portalCta(
   _portalLink: string | null | undefined,
-  _label = 'Open your secure portal'
+  _label = 'Open your secure portal',
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
 ): string {
-  return para(
-    `Please contact us using the phone number and email in the footer below if you need help sending documents securely.`
-  )
+  const copy =
+    locale === 'es'
+      ? 'Comuníquese con nosotros usando el teléfono y el correo electrónico al final de este mensaje si necesita ayuda para enviar documentos de forma segura.'
+      : 'Please contact us using the phone number and email in the footer below if you need help sending documents securely.'
+  return para(copy)
 }
 
 export { childName, childInitialLast } from './helpers'

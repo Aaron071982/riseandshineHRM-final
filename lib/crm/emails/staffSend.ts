@@ -27,6 +27,8 @@ import { auditCaseCoordinationAction } from '@/lib/crm/caseCoordination/audit'
 import { buildMissingDocsList } from '@/lib/crm/emails/missingDocs'
 import { renderStaffEmail } from '@/lib/crm/emails/templates'
 import type { AssessmentModality } from '@/lib/crm/emails/templates/types'
+import type { EmailLocale } from '@/lib/crm/emails/locale'
+import { normalizeEmailLocale } from '@/lib/crm/emails/locale'
 import type { EmailLinkMeta } from '@/lib/crm/emails/templates/shell'
 import {
   downloadEmailAttachment,
@@ -183,7 +185,8 @@ function attachmentsJsonValue(
 function auditExtras(
   attachments: StaffEmailAttachmentInput[],
   links: EmailLinkMeta[],
-  templateFormNames?: string[]
+  templateFormNames?: string[],
+  locale?: EmailLocale
 ): string {
   const parts: string[] = []
   const allNames = [
@@ -195,6 +198,9 @@ function auditExtras(
   }
   if (links.length) {
     parts.push(`LINK:${links.map((l) => l.url).join(',')}`)
+  }
+  if (locale === 'es') {
+    parts.push('LOCALE:es')
   }
   return parts.length ? `:${parts.join(':')}` : ''
 }
@@ -248,10 +254,12 @@ export async function previewStaffClientEmail(
     links?: StaffEmailLinkInput[]
     assessmentModality?: AssessmentModality | null
     rbtAssignmentId?: string | null
+    locale?: EmailLocale | null
   }
 ) {
   await assertCanSendStaffEmail(user, clientId)
   assertTemplateAllowedForUser(user, input.template)
+  const locale = normalizeEmailLocale(input.locale)
 
   const client = await loadStaffEmailMergeContext(clientId)
   if (!client) throw new Error('Client not found')
@@ -291,6 +299,7 @@ export async function previewStaffClientEmail(
     ],
     links,
     assessmentModality: input.assessmentModality ?? null,
+    locale,
   })
   if (!rendered) throw new Error(`No renderer for ${input.template}`)
 
@@ -346,10 +355,12 @@ export async function sendStaffClientEmail(
     links?: StaffEmailLinkInput[]
     assessmentModality?: AssessmentModality | null
     rbtAssignmentId?: string | null
+    locale?: EmailLocale | null
   }
 ): Promise<StaffEmailSendResult> {
   await assertCanSendStaffEmail(user, clientId)
   assertTemplateAllowedForUser(user, input.template)
+  const locale = normalizeEmailLocale(input.locale)
 
   const mailboxReason = mailboxBlockedReason(user.email)
   if (mailboxReason) {
@@ -435,6 +446,7 @@ export async function sendStaffClientEmail(
     ],
     links,
     assessmentModality: input.assessmentModality ?? null,
+    locale,
   })
   if (!rendered) throw new Error(`No renderer for ${input.template}`)
 
@@ -444,7 +456,8 @@ export async function sendStaffClientEmail(
   const extras = auditExtras(
     attachments,
     links,
-    templateForms.map((f) => f.fileName)
+    templateForms.map((f) => f.fileName),
+    locale
   )
 
   const recordSkipped = async (reason: string) => {

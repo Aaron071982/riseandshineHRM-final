@@ -1,20 +1,32 @@
-import { DAY_LABELS, formatTime12h } from '@/lib/rbt-schedule/utils'
+import { formatTime12h } from '@/lib/rbt-schedule/utils'
+import { dayLabel, type EmailLocale } from '@/lib/crm/emails/locale'
+import { DEFAULT_EMAIL_LOCALE } from '@/lib/crm/emails/locale'
 import type { StaffMergeFields, ScheduleSlotRow } from './types'
 import { escapeHtml } from './shell'
 
-export function childInitialLast(fields: {
-  childFirstName: string
-  childLastName: string
-}): string {
+export function childInitialLast(
+  fields: {
+    childFirstName: string
+    childLastName: string
+  },
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
+): string {
   const first = fields.childFirstName.trim()
   const last = fields.childLastName.trim()
-  if (!first && !last) return 'your child'
+  const fallback = locale === 'es' ? 'su hijo/a' : 'your child'
+  if (!first && !last) return fallback
   const initial = first ? `${first[0]!.toUpperCase()}.` : ''
   return last ? `${initial} ${last}`.trim() : initial || first
 }
 
-export function childName(fields: { childFirstName: string }): string {
-  return fields.childFirstName.trim() || 'your child'
+export function childName(
+  fields: { childFirstName: string },
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
+): string {
+  return (
+    fields.childFirstName.trim() ||
+    (locale === 'es' ? 'su hijo/a' : 'your child')
+  )
 }
 
 export function formatClientAddress(fields: StaffMergeFields): string | null {
@@ -35,17 +47,22 @@ export function formatRbtAddress(fields: StaffMergeFields): string | null {
   return parts.length ? parts.join(', ') : null
 }
 
-/** Weekly schedule (Mon–Sun) for Meet & Greet — matches the family guide layout. */
-export function meetGreetWeeklyScheduleTable(slots: ScheduleSlotRow[]): string {
+export function meetGreetWeeklyScheduleTable(
+  slots: ScheduleSlotRow[],
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
+): string {
   const byDay = new Map<number, ScheduleSlotRow>()
   for (const s of slots) {
     if (!byDay.has(s.dayOfWeek)) byDay.set(s.dayOfWeek, s)
   }
   const order = [1, 2, 3, 4, 5, 6, 0]
+  const dayHeader = locale === 'es' ? 'Día' : 'Day'
+  const startHeader = locale === 'es' ? 'Inicio' : 'Start'
+  const endHeader = locale === 'es' ? 'Fin' : 'End'
   const rows = order
     .map((dow) => {
       const slot = byDay.get(dow)
-      const day = DAY_LABELS[dow] ?? 'Day'
+      const day = dayLabel(dow, locale)
       const start = slot ? formatTime12h(slot.startTime) : '—'
       const end = slot ? formatTime12h(slot.endTime) : '—'
       return `<tr>
@@ -57,9 +74,9 @@ export function meetGreetWeeklyScheduleTable(slots: ScheduleSlotRow[]): string {
     .join('')
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;border:1px solid #ebe3da;border-radius:10px;overflow:hidden;background:#fffcf8;">
     <tr style="background:#f7f0e8;">
-      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">Day</th>
-      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">Start</th>
-      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">End</th>
+      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">${dayHeader}</th>
+      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">${startHeader}</th>
+      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">${endHeader}</th>
     </tr>
     ${rows}
   </table>`
@@ -77,14 +94,23 @@ export function emailGuideSection(title: string, bodyHtml: string): string {
 </table>`
 }
 
-/** Email-safe schedule table for SCHEDULE_CONFIRMED. */
-export function scheduleTable(slots: ScheduleSlotRow[]): string {
+export function scheduleTable(
+  slots: ScheduleSlotRow[],
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
+): string {
   if (!slots.length) {
-    return `<p style="margin:16px 0;font-size:14px;color:#6b5e52;font-style:italic;">No sessions are on file yet — we will confirm your schedule separately.</p>`
+    const empty =
+      locale === 'es'
+        ? 'Aún no hay sesiones registradas — confirmaremos su horario por separado.'
+        : 'No sessions are on file yet — we will confirm your schedule separately.'
+    return `<p style="margin:16px 0;font-size:14px;color:#6b5e52;font-style:italic;">${empty}</p>`
   }
+  const dayHeader = locale === 'es' ? 'Día' : 'Day'
+  const timeHeader = locale === 'es' ? 'Hora' : 'Time'
+  const therapistHeader = locale === 'es' ? 'Terapeuta' : 'Therapist'
   const rows = slots
     .map((s) => {
-      const day = DAY_LABELS[s.dayOfWeek] ?? 'Day'
+      const day = dayLabel(s.dayOfWeek, locale)
       const time = `${formatTime12h(s.startTime)} – ${formatTime12h(s.endTime)}`
       return `<tr>
         <td style="padding:10px 14px;border-bottom:1px solid #ebe3da;font-size:14px;color:#2f2318;">${escapeHtml(day)}</td>
@@ -95,9 +121,9 @@ export function scheduleTable(slots: ScheduleSlotRow[]): string {
     .join('')
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;border:1px solid #ebe3da;border-radius:10px;overflow:hidden;background:#fffcf8;">
     <tr style="background:#f7f0e8;">
-      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">Day</th>
-      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">Time</th>
-      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">Therapist</th>
+      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">${dayHeader}</th>
+      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">${timeHeader}</th>
+      <th align="left" style="padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;border-bottom:1px solid #ebe3da;">${therapistHeader}</th>
     </tr>
     ${rows}
   </table>`

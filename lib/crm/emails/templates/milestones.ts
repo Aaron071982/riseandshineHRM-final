@@ -1,4 +1,6 @@
 import type { CommTemplate } from '@prisma/client'
+import type { EmailLocale } from '@/lib/crm/emails/locale'
+import { DEFAULT_EMAIL_LOCALE } from '@/lib/crm/emails/locale'
 
 function escapeHtml(s: string): string {
   return s
@@ -13,12 +15,20 @@ function escapeHtml(s: string): string {
  * Adjust labels here — template mapping is below.
  */
 export const PARENT_MILESTONES = [
-  { id: 'welcome', label: 'Welcome' },
-  { id: 'documents', label: 'Documents' },
-  { id: 'insurance', label: 'Insurance & Authorization' },
-  { id: 'assessment', label: 'Assessment' },
-  { id: 'matching', label: 'Matching Your Therapist' },
-  { id: 'services', label: 'Services Begin' },
+  { id: 'welcome', label: 'Welcome', labelEs: 'Bienvenida' },
+  { id: 'documents', label: 'Documents', labelEs: 'Documentos' },
+  {
+    id: 'insurance',
+    label: 'Insurance & Authorization',
+    labelEs: 'Seguro y autorización',
+  },
+  { id: 'assessment', label: 'Assessment', labelEs: 'Evaluación' },
+  {
+    id: 'matching',
+    label: 'Matching Your Therapist',
+    labelEs: 'Asignación de terapeuta',
+  },
+  { id: 'services', label: 'Services Begin', labelEs: 'Inicio de servicios' },
 ] as const
 
 export type ParentMilestoneId = (typeof PARENT_MILESTONES)[number]['id']
@@ -64,8 +74,22 @@ function stepState(index: number, currentIndex: number): StepState {
   return 'upcoming'
 }
 
+function milestoneLabel(
+  label: string,
+  labelEs: string,
+  locale: EmailLocale
+): string {
+  return locale === 'es' ? labelEs : label
+}
+
 /** Compact label for narrow email columns. */
-function shortLabel(label: string): string {
+function shortLabel(label: string, locale: EmailLocale): string {
+  if (locale === 'es') {
+    if (label === 'Seguro y autorización') return 'Seguro'
+    if (label === 'Asignación de terapeuta') return 'Asignación'
+    if (label === 'Inicio de servicios') return 'Servicios'
+    return label
+  }
   if (label === 'Insurance & Authorization') return 'Insurance'
   if (label === 'Matching Your Therapist') return 'Matching'
   if (label === 'Services Begin') return 'Services'
@@ -86,14 +110,16 @@ function markerHtml(state: StepState): string {
  * Email-client-safe progression tracker (table + inline styles, no JS).
  * Returns a full `<tr>` for insertion under the logo/header in the shell.
  */
-export function progressionTimelineHtml(currentId: ParentMilestoneId): string {
+export function progressionTimelineHtml(
+  currentId: ParentMilestoneId,
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
+): string {
   const currentIndex = milestoneIndex(currentId)
   if (currentIndex < 0) return ''
 
   const n = PARENT_MILESTONES.length
   const colWidth = `${Math.floor(100 / n)}%`
 
-  // Connector line row (drawn behind the markers visually)
   const lineCells = PARENT_MILESTONES.map((_, i) => {
     const leftFilled = i <= currentIndex
     const rightFilled = i < currentIndex
@@ -111,7 +137,7 @@ export function progressionTimelineHtml(currentId: ParentMilestoneId): string {
     </td>`
   }).join('')
 
-  const markerCells = PARENT_MILESTONES.map((m, i) => {
+  const markerCells = PARENT_MILESTONES.map((_, i) => {
     const state = stepState(i, currentIndex)
     return `<td align="center" width="${colWidth}" style="padding:0;vertical-align:middle;">
       ${markerHtml(state)}
@@ -120,32 +146,42 @@ export function progressionTimelineHtml(currentId: ParentMilestoneId): string {
 
   const labelCells = PARENT_MILESTONES.map((m, i) => {
     const state = stepState(i, currentIndex)
+    const label = milestoneLabel(m.label, m.labelEs, locale)
     const color =
       state === 'current' ? '#c45a1a' : state === 'done' ? '#2f2318' : '#a89888'
     const weight = state === 'current' ? '700' : state === 'done' ? '600' : '500'
     const here =
       state === 'current'
-        ? `<div style="font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#f2652a;margin-bottom:3px;">You&rsquo;re here</div>`
+        ? locale === 'es'
+          ? `<div style="font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#f2652a;margin-bottom:3px;">Usted está aquí</div>`
+          : `<div style="font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#f2652a;margin-bottom:3px;">You&rsquo;re here</div>`
         : `<div style="font-size:9px;line-height:12px;color:transparent;margin-bottom:3px;">&nbsp;</div>`
     return `<td align="center" valign="top" width="${colWidth}" style="padding:8px 3px 0;vertical-align:top;">
       ${here}
-      <div style="font-size:10px;line-height:1.3;font-weight:${weight};color:${color};">${escapeHtml(shortLabel(m.label))}</div>
+      <div style="font-size:10px;line-height:1.3;font-weight:${weight};color:${color};">${escapeHtml(shortLabel(label, locale))}</div>
     </td>`
   }).join('')
 
+  const doneLabel = locale === 'es' ? '(completado)' : '(done)'
+  const hereLabel = locale === 'es' ? '(usted está aquí)' : "(you're here)"
   const plainSteps = PARENT_MILESTONES.map((m, i) => {
     const state = stepState(i, currentIndex)
-    if (state === 'done') return `${m.label} (done)`
-    if (state === 'current') return `${m.label} (you're here)`
-    return m.label
+    const label = milestoneLabel(m.label, m.labelEs, locale)
+    if (state === 'done') return `${label} ${doneLabel}`
+    if (state === 'current') return `${label} ${hereLabel}`
+    return label
   }).join(' → ')
+
+  const journeyTitle =
+    locale === 'es' ? 'Su recorrido con nosotros' : 'Your journey with us'
+  const progressLabel = locale === 'es' ? 'Progreso' : 'Progress'
 
   return `<tr>
   <td style="padding:0;background:#fffcf8;border-bottom:1px solid #f0e8df;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
       <tr>
         <td style="padding:16px 28px 18px;">
-          <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;margin:0 0 14px;">Your journey with us</div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#8a7a6c;margin:0 0 14px;">${journeyTitle}</div>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
             <tr>${lineCells}</tr>
           </table>
@@ -154,7 +190,7 @@ export function progressionTimelineHtml(currentId: ParentMilestoneId): string {
             <tr>${labelCells}</tr>
           </table>
           <p style="margin:14px 0 0;font-size:11px;line-height:1.45;color:#8a7a6c;">
-            Progress: ${escapeHtml(plainSteps)}
+            ${progressLabel}: ${escapeHtml(plainSteps)}
           </p>
         </td>
       </tr>
@@ -164,9 +200,10 @@ export function progressionTimelineHtml(currentId: ParentMilestoneId): string {
 }
 
 export function progressionTimelineForTemplate(
-  template: CommTemplate
+  template: CommTemplate,
+  locale: EmailLocale = DEFAULT_EMAIL_LOCALE
 ): string {
   const id = milestoneForTemplate(template)
   if (!id) return ''
-  return progressionTimelineHtml(id)
+  return progressionTimelineHtml(id, locale)
 }

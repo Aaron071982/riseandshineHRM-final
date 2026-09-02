@@ -272,6 +272,23 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email?.html).not.toContain('Your journey with us')
   })
 
+  it('renders Spanish copy when locale is es', () => {
+    const welcome = renderStaffEmail('WELCOME', fields, { locale: 'es' })
+    expect(welcome?.subject).toMatch(/Bienvenido/)
+    expect(welcome?.html).toContain('lang="es"')
+    expect(welcome?.html).toContain('Su recorrido con nosotros')
+    expect(welcome?.html).toContain('Estimado/a')
+    expect(welcome?.html).not.toContain('Your journey with us')
+
+    const consent = renderStaffEmail('CONSENT_REQUEST', fields, { locale: 'es' })
+    expect(consent?.subject).toMatch(/admisión/i)
+    expect(consent?.html).toContain('Formularios a completar')
+
+    const meet = renderStaffEmail('MEET_AND_GREET', fields, { locale: 'es' })
+    expect(meet?.subject).toMatch(/Presentación|presentación/)
+    expect(meet?.html).toContain('Guía de Presentación para Familias')
+  })
+
   it('weekly activity summary is internal and branded', () => {
     const email = renderWeeklyActivitySummary({
       weekRange: 'Aug 18–24, 2026',
