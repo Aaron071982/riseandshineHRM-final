@@ -1,8 +1,12 @@
 import 'server-only'
+import { extractText, getDocumentProxy } from 'unpdf'
 
 /**
  * Extract searchable text from PDF or plain text. Never OCR images.
- * DOCX/images return null so callers can refuse or fall back to link mode.
+ * DOCX/images refuse so callers can fall back to link mode.
+ *
+ * PDFs use `unpdf` (serverless-safe) — not browser pdf.js, which crashes
+ * on Vercel with `DOMMatrix is not defined`.
  */
 export async function extractDocumentText(input: {
   bytes: Buffer
@@ -32,14 +36,22 @@ export async function extractDocumentText(input: {
   }
 
   if (type.includes('pdf') || name.endsWith('.pdf') || isPdfMagic(input.bytes)) {
-    const text = await extractPdfText(input.bytes)
-    if (!text.trim()) {
+    try {
+      const text = await extractPdfText(input.bytes)
+      if (!text.trim()) {
+        return {
+          error:
+            "Couldn't extract text from this PDF (it may be scanned/image-only). Use mode=link — OCR is not used.",
+        }
+      }
+      return { text: text.slice(0, 200_000) }
+    } catch (err) {
+      console.error('[mcp] PDF text extraction failed', err)
       return {
         error:
-          'Could not extract text from this PDF (it may be scanned). Use mode=link — OCR is not used.',
+          "Couldn't extract text from this PDF — open via link (mode=link) or in the app.",
       }
     }
-    return { text: text.slice(0, 200_000) }
   }
 
   return { error: 'Unsupported file type for text extraction. Use mode=link.' }
@@ -50,21 +62,14 @@ function isPdfMagic(bytes: Buffer): boolean {
 }
 
 async function extractPdfText(bytes: Buffer): Promise<string> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const loadingTask = pdfjs.getDocument({
-    data: new Uint8Array(bytes),
-    useSystemFonts: true,
-  })
-  const pdf = await loadingTask.promise
-  const pages: string[] = []
-  const maxPages = Math.min(pdf.numPages, 40)
-  for (let i = 1; i <= maxPages; i++) {
-    const page = await pdf.getPage(i)
-    const content = await page.getTextContent()
-    const line = content.items
-      .map((item) => ('str' in item ? item.str : ''))
-      .join(' ')
-    pages.push(line)
+  // Copy into a fresh Uint8Array — some PDF loaders detach/transfer the buffer.
+  const data = new Uint8Array(bytes)
+  const pdf = await getDocumentProxy(data)
+  const { text } = await extractText(pdf, { mergePages: true })
+  if (Array.isArray(text)) {
+    return text.join('\n\n').replace(/\s+/g, ' ').trim()
   }
-  return pages.join('\n\n').replace(/\s+/g, ' ').trim()
+  return String(text ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
