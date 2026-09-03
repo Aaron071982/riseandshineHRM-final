@@ -15,6 +15,7 @@ export const caseCoordinationFieldOverridesSchema = z
     coordinatorName: optionalString,
     coordinatorContactNumber: optionalString,
     coordinatorEmail: optionalString,
+    startDate: optionalString,
   })
   .partial()
 

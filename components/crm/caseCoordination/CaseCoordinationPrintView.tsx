@@ -57,6 +57,7 @@ export function CaseCoordinationPrintView({
         <div className="cc-section-band orange">CLIENT INFORMATION</div>
         <Field label="Client Name:" value={d.clientName} />
         <Field label="Service Address:" value={d.serviceAddress} />
+        <Field label="Start Date:" value={d.startDate?.trim() ? d.startDate : '—'} />
         <Field label="Parent/Guardian Name:" value={d.parentGuardianName} />
         <Field label="Parent Email Address:" value={d.parentEmail} />
         <Field label="Parent Contact Number:" value={d.parentContactNumber} />

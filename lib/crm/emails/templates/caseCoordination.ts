@@ -68,6 +68,7 @@ export function renderCaseCoordination(fields: StaffMergeFields): StaffEmailCont
   const clientBlock = contactBlock('Client Information', [
     { label: 'Client Name', value: clientName },
     { label: 'Service Address', value: address },
+    { label: 'Start Date', value: fields.startDate },
     { label: 'Parent/Guardian Name', value: fields.parentName },
     { label: 'Parent Email Address', value: fields.parentEmail },
     { label: 'Parent Contact Number', value: fields.parentPhone },

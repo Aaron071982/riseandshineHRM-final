@@ -25,6 +25,8 @@ export type CaseCoordinationDocumentPayload = {
   coordinatorName: string
   coordinatorContactNumber: string
   coordinatorEmail: string
+  /** Optional service start date (display string). Empty when unknown. */
+  startDate: string
 }
 
 export type CaseCoordinationSnapshot = CaseCoordinationDocumentPayload & {
@@ -42,8 +44,18 @@ function formatPhoneEmail(phone: string | null | undefined, email: string | null
 }
 
 function formatStartDate(d: Date | null | undefined): string {
-  if (!d) return CASE_COORDINATION_NOT_ASSIGNED
-  return formatEmailDate(d) ?? CASE_COORDINATION_NOT_ASSIGNED
+  if (!d) return ''
+  return formatEmailDate(d) ?? ''
+}
+
+function formatOverrideDate(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+    const d = new Date(`${trimmed.slice(0, 10)}T12:00:00`)
+    if (!Number.isNaN(d.getTime())) return formatEmailDate(d) ?? trimmed
+  }
+  return trimmed
 }
 
 async function loadClientForCaseCoordination(serviceClientId: string) {
@@ -211,6 +223,7 @@ function basePayloadFromClient(
     coordinatorName: display(coordinator?.name ?? client.caseCoordinatorName),
     coordinatorContactNumber: display(coordinator?.phoneNumber),
     coordinatorEmail: display(coordinator?.email),
+    startDate: formatStartDate(client.actualServiceStartDate ?? client.serviceStartDate),
   }
 }
 
@@ -237,6 +250,7 @@ function applyFieldOverrides(
         coordinatorContactNumber:
           fields.coordinatorContactNumber?.trim() || payload.coordinatorContactNumber,
         coordinatorEmail: fields.coordinatorEmail?.trim() || payload.coordinatorEmail,
+        startDate: fields.startDate?.trim() ? formatOverrideDate(fields.startDate) : payload.startDate,
       }
     : payload
 

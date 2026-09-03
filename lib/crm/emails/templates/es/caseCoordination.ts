@@ -73,6 +73,7 @@ export function renderCaseCoordinationEs(
   const clientBlock = contactBlock('Información del cliente', [
     { label: 'Nombre del cliente', value: clientName },
     { label: 'Dirección de servicio', value: address },
+    { label: 'Fecha de inicio', value: fields.startDate },
     { label: 'Nombre del padre/madre o tutor/a', value: fields.parentName },
     { label: 'Correo del padre/madre', value: fields.parentEmail },
     { label: 'Teléfono de contacto', value: fields.parentPhone },

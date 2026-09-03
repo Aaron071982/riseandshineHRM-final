@@ -27,6 +27,28 @@ type Props = {
   canConfirm: boolean
 }
 
+function toDateInputValue(display: string | null | undefined): string {
+  const raw = display?.trim()
+  if (!raw) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10)
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) return ''
+  const y = parsed.getFullYear()
+  const m = String(parsed.getMonth() + 1).padStart(2, '0')
+  const d = String(parsed.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function formatOverrideStartDate(isoDate: string): string {
+  const parsed = new Date(`${isoDate}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return isoDate
+  return parsed.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 export function CaseCoordinationPanel({
   clientId,
   record,
@@ -226,17 +248,34 @@ export function CaseCoordinationPanel({
                 ['coordinatorName', 'Coordinator Name'],
                 ['coordinatorContactNumber', 'Coordinator Phone'],
                 ['coordinatorEmail', 'Coordinator Email'],
+                ['startDate', 'Start Date'],
               ] as const
             ).map(([key, label]) => (
               <label key={key} className="block text-sm">
                 <span className="mb-1 block text-quiet">{label}</span>
-                <input
-                  className="w-full rounded-lg border border-line px-3 py-2 text-sm"
-                  defaultValue={document[key] ?? ''}
-                  onChange={(e) =>
-                    setFieldDraft((prev) => ({ ...prev, [key]: e.target.value }))
-                  }
-                />
+                {key === 'startDate' ? (
+                  <input
+                    type="date"
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm"
+                    defaultValue={toDateInputValue(document.startDate)}
+                    onChange={(e) =>
+                      setFieldDraft((prev) => ({
+                        ...prev,
+                        startDate: e.target.value
+                          ? formatOverrideStartDate(e.target.value)
+                          : '',
+                      }))
+                    }
+                  />
+                ) : (
+                  <input
+                    className="w-full rounded-lg border border-line px-3 py-2 text-sm"
+                    defaultValue={document[key] ?? ''}
+                    onChange={(e) =>
+                      setFieldDraft((prev) => ({ ...prev, [key]: e.target.value }))
+                    }
+                  />
+                )}
               </label>
             ))}
           </div>

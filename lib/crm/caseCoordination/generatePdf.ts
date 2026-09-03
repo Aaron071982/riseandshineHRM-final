@@ -290,6 +290,7 @@ export async function generateCaseCoordinationPdf(
   drawSectionBand(ctx, 'CLIENT INFORMATION', ORANGE)
   drawField(ctx, 'Client Name:', document.clientName)
   drawField(ctx, 'Service Address:', document.serviceAddress)
+  drawField(ctx, 'Start Date:', document.startDate?.trim() ? document.startDate : '—')
   drawField(ctx, 'Parent/Guardian Name:', document.parentGuardianName)
   drawField(ctx, 'Parent Email Address:', document.parentEmail)
   drawField(ctx, 'Parent Contact Number:', document.parentContactNumber)
