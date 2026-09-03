@@ -150,6 +150,24 @@ export async function listClients(args: {
     },
   })
 
+  // Sanity check: if no filters are applied and zero rows returned, warn loudly
+  // so scope/access bugs don't silently surface as an empty clean response.
+  if (
+    clients.length === 0 &&
+    !args.stage &&
+    !args.state &&
+    !args.needs_staffing &&
+    !args.missing_docs
+  ) {
+    const totalInTable = await prisma.serviceClient.count({ where: { deletedAt: null } })
+    if (totalInTable > 0) {
+      console.error(
+        `[MCP list_clients] SANITY FAIL: query returned 0 clients but service_clients has ${totalInTable} non-deleted rows. ` +
+          'Likely a scope/access filter bug. Check getMcpCrmUser() fullAccess flag.'
+      )
+    }
+  }
+
   const metrics = await deriveMetricsForClients(
     clients.map((c) => ({
       id: c.id,
