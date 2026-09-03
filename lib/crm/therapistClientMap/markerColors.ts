@@ -1,4 +1,4 @@
-import type { ClientStage, RBTStatus } from '@prisma/client'
+import type { ClientStage, PostHireStage, RBTStatus } from '@prisma/client'
 import type { NeedsStaffingReason } from '@/lib/crm/staffing/needsStaffing'
 import {
   STAGE_GROUP,
@@ -10,8 +10,6 @@ import type {
   ClientMarkerColor,
   TherapistMarkerColor,
 } from '@/lib/crm/therapistClientMap/types'
-
-const HIRED_STATUSES: readonly RBTStatus[] = ['HIRED', 'ONBOARDING_COMPLETED']
 
 /** Hex colors aligned with CRM stage-group accents in globals.css */
 export const CLIENT_STAGE_GROUP_HEX: Record<StageGroupId, string> = {
@@ -27,12 +25,25 @@ export const THERAPIST_MARKER_HEX: Record<TherapistMarkerColor, string> = {
   red: '#dc2626',
 }
 
-export function therapistMarkerColor(status: RBTStatus): TherapistMarkerColor {
-  return HIRED_STATUSES.includes(status) ? 'green' : 'red'
+/**
+ * Green = HRM "Actively working" tag (`postHireStage === ACTIVE_DELIVERY`).
+ * Red = everyone else on the map (hired-but-not-active, interview, etc.).
+ * Matches Admin RBT profile / Kanban actively-working controls.
+ */
+export function therapistMarkerColor(
+  postHireStage: PostHireStage | null | undefined
+): TherapistMarkerColor {
+  return postHireStage === 'ACTIVE_DELIVERY' ? 'green' : 'red'
 }
 
-export function therapistStatusLabel(status: RBTStatus): string {
-  if (HIRED_STATUSES.includes(status)) return 'Actively working'
+export function therapistStatusLabel(
+  postHireStage: PostHireStage | null | undefined,
+  status: RBTStatus
+): string {
+  if (postHireStage === 'ACTIVE_DELIVERY') return 'Actively working'
+  if (status === 'HIRED' || status === 'ONBOARDING_COMPLETED') {
+    return 'Not actively working'
+  }
   if (
     status === 'TO_INTERVIEW' ||
     status === 'INTERVIEW_SCHEDULED' ||

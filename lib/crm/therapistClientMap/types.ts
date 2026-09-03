@@ -1,5 +1,5 @@
 import type { NeedsStaffingReason } from '@/lib/crm/staffing/needsStaffing'
-import type { RBTStatus } from '@prisma/client'
+import type { PostHireStage, RBTStatus } from '@prisma/client'
 import type { StageGroupId } from '@/lib/crm/stages'
 
 export type TherapistMarkerColor = 'green' | 'red'
@@ -10,6 +10,7 @@ export type MapTherapistEntity = {
   id: string
   name: string
   status: RBTStatus
+  postHireStage: PostHireStage | null
   markerColor: TherapistMarkerColor
   markerHex: string
   statusLabel: string

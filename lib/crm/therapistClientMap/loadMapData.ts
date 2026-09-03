@@ -56,6 +56,7 @@ export async function loadTherapistClientMapData(
           firstName: true,
           lastName: true,
           status: true,
+          postHireStage: true,
           locationCity: true,
           locationState: true,
           zipCode: true,
@@ -125,7 +126,7 @@ export async function loadTherapistClientMapData(
     const hired = HIRED_STATUSES.has(t.status)
     const hasCapacity = hired && therapistHasCapacity(scheduled, weeklyHourCap)
     const isUnmatched = hired && assignedClientIds.length === 0
-    const markerColor = therapistMarkerColor(t.status)
+    const markerColor = therapistMarkerColor(t.postHireStage)
     const addressSummary = formatAddressSummary({
       addressLine1: t.addressLine1,
       locationCity: t.locationCity,
@@ -145,9 +146,10 @@ export async function loadTherapistClientMapData(
           id: t.id,
           name,
           status: t.status,
+          postHireStage: t.postHireStage,
           markerColor,
           markerHex: THERAPIST_MARKER_HEX[markerColor],
-          statusLabel: therapistStatusLabel(t.status),
+          statusLabel: therapistStatusLabel(t.postHireStage, t.status),
           state: t.locationState,
           city: t.locationCity,
           lat: t.latitude,

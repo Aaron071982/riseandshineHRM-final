@@ -8,6 +8,7 @@ import {
   clientMarkerFromStage,
   clientStaffingNote,
   therapistMarkerColor,
+  therapistStatusLabel,
 } from '@/lib/crm/therapistClientMap/markerColors'
 
 describe('classifyClientStaffingNeed', () => {
@@ -64,10 +65,13 @@ describe('classifyClientStaffingNeed', () => {
 })
 
 describe('markerColors', () => {
-  it('maps therapist hiring stage to green or red', () => {
-    expect(therapistMarkerColor('HIRED')).toBe('green')
-    expect(therapistMarkerColor('ONBOARDING_COMPLETED')).toBe('green')
-    expect(therapistMarkerColor('REACH_OUT')).toBe('red')
+  it('maps actively-working postHireStage to green, others to red', () => {
+    expect(therapistMarkerColor('ACTIVE_DELIVERY')).toBe('green')
+    expect(therapistMarkerColor('MATCHING')).toBe('red')
+    expect(therapistMarkerColor(null)).toBe('red')
+    expect(therapistStatusLabel('ACTIVE_DELIVERY', 'HIRED')).toBe('Actively working')
+    expect(therapistStatusLabel('MATCHING', 'HIRED')).toBe('Not actively working')
+    expect(therapistStatusLabel(null, 'REACH_OUT')).toBe('Reach-out pipeline')
   })
 
   it('maps client CRM stage to stage-group colors', () => {
