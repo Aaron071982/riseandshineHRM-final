@@ -39,7 +39,13 @@ import {
   listClientDocuments,
   readDocument,
 } from '@/lib/mcp/tools/documents'
+import {
+  getPayrollSummary,
+  getStaffPay,
+  getStaffWorkedSessions,
+} from '@/lib/mcp/tools/payroll'
 import { logDocumentAccess } from '@/lib/mcp/documentAccess'
+import { logSensitiveAccess } from '@/lib/mcp/sensitiveAccess'
 import type { ToolResult } from '@/lib/mcp/types'
 
 export { MCP_TOOL_DEFINITIONS }
@@ -152,6 +158,28 @@ async function executeTool(
         documentId: String(args.documentId ?? ''),
         mode: typeof args.mode === 'string' ? args.mode : undefined,
       })
+    case 'get_staff_pay':
+      return getStaffPay({
+        staff: String(args.staff ?? ''),
+        date_range: typeof args.date_range === 'string' ? args.date_range : undefined,
+        from: typeof args.from === 'string' ? args.from : undefined,
+        to: typeof args.to === 'string' ? args.to : undefined,
+        match_by: typeof args.match_by === 'string' ? args.match_by : undefined,
+      })
+    case 'get_staff_worked_sessions':
+      return getStaffWorkedSessions({
+        staff: String(args.staff ?? ''),
+        date_range: typeof args.date_range === 'string' ? args.date_range : undefined,
+        from: typeof args.from === 'string' ? args.from : undefined,
+        to: typeof args.to === 'string' ? args.to : undefined,
+      })
+    case 'get_payroll_summary':
+      return getPayrollSummary({
+        date_range: typeof args.date_range === 'string' ? args.date_range : undefined,
+        from: typeof args.from === 'string' ? args.from : undefined,
+        to: typeof args.to === 'string' ? args.to : undefined,
+        match_by: typeof args.match_by === 'string' ? args.match_by : undefined,
+      })
     default:
       throw new Error(`Unknown tool: ${name}`)
   }
@@ -185,6 +213,28 @@ export async function callMcpTool(
         documentType: 'unknown',
         action: 'BLOCKED_UNAUTHORIZED',
         mode: typeof args.mode === 'string' ? args.mode : 'text',
+        reason: access.reason,
+      })
+    }
+    if (
+      name === 'get_staff_pay' ||
+      name === 'get_staff_worked_sessions' ||
+      name === 'get_payroll_summary'
+    ) {
+      await logSensitiveAccess({
+        userId: auth.userId,
+        category:
+          name === 'get_staff_worked_sessions'
+            ? 'WORKED_SESSIONS'
+            : name === 'get_payroll_summary'
+              ? 'PAYROLL'
+              : 'PAY',
+        action:
+          access.reason === 'missing_mcp_superadmin' ||
+          access.reason === 'api_key_superadmin_forbidden'
+            ? 'BLOCKED_SCOPE'
+            : 'BLOCKED_UNAUTHORIZED',
+        toolName: name,
         reason: access.reason,
       })
     }

@@ -72,6 +72,7 @@ export async function loadDocumentReadAllowlistUsers() {
       name: true,
       email: true,
       canReadClientDocuments: true,
+      isMcpSuperAdmin: true,
       crmRoles: {
         where: { revokedAt: null },
         select: { role: true },
@@ -104,6 +105,45 @@ export async function loadDocumentAccessLogs(input: {
     include: {
       user: { select: { name: true, email: true } },
       serviceClient: { select: { clientCode: true, firstName: true, lastName: true } },
+    },
+  })
+}
+
+export async function loadSensitiveAccessLogs(input: {
+  category?: string
+  action?: string
+  days?: number
+  limit?: number
+}) {
+  const from = new Date()
+  from.setDate(from.getDate() - (input.days ?? 7))
+
+  return prisma.sensitiveAccessLog.findMany({
+    where: {
+      createdAt: { gte: from },
+      ...(input.category
+        ? {
+            category: input.category as
+              | 'PAY'
+              | 'WORKED_SESSIONS'
+              | 'PAYROLL'
+              | 'DOCUMENT'
+              | 'OTHER',
+          }
+        : {}),
+      ...(input.action
+        ? {
+            action: input.action as
+              | 'READ'
+              | 'BLOCKED_UNAUTHORIZED'
+              | 'BLOCKED_SCOPE',
+          }
+        : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    take: input.limit ?? 300,
+    include: {
+      user: { select: { name: true, email: true } },
     },
   })
 }

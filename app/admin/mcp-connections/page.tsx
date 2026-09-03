@@ -4,8 +4,13 @@ import {
   revokeAllMcpTokens,
   revokeMcpToken,
   setCanReadClientDocuments,
+  setMcpSuperAdmin,
 } from '@/lib/mcp/admin/actions'
 import { userCanReadClientDocuments } from '@/lib/mcp/documentAllowlist'
+import {
+  isMcpSuperAdminEmail,
+  userIsMcpSuperAdmin,
+} from '@/lib/mcp/superAdminAllowlist'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +38,10 @@ export default async function McpConnectionsPage() {
         <span className="mx-2 text-muted-foreground">·</span>
         <Link href="/admin/mcp-document-access" className="text-sm text-primary hover:underline">
           Document access
+        </Link>
+        <span className="mx-2 text-muted-foreground">·</span>
+        <Link href="/admin/mcp-sensitive-access" className="text-sm text-primary hover:underline">
+          Sensitive / pay access
         </Link>
       </header>
 
@@ -77,7 +86,9 @@ export default async function McpConnectionsPage() {
                         <span
                           key={s}
                           className={
-                            s === 'mcp:phi' || s === 'mcp:phi:documents'
+                            s === 'mcp:phi' ||
+                            s === 'mcp:phi:documents' ||
+                            s === 'mcp:superadmin'
                               ? 'mr-1 rounded bg-red-100 px-1 text-red-800'
                               : 'mr-1'
                           }
@@ -159,6 +170,53 @@ export default async function McpConnectionsPage() {
                 >
                   <button type="submit" className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
                     {u.canReadClientDocuments ? 'Clear flag' : 'Grant flag'}
+                  </button>
+                </form>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+
+      <section className="rounded-lg border">
+        <h2 className="border-b px-4 py-3 font-medium">
+          MCP super-admin (pay / compensation)
+        </h2>
+        <p className="px-4 pt-3 text-xs text-muted-foreground">
+          Hardcoded executives: irsal@, kazi@, siyam@, shazia@, fardeen@ (@riseandshineaba.com).
+          Scope mcp:superadmin is still required. Read-only — no writes.
+        </p>
+        <ul className="divide-y">
+          {allowlistUsers.map((u) => {
+            const viaEmail = isMcpSuperAdminEmail(u.email)
+            const allowed = userIsMcpSuperAdmin({
+              id: u.id,
+              email: u.email,
+              isMcpSuperAdmin: u.isMcpSuperAdmin,
+            })
+            return (
+              <li key={`sa-${u.id}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-medium">{u.name || u.email}</p>
+                  <p className="text-xs text-muted-foreground">{u.email}</p>
+                  <p className="text-xs">
+                    {allowed ? (
+                      <span className="text-green-700">Allowed</span>
+                    ) : (
+                      <span className="text-muted-foreground">Not allowed</span>
+                    )}
+                    {viaEmail ? ' · named executive email' : ''}
+                    {u.isMcpSuperAdmin ? ' · flag' : ''}
+                  </p>
+                </div>
+                <form
+                  action={async () => {
+                    'use server'
+                    await setMcpSuperAdmin(u.id, !u.isMcpSuperAdmin)
+                  }}
+                >
+                  <button type="submit" className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
+                    {u.isMcpSuperAdmin ? 'Clear flag' : 'Grant flag'}
                   </button>
                 </form>
               </li>

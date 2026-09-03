@@ -67,6 +67,7 @@ function consentHtml(params: AuthorizeParams, clientName: string): string {
   const scopes = params.scope.split(/\s+/).filter(Boolean)
   const includesPhi = scopes.includes('mcp:phi')
   const includesDocs = scopes.includes('mcp:phi:documents')
+  const includesSuper = scopes.includes('mcp:superadmin')
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -109,6 +110,14 @@ function consentHtml(params: AuthorizeParams, clientName: string): string {
     <li><strong>Document contents (mcp:phi:documents):</strong> list on-file documents and, if you are on the document-read allowlist, return extracted text of clinical/admin files or a short-lived viewing link. Photo IDs, insurance cards, and Medicaid cards are never sent as text.</li>
   </ul>
   <p><strong>This is the most sensitive connector permission.</strong> Only approve if you are an authorized document reader.</p>`
+      : ''
+  }
+  ${
+    includesSuper
+      ? `<ul class="phi">
+    <li><strong>Super-admin (mcp:superadmin):</strong> read staff pay amounts, pay dates, worked sessions, and payroll summaries. Restricted to five named executives. SSN/bank/ID numbers stay masked.</li>
+  </ul>
+  <p><strong>Employee compensation will be sent to Claude.</strong> Only approve if you are on the super-admin allowlist.</p>`
       : ''
   }
   <p>Scopes: ${escapeHtml(scopes.join(', ') || MCP_OAUTH_SCOPE_STRING)}</p>

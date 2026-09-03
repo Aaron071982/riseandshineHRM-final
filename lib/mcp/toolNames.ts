@@ -23,6 +23,9 @@ export const MCP_TOOL_NAMES = [
   'get_weekly_summary_stats',
   'list_client_documents',
   'read_document',
+  'get_staff_pay',
+  'get_staff_worked_sessions',
+  'get_payroll_summary',
 ] as const
 
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number]

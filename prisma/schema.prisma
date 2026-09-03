@@ -399,6 +399,8 @@ model User {
   isActive    Boolean  @default(true)
   /// Named allowlist for MCP `read_document`. CRM SUPER_ADMIN / INTAKE also qualify.
   canReadClientDocuments Boolean @default(false) @map("can_read_client_documents")
+  /// Named allowlist for MCP `mcp:superadmin` pay/comp reads (5 executives).
+  isMcpSuperAdmin Boolean @default(false) @map("mcp_super_admin")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -501,6 +503,7 @@ model User {
   orgTrainingModulesCreated     OrgTrainingModule[]          @relation("OrgTrainingModuleCreatedBy")
   orgTrainingCompletions        OrgTrainingCompletion[]      @relation("OrgTrainingCompletions")
   documentAccessLogs            DocumentAccessLog[]
+  sensitiveAccessLogs           SensitiveAccessLog[]
   oauthAccessTokens             OAuthAccessToken[]
 
   @@map("users")
@@ -1810,6 +1813,48 @@ model DocumentAccessLog {
   @@index([documentType, createdAt])
   @@index([action, createdAt])
   @@map("document_access_logs")
+}
+
+enum SensitiveAccessCategory {
+  PAY
+  WORKED_SESSIONS
+  PAYROLL
+  DOCUMENT
+  OTHER
+}
+
+enum SensitiveAccessAction {
+  READ
+  BLOCKED_UNAUTHORIZED
+  BLOCKED_SCOPE
+}
+
+/// Append-only audit for MCP super-admin / sensitive reads (pay, payroll, etc.).
+model SensitiveAccessLog {
+  id              String                   @id @default(cuid())
+  userId          String
+  category        SensitiveAccessCategory
+  action          SensitiveAccessAction
+  toolName        String
+  subjectType     String?
+  subjectId       String?
+  subjectLabel    String?
+  dateRangeFrom   DateTime?                @db.Date
+  dateRangeTo     DateTime?                @db.Date
+  oauthClientId   String?
+  tokenHashPrefix String?
+  ip              String?
+  reason          String?                  @db.Text
+  resultSummary   Json?
+  createdAt       DateTime                 @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([category, createdAt])
+  @@index([action, createdAt])
+  @@index([toolName, createdAt])
+  @@map("sensitive_access_logs")
 }
 
 // --- Employees and Candidates (non-RBT) ---

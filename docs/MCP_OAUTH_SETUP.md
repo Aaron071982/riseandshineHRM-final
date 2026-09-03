@@ -38,7 +38,7 @@ https://www.riseandshinehrm.com/api/mcp
    - If not logged in → `/login` → OTP → back to authorize
    - **Only ADMIN users** can approve
 5. Consent screen: **Approve** or **Deny**
-6. Claude exchanges the code at `/api/oauth/token` (PKCE verified) and receives a 30-day access token with scopes `mcp:read mcp:write mcp:phi mcp:phi:documents`.
+6. Claude exchanges the code at `/api/oauth/token` (PKCE verified) and receives a 30-day access token with scopes `mcp:read mcp:write mcp:phi mcp:phi:documents mcp:superadmin`.
 
 ## Scopes
 
@@ -48,6 +48,20 @@ https://www.riseandshinehrm.com/api/mcp
 | `mcp:write` | `add_candidate_note` |
 | `mcp:phi` | Client Services CRM metadata (clients, staffing, assessments, ops). Does **not** include document contents. |
 | `mcp:phi:documents` | Document contents via `read_document`. Requires the named allowlist as well. **Never granted to `MCP_API_KEY`.** |
+| `mcp:superadmin` | Pay/compensation + worked sessions + payroll summary. Encompasses PHI/documents for gate checks. **OAuth + five-executive allowlist only.** |
+
+### Super-admin (pay / compensation)
+
+Named executives (`@riseandshineaba.com`): **irsal@**, **kazi@**, **siyam@**, **shazia@**, **fardeen@**. Also `User.mcp_super_admin` flag.
+
+Tools (read-only):
+- `get_staff_pay` — published payroll amounts + Artemis estimates; default match by worked/service period (`match_by=pay_date` optional)
+- `get_staff_worked_sessions` — Artemis days worked (no dollars)
+- `get_payroll_summary` — period roll-up across staff
+
+SSN / government ID / bank / card numbers stay **masked (last-4)** even for super-admins. Photo IDs / insurance images stay link-only via the document policy.
+
+Audit: `/admin/mcp-sensitive-access` (categories PAY / WORKED_SESSIONS / PAYROLL). Denied attempts are logged and alert admins.
 
 ### Document contents (`read_document`)
 
@@ -66,9 +80,9 @@ Inventory (metadata only) is `list_client_documents` and only needs `mcp:phi`.
 
 Audit: every attempt — including refusals — is stored in `document_access_logs` and shown at `/admin/mcp-document-access`. Blocked events and unusual volume create in-app admin notifications.
 
-Re-authorize the connector after this change so the token includes `mcp:phi:documents`. Existing tokens without that scope cannot call `read_document`.
+Re-authorize the connector after this change so the token includes `mcp:phi:documents` / `mcp:superadmin` as needed. Existing tokens without those scopes cannot call the new tools.
 
-CRM tools are blocked unless the OAuth token includes `mcp:phi`. The static `MCP_API_KEY` fallback cannot access PHI or document tools.
+CRM tools are blocked unless the OAuth token includes `mcp:phi`. The static `MCP_API_KEY` fallback cannot access PHI, document, or super-admin tools.
 
 ## Test the connection
 
@@ -100,6 +114,13 @@ Claude should call `get_onboarding_status` and return hired RBTs with incomplete
 
 - Every `read_document` attempt (including blocked)
 - Allowlist toggles live on **MCP Connections**
+
+### Sensitive / pay access log
+
+**Admin → More → MCP Sensitive** (`/admin/mcp-sensitive-access`)
+
+- Super-admin pay, payroll, and worked-session reads
+- Denied attempts and volume alerts
 
 ## Security notes
 

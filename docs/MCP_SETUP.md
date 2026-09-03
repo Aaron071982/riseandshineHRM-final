@@ -74,8 +74,9 @@ Claude will ask for confirmation before calling write tools.
 | `mcp:write` | HR write: `add_candidate_note` |
 | `mcp:phi` | Client Services CRM tools (clients, staffing, assessments, ops). **Not** document contents. |
 | `mcp:phi:documents` | `read_document` contents. OAuth + named allowlist. Static API key blocked. |
+| `mcp:superadmin` | Pay/comp + worked sessions + payroll summary. Five executives only. |
 
-The consent screen requests all four scopes. Static `MCP_API_KEY` auth can use HR read/write tools only — **not** PHI/CRM or document tools.
+The consent screen requests all five scopes. Static `MCP_API_KEY` auth can use HR read/write tools only — **not** PHI/CRM, document, or super-admin tools.
 
 ## 7. Available tools
 
@@ -117,7 +118,15 @@ The consent screen requests all four scopes. Static `MCP_API_KEY` auth can use H
 |------|------|-------------|
 | `read_document` | Read | One document by id. Default `mode=text` for clinical/admin PDFs. Photo IDs / insurance / Medicaid cards are **link-only**. |
 
-Also run `prisma/scripts/add-mcp-document-access.sql`. Re-authorize OAuth so the token includes `mcp:phi:documents`. Manage the allowlist at `/admin/mcp-connections`. Review `/admin/mcp-document-access`.
+### Super-admin pay (requires `mcp:superadmin` + five-executive allowlist)
+
+| Tool | Type | Description |
+|------|------|-------------|
+| `get_staff_pay` | Read | Published payroll + Artemis estimates for one staffer. |
+| `get_staff_worked_sessions` | Read | Artemis days worked (no dollars). |
+| `get_payroll_summary` | Read | Period roll-up across staff. |
+
+Also run `prisma/scripts/add-mcp-document-access.sql` and `prisma/scripts/add-mcp-superadmin.sql`. Re-authorize OAuth for new scopes. Allowlists: `/admin/mcp-connections`. Review: `/admin/mcp-document-access`, `/admin/mcp-sensitive-access`.
 
 ## 8. Audit log
 

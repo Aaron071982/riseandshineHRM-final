@@ -6,13 +6,16 @@ export const MCP_SCOPE_WRITE = 'mcp:write'
 export const MCP_SCOPE_PHI = 'mcp:phi'
 /** Document *contents* (text or signed view link). Separate from mcp:phi metadata. */
 export const MCP_SCOPE_PHI_DOCUMENTS = 'mcp:phi:documents'
+/** Super-admin: pay/comp + worked sessions. Encompasses PHI + documents for gate checks. */
+export const MCP_SCOPE_SUPERADMIN = 'mcp:superadmin'
 
-/** Default scopes requested during OAuth (includes PHI + document contents for admin consent). */
+/** Default scopes requested during OAuth. */
 export const MCP_OAUTH_SCOPES = [
   MCP_SCOPE_READ,
   MCP_SCOPE_WRITE,
   MCP_SCOPE_PHI,
   MCP_SCOPE_PHI_DOCUMENTS,
+  MCP_SCOPE_SUPERADMIN,
 ] as const
 
 export const MCP_OAUTH_SCOPE_STRING = MCP_OAUTH_SCOPES.join(' ')
@@ -24,6 +27,7 @@ export type McpToolAccessRule = {
   requiresPhi: boolean
   requiresWrite: boolean
   requiresDocuments?: boolean
+  requiresSuperAdmin?: boolean
 }
 
 export const MCP_TOOL_ACCESS: Record<McpToolName | string, McpToolAccessRule> = {
@@ -57,6 +61,22 @@ export const MCP_TOOL_ACCESS: Record<McpToolName | string, McpToolAccessRule> = 
     requiresWrite: false,
     requiresDocuments: true,
   },
+
+  get_staff_pay: {
+    requiresPhi: false,
+    requiresWrite: false,
+    requiresSuperAdmin: true,
+  },
+  get_staff_worked_sessions: {
+    requiresPhi: false,
+    requiresWrite: false,
+    requiresSuperAdmin: true,
+  },
+  get_payroll_summary: {
+    requiresPhi: false,
+    requiresWrite: false,
+    requiresSuperAdmin: true,
+  },
 }
 
 export function parseOAuthScopes(scope: string | null | undefined): Set<string> {
@@ -66,6 +86,18 @@ export function parseOAuthScopes(scope: string | null | undefined): Set<string> 
       .map((s) => s.trim())
       .filter(Boolean)
   )
+}
+
+export function hasEffectiveScope(scopes: Set<string>, needed: string): boolean {
+  if (scopes.has(needed)) return true
+  // mcp:superadmin encompasses phi + documents for gate checks
+  if (
+    scopes.has(MCP_SCOPE_SUPERADMIN) &&
+    (needed === MCP_SCOPE_PHI || needed === MCP_SCOPE_PHI_DOCUMENTS)
+  ) {
+    return true
+  }
+  return false
 }
 
 export function getToolAccessRule(toolName: string): McpToolAccessRule {
@@ -81,9 +113,11 @@ export type McpScopeDenialReason =
   | 'unknown_tool'
   | 'api_key_phi_forbidden'
   | 'api_key_documents_forbidden'
+  | 'api_key_superadmin_forbidden'
   | 'missing_mcp_read'
   | 'missing_mcp_phi'
   | 'missing_mcp_phi_documents'
+  | 'missing_mcp_superadmin'
   | 'missing_mcp_write'
 
 export function checkToolScopeAccess(input: {
@@ -96,10 +130,13 @@ export function checkToolScopeAccess(input: {
     return { allowed: false, reason: 'unknown_tool' }
   }
 
-  if (
-    (rule.requiresPhi || rule.requiresDocuments) &&
-    input.authMethod === 'api_key'
-  ) {
+  const sensitive =
+    rule.requiresPhi || rule.requiresDocuments || rule.requiresSuperAdmin
+
+  if (sensitive && input.authMethod === 'api_key') {
+    if (rule.requiresSuperAdmin) {
+      return { allowed: false, reason: 'api_key_superadmin_forbidden' }
+    }
     return {
       allowed: false,
       reason: rule.requiresDocuments
@@ -108,18 +145,29 @@ export function checkToolScopeAccess(input: {
     }
   }
 
-  const needsRead = !rule.requiresWrite || rule.requiresPhi || rule.requiresDocuments
+  const needsRead =
+    !rule.requiresWrite ||
+    rule.requiresPhi ||
+    rule.requiresDocuments ||
+    rule.requiresSuperAdmin
   if (needsRead && !input.grantedScopes.has(MCP_SCOPE_READ)) {
-    return { allowed: false, reason: 'missing_mcp_read' }
+    // Superadmin scope alone is enough for its tools (still OAuth)
+    if (!(rule.requiresSuperAdmin && input.grantedScopes.has(MCP_SCOPE_SUPERADMIN))) {
+      return { allowed: false, reason: 'missing_mcp_read' }
+    }
   }
 
-  if (rule.requiresPhi && !input.grantedScopes.has(MCP_SCOPE_PHI)) {
+  if (rule.requiresSuperAdmin && !input.grantedScopes.has(MCP_SCOPE_SUPERADMIN)) {
+    return { allowed: false, reason: 'missing_mcp_superadmin' }
+  }
+
+  if (rule.requiresPhi && !hasEffectiveScope(input.grantedScopes, MCP_SCOPE_PHI)) {
     return { allowed: false, reason: 'missing_mcp_phi' }
   }
 
   if (
     rule.requiresDocuments &&
-    !input.grantedScopes.has(MCP_SCOPE_PHI_DOCUMENTS)
+    !hasEffectiveScope(input.grantedScopes, MCP_SCOPE_PHI_DOCUMENTS)
   ) {
     return { allowed: false, reason: 'missing_mcp_phi_documents' }
   }
@@ -137,10 +185,14 @@ export function scopeDenialMessage(reason: McpScopeDenialReason): string {
       return 'This tool returns client PHI and requires OAuth with the mcp:phi scope. The static MCP_API_KEY cannot access PHI tools.'
     case 'api_key_documents_forbidden':
       return 'Document contents require OAuth with mcp:phi:documents. The static MCP_API_KEY cannot access document tools.'
+    case 'api_key_superadmin_forbidden':
+      return 'Pay/compensation tools require OAuth with mcp:superadmin. The static MCP_API_KEY cannot access them.'
     case 'missing_mcp_phi':
       return 'This tool requires the mcp:phi scope. Re-authorize the connector and approve client data access.'
     case 'missing_mcp_phi_documents':
       return 'This tool requires the mcp:phi:documents scope. Re-authorize the connector and approve document-content access.'
+    case 'missing_mcp_superadmin':
+      return 'This tool requires the mcp:superadmin scope. Re-authorize and approve as a named executive.'
     case 'missing_mcp_write':
       return 'This tool requires the mcp:write scope.'
     case 'missing_mcp_read':

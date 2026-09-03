@@ -242,4 +242,49 @@ export const MCP_TOOL_DEFINITIONS = [
       required: ['documentId'],
     },
   },
+  {
+    name: 'get_staff_pay',
+    description:
+      'Super-admin only. Actual pay for a staffer over a date range from published payroll runs (gross/net, pay dates, hours×rate breakdown) plus Artemis estimated payable. Default match_by=worked (service period); match_by=pay_date uses paycheck date. SSN/bank/ID numbers stay masked.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        staff: { type: 'string', description: 'Name, email, or RBT profile id.' },
+        date_range: { type: 'string', description: 'e.g. "2026-03-13 to 2026-03-26"' },
+        from: { type: 'string' },
+        to: { type: 'string' },
+        match_by: { type: 'string', enum: ['worked', 'pay_date'] },
+      },
+      required: ['staff'],
+    },
+  },
+  {
+    name: 'get_staff_worked_sessions',
+    description:
+      'Super-admin only. Days worked from Artemis session-reconciliation (date, hours, client). No dollar figures.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        staff: { type: 'string' },
+        date_range: { type: 'string' },
+        from: { type: 'string' },
+        to: { type: 'string' },
+      },
+      required: ['staff'],
+    },
+  },
+  {
+    name: 'get_payroll_summary',
+    description:
+      'Super-admin only. Payroll roll-up across staff for a period: who got paid, totals, pay dates. Default match_by=worked.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        date_range: { type: 'string' },
+        from: { type: 'string' },
+        to: { type: 'string' },
+        match_by: { type: 'string', enum: ['worked', 'pay_date'] },
+      },
+    },
+  },
 ] as const
