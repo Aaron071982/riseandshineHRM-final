@@ -38,7 +38,7 @@ https://www.riseandshinehrm.com/api/mcp
    - If not logged in → `/login` → OTP → back to authorize
    - **Only ADMIN users** can approve
 5. Consent screen: **Approve** or **Deny**
-6. Claude exchanges the code at `/api/oauth/token` (PKCE verified) and receives a 30-day access token with scopes `mcp:read mcp:write mcp:phi`.
+6. Claude exchanges the code at `/api/oauth/token` (PKCE verified) and receives a 30-day access token with scopes `mcp:read mcp:write mcp:phi mcp:phi:documents`.
 
 ## Scopes
 
@@ -46,9 +46,29 @@ https://www.riseandshinehrm.com/api/mcp
 |-------|---------|
 | `mcp:read` | HR pipeline and onboarding read tools |
 | `mcp:write` | `add_candidate_note` |
-| `mcp:phi` | Client Services CRM tools (client records, staffing, assessments, operational reports) |
+| `mcp:phi` | Client Services CRM metadata (clients, staffing, assessments, ops). Does **not** include document contents. |
+| `mcp:phi:documents` | Document contents via `read_document`. Requires the named allowlist as well. **Never granted to `MCP_API_KEY`.** |
 
-CRM tools are blocked unless the OAuth token includes `mcp:phi`. The static `MCP_API_KEY` fallback cannot access PHI tools.
+### Document contents (`read_document`)
+
+Three gates, all required:
+
+1. OAuth scope `mcp:phi:documents`
+2. Actor on the document-read allowlist: CRM **SUPER_ADMIN** or **INTAKE**, platform super-admin email, or explicit `can_read_client_documents` flag (Admin → MCP Connections)
+3. Per-document-type policy:
+   - **Text:** psych eval, DSM-5, treatment/assessment, IEP/IFSP, referral, Vineland/FAST, intake, demographics, VOB/eligibility, consent
+   - **Link-only (never text/OCR):** parent/guardian photo ID, insurance card, Medicaid card, other government IDs
+   - **Blocked:** anything unclassified
+
+Default `read_document` mode is **text** (explicit opt-in for clinical files). Identity docs refuse text even for allowlisted users.
+
+Inventory (metadata only) is `list_client_documents` and only needs `mcp:phi`.
+
+Audit: every attempt — including refusals — is stored in `document_access_logs` and shown at `/admin/mcp-document-access`. Blocked events and unusual volume create in-app admin notifications.
+
+Re-authorize the connector after this change so the token includes `mcp:phi:documents`. Existing tokens without that scope cannot call `read_document`.
+
+CRM tools are blocked unless the OAuth token includes `mcp:phi`. The static `MCP_API_KEY` fallback cannot access PHI or document tools.
 
 ## Test the connection
 
@@ -73,6 +93,13 @@ Claude should call `get_onboarding_status` and return hired RBTs with incomplete
 **Admin → More → MCP Activity** (`/admin/mcp-activity`)
 
 - Every MCP tool call (reads and writes) is logged
+
+### Document access log
+
+**Admin → More → MCP Documents** (`/admin/mcp-document-access`)
+
+- Every `read_document` attempt (including blocked)
+- Allowlist toggles live on **MCP Connections**
 
 ## Security notes
 

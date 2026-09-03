@@ -4,12 +4,15 @@ import type { McpToolName } from '@/lib/mcp/toolNames'
 export const MCP_SCOPE_READ = 'mcp:read'
 export const MCP_SCOPE_WRITE = 'mcp:write'
 export const MCP_SCOPE_PHI = 'mcp:phi'
+/** Document *contents* (text or signed view link). Separate from mcp:phi metadata. */
+export const MCP_SCOPE_PHI_DOCUMENTS = 'mcp:phi:documents'
 
-/** Default scopes requested during OAuth (includes PHI for admin CRM use). */
+/** Default scopes requested during OAuth (includes PHI + document contents for admin consent). */
 export const MCP_OAUTH_SCOPES = [
   MCP_SCOPE_READ,
   MCP_SCOPE_WRITE,
   MCP_SCOPE_PHI,
+  MCP_SCOPE_PHI_DOCUMENTS,
 ] as const
 
 export const MCP_OAUTH_SCOPE_STRING = MCP_OAUTH_SCOPES.join(' ')
@@ -20,21 +23,16 @@ export const MCP_API_KEY_SCOPES = [MCP_SCOPE_READ, MCP_SCOPE_WRITE] as const
 export type McpToolAccessRule = {
   requiresPhi: boolean
   requiresWrite: boolean
+  requiresDocuments?: boolean
 }
 
-/**
- * Access rules per tool. CRM tools are listed here for v2 gating even before
- * implementations land in registry.ts.
- */
 export const MCP_TOOL_ACCESS: Record<McpToolName | string, McpToolAccessRule> = {
-  // --- v1 HR tools (mcp:read / mcp:write only) ---
   get_onboarding_status: { requiresPhi: false, requiresWrite: false },
   get_pipeline_stats: { requiresPhi: false, requiresWrite: false },
   find_idle_hires: { requiresPhi: false, requiresWrite: false },
   lookup_bt: { requiresPhi: false, requiresWrite: false },
   add_candidate_note: { requiresPhi: false, requiresWrite: true },
 
-  // --- v2 CRM read tools (mcp:phi) ---
   lookup_client: { requiresPhi: true, requiresWrite: false },
   list_clients: { requiresPhi: true, requiresWrite: false },
   get_client_summary: { requiresPhi: true, requiresWrite: false },
@@ -49,10 +47,16 @@ export const MCP_TOOL_ACCESS: Record<McpToolName | string, McpToolAccessRule> = 
   get_reassessments_due: { requiresPhi: true, requiresWrite: false },
   get_email_activity: { requiresPhi: true, requiresWrite: false },
   get_weekly_summary_stats: { requiresPhi: true, requiresWrite: false },
+  list_client_documents: { requiresPhi: true, requiresWrite: false },
 
-  // --- v2 CRM write tools (mcp:phi + mcp:write) ---
   flag_staffing: { requiresPhi: true, requiresWrite: true },
   add_client_note: { requiresPhi: true, requiresWrite: true },
+
+  read_document: {
+    requiresPhi: true,
+    requiresWrite: false,
+    requiresDocuments: true,
+  },
 }
 
 export function parseOAuthScopes(scope: string | null | undefined): Set<string> {
@@ -76,8 +80,10 @@ export function getToolAccessRule(toolName: string): McpToolAccessRule {
 export type McpScopeDenialReason =
   | 'unknown_tool'
   | 'api_key_phi_forbidden'
+  | 'api_key_documents_forbidden'
   | 'missing_mcp_read'
   | 'missing_mcp_phi'
+  | 'missing_mcp_phi_documents'
   | 'missing_mcp_write'
 
 export function checkToolScopeAccess(input: {
@@ -90,17 +96,32 @@ export function checkToolScopeAccess(input: {
     return { allowed: false, reason: 'unknown_tool' }
   }
 
-  if (rule.requiresPhi && input.authMethod === 'api_key') {
-    return { allowed: false, reason: 'api_key_phi_forbidden' }
+  if (
+    (rule.requiresPhi || rule.requiresDocuments) &&
+    input.authMethod === 'api_key'
+  ) {
+    return {
+      allowed: false,
+      reason: rule.requiresDocuments
+        ? 'api_key_documents_forbidden'
+        : 'api_key_phi_forbidden',
+    }
   }
 
-  const needsRead = !rule.requiresWrite || rule.requiresPhi
+  const needsRead = !rule.requiresWrite || rule.requiresPhi || rule.requiresDocuments
   if (needsRead && !input.grantedScopes.has(MCP_SCOPE_READ)) {
     return { allowed: false, reason: 'missing_mcp_read' }
   }
 
   if (rule.requiresPhi && !input.grantedScopes.has(MCP_SCOPE_PHI)) {
     return { allowed: false, reason: 'missing_mcp_phi' }
+  }
+
+  if (
+    rule.requiresDocuments &&
+    !input.grantedScopes.has(MCP_SCOPE_PHI_DOCUMENTS)
+  ) {
+    return { allowed: false, reason: 'missing_mcp_phi_documents' }
   }
 
   if (rule.requiresWrite && !input.grantedScopes.has(MCP_SCOPE_WRITE)) {
@@ -114,8 +135,12 @@ export function scopeDenialMessage(reason: McpScopeDenialReason): string {
   switch (reason) {
     case 'api_key_phi_forbidden':
       return 'This tool returns client PHI and requires OAuth with the mcp:phi scope. The static MCP_API_KEY cannot access PHI tools.'
+    case 'api_key_documents_forbidden':
+      return 'Document contents require OAuth with mcp:phi:documents. The static MCP_API_KEY cannot access document tools.'
     case 'missing_mcp_phi':
       return 'This tool requires the mcp:phi scope. Re-authorize the connector and approve client data access.'
+    case 'missing_mcp_phi_documents':
+      return 'This tool requires the mcp:phi:documents scope. Re-authorize the connector and approve document-content access.'
     case 'missing_mcp_write':
       return 'This tool requires the mcp:write scope.'
     case 'missing_mcp_read':

@@ -35,6 +35,11 @@ import {
   getClientsNeedingStaffingTool,
   getStaffCaseload,
 } from '@/lib/mcp/tools/staffingTools'
+import {
+  listClientDocuments,
+  readDocument,
+} from '@/lib/mcp/tools/documents'
+import { logDocumentAccess } from '@/lib/mcp/documentAccess'
 import type { ToolResult } from '@/lib/mcp/types'
 
 export { MCP_TOOL_DEFINITIONS }
@@ -140,6 +145,13 @@ async function executeTool(
       return getWeeklySummaryStats({
         week: typeof args.week === 'string' ? args.week : undefined,
       })
+    case 'list_client_documents':
+      return listClientDocuments({ client: String(args.client ?? '') })
+    case 'read_document':
+      return readDocument({
+        documentId: String(args.documentId ?? ''),
+        mode: typeof args.mode === 'string' ? args.mode : undefined,
+      })
     default:
       throw new Error(`Unknown tool: ${name}`)
   }
@@ -166,6 +178,16 @@ export async function callMcpTool(
       clientId: auth.clientId,
       tokenHashPrefix: auth.tokenHash?.slice(0, 8),
     })
+    if (name === 'read_document') {
+      await logDocumentAccess({
+        userId: auth.userId,
+        documentId: String(args.documentId ?? 'unknown'),
+        documentType: 'unknown',
+        action: 'BLOCKED_UNAUTHORIZED',
+        mode: typeof args.mode === 'string' ? args.mode : 'text',
+        reason: access.reason,
+      })
+    }
     return {
       content: [{ type: 'text', text: `Error: ${message}` }],
       isError: true,

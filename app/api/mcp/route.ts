@@ -17,6 +17,7 @@ import { resolveMcpAuth } from '@/lib/mcp-auth'
 import { runWithMcpAuth } from '@/lib/mcp/context'
 import { handleMcpProtocolRequest } from '@/lib/mcp/httpHandler'
 import { logMcpRequest, oauthOptionsResponse, withCors } from '@/lib/oauth/http'
+import { getClientIpFromRequest } from '@/lib/client-ip'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -44,8 +45,13 @@ async function handleMcpRequest(request: NextRequest): Promise<Response> {
 
   logMcpRequest(request, 'authorized')
 
+  const context = {
+    ...authResult.context,
+    requestIp: getClientIpFromRequest(request),
+  }
+
   try {
-    const response = await runWithMcpAuth(authResult.context, () =>
+    const response = await runWithMcpAuth(context, () =>
       handleMcpProtocolRequest(request)
     )
     return withCorsResponse(response)

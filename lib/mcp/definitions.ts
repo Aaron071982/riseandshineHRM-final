@@ -215,4 +215,31 @@ export const MCP_TOOL_DEFINITIONS = [
       properties: { week: { type: 'string', description: 'Optional label override.' } },
     },
   },
+  {
+    name: 'list_client_documents',
+    description:
+      'List on-file client documents (metadata only): documentId, type, uploadedAt, readableVia (text/link/blocked). Use read_document to fetch contents.',
+    inputSchema: {
+      type: 'object',
+      properties: { client: { type: 'string', description: 'Client name, code, or id.' } },
+      required: ['client'],
+    },
+  },
+  {
+    name: 'read_document',
+    description:
+      'Read one client document by documentId. Default mode is text for clinical/admin docs. Identity/financial docs (photo ID, insurance/Medicaid cards) are link-only — never returned as text. Requires mcp:phi:documents and the document-read allowlist. One document per call.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        documentId: { type: 'string' },
+        mode: {
+          type: 'string',
+          enum: ['text', 'link'],
+          description: 'text (default) extracts PDF/plain text; link returns a 5-minute viewing URL.',
+        },
+      },
+      required: ['documentId'],
+    },
+  },
 ] as const

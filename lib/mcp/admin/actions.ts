@@ -31,3 +31,16 @@ export async function revokeAllMcpTokens() {
 
   revalidatePath('/admin/mcp-connections')
 }
+
+export async function setCanReadClientDocuments(userId: string, enabled: boolean) {
+  const auth = await requireAdminSession()
+  if (auth.response) throw new Error('Unauthorized')
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { canReadClientDocuments: enabled },
+  })
+
+  revalidatePath('/admin/mcp-connections')
+  revalidatePath('/admin/mcp-document-access')
+}

@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
         clientId,
         scope: authCode.scope,
         expiresAt,
+        userId: authCode.approvedByUserId,
       },
     })
 

@@ -72,9 +72,10 @@ Claude will ask for confirmation before calling write tools.
 |-------|--------|
 | `mcp:read` | HR read tools (onboarding, pipeline, idle hires, lookup) |
 | `mcp:write` | HR write: `add_candidate_note` |
-| `mcp:phi` | Client Services CRM tools (clients, staffing, assessments, ops) |
+| `mcp:phi` | Client Services CRM tools (clients, staffing, assessments, ops). **Not** document contents. |
+| `mcp:phi:documents` | `read_document` contents. OAuth + named allowlist. Static API key blocked. |
 
-The consent screen requests all three scopes. Static `MCP_API_KEY` auth can use HR read/write tools only — **not** PHI/CRM tools.
+The consent screen requests all four scopes. Static `MCP_API_KEY` auth can use HR read/write tools only — **not** PHI/CRM or document tools.
 
 ## 7. Available tools
 
@@ -108,6 +109,15 @@ The consent screen requests all three scopes. Static `MCP_API_KEY` auth can use 
 | `get_reassessments_due` | Read | Clients due for reassessment. |
 | `get_email_activity` | Read | Recent outbound email metadata (no body content). |
 | `get_weekly_summary_stats` | Read | Manager dashboard KPIs for the current week. |
+| `list_client_documents` | Read | On-file document inventory (ids, types, `readableVia`). No contents. |
+
+### Document contents (requires `mcp:phi:documents` + allowlist)
+
+| Tool | Type | Description |
+|------|------|-------------|
+| `read_document` | Read | One document by id. Default `mode=text` for clinical/admin PDFs. Photo IDs / insurance / Medicaid cards are **link-only**. |
+
+Also run `prisma/scripts/add-mcp-document-access.sql`. Re-authorize OAuth so the token includes `mcp:phi:documents`. Manage the allowlist at `/admin/mcp-connections`. Review `/admin/mcp-document-access`.
 
 ## 8. Audit log
 

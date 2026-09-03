@@ -21,6 +21,8 @@ export const MCP_TOOL_NAMES = [
   'get_reassessments_due',
   'get_email_activity',
   'get_weekly_summary_stats',
+  'list_client_documents',
+  'read_document',
 ] as const
 
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number]

@@ -62,3 +62,48 @@ export async function loadMcpConnections() {
 
   return { clients, tokens }
 }
+
+export async function loadDocumentReadAllowlistUsers() {
+  return prisma.user.findMany({
+    where: { role: 'ADMIN', isActive: true },
+    orderBy: { email: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      canReadClientDocuments: true,
+      crmRoles: {
+        where: { revokedAt: null },
+        select: { role: true },
+      },
+    },
+  })
+}
+
+export async function loadDocumentAccessLogs(input: {
+  action?: string
+  documentType?: string
+  days?: number
+  limit?: number
+}) {
+  const from = new Date()
+  from.setDate(from.getDate() - (input.days ?? 7))
+
+  return prisma.documentAccessLog.findMany({
+    where: {
+      createdAt: { gte: from },
+      ...(input.action
+        ? { action: input.action as 'LINK_ISSUED' | 'TEXT_RETURNED' | 'BLOCKED_TYPE' | 'BLOCKED_UNAUTHORIZED' }
+        : {}),
+      ...(input.documentType?.trim()
+        ? { documentType: { equals: input.documentType.trim(), mode: 'insensitive' } }
+        : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    take: input.limit ?? 200,
+    include: {
+      user: { select: { name: true, email: true } },
+      serviceClient: { select: { clientCode: true, firstName: true, lastName: true } },
+    },
+  })
+}

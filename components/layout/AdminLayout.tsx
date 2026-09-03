@@ -60,6 +60,7 @@ const secondaryBaseWithoutDocs: NavItem[] = [
   { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
   { href: '/admin/mcp-activity', label: 'MCP Activity', icon: Plug },
   { href: '/admin/mcp-connections', label: 'MCP Connections', icon: Plug },
+  { href: '/admin/mcp-document-access', label: 'MCP Documents', icon: Plug },
   { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
   { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
   { href: '/admin/org-chart', label: 'Company hierarchy', icon: Network },
@@ -89,6 +90,7 @@ function pathIsActive(pathname: string, href: string): boolean {
   if (href === '/admin/documents') return pathname.startsWith('/admin/documents')
   if (href === '/admin/mcp-activity') return pathname.startsWith('/admin/mcp-activity')
   if (href === '/admin/mcp-connections') return pathname.startsWith('/admin/mcp-connections')
+  if (href === '/admin/mcp-document-access') return pathname.startsWith('/admin/mcp-document-access')
   if (href === '/client-services/training') {
     return (
       pathname.startsWith('/client-services/training') ||
@@ -167,6 +169,7 @@ export default function AdminLayout({
         { href: '/admin/messages', label: 'Messages', icon: MessageCircle },
         { href: '/admin/mcp-activity', label: 'MCP Activity', icon: Plug },
         { href: '/admin/mcp-connections', label: 'MCP Connections', icon: Plug },
+        { href: '/admin/mcp-document-access', label: 'MCP Documents', icon: Plug },
         { href: '/admin/settings/availability', label: 'My Availability', icon: CalendarClock },
         { href: '/admin/settings/workflows', label: 'Workflow Settings', icon: Settings },
         { href: '/admin/org-chart', label: 'Company hierarchy', icon: Network },

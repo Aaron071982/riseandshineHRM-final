@@ -66,6 +66,7 @@ function consentHtml(params: AuthorizeParams, clientName: string): string {
   })
   const scopes = params.scope.split(/\s+/).filter(Boolean)
   const includesPhi = scopes.includes('mcp:phi')
+  const includesDocs = scopes.includes('mcp:phi:documents')
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -100,6 +101,14 @@ function consentHtml(params: AuthorizeParams, clientName: string): string {
     <li>Write client staffing flags and client notes when you explicitly confirm</li>
   </ul>
   <p><strong>Client data will be sent to Claude on each relevant tool call.</strong> Only approve if you accept this for your account.</p>`
+      : ''
+  }
+  ${
+    includesDocs
+      ? `<ul class="phi">
+    <li><strong>Document contents (mcp:phi:documents):</strong> list on-file documents and, if you are on the document-read allowlist, return extracted text of clinical/admin files or a short-lived viewing link. Photo IDs, insurance cards, and Medicaid cards are never sent as text.</li>
+  </ul>
+  <p><strong>This is the most sensitive connector permission.</strong> Only approve if you are an authorized document reader.</p>`
       : ''
   }
   <p>Scopes: ${escapeHtml(scopes.join(', ') || MCP_OAUTH_SCOPE_STRING)}</p>

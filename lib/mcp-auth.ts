@@ -14,6 +14,9 @@ export type McpAuthContext = {
   scopes: Set<string>
   tokenHash?: string
   clientId?: string
+  /** Consenting admin user id (OAuth only). */
+  userId?: string
+  requestIp?: string | null
 }
 
 /**
@@ -49,6 +52,7 @@ export async function resolveMcpAuth(
       scope: true,
       expiresAt: true,
       revokedAt: true,
+      userId: true,
     },
   })
 
@@ -66,6 +70,7 @@ export async function resolveMcpAuth(
       scopes: parseOAuthScopes(record.scope),
       tokenHash: record.id,
       clientId: record.clientId,
+      userId: record.userId ?? undefined,
     },
   }
 }

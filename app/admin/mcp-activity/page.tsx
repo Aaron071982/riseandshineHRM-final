@@ -31,6 +31,9 @@ export default async function McpActivityPage({
         <p className="mt-1 text-sm text-muted-foreground">
           Tool calls from the Claude MCP connector. PHI access events are flagged.
         </p>
+        <Link href="/admin/mcp-document-access" className="mt-2 inline-block text-sm text-primary hover:underline">
+          Document access log →
+        </Link>
       </header>
 
       <form

@@ -397,6 +397,8 @@ model User {
   email       String?  @unique
   role        UserRole @default(CANDIDATE)
   isActive    Boolean  @default(true)
+  /// Named allowlist for MCP `read_document`. CRM SUPER_ADMIN / INTAKE also qualify.
+  canReadClientDocuments Boolean @default(false) @map("can_read_client_documents")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -498,6 +500,8 @@ model User {
   savedQueries                  SavedQuery[]                 @relation("SavedQueryOwner")
   orgTrainingModulesCreated     OrgTrainingModule[]          @relation("OrgTrainingModuleCreatedBy")
   orgTrainingCompletions        OrgTrainingCompletion[]      @relation("OrgTrainingCompletions")
+  documentAccessLogs            DocumentAccessLog[]
+  oauthAccessTokens             OAuthAccessToken[]
 
   @@map("users")
 }
@@ -1763,13 +1767,49 @@ model OAuthAccessToken {
   revokedAt  DateTime?
   lastUsedAt DateTime?
   createdAt  DateTime  @default(now())
+  /// Admin who approved the OAuth consent (for document-read allowlist).
+  userId     String?
 
   client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([clientId])
   @@index([expiresAt])
   @@index([revokedAt])
+  @@index([userId])
   @@map("oauth_access_tokens")
+}
+
+enum DocumentAccessAction {
+  LINK_ISSUED
+  TEXT_RETURNED
+  BLOCKED_TYPE
+  BLOCKED_UNAUTHORIZED
+}
+
+/// Append-only audit of MCP document content access (including refusals).
+model DocumentAccessLog {
+  id               String                @id @default(cuid())
+  userId           String
+  serviceClientId  String?
+  documentId       String
+  documentType     String
+  action           DocumentAccessAction
+  mode             String?
+  oauthClientId    String?
+  tokenHashPrefix  String?
+  ip               String?
+  reason           String?               @db.Text
+  createdAt        DateTime              @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceClient ServiceClient? @relation(fields: [serviceClientId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([serviceClientId, createdAt])
+  @@index([documentType, createdAt])
+  @@index([action, createdAt])
+  @@map("document_access_logs")
 }
 
 // --- Employees and Candidates (non-RBT) ---
@@ -3036,6 +3076,7 @@ model ServiceClient {
   documents           ServiceClientDocument[]
   clientNotes         ServiceClientNote[]
   accessLogs          ClientAccessLog[]
+  documentAccessLogs  DocumentAccessLog[]
   scheduleAssignments RbtScheduleAssignment[]
   serviceBreaks       ClientServiceBreak[]
   rbtBreaks           ClientRbtBreak[]

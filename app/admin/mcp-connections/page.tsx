@@ -1,6 +1,11 @@
 import Link from 'next/link'
-import { loadMcpConnections } from '@/lib/mcp/admin/data'
-import { revokeAllMcpTokens, revokeMcpToken } from '@/lib/mcp/admin/actions'
+import { loadDocumentReadAllowlistUsers, loadMcpConnections } from '@/lib/mcp/admin/data'
+import {
+  revokeAllMcpTokens,
+  revokeMcpToken,
+  setCanReadClientDocuments,
+} from '@/lib/mcp/admin/actions'
+import { userCanReadClientDocuments } from '@/lib/mcp/documentAllowlist'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +15,7 @@ function parseScopes(scope: string): string[] {
 
 export default async function McpConnectionsPage() {
   const { clients, tokens } = await loadMcpConnections()
+  const allowlistUsers = await loadDocumentReadAllowlistUsers()
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-12">
@@ -23,6 +29,10 @@ export default async function McpConnectionsPage() {
         </p>
         <Link href="/admin/mcp-activity" className="mt-2 inline-block text-sm text-primary hover:underline">
           ← View activity log
+        </Link>
+        <span className="mx-2 text-muted-foreground">·</span>
+        <Link href="/admin/mcp-document-access" className="text-sm text-primary hover:underline">
+          Document access
         </Link>
       </header>
 
@@ -67,7 +77,7 @@ export default async function McpConnectionsPage() {
                         <span
                           key={s}
                           className={
-                            s === 'mcp:phi'
+                            s === 'mcp:phi' || s === 'mcp:phi:documents'
                               ? 'mr-1 rounded bg-red-100 px-1 text-red-800'
                               : 'mr-1'
                           }
@@ -102,6 +112,59 @@ export default async function McpConnectionsPage() {
             })}
           </ul>
         )}
+      </section>
+
+      <section className="rounded-lg border">
+        <h2 className="border-b px-4 py-3 font-medium">
+          Document-read allowlist
+        </h2>
+        <p className="px-4 pt-3 text-xs text-muted-foreground">
+          CRM SUPER_ADMIN and INTAKE roles always qualify. The toggle grants others explicitly.
+          Scope mcp:phi:documents is still required.
+        </p>
+        <ul className="divide-y">
+          {allowlistUsers.map((u) => {
+            const viaRole = userCanReadClientDocuments({
+              id: u.id,
+              email: u.email,
+              canReadClientDocuments: false,
+              crmRoles: u.crmRoles.map((r) => r.role),
+            })
+            const allowed = userCanReadClientDocuments({
+              id: u.id,
+              email: u.email,
+              canReadClientDocuments: u.canReadClientDocuments,
+              crmRoles: u.crmRoles.map((r) => r.role),
+            })
+            return (
+              <li key={u.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+                <div>
+                  <p className="font-medium">{u.name || u.email}</p>
+                  <p className="text-xs text-muted-foreground">{u.email}</p>
+                  <p className="text-xs">
+                    {allowed ? (
+                      <span className="text-green-700">Allowed</span>
+                    ) : (
+                      <span className="text-muted-foreground">Not allowed</span>
+                    )}
+                    {viaRole ? ' · via SUPER_ADMIN/INTAKE role' : ''}
+                    {u.canReadClientDocuments ? ' · explicit flag' : ''}
+                  </p>
+                </div>
+                <form
+                  action={async () => {
+                    'use server'
+                    await setCanReadClientDocuments(u.id, !u.canReadClientDocuments)
+                  }}
+                >
+                  <button type="submit" className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
+                    {u.canReadClientDocuments ? 'Clear flag' : 'Grant flag'}
+                  </button>
+                </form>
+              </li>
+            )
+          })}
+        </ul>
       </section>
 
       <section className="rounded-lg border">
