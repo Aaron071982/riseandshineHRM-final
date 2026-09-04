@@ -72,6 +72,13 @@ export async function createElevatedSession(
   return token
 }
 
+/** Drop every elevated CS session for a user (e.g. on HRM login / logout). */
+export async function revokeAllClientServicesElevatedSessions(
+  userId: string
+): Promise<void> {
+  await prisma.clientServicesSession.deleteMany({ where: { userId } }).catch(() => {})
+}
+
 /**
  * Elevated CS session is valid when:
  * - absolute age since createdAt is under CS_SESSION_ABSOLUTE_MS, AND

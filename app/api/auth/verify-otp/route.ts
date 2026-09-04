@@ -15,6 +15,10 @@ import {
   normalizeLoginRole,
   roleAllowedInOtpResponse,
 } from '@/lib/auth/postLogin'
+import {
+  clearElevatedSessionCookie,
+  revokeAllClientServicesElevatedSessions,
+} from '@/lib/client-services/access'
 import { prisma } from '@/lib/prisma'
 
 
@@ -396,8 +400,10 @@ export async function POST(request: NextRequest) {
       path: '/',
     })
 
-    // CRM-only admins land on /client-services and must enter the access code
-    // (ElevateGate). Do not auto-grant elevated Client Services access here.
+    // Always clear any prior Client Services unlock so CRM users must re-enter
+    // the access code after every sign-in (cookie otherwise survives logout).
+    await revokeAllClientServicesElevatedSessions(user.id)
+    clearElevatedSessionCookie(response)
 
     return response
   } catch (error: unknown) {

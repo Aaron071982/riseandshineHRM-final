@@ -20,6 +20,10 @@ import {
   normalizeMicrosoftEmail,
 } from '@/lib/auth/microsoft'
 import { bootstrapCrmSuperAdmins } from '@/lib/crm/bootstrapRoles'
+import {
+  clearElevatedSessionCookie,
+  revokeAllClientServicesElevatedSessions,
+} from '@/lib/client-services/access'
 import { isFullAdminLoginEmail } from '@/lib/constants'
 import { prisma } from '@/lib/prisma'
 
@@ -169,7 +173,9 @@ export async function GET(request: NextRequest) {
     path: '/',
   })
 
-  // CRM-only admins must enter the Client Services access code (ElevateGate).
+  // Force access-code re-entry after every Microsoft sign-in.
+  await revokeAllClientServicesElevatedSessions(user.id)
+  clearElevatedSessionCookie(response)
 
   response.cookies.delete(MICROSOFT_PKCE_COOKIE)
   response.cookies.delete(MICROSOFT_STATE_COOKIE)
