@@ -167,6 +167,7 @@ export function TreatmentAssessmentPanel({
               >
                 {uploadProgress > 0 ? `Uploading ${uploadProgress}%…` : 'Upload completed PDF'}
               </button>
+              <p className="w-full text-xs text-quiet">PDF up to 50 MB · direct secure upload</p>
             </>
           )}
         </div>

@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSession } from '@/lib/auth'
 import {
-  CLIENT_SERVICES_HOME_PATH,
   getPostLoginPath,
   normalizeLoginRole,
-  shouldRedirectAdminToCrm,
 } from '@/lib/auth/postLogin'
 import {
   MICROSOFT_GRAPH_TOKEN_COOKIE,
@@ -22,10 +20,6 @@ import {
   normalizeMicrosoftEmail,
 } from '@/lib/auth/microsoft'
 import { bootstrapCrmSuperAdmins } from '@/lib/crm/bootstrapRoles'
-import {
-  grantClientServicesElevatedAccess,
-  setElevatedSessionCookie,
-} from '@/lib/client-services/access'
 import { isFullAdminLoginEmail } from '@/lib/constants'
 import { prisma } from '@/lib/prisma'
 
@@ -175,16 +169,7 @@ export async function GET(request: NextRequest) {
     path: '/',
   })
 
-  if (
-    shouldRedirectAdminToCrm(email, loginRole) &&
-    redirectTo === CLIENT_SERVICES_HOME_PATH
-  ) {
-    const csToken = await grantClientServicesElevatedAccess({
-      userId: user.id,
-      ip,
-    })
-    setElevatedSessionCookie(response, csToken)
-  }
+  // CRM-only admins must enter the Client Services access code (ElevateGate).
 
   response.cookies.delete(MICROSOFT_PKCE_COOKIE)
   response.cookies.delete(MICROSOFT_STATE_COOKIE)

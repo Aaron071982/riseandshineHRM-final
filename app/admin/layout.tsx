@@ -2,6 +2,7 @@ import AdminLayout from '@/components/layout/AdminLayout'
 import { cookies } from 'next/headers'
 import { validateSession, isAdmin, isBillingManager, isExecutiveAdmin } from '@/lib/auth'
 import { isOperationsViewer } from '@/lib/auth/operationsAccess'
+import { shouldRedirectAdminToCrm } from '@/lib/auth/postLogin'
 import { canAccessDocumentsEmail } from '@/lib/constants'
 import { canAccessClientServices } from '@/lib/client-services/access'
 import { redirect } from 'next/navigation'
@@ -34,6 +35,11 @@ export default async function AdminLayoutWrapper({
   }
   if (!user || !isAdmin(user)) {
     redirect('/login?session_expired=1')
+  }
+
+  // CRM-only admins (everyone except irsal/tisha) have no HRM portal.
+  if (shouldRedirectAdminToCrm(user.email, user.role)) {
+    redirect('/client-services')
   }
 
   return (

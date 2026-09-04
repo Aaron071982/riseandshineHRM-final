@@ -170,7 +170,7 @@ function SummarySection(props: Props) {
       <Field label="Age">
         <Input value={s.age} readOnly className="bg-canvas/50" />
       </Field>
-      <Field label="Referring Provider">
+      <Field label="Referring / Primary Care Provider">
         <Input value={s.referringProvider} onChange={(e) => set({ referringProvider: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
       <Field label="NPI">
@@ -366,7 +366,19 @@ function PresentLevelsSection(props: Props) {
       {instruments.map(({ key, label, sectionKey }) => (
         <div key={key} className="space-y-2 rounded-lg border border-line p-3">
           <h4 className="font-medium">{label}</h4>
-          <AttachmentUploader clientId={props.clientId} assessmentId={props.assessmentId} sectionKey={sectionKey} kind="IMAGE" accept="image/*" multiple attachments={props.attachments} readOnly={props.readOnly} onUploaded={props.onUploaded} label="Add screenshots / graphs" />
+          <AttachmentUploader
+            clientId={props.clientId}
+            assessmentId={props.assessmentId}
+            sectionKey={sectionKey}
+            kind="AUTO"
+            accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,application/pdf,image/*"
+            multiple
+            attachments={props.attachments}
+            readOnly={props.readOnly}
+            onUploaded={props.onUploaded}
+            label={`Upload ${label} (PDF or image)`}
+            hint="PDF or image · up to 50 MB · uploads go directly to secure storage"
+          />
           {key === 'vineland' && (
             <Field label="Date"><Input type="date" value={p.vineland.date} onChange={(e) => props.setSections((prev) => ({ ...prev, presentLevels: { ...prev.presentLevels, vineland: { ...prev.presentLevels.vineland, date: e.target.value } } }))} readOnly={props.readOnly} onBlur={props.onBlur} /></Field>
           )}
@@ -375,7 +387,19 @@ function PresentLevelsSection(props: Props) {
       ))}
       <div className="space-y-2">
         <h4 className="font-medium">Additional screenshots / attachments</h4>
-        <AttachmentUploader clientId={props.clientId} assessmentId={props.assessmentId} sectionKey="present_levels.extra" kind="IMAGE" accept="image/*" multiple attachments={props.attachments} readOnly={props.readOnly} onUploaded={props.onUploaded} />
+        <AttachmentUploader
+          clientId={props.clientId}
+          assessmentId={props.assessmentId}
+          sectionKey="present_levels.extra"
+          kind="AUTO"
+          accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,application/pdf,image/*"
+          multiple
+          attachments={props.attachments}
+          readOnly={props.readOnly}
+          onUploaded={props.onUploaded}
+          label="Add PDF or image"
+          hint="PDF or image · up to 50 MB"
+        />
       </div>
     </div>
   ))

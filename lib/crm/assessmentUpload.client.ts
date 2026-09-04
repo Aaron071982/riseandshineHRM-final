@@ -1,5 +1,10 @@
 'use client'
 
+import {
+  MAX_ASSESSMENT_FILE_BYTES,
+  validateAssessmentFile,
+} from '@/lib/crm/assessment/attachments.shared'
+
 export type AssessmentUploadProgress = {
   loaded: number
   total: number
@@ -13,6 +18,16 @@ export async function uploadTreatmentAssessmentFile(input: {
   file: File
   onProgress?: (p: AssessmentUploadProgress) => void
 }): Promise<{ attachmentId: string; storagePath: string }> {
+  const check = validateAssessmentFile({
+    kind: input.kind,
+    name: input.file.name,
+    size: input.file.size,
+    type: input.file.type || 'application/octet-stream',
+  })
+  if (!check.ok) {
+    throw new Error(check.error)
+  }
+
   const uploadUrlRes = await fetch(
     `/api/client-services/clients/${input.clientId}/assessments/${input.assessmentId}/upload-url`,
     {
@@ -29,7 +44,12 @@ export async function uploadTreatmentAssessmentFile(input: {
   )
   if (!uploadUrlRes.ok) {
     const err = await uploadUrlRes.json().catch(() => ({}))
-    throw new Error(err.error || 'Could not prepare upload')
+    throw new Error(
+      err.error ||
+        (uploadUrlRes.status === 413
+          ? `File must be ${MAX_ASSESSMENT_FILE_BYTES / (1024 * 1024)} MB or smaller`
+          : 'Could not prepare upload')
+    )
   }
   const { signedUrl, storagePath, contentType } = await uploadUrlRes.json()
 
@@ -46,7 +66,12 @@ export async function uploadTreatmentAssessmentFile(input: {
     }
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve()
-      else reject(new Error('Upload to storage failed'))
+      else
+        reject(
+          new Error(
+            'Upload to storage failed — confirm the assessment-files bucket allows files up to 50 MB'
+          )
+        )
     }
     xhr.onerror = () => reject(new Error('Upload to storage failed'))
     xhr.send(input.file)

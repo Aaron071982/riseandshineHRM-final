@@ -45,11 +45,11 @@ type AssessmentVersion = {
 const GRAPH_TYPES: AssessmentArtifactType[] = ['VINELAND_3', 'ATEC', 'FAST']
 
 const ARTIFACT_ACCEPT: Record<AssessmentArtifactType, string> = {
-  INITIAL_REPORT: '.pdf',
-  VINELAND_3: '.pdf,.png,.jpg,.jpeg,.heic,.webp',
-  ATEC: '.pdf,.png,.jpg,.jpeg,.heic,.webp',
-  FAST: '.jpg,.jpeg,.png,.heic,.webp',
-  JUSTIFICATION: '.pdf',
+  INITIAL_REPORT: '.pdf,application/pdf',
+  VINELAND_3: '.pdf,.png,.jpg,.jpeg,.heic,.webp,application/pdf,image/*',
+  ATEC: '.pdf,.png,.jpg,.jpeg,.heic,.webp,application/pdf,image/*',
+  FAST: '.pdf,.png,.jpg,.jpeg,.heic,.webp,application/pdf,image/*',
+  JUSTIFICATION: '.pdf,application/pdf',
 }
 
 export function ClinicalAssessmentPanel({
@@ -215,8 +215,9 @@ export function ClinicalAssessmentPanel({
             </h3>
             <p className="mt-1 text-sm text-quiet">
               Upload the initial assessment report (PDF) to lock this version. Vineland,
-              ATEC, FAST, and justification are optional when filed separately. Locking
-              makes the record immutable — corrections create a new version.
+              ATEC, FAST, and justification are optional when filed separately (PDF or
+              image, up to 50&nbsp;MB each — uploads go directly to secure storage).
+              Locking makes the record immutable — corrections create a new version.
             </p>
           </div>
           <span

@@ -31,7 +31,12 @@ export function dobToInputString(dob: Date | null | undefined): string {
 export function prefillSummaryFromClient(
   client: Pick<
     ServiceClient,
-    'firstName' | 'lastName' | 'dateOfBirth' | 'parentName' | 'diagnosis'
+    | 'firstName'
+    | 'lastName'
+    | 'dateOfBirth'
+    | 'parentName'
+    | 'diagnosis'
+    | 'referringProvider'
   >
 ): AssessmentSummary {
   const dob = client.dateOfBirth ?? null
@@ -43,7 +48,7 @@ export function prefillSummaryFromClient(
     comorbidDiagnosis: '',
     dateOfBirth: dobStr,
     age: computeAgeFromDob(dob),
-    referringProvider: '',
+    referringProvider: client.referringProvider?.trim() || '',
     npi: '',
     reportDate: todayCalendarDateString(),
     assessorName: '',
@@ -55,7 +60,12 @@ export function prefillSummaryFromClient(
 export function sectionsWithClientPrefill(
   client: Pick<
     ServiceClient,
-    'firstName' | 'lastName' | 'dateOfBirth' | 'parentName' | 'diagnosis'
+    | 'firstName'
+    | 'lastName'
+    | 'dateOfBirth'
+    | 'parentName'
+    | 'diagnosis'
+    | 'referringProvider'
   >
 ): AssessmentSectionData {
   const defaults = defaultAssessmentSections()

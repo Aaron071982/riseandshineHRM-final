@@ -10,17 +10,11 @@ import {
 } from '@/lib/otp-rate-limit'
 import { provisionBillingLoginIfNeeded, shouldProvisionBillingLogin } from '@/lib/billing-portal-users'
 import {
-  CLIENT_SERVICES_HOME_PATH,
   getPostLoginPath,
   isDirectLoginRole,
   normalizeLoginRole,
   roleAllowedInOtpResponse,
-  shouldRedirectAdminToCrm,
 } from '@/lib/auth/postLogin'
-import {
-  grantClientServicesElevatedAccess,
-  setElevatedSessionCookie,
-} from '@/lib/client-services/access'
 import { prisma } from '@/lib/prisma'
 
 
@@ -402,16 +396,8 @@ export async function POST(request: NextRequest) {
       path: '/',
     })
 
-    if (
-      redirectTo === CLIENT_SERVICES_HOME_PATH &&
-      shouldRedirectAdminToCrm(user.email, roleNormalized)
-    ) {
-      const csToken = await grantClientServicesElevatedAccess({
-        userId: user.id,
-        ip: getClientIpFromRequest(request),
-      })
-      setElevatedSessionCookie(response, csToken)
-    }
+    // CRM-only admins land on /client-services and must enter the access code
+    // (ElevateGate). Do not auto-grant elevated Client Services access here.
 
     return response
   } catch (error: unknown) {

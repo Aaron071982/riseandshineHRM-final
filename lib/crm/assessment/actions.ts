@@ -103,6 +103,7 @@ export async function createTreatmentAssessmentForm(
         dateOfBirth: true,
         parentName: true,
         diagnosis: true,
+        referringProvider: true,
       },
     })
     if (!client) {

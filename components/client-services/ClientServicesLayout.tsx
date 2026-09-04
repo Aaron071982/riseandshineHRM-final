@@ -27,6 +27,7 @@ export default function ClientServicesLayout({
   showAdmin = false,
   showTherapistSearch = false,
   showScheduleNav = false,
+  canAccessHrm = false,
   departmentNav = [],
 }: {
   children: React.ReactNode
@@ -35,6 +36,8 @@ export default function ClientServicesLayout({
   showAdmin?: boolean
   showTherapistSearch?: boolean
   showScheduleNav?: boolean
+  /** Irsal/Tisha — may return to the HRM admin portal. */
+  canAccessHrm?: boolean
   departmentNav?: { href: string; label: string }[]
 }) {
   const pathname = usePathname()
@@ -107,7 +110,12 @@ export default function ClientServicesLayout({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'logout' }),
     })
-    router.push('/admin/dashboard')
+    if (canAccessHrm) {
+      router.push('/admin/dashboard')
+    } else {
+      router.push('/client-services')
+      router.refresh()
+    }
   }
 
   const onDetail =
@@ -126,57 +134,61 @@ export default function ClientServicesLayout({
     ? departmentNav.find((d) => pathname.startsWith(d.href))?.label ?? 'Department'
     : null
 
+  const hrmCrumb = canAccessHrm
+    ? [{ label: 'Admin', href: '/admin/dashboard' as const }]
+    : []
+
   const crumbs = onDetail
     ? [
-        { label: 'Admin', href: '/admin/dashboard' },
+        ...hrmCrumb,
         { label: 'Client Services', href: '/client-services' },
         { label: 'Clients', href: '/client-services/clients' },
         { label: 'Client' },
       ]
     : onCaseload
       ? [
-          { label: 'Admin', href: '/admin/dashboard' },
+          ...hrmCrumb,
           { label: 'Client Services', href: '/client-services' },
           { label: 'Clients' },
         ]
       : onAdmin
         ? [
-            { label: 'Admin', href: '/admin/dashboard' },
+            ...hrmCrumb,
             { label: 'Client Services', href: '/client-services' },
             { label: 'Admin Management' },
           ]
         : onTherapistSearch
           ? [
-              { label: 'Admin', href: '/admin/dashboard' },
+              ...hrmCrumb,
               { label: 'Client Services', href: '/client-services' },
               { label: 'Therapist Search' },
             ]
           : onSchedule
           ? [
-              { label: 'Admin', href: '/admin/dashboard' },
+              ...hrmCrumb,
               { label: 'Client Services', href: '/client-services' },
               { label: 'Schedule' },
             ]
           : onProcess
           ? [
-              { label: 'Admin', href: '/admin/dashboard' },
+              ...hrmCrumb,
               { label: 'Client Services', href: '/client-services' },
               { label: 'Process map' },
             ]
           : onProfile
           ? [
-              { label: 'Admin', href: '/admin/dashboard' },
+              ...hrmCrumb,
               { label: 'Client Services', href: '/client-services' },
               { label: 'Profile' },
             ]
           : onDept
           ? [
-              { label: 'Admin', href: '/admin/dashboard' },
+              ...hrmCrumb,
               { label: 'Client Services', href: '/client-services' },
               { label: deptCrumb ?? 'Department' },
             ]
           : [
-              { label: 'Admin', href: '/admin/dashboard' },
+              ...hrmCrumb,
               { label: 'Client Services' },
             ]
 
@@ -205,7 +217,7 @@ export default function ClientServicesLayout({
       moreItems={EMPTY_MORE}
       restricted
       onExit={exitSection}
-      exitLabel="Back to Admin"
+      exitLabel={canAccessHrm ? 'Back to Admin' : 'Lock Client Services'}
       searchValue={search}
       onSearchChange={setSearch}
       onSearchSubmit={() => {

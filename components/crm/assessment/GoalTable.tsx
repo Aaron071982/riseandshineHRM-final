@@ -6,6 +6,7 @@ import type {
   GoalRowColumnA,
   GoalRowColumnB,
 } from '@/lib/crm/assessment/assessment.schema'
+import { defaultTargetMasteryDate } from '@/lib/crm/assessment/targetMasteryDate'
 
 type GoalTableProps =
   | {
@@ -27,10 +28,38 @@ function newRowId() {
   return crypto.randomUUID()
 }
 
+function CellInput({
+  fieldKey,
+  value,
+  onChange,
+  onBlur,
+  readOnly,
+}: {
+  fieldKey: string
+  value: string
+  onChange: (v: string) => void
+  onBlur?: () => void
+  readOnly?: boolean
+}) {
+  const isMastery = fieldKey === 'targetMasteryDate'
+  return (
+    <Input
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
+      readOnly={readOnly}
+      placeholder={isMastery ? 'MM/YYYY' : undefined}
+      inputMode={isMastery ? 'numeric' : undefined}
+      className="min-w-[120px] text-xs"
+    />
+  )
+}
+
 export function GoalTable(props: GoalTableProps) {
   const { readOnly, onBlur } = props
 
   const addRow = () => {
+    const mastery = defaultTargetMasteryDate()
     if (props.variant === 'A') {
       props.onChange([
         ...props.rows,
@@ -42,7 +71,7 @@ export function GoalTable(props: GoalTableProps) {
           previousAssessmentScore: '',
           currentPerformance: '',
           masteryCriteria: '',
-          targetMasteryDate: '',
+          targetMasteryDate: mastery,
         },
       ])
     } else {
@@ -55,7 +84,7 @@ export function GoalTable(props: GoalTableProps) {
           previousAssessmentPerformance: '',
           currentPerformance: '',
           masteryCriteria: '',
-          targetMasteryDate: '',
+          targetMasteryDate: mastery,
           methodsToBeUtilized: '',
         },
       ])
@@ -90,18 +119,18 @@ export function GoalTable(props: GoalTableProps) {
           <tr key={row.id} className="border-t border-line">
             {cols.map((col) => (
               <td key={col.key} className="p-1 align-top">
-                <Input
+                <CellInput
+                  fieldKey={col.key}
                   value={row[col.key] as string}
-                  onChange={(e) =>
+                  onChange={(v) =>
                     props.onChange(
                       props.rows.map((r) =>
-                        r.id === row.id ? { ...r, [col.key]: e.target.value } : r
+                        r.id === row.id ? { ...r, [col.key]: v } : r
                       )
                     )
                   }
                   onBlur={onBlur}
                   readOnly={readOnly}
-                  className="min-w-[120px] text-xs"
                 />
               </td>
             ))}
@@ -143,18 +172,18 @@ export function GoalTable(props: GoalTableProps) {
         <tr key={row.id} className="border-t border-line">
           {colsB.map((col) => (
             <td key={col.key} className="p-1 align-top">
-              <Input
+              <CellInput
+                fieldKey={col.key}
                 value={row[col.key] as string}
-                onChange={(e) =>
+                onChange={(v) =>
                   props.onChange(
                     props.rows.map((r) =>
-                      r.id === row.id ? { ...r, [col.key]: e.target.value } : r
+                      r.id === row.id ? { ...r, [col.key]: v } : r
                     )
                   )
                 }
                 onBlur={onBlur}
                 readOnly={readOnly}
-                className="min-w-[120px] text-xs"
               />
             </td>
           ))}

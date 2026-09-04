@@ -20,6 +20,18 @@ describe('lib/auth/postLogin', () => {
     expect(getPostLoginPath('ADMIN', 'tisha@riseandshineaba.com')).toBe('/admin/dashboard')
   })
 
+  it('sends other riseandshine admins to Client Services access-code entry', () => {
+    for (const email of [
+      'kazi@riseandshineaba.com',
+      'fardeen@riseandshineaba.com',
+      'shazia@riseandshineaba.com',
+      'afsana@riseandshineaba.com',
+    ]) {
+      expect(shouldRedirectAdminToCrm(email, 'ADMIN')).toBe(true)
+      expect(getPostLoginPath('ADMIN', email)).toBe(CLIENT_SERVICES_HOME_PATH)
+    }
+  })
+
   it('does not redirect non-admin roles to CRM', () => {
     expect(shouldRedirectAdminToCrm('afsana@riseandshineaba.com', 'RBT')).toBe(false)
     expect(getPostLoginPath('RBT', 'afsana@riseandshineaba.com')).toBe('/rbt/dashboard')

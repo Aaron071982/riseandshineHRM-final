@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { inferAssessmentAttachmentKind } from '@/lib/crm/assessment/attachments.shared'
 import { uploadTreatmentAssessmentFile } from '@/lib/crm/assessmentUpload.client'
 
 type AttachmentRecord = {
@@ -15,13 +16,15 @@ type AttachmentUploaderProps = {
   clientId: string
   assessmentId: string
   sectionKey: string
-  kind: 'IMAGE' | 'PDF'
+  /** Fixed kind, or auto-detect PDF vs image from the selected file. */
+  kind: 'IMAGE' | 'PDF' | 'AUTO'
   accept: string
   multiple?: boolean
   attachments: AttachmentRecord[]
   readOnly?: boolean
   onUploaded: () => void
   label?: string
+  hint?: string
 }
 
 export function AttachmentUploader({
@@ -35,6 +38,7 @@ export function AttachmentUploader({
   readOnly,
   onUploaded,
   label = 'Upload file',
+  hint,
 }: AttachmentUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -50,11 +54,16 @@ export function AttachmentUploader({
     try {
       const list = multiple ? Array.from(files) : [files[0]]
       for (const file of list) {
+        const resolvedKind =
+          kind === 'AUTO' ? inferAssessmentAttachmentKind(file) : kind
+        if (!resolvedKind) {
+          throw new Error('Only PDF or image files are allowed (up to 50 MB)')
+        }
         await uploadTreatmentAssessmentFile({
           clientId,
           assessmentId,
           sectionKey,
-          kind,
+          kind: resolvedKind,
           file,
           onProgress: (p) => setProgress(Math.round((p.loaded / p.total) * 100)),
         })
@@ -90,6 +99,7 @@ export function AttachmentUploader({
           >
             {uploading ? `Uploading ${progress}%…` : label}
           </Button>
+          {hint && <p className="text-xs text-quiet">{hint}</p>}
         </>
       )}
       {error && (

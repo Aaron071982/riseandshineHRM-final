@@ -5,6 +5,7 @@ import {
   REQUIRED_ASSESSMENT_ARTIFACT_TYPES,
   missingAssessmentArtifactTypes,
   parseAssessmentArtifactType,
+  validateClinicalAssessmentFile,
 } from '@/lib/crm/clinicalAssessment/artifacts.shared'
 
 describe('clinical assessment artifact sets', () => {
@@ -36,5 +37,37 @@ describe('clinical assessment artifact sets', () => {
     expect(
       missingAssessmentArtifactTypes([{ artifactType: 'INITIAL_REPORT' }])
     ).toEqual([])
+  })
+
+  it('accepts PDF or image for Vineland, ATEC, and FAST up to 50 MB', () => {
+    for (const artifactType of ['VINELAND_3', 'ATEC', 'FAST'] as const) {
+      expect(
+        validateClinicalAssessmentFile({
+          artifactType,
+          name: `${artifactType.toLowerCase()}.pdf`,
+          size: 40 * 1024 * 1024,
+          type: 'application/pdf',
+        }).ok
+      ).toBe(true)
+      expect(
+        validateClinicalAssessmentFile({
+          artifactType,
+          name: `${artifactType.toLowerCase()}.png`,
+          size: 1024,
+          type: 'image/png',
+        }).ok
+      ).toBe(true)
+    }
+  })
+
+  it('rejects clinical assessment files over 50 MB', () => {
+    const result = validateClinicalAssessmentFile({
+      artifactType: 'INITIAL_REPORT',
+      name: 'report.pdf',
+      size: 50 * 1024 * 1024 + 1,
+      type: 'application/pdf',
+    })
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toMatch(/50 MB/)
   })
 })

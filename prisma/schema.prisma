@@ -3069,6 +3069,8 @@ model ServiceClient {
   inquiryReceivedAt    DateTime?
   lastParentContactAt  DateTime?
   actualServiceStartDate DateTime?
+  /// PCP / referring provider who referred for ABA services (assessment prefill).
+  referringProvider    String?
   /// Parallel clinical track — does not block staffing; must be COMPLETE before ACTIVE.
   treatmentPlanStatus    MilestoneStatus       @default(NOT_STARTED)
   treatmentPlanCompletedAt DateTime?

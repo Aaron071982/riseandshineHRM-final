@@ -151,12 +151,13 @@ export function BehaviorBlockEditor({
           clientId={clientId}
           assessmentId={assessmentId}
           sectionKey={graphKey}
-          kind="IMAGE"
-          accept="image/*"
+          kind="AUTO"
+          accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,application/pdf,image/*"
           attachments={attachments}
           readOnly={readOnly}
           onUploaded={onUploaded}
-          label="Upload graph"
+          label="Upload graph (PDF or image)"
+          hint="Up to 50 MB"
         />
       </Field>
       {(
@@ -183,12 +184,13 @@ export function BehaviorBlockEditor({
           clientId={clientId}
           assessmentId={assessmentId}
           sectionKey={mapKey}
-          kind="IMAGE"
-          accept="image/*"
+          kind="AUTO"
+          accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,application/pdf,image/*"
           attachments={attachments}
           readOnly={readOnly}
           onUploaded={onUploaded}
-          label="Upload contingency map"
+          label="Upload contingency map (PDF or image)"
+          hint="Up to 50 MB"
         />
       </Field>
     </div>

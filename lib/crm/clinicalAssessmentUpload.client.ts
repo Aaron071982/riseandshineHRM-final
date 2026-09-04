@@ -1,5 +1,6 @@
 import type { AssessmentArtifactType } from '@prisma/client'
 import {
+  MAX_CLINICAL_ASSESSMENT_BYTES,
   validateClinicalAssessmentFile,
 } from '@/lib/crm/clinicalAssessment/artifacts.shared'
 
@@ -85,6 +86,12 @@ export async function uploadClinicalAssessmentArtifact(
   })
   if (!check.ok) {
     throw new ClinicalAssessmentUploadError(check.error, 'validation')
+  }
+  if (file.size > MAX_CLINICAL_ASSESSMENT_BYTES) {
+    throw new ClinicalAssessmentUploadError(
+      `File must be ${MAX_CLINICAL_ASSESSMENT_BYTES / (1024 * 1024)} MB or smaller`,
+      'validation'
+    )
   }
 
   const urlRes = await fetch(

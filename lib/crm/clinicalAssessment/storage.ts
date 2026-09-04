@@ -63,7 +63,9 @@ export async function createClinicalAssessmentSignedUpload(input: {
     .createSignedUploadUrl(storagePath, { upsert: false })
   if (error || !data?.signedUrl) {
     console.error('[crm-clinical-assessment] signed upload url failed', error)
-    throw new Error('Could not prepare upload')
+    throw new Error(
+      'Could not prepare upload — confirm the onboarding-documents bucket allows files up to 50 MB'
+    )
   }
   return {
     signedUrl: data.signedUrl,

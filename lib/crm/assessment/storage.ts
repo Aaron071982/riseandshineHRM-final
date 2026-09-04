@@ -11,6 +11,7 @@ import { buildAssessmentStoragePath } from '@/lib/crm/assessment/storagePaths'
 
 export {
   assertAssessmentStoragePath,
+  inferAssessmentAttachmentKind,
   MAX_ASSESSMENT_FILE_BYTES,
   parseAssessmentAttachmentKind,
   validateAssessmentFile,
@@ -49,7 +50,9 @@ export async function createAssessmentSignedUpload(input: {
 
   if (error || !data?.signedUrl) {
     console.error('[treatment-assessment] signed upload url failed', error)
-    throw new Error('Could not prepare upload')
+    throw new Error(
+      'Could not prepare upload — confirm the assessment-files bucket allows files up to 50 MB'
+    )
   }
 
   return {

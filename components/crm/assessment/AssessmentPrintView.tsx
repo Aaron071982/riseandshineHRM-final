@@ -143,7 +143,7 @@ export function AssessmentPrintView(props: Props) {
                   <Field label="Comorbid Diagnosis" value={s.comorbidDiagnosis} />
                   <Field label="Date of Birth" value={dobDisplay} />
                   <Field label="Age" value={s.age} />
-                  <Field label="Referring Provider" value={s.referringProvider} />
+                  <Field label="Referring / Primary Care Provider" value={s.referringProvider} />
                   <Field label="NPI" value={s.npi} />
                   <Field label="Report Date" value={s.reportDate} />
                   <Field

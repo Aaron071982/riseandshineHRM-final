@@ -807,6 +807,7 @@ export type UpdateClientOverviewInput = {
   bcbaName?: string | null
   caseCoordinatorName?: string | null
   referralSource?: ClientReferralSource | null
+  referringProvider?: string | null
   inquiryReceivedAt?: string | null
   actualServiceStartDate?: string | null
   authHours?: string | null
@@ -889,6 +890,9 @@ export async function updateClientOverview(
           : {}),
         ...(input.referralSource !== undefined
           ? { referralSource: input.referralSource ?? 'OTHER' }
+          : {}),
+        ...(input.referringProvider !== undefined
+          ? { referringProvider: trim(input.referringProvider) }
           : {}),
         ...(input.inquiryReceivedAt !== undefined
           ? { inquiryReceivedAt: parseOptionalDate(input.inquiryReceivedAt) }

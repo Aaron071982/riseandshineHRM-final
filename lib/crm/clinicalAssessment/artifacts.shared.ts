@@ -45,24 +45,29 @@ const IMAGE_TYPES = new Set([
 ])
 const PDF_EXT = new Set(['pdf'])
 const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'heic', 'heif', 'webp'])
-const FAST_EXT = new Set(['jpg', 'jpeg', 'png', 'heic', 'heif', 'webp'])
+const INSTRUMENT_EXT = new Set([...PDF_EXT, ...IMAGE_EXT])
 
 type ArtifactRule = {
   contentTypes: Set<string>
   extensions: Set<string>
 }
 
+const INSTRUMENT_TYPES = new Set([...PDF_TYPES, ...IMAGE_TYPES])
+
 const ARTIFACT_RULES: Record<AssessmentArtifactType, ArtifactRule> = {
   INITIAL_REPORT: { contentTypes: PDF_TYPES, extensions: PDF_EXT },
   VINELAND_3: {
-    contentTypes: new Set([...PDF_TYPES, ...IMAGE_TYPES]),
-    extensions: new Set([...PDF_EXT, ...IMAGE_EXT]),
+    contentTypes: INSTRUMENT_TYPES,
+    extensions: INSTRUMENT_EXT,
   },
   ATEC: {
-    contentTypes: new Set([...PDF_TYPES, ...IMAGE_TYPES]),
-    extensions: new Set([...PDF_EXT, ...IMAGE_EXT]),
+    contentTypes: INSTRUMENT_TYPES,
+    extensions: INSTRUMENT_EXT,
   },
-  FAST: { contentTypes: IMAGE_TYPES, extensions: FAST_EXT },
+  FAST: {
+    contentTypes: INSTRUMENT_TYPES,
+    extensions: INSTRUMENT_EXT,
+  },
   JUSTIFICATION: { contentTypes: PDF_TYPES, extensions: PDF_EXT },
 }
 

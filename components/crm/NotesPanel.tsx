@@ -69,6 +69,7 @@ type OverviewClient = {
   bcbaProfile: { fullName: string; email: string | null } | null
   caseCoordinatorUser: { name: string | null; email: string | null } | null
   referralSource: string | null
+  referringProvider: string | null
   inquiryReceivedAt: string | Date | null
   actualServiceStartDate: string | Date | null
   preferredRbtGender: GenderPreference | null
@@ -93,6 +94,7 @@ type OverviewForm = {
   bcbaName: string
   caseCoordinatorName: string
   referralSource: ClientReferralSource
+  referringProvider: string
   inquiryReceivedAt: string
   actualServiceStartDate: string
   authHours: string
@@ -116,6 +118,7 @@ function buildOverviewForm(client: OverviewClient): OverviewForm {
     bcbaName: client.bcbaName ?? '',
     caseCoordinatorName: client.caseCoordinatorName ?? '',
     referralSource: (client.referralSource as ClientReferralSource) || 'OTHER',
+    referringProvider: client.referringProvider ?? '',
     inquiryReceivedAt: toDateInputValue(client.inquiryReceivedAt),
     actualServiceStartDate: toDateInputValue(client.actualServiceStartDate),
     authHours: client.authHours != null ? String(client.authHours) : '',
@@ -486,6 +489,10 @@ export function OverviewPanel({
     },
     { label: 'Referral source', value: client.referralSource || '—' },
     {
+      label: 'Referring / PCP provider',
+      value: client.referringProvider || '—',
+    },
+    {
       label: 'Inquiry received',
       value: client.inquiryReceivedAt
         ? formatCalendarDate(client.inquiryReceivedAt)
@@ -770,6 +777,17 @@ export function OverviewPanel({
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Referring / PCP provider (ABA referral)
+              </span>
+              <input
+                value={form.referringProvider}
+                onChange={(e) => setField('referringProvider', e.target.value)}
+                placeholder="Primary care or referring provider"
+                className={inputCls}
+              />
             </label>
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
