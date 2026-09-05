@@ -204,8 +204,8 @@ function TreatmentRequestSection(props: Props) {
         <thead><tr className="bg-canvas/60"><th className="p-2 text-left">Code</th><th className="p-2 text-left">Service</th><th className="p-2 text-left">Requested Hours</th></tr></thead>
         <tbody>
           <IntensityRow code="97151" label="Initial assessment — hours per authorization period" value={t.hrs97151} onChange={(v) => set({ hrs97151: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
-          <IntensityRow code="97153" label="Direct 1:1 ABA Treatment — hours weekly initially; 25 hours weekly thereafter" value={t.hrs97153Initial} onChange={(v) => set({ hrs97153Initial: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
-          <IntensityRow code="97155" label="Direction of Technician / Protocol Modification (BCBA present) — hours weekly initially; 2.5 hours weekly thereafter" value={t.hrs97155Initial} onChange={(v) => set({ hrs97155Initial: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
+          <IntensityRow code="97153" label="Direct 1:1 ABA Treatment — hours weekly initially" value={t.hrs97153Initial} onChange={(v) => set({ hrs97153Initial: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
+          <IntensityRow code="97155" label="Direction of Technician / Protocol Modification (BCBA present) — hours weekly initially" value={t.hrs97155Initial} onChange={(v) => set({ hrs97155Initial: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
           <IntensityRow code="97156" label="Parent / Caregiver Training — hour weekly (no less than 2x sessions monthly)" value={t.hrs97156} onChange={(v) => set({ hrs97156: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
           <IntensityRow code="97157" label="Group Parent Training — hours monthly (if applicable)" value={t.hrs97157} onChange={(v) => set({ hrs97157: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
         </tbody>
