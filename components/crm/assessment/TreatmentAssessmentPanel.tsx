@@ -8,6 +8,7 @@ import {
   createTreatmentAssessmentForm,
   createTreatmentAssessmentUploadShell,
   finalizeTreatmentAssessmentUpload,
+  reopenTreatmentAssessment,
   softDeleteTreatmentAssessment,
 } from '@/lib/crm/assessment/actions'
 import { uploadTreatmentAssessmentFile } from '@/lib/crm/assessmentUpload.client'
@@ -109,6 +110,18 @@ export function TreatmentAssessmentPanel({
     if (!confirm('Soft-delete this assessment record?')) return
     startTransition(async () => {
       const result = await softDeleteTreatmentAssessment(assessmentId)
+      if (!result.ok) setError(result.error)
+      else router.refresh()
+    })
+  }
+
+  const onReopen = (assessmentId: string) => {
+    if (!confirm('Re-open this assessment for editing? You can mark it complete again later.')) {
+      return
+    }
+    setError(null)
+    startTransition(async () => {
+      const result = await reopenTreatmentAssessment(assessmentId)
       if (!result.ok) setError(result.error)
       else router.refresh()
     })
@@ -216,6 +229,16 @@ export function TreatmentAssessmentPanel({
                   >
                     View
                   </Link>
+                )}
+                {a.source === 'FORM' && a.status === 'COMPLETED' && canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onReopen(a.id)}
+                    disabled={pending}
+                    className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas disabled:opacity-50"
+                  >
+                    Re-open
+                  </button>
                 )}
                 <a
                   href={downloadHref(a)}

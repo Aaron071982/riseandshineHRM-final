@@ -11,6 +11,7 @@ import {
 import {
   markTreatmentAssessmentComplete,
   patchTreatmentAssessment,
+  reopenTreatmentAssessment,
   saveTreatmentAssessmentSection,
   signTreatmentAssessment,
 } from '@/lib/crm/assessment/actions'
@@ -133,6 +134,18 @@ export function AssessmentFormClient({
     })
   }
 
+  const onReopen = () => {
+    if (!confirm('Re-open this assessment for editing? You can mark it complete again later.')) {
+      return
+    }
+    setError(null)
+    startTransition(async () => {
+      const result = await reopenTreatmentAssessment(assessmentId)
+      if (!result.ok) setError(result.error)
+      else router.refresh()
+    })
+  }
+
   const onUploaded = () => {
     router.refresh()
   }
@@ -166,6 +179,11 @@ export function AssessmentFormClient({
             {canEdit && source === 'FORM' && status !== 'COMPLETED' && status !== 'SIGNED' && (
               <button type="button" onClick={onComplete} disabled={pending} className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand/90 disabled:opacity-50">
                 Mark complete
+              </button>
+            )}
+            {canEdit && source === 'FORM' && status === 'COMPLETED' && (
+              <button type="button" onClick={onReopen} disabled={pending} className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas disabled:opacity-50">
+                Re-open for editing
               </button>
             )}
             {canEdit && status === 'COMPLETED' && (

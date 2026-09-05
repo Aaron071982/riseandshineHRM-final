@@ -341,6 +341,64 @@ export async function markTreatmentAssessmentComplete(
   }
 }
 
+export async function reopenTreatmentAssessment(
+  assessmentId: string
+): Promise<ActionResult<{ assessmentId: string }>> {
+  try {
+    const user = await getClientServicesUser()
+    assertCanCompleteTreatmentAssessment(user)
+
+    const assessment = await prisma.clientTreatmentAssessment.findFirst({
+      where: { id: assessmentId, deletedAt: null },
+      select: { id: true, serviceClientId: true, status: true, source: true },
+    })
+    if (!assessment) {
+      return { ok: false, error: 'Assessment not found', status: 404 }
+    }
+    if (assessment.source === 'UPLOAD') {
+      return {
+        ok: false,
+        error: 'Uploaded assessments cannot be reopened for in-app editing',
+        status: 400,
+      }
+    }
+    if (assessment.status === 'SIGNED') {
+      return {
+        ok: false,
+        error: 'Signed assessments cannot be reopened',
+        status: 400,
+      }
+    }
+    if (assessment.status !== 'COMPLETED') {
+      return { ok: true, assessmentId: assessment.id }
+    }
+
+    await assertCanViewClient(user, assessment.serviceClientId)
+
+    await prisma.clientTreatmentAssessment.update({
+      where: { id: assessmentId },
+      data: {
+        status: 'IN_PROGRESS',
+        completedAt: null,
+        updatedByUserId: user.id,
+      },
+    })
+
+    await auditTreatmentAssessmentAction({
+      userId: user.id,
+      serviceClientId: assessment.serviceClientId,
+      assessmentId,
+      action: 'UPDATED',
+      detail: 'REOPENED',
+    })
+
+    revalidateAssessmentPaths(assessment.serviceClientId, assessmentId)
+    return { ok: true, assessmentId }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 export async function signTreatmentAssessment(
   assessmentId: string
 ): Promise<ActionResult<{ assessmentId: string }>> {
