@@ -182,7 +182,7 @@ export function AssessmentFormClient({
               </button>
             )}
             {canEdit && source === 'FORM' && status === 'COMPLETED' && (
-              <button type="button" onClick={onReopen} disabled={pending} className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas disabled:opacity-50">
+              <button type="button" onClick={onReopen} disabled={pending} className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand/90 disabled:opacity-50">
                 Re-open for editing
               </button>
             )}
