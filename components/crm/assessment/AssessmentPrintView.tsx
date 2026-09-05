@@ -10,6 +10,12 @@ import {
   TREATMENT_REQUESTS_INTRO,
 } from '@/lib/crm/assessment/boilerplate'
 import type { AssessmentSectionData } from '@/lib/crm/assessment/assessment.schema'
+import {
+  aflsLatestProtocolValue,
+  aflsLatestSkillAreaValue,
+  hasLegacyAtecData,
+  selectedSkillsAssessmentLabel,
+} from '@/lib/crm/assessment/afls'
 import type { TreatmentAssessmentStatus, TreatmentAssessmentSource } from '@prisma/client'
 import { AssessmentPrintToolbar } from '@/components/crm/assessment/AssessmentPrintToolbar'
 
@@ -81,6 +87,12 @@ export function AssessmentPrintView(props: Props) {
 
   const attachmentsFor = (prefix: string) =>
     props.attachments.filter((a) => a.sectionKey.startsWith(prefix))
+  const selectedSkillsLabel = selectedSkillsAssessmentLabel(props.sections.instruments)
+  const showLegacyAtec = hasLegacyAtecData(
+    props.sections.instruments,
+    props.sections.presentLevels.atec.interpretation,
+    attachmentsFor('present_levels.atec').length
+  )
 
   const locations = Object.entries(props.sections.locationSchedule.primaryLocations)
     .filter(([, v]) => v)
@@ -187,32 +199,92 @@ export function AssessmentPrintView(props: Props) {
                 <PrintSection title="Instruments & Methods" pageBreak>
                   <Block title="Family/caregiver(s) interview" text={props.sections.instruments.familyCaregiverInterview} />
                   <Block title="Records reviewed" text={props.sections.instruments.recordsReviewed} />
+                  <Field label="Skills assessment instrument" value={selectedSkillsLabel} />
                   <Field label="Vineland completed by parent on" value={props.sections.instruments.vinelandCompletedDate} />
                   <Block title="Behavior Assessment (FAST)" text={props.sections.instruments.fastAssessment} />
-                  <Block title="Autism Treatment Evaluation Checklist (ATEC)" text={props.sections.instruments.atecAssessment} />
+                  {props.sections.instruments.skillsAssessmentType === 'AFLS' && (
+                    <Block title="Assessment of Functional Living Skills (AFLS)" text={props.sections.instruments.aflsAssessment} />
+                  )}
+                  {props.sections.instruments.skillsAssessmentType === 'ATEC' && (
+                    <Block title="Autism Treatment Evaluation Checklist (ATEC)" text={props.sections.instruments.atecAssessment} />
+                  )}
+                  {props.sections.instruments.skillsAssessmentType === 'OTHER' && (
+                    <Block title={selectedSkillsLabel} text={props.sections.instruments.otherSkillsAssessmentSummary} />
+                  )}
                   <Block title="Observation 1" text={props.sections.instruments.observation1} />
                   <Block title="Observation 2" text={props.sections.instruments.observation2} />
                   <Block title="Preference Assessment" text={props.sections.instruments.preferenceAssessment} />
                 </PrintSection>
 
                 <PrintSection title="Present Levels of Performance" pageBreak>
-                  {(['vineland', 'atec', 'fast'] as const).map((key) => (
-                    <div key={key} className="section-block">
-                      <p className="subheading">{key === 'vineland' ? 'Vineland' : key.toUpperCase()}</p>
-                      {key === 'vineland' && (
-                        <Field label="Date" value={props.sections.presentLevels.vineland.date} />
-                      )}
+                  <div className="section-block">
+                    <p className="subheading">Vineland</p>
+                    <Field label="Date" value={props.sections.presentLevels.vineland.date} />
+                    <AttachmentImages
+                      attachments={attachmentsFor('present_levels.vineland')}
+                      urls={props.attachmentUrls}
+                    />
+                    <AttachmentFileList attachments={attachmentsFor('present_levels.vineland')} />
+                    <Block title="Interpretation" text={props.sections.presentLevels.vineland.interpretation} />
+                  </div>
+                  {props.sections.instruments.skillsAssessmentType === 'AFLS' && (
+                    <AflsPrintBlock
+                      afls={props.sections.presentLevels.afls}
+                      attachments={attachmentsFor('present_levels.afls')}
+                      urls={props.attachmentUrls}
+                    />
+                  )}
+                  {props.sections.instruments.skillsAssessmentType === 'ATEC' && (
+                    <div className="section-block">
+                      <p className="subheading">ATEC</p>
                       <AttachmentImages
-                        attachments={attachmentsFor(`present_levels.${key}`)}
+                        attachments={attachmentsFor('present_levels.atec')}
                         urls={props.attachmentUrls}
                       />
-                      <Block title="Interpretation" text={props.sections.presentLevels[key].interpretation} />
+                      <AttachmentFileList attachments={attachmentsFor('present_levels.atec')} />
+                      <Block title="Interpretation" text={props.sections.presentLevels.atec.interpretation} />
                     </div>
-                  ))}
+                  )}
+                  {props.sections.instruments.skillsAssessmentType === 'OTHER' && (
+                    <div className="section-block">
+                      <p className="subheading">{selectedSkillsLabel}</p>
+                      <AttachmentImages
+                        attachments={attachmentsFor('present_levels.other')}
+                        urls={props.attachmentUrls}
+                      />
+                      <AttachmentFileList attachments={attachmentsFor('present_levels.other')} />
+                      <Block title="Interpretation" text={props.sections.presentLevels.other.interpretation} />
+                    </div>
+                  )}
+                  <div className="section-block">
+                    <p className="subheading">FAST</p>
+                    <AttachmentImages
+                      attachments={attachmentsFor('present_levels.fast')}
+                      urls={props.attachmentUrls}
+                    />
+                    <AttachmentFileList attachments={attachmentsFor('present_levels.fast')} />
+                    <Block title="Interpretation" text={props.sections.presentLevels.fast.interpretation} />
+                  </div>
+                  {props.sections.instruments.skillsAssessmentType !== 'ATEC' && showLegacyAtec && (
+                    <div className="section-block">
+                      <p className="subheading">Legacy ATEC</p>
+                      <AttachmentImages
+                        attachments={attachmentsFor('present_levels.atec')}
+                        urls={props.attachmentUrls}
+                      />
+                      <AttachmentFileList attachments={attachmentsFor('present_levels.atec')} />
+                      <Block title="Legacy summary text" text={props.sections.instruments.atecAssessment} />
+                      <Block title="Legacy interpretation" text={props.sections.presentLevels.atec.interpretation} />
+                    </div>
+                  )}
                   <AttachmentImages
                     attachments={attachmentsFor('present_levels.extra')}
                     urls={props.attachmentUrls}
                     label="Additional attachments"
+                  />
+                  <AttachmentFileList
+                    attachments={attachmentsFor('present_levels.extra')}
+                    label="Additional attachment files"
                   />
                 </PrintSection>
 
@@ -427,6 +499,177 @@ function AttachmentImages({
           <img key={a.id} src={urls[a.id]} alt={a.fileName} />
         ))}
       </div>
+    </div>
+  )
+}
+
+function AttachmentFileList({
+  attachments,
+  label,
+}: {
+  attachments: Props['attachments']
+  label?: string
+}) {
+  const files = attachments.filter((a) => !/\bimage\//i.test(a.mimeType || ''))
+  if (files.length === 0) return null
+  return (
+    <div className="section-block">
+      <p className="subheading">{label || 'Files on record'}</p>
+      {files.map((file) => (
+        <p key={file.id} className="prose-block">
+          {file.fileName}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+function AflsPrintBlock({
+  afls,
+  attachments,
+  urls,
+}: {
+  afls: AssessmentSectionData['presentLevels']['afls']
+  attachments: Props['attachments']
+  urls: Record<string, string>
+}) {
+  const hasContent =
+    afls.interpretation.trim() ||
+    afls.protocols.length > 0 ||
+    attachments.length > 0
+  if (!hasContent) return null
+
+  return (
+    <div className="section-block">
+      <p className="subheading">AFLS</p>
+      <AttachmentImages attachments={attachments} urls={urls} />
+      <AttachmentFileList attachments={attachments} />
+      <Block title="Interpretation" text={afls.interpretation} />
+      <AflsSummaryTables afls={afls} />
+    </div>
+  )
+}
+
+function AflsSummaryTables({
+  afls,
+}: {
+  afls: AssessmentSectionData['presentLevels']['afls']
+}) {
+  const protocolRows = afls.protocols
+    .map((protocol) => ({
+      label: protocol.label || protocol.key || 'Protocol',
+      value: aflsLatestProtocolValue(protocol),
+    }))
+    .filter((row) => row.value != null) as { label: string; value: number }[]
+  const areaRows = afls.protocols.flatMap((protocol) =>
+    protocol.skillAreas
+      .map((area) => ({
+        label: area.label || area.code || protocol.label || protocol.key || 'Skill area',
+        value: aflsLatestSkillAreaValue(area),
+      }))
+      .filter((row) => row.value != null) as { label: string; value: number }[]
+  )
+
+  return (
+    <>
+      {protocolRows.length > 0 && <AflsBarTable title="Protocol summary scores" rows={protocolRows} />}
+      {areaRows.length > 0 && <AflsBarTable title="Skill-area summary scores" rows={areaRows} />}
+      {afls.protocols.map((protocol) => (
+        <div key={protocol.id} className="section-block">
+          <p className="subheading">{protocol.label || protocol.key || 'Protocol'}</p>
+          {protocol.skillAreas.map((area) =>
+            area.skills.length > 0 ? (
+              <AflsSkillGridPrint
+                key={area.id}
+                title={area.label || area.code || 'Skill area'}
+                area={area}
+              />
+            ) : null
+          )}
+        </div>
+      ))}
+    </>
+  )
+}
+
+function AflsBarTable({
+  title,
+  rows,
+}: {
+  title: string
+  rows: { label: string; value: number }[]
+}) {
+  const max = Math.max(...rows.map((row) => row.value), 1)
+  return (
+    <div className="section-block">
+      <p className="subheading">{title}</p>
+      <table className="print-table">
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th>Graph</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${title}-${row.label}`}>
+              <td>{row.label}</td>
+              <td>
+                <div style={{ height: 12, background: '#f3ede7', borderRadius: 9999 }}>
+                  <div
+                    style={{
+                      height: 12,
+                      width: `${Math.max(4, (row.value / max) * 100)}%`,
+                      background: '#f97316',
+                      borderRadius: 9999,
+                    }}
+                  />
+                </div>
+              </td>
+              <td>{row.value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function AflsSkillGridPrint({
+  title,
+  area,
+}: {
+  title: string
+  area: AssessmentSectionData['presentLevels']['afls']['protocols'][number]['skillAreas'][number]
+}) {
+  const dates = [...new Set(area.skills.flatMap((skill) => skill.scores.map((score) => score.date).filter(Boolean)))].sort()
+  if (area.skills.length === 0 || dates.length === 0) return null
+
+  return (
+    <div className="section-block">
+      <p className="subheading">{title}</p>
+      <table className="print-table">
+        <thead>
+          <tr>
+            <th>Skill</th>
+            {dates.map((date) => (
+              <th key={date}>{date}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {area.skills.map((skill) => (
+            <tr key={skill.id}>
+              <td>{[skill.code, skill.label].filter(Boolean).join(' · ') || 'Skill'}</td>
+              {dates.map((date) => {
+                const score = skill.scores.find((entry) => entry.date === date)?.value
+                return <td key={date}>{score == null ? '—' : String(score)}</td>
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

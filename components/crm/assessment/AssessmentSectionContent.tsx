@@ -13,6 +13,7 @@ import { CheckboxGroup } from '@/components/crm/assessment/CheckboxGroup'
 import { ContactFieldEditor } from '@/components/crm/assessment/ContactFieldEditor'
 import { GoalTable } from '@/components/crm/assessment/GoalTable'
 import { AttachmentUploader } from '@/components/crm/assessment/AttachmentUploader'
+import { AflsEditor } from '@/components/crm/assessment/AflsEditor'
 import { BehaviorBlockEditor } from '@/components/crm/assessment/BehaviorBlockEditor'
 import SignaturePad from '@/components/rbt/SignaturePad'
 import {
@@ -32,7 +33,13 @@ import {
   emptyTransitionCriteriaRow,
   type AssessmentSectionData,
   type AssessmentSectionKey,
+  type SkillsAssessmentType,
 } from '@/lib/crm/assessment/assessment.schema'
+import {
+  hasLegacyAtecData,
+  SKILLS_ASSESSMENT_TYPE_LABELS,
+  selectedSkillsAssessmentLabel,
+} from '@/lib/crm/assessment/afls'
 import { computeAgeFromDob, calendarDateFromInput } from '@/lib/crm/assessment/prefill'
 
 export const SECTION_NAV: { key: AssessmentSectionKey; label: string }[] = [
@@ -336,17 +343,59 @@ function InstrumentsSection(props: Props) {
   const i = props.sections.instruments
   const set = (key: keyof typeof i, v: string) =>
     props.setSections((prev) => ({ ...prev, instruments: { ...prev.instruments, [key]: v } }))
+  const selectedLabel = selectedSkillsAssessmentLabel(i)
   return wrap(props, 'instruments', 'Summary of Assessment Instruments & Methods', (
     <div className="space-y-3">
       <h4 className="font-medium">Indirect Methods</h4>
       <PrefilledTextArea label="Family/caregiver(s) interview" value={i.familyCaregiverInterview} onChange={(v) => set('familyCaregiverInterview', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       <PrefilledTextArea label="Records reviewed (IEP, psych evals, reports from other ABA providers, etc.)" value={i.recordsReviewed} onChange={(v) => set('recordsReviewed', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       <h4 className="font-medium">Direct Methods / Skills Assessment(s)</h4>
+      <Field label="Skills assessment instrument">
+        <select
+          value={i.skillsAssessmentType}
+          onChange={(e) =>
+            props.setSections((prev) => ({
+              ...prev,
+              instruments: {
+                ...prev.instruments,
+                skillsAssessmentType: e.target.value as SkillsAssessmentType,
+              },
+            }))
+          }
+          onBlur={props.onBlur}
+          disabled={props.readOnly}
+          className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
+        >
+          {(['AFLS', 'ATEC', 'OTHER'] as const).map((type) => (
+            <option key={type} value={type}>
+              {SKILLS_ASSESSMENT_TYPE_LABELS[type]}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {i.skillsAssessmentType === 'OTHER' && (
+        <Field label="Other skills assessment label">
+          <Input
+            value={i.otherSkillsAssessmentLabel}
+            onChange={(e) => set('otherSkillsAssessmentLabel', e.target.value)}
+            onBlur={props.onBlur}
+            readOnly={props.readOnly}
+          />
+        </Field>
+      )}
       <Field label="Vineland Assessment Tool completed by parent on (updated every 6 months)">
         <Input type="date" value={i.vinelandCompletedDate} onChange={(e) => set('vinelandCompletedDate', e.target.value)} readOnly={props.readOnly} onBlur={props.onBlur} />
       </Field>
       <PrefilledTextArea label="Behavior Assessment (FAST) (updated every 6 months)" value={i.fastAssessment} onChange={(v) => set('fastAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <PrefilledTextArea label="Autism Treatment Evaluation Checklist (ATEC)" value={i.atecAssessment} onChange={(v) => set('atecAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      {i.skillsAssessmentType === 'AFLS' && (
+        <PrefilledTextArea label="Assessment of Functional Living Skills (AFLS)" value={i.aflsAssessment} onChange={(v) => set('aflsAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      )}
+      {i.skillsAssessmentType === 'ATEC' && (
+        <PrefilledTextArea label="Autism Treatment Evaluation Checklist (ATEC)" value={i.atecAssessment} onChange={(v) => set('atecAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      )}
+      {i.skillsAssessmentType === 'OTHER' && (
+        <PrefilledTextArea label={selectedLabel} value={i.otherSkillsAssessmentSummary} onChange={(v) => set('otherSkillsAssessmentSummary', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      )}
       <PrefilledTextArea label="Observation 1" value={i.observation1} onChange={(v) => set('observation1', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       <PrefilledTextArea label="Observation 2" value={i.observation2} onChange={(v) => set('observation2', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       <PrefilledTextArea label="Preference Assessment" value={i.preferenceAssessment} onChange={(v) => set('preferenceAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
@@ -356,35 +405,150 @@ function InstrumentsSection(props: Props) {
 
 function PresentLevelsSection(props: Props) {
   const p = props.sections.presentLevels
-  const instruments = [
-    { key: 'vineland' as const, label: 'Vineland', sectionKey: 'present_levels.vineland' },
-    { key: 'atec' as const, label: 'ATEC', sectionKey: 'present_levels.atec' },
-    { key: 'fast' as const, label: 'FAST', sectionKey: 'present_levels.fast' },
-  ]
+  const selectedType = props.sections.instruments.skillsAssessmentType
+  const selectedLabel = selectedSkillsAssessmentLabel(props.sections.instruments)
+  const showLegacyAtec = hasLegacyAtecData(
+    props.sections.instruments,
+    p.atec.interpretation,
+    props.attachments.filter((a) => a.sectionKey.startsWith('present_levels.atec')).length
+  )
   return wrap(props, 'presentLevels', 'Present Levels of Performance by Domain', (
     <div className="space-y-6">
-      {instruments.map(({ key, label, sectionKey }) => (
-        <div key={key} className="space-y-2 rounded-lg border border-line p-3">
-          <h4 className="font-medium">{label}</h4>
+      <div className="space-y-2 rounded-lg border border-line p-3">
+        <h4 className="font-medium">Vineland</h4>
+        <AttachmentUploader
+          clientId={props.clientId}
+          assessmentId={props.assessmentId}
+          sectionKey="present_levels.vineland"
+          kind="AUTO"
+          accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,application/pdf,image/*"
+          multiple
+          attachments={props.attachments}
+          readOnly={props.readOnly}
+          onUploaded={props.onUploaded}
+          label="Upload Vineland (PDF or image)"
+          hint="PDF or image · up to 50 MB · uploads go directly to secure storage"
+        />
+        <Field label="Date"><Input type="date" value={p.vineland.date} onChange={(e) => props.setSections((prev) => ({ ...prev, presentLevels: { ...prev.presentLevels, vineland: { ...prev.presentLevels.vineland, date: e.target.value } } }))} readOnly={props.readOnly} onBlur={props.onBlur} /></Field>
+        <PrefilledTextArea label="Interpretation" value={p.vineland.interpretation} onChange={(v) => props.setSections((prev) => ({ ...prev, presentLevels: { ...prev.presentLevels, vineland: { ...prev.presentLevels.vineland, interpretation: v } } }))} readOnly={props.readOnly} onBlur={props.onBlur} />
+      </div>
+
+      {selectedType === 'AFLS' && (
+        <div className="space-y-2 rounded-lg border border-line p-3">
+          <h4 className="font-medium">AFLS</h4>
+          <AflsEditor
+            clientId={props.clientId}
+            assessmentId={props.assessmentId}
+            value={p.afls}
+            onChange={(afls) =>
+              props.setSections((prev) => ({
+                ...prev,
+                presentLevels: { ...prev.presentLevels, afls },
+              }))
+            }
+            readOnly={props.readOnly}
+            onBlur={props.onBlur}
+            attachments={props.attachments}
+            onUploaded={props.onUploaded}
+          />
+        </div>
+      )}
+
+      {selectedType === 'ATEC' && (
+        <SimplePresentLevelBlock
+          title="ATEC"
+          sectionKey="present_levels.atec"
+          value={p.atec}
+          setValue={(atec) =>
+            props.setSections((prev) => ({
+              ...prev,
+              presentLevels: { ...prev.presentLevels, atec },
+            }))
+          }
+          readOnly={props.readOnly}
+          onBlur={props.onBlur}
+          clientId={props.clientId}
+          assessmentId={props.assessmentId}
+          attachments={props.attachments}
+          onUploaded={props.onUploaded}
+        />
+      )}
+
+      {selectedType === 'OTHER' && (
+        <SimplePresentLevelBlock
+          title={selectedLabel}
+          sectionKey="present_levels.other"
+          value={p.other}
+          setValue={(other) =>
+            props.setSections((prev) => ({
+              ...prev,
+              presentLevels: { ...prev.presentLevels, other },
+            }))
+          }
+          readOnly={props.readOnly}
+          onBlur={props.onBlur}
+          clientId={props.clientId}
+          assessmentId={props.assessmentId}
+          attachments={props.attachments}
+          onUploaded={props.onUploaded}
+        />
+      )}
+
+      <SimplePresentLevelBlock
+        title="FAST"
+        sectionKey="present_levels.fast"
+        value={p.fast}
+        setValue={(fast) =>
+          props.setSections((prev) => ({
+            ...prev,
+            presentLevels: { ...prev.presentLevels, fast },
+          }))
+        }
+        readOnly={props.readOnly}
+        onBlur={props.onBlur}
+        clientId={props.clientId}
+        assessmentId={props.assessmentId}
+        attachments={props.attachments}
+        onUploaded={props.onUploaded}
+      />
+
+      {selectedType !== 'ATEC' && showLegacyAtec && (
+        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <h4 className="font-medium">Legacy ATEC</h4>
+          <p className="text-sm text-quiet">
+            Preserved from older assessments so existing records are not lost.
+          </p>
+          {props.sections.instruments.atecAssessment?.trim() && (
+            <PrefilledTextArea
+              label="Legacy summary text"
+              value={props.sections.instruments.atecAssessment}
+              onChange={() => {}}
+              readOnly
+            />
+          )}
           <AttachmentUploader
             clientId={props.clientId}
             assessmentId={props.assessmentId}
-            sectionKey={sectionKey}
+            sectionKey="present_levels.atec"
             kind="AUTO"
             accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,application/pdf,image/*"
             multiple
             attachments={props.attachments}
-            readOnly={props.readOnly}
+            readOnly
             onUploaded={props.onUploaded}
-            label={`Upload ${label} (PDF or image)`}
-            hint="PDF or image · up to 50 MB · uploads go directly to secure storage"
+            label="Legacy ATEC uploads"
+            hint="Read-only legacy data"
           />
-          {key === 'vineland' && (
-            <Field label="Date"><Input type="date" value={p.vineland.date} onChange={(e) => props.setSections((prev) => ({ ...prev, presentLevels: { ...prev.presentLevels, vineland: { ...prev.presentLevels.vineland, date: e.target.value } } }))} readOnly={props.readOnly} onBlur={props.onBlur} /></Field>
-          )}
-          <PrefilledTextArea label="Interpretation" value={p[key].interpretation} onChange={(v) => props.setSections((prev) => ({ ...prev, presentLevels: { ...prev.presentLevels, [key]: { ...prev.presentLevels[key], interpretation: v } } }))} readOnly={props.readOnly} onBlur={props.onBlur} />
+          <PrefilledTextArea
+            label="Legacy interpretation"
+            value={p.atec.interpretation}
+            onChange={() => {}}
+            readOnly
+            onBlur={props.onBlur}
+          />
         </div>
-      ))}
+      )}
+
       <div className="space-y-2">
         <h4 className="font-medium">Additional screenshots / attachments</h4>
         <AttachmentUploader
@@ -403,6 +567,56 @@ function PresentLevelsSection(props: Props) {
       </div>
     </div>
   ))
+}
+
+function SimplePresentLevelBlock({
+  title,
+  sectionKey,
+  value,
+  setValue,
+  readOnly,
+  onBlur,
+  clientId,
+  assessmentId,
+  attachments,
+  onUploaded,
+}: {
+  title: string
+  sectionKey: string
+  value: AssessmentSectionData['presentLevels']['vineland']
+  setValue: (value: AssessmentSectionData['presentLevels']['vineland']) => void
+  readOnly?: boolean
+  onBlur?: () => void
+  clientId: string
+  assessmentId: string
+  attachments: AttachmentRecord[]
+  onUploaded: () => void
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-3">
+      <h4 className="font-medium">{title}</h4>
+      <AttachmentUploader
+        clientId={clientId}
+        assessmentId={assessmentId}
+        sectionKey={sectionKey}
+        kind="AUTO"
+        accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,application/pdf,image/*"
+        multiple
+        attachments={attachments}
+        readOnly={readOnly}
+        onUploaded={onUploaded}
+        label={`Upload ${title} (PDF or image)`}
+        hint="PDF or image · up to 50 MB · uploads go directly to secure storage"
+      />
+      <PrefilledTextArea
+        label="Interpretation"
+        value={value.interpretation}
+        onChange={(interpretation) => setValue({ ...value, interpretation })}
+        readOnly={readOnly}
+        onBlur={onBlur}
+      />
+    </div>
+  )
 }
 
 function EnvironmentalSection(props: Props) {

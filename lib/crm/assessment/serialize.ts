@@ -3,6 +3,10 @@ import {
   type AssessmentSectionData,
   type AssessmentSectionKey,
 } from '@/lib/crm/assessment/assessment.schema'
+import {
+  isLikelyLegacyAflsText,
+  normalizeSkillsAssessmentType,
+} from '@/lib/crm/assessment/afls'
 
 /** Parse JSONB columns from DB into typed section data with defaults. */
 export function parseAssessmentRecord(record: {
@@ -30,5 +34,41 @@ export function parseAssessmentRecord(record: {
   for (const key of keys) {
     out[key] = assessmentSectionSchemas[key].parse(record[key] ?? {}) as AssessmentSectionData[typeof key]
   }
-  return out as AssessmentSectionData
+
+  const rawInstruments =
+    record.instruments && typeof record.instruments === 'object'
+      ? (record.instruments as Record<string, unknown>)
+      : {}
+  const next = out as AssessmentSectionData
+  const inferredType = normalizeSkillsAssessmentType({
+    rawType: rawInstruments.skillsAssessmentType,
+    atecAssessment: next.instruments.atecAssessment,
+    aflsAssessment: next.instruments.aflsAssessment,
+    atecInterpretation: next.presentLevels.atec.interpretation,
+  })
+
+  next.instruments.skillsAssessmentType = inferredType
+
+  const legacyJoined = [
+    next.instruments.atecAssessment,
+    next.presentLevels.atec.interpretation,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+    .trim()
+
+  if (
+    inferredType === 'AFLS' &&
+    !next.instruments.aflsAssessment.trim() &&
+    isLikelyLegacyAflsText(legacyJoined)
+  ) {
+    next.instruments.aflsAssessment = next.instruments.atecAssessment || legacyJoined
+    if (!next.presentLevels.afls.interpretation.trim()) {
+      next.presentLevels.afls.interpretation =
+        next.presentLevels.atec.interpretation || next.instruments.atecAssessment
+    }
+    next.presentLevels.afls.legacyMigratedFromAtec = true
+  }
+
+  return next
 }

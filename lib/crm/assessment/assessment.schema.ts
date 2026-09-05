@@ -96,12 +96,21 @@ export const bioPsychosocialSchema = z.object({
 })
 
 /** §3.5 Instruments & Methods */
+export const skillsAssessmentTypeSchema = z
+  .enum(['AFLS', 'ATEC', 'OTHER'])
+  .optional()
+  .default('AFLS')
+
 export const instrumentsSchema = z.object({
+  skillsAssessmentType: skillsAssessmentTypeSchema,
+  otherSkillsAssessmentLabel: optionalTextSchema,
   familyCaregiverInterview: optionalTextSchema,
   recordsReviewed: optionalTextSchema,
   vinelandCompletedDate: optionalDateStringSchema,
   fastAssessment: optionalTextSchema,
+  aflsAssessment: optionalTextSchema,
   atecAssessment: optionalTextSchema,
+  otherSkillsAssessmentSummary: optionalTextSchema,
   observation1: optionalTextSchema,
   observation2: optionalTextSchema,
   preferenceAssessment: optionalTextSchema,
@@ -113,9 +122,55 @@ export const presentLevelInstrumentSchema = z.object({
   interpretation: optionalTextSchema,
 })
 
+export const aflsSummaryScoreSchema = z.object({
+  id: z.string(),
+  date: optionalDateStringSchema,
+  value: z.number().min(0).max(9999).nullable().optional().default(null),
+})
+
+export const aflsSkillScoreSchema = z.object({
+  id: z.string(),
+  date: optionalDateStringSchema,
+  value: z
+    .union([z.number().int().min(0).max(4), z.literal('N/A'), z.null()])
+    .optional()
+    .default(null),
+})
+
+export const aflsSkillSchema = z.object({
+  id: z.string(),
+  code: optionalTextSchema,
+  label: optionalTextSchema,
+  scores: z.array(aflsSkillScoreSchema).default([]),
+})
+
+export const aflsSkillAreaSchema = z.object({
+  id: z.string(),
+  code: optionalTextSchema,
+  label: optionalTextSchema,
+  summaryScores: z.array(aflsSummaryScoreSchema).default([]),
+  skills: z.array(aflsSkillSchema).default([]),
+})
+
+export const aflsProtocolSchema = z.object({
+  id: z.string(),
+  key: optionalTextSchema,
+  label: optionalTextSchema,
+  summaryScores: z.array(aflsSummaryScoreSchema).default([]),
+  skillAreas: z.array(aflsSkillAreaSchema).default([]),
+})
+
+export const aflsPresentLevelSchema = z.object({
+  interpretation: optionalTextSchema,
+  protocols: z.array(aflsProtocolSchema).default([]),
+  legacyMigratedFromAtec: z.boolean().optional().default(false),
+})
+
 export const presentLevelsSchema = z.object({
   vineland: presentLevelInstrumentSchema.default({}),
+  afls: aflsPresentLevelSchema.default({}),
   atec: presentLevelInstrumentSchema.default({}),
+  other: presentLevelInstrumentSchema.default({}),
   fast: presentLevelInstrumentSchema.default({}),
 })
 
@@ -388,6 +443,13 @@ export type LocationSchedule = z.infer<typeof locationScheduleSchema>
 export type BioPsychosocial = z.infer<typeof bioPsychosocialSchema>
 export type Instruments = z.infer<typeof instrumentsSchema>
 export type PresentLevels = z.infer<typeof presentLevelsSchema>
+export type SkillsAssessmentType = z.infer<typeof skillsAssessmentTypeSchema>
+export type AflsSummaryScore = z.infer<typeof aflsSummaryScoreSchema>
+export type AflsSkillScore = z.infer<typeof aflsSkillScoreSchema>
+export type AflsSkill = z.infer<typeof aflsSkillSchema>
+export type AflsSkillArea = z.infer<typeof aflsSkillAreaSchema>
+export type AflsProtocol = z.infer<typeof aflsProtocolSchema>
+export type AflsPresentLevel = z.infer<typeof aflsPresentLevelSchema>
 export type Environmental = z.infer<typeof environmentalSchema>
 export type ResponseToTx = z.infer<typeof responseToTxSchema>
 export type Interventions = z.infer<typeof interventionsSchema>
@@ -489,6 +551,26 @@ export function emptyScheduleRow(
 
 export function emptyTransitionCriteriaRow(): z.infer<typeof transitionCriteriaRowSchema> {
   return transitionCriteriaRowSchema.parse({ id: newId() })
+}
+
+export function emptyAflsSummaryScore(): AflsSummaryScore {
+  return aflsSummaryScoreSchema.parse({ id: newId() })
+}
+
+export function emptyAflsSkillScore(date = ''): AflsSkillScore {
+  return aflsSkillScoreSchema.parse({ id: newId(), date })
+}
+
+export function emptyAflsSkill(): AflsSkill {
+  return aflsSkillSchema.parse({ id: newId() })
+}
+
+export function emptyAflsSkillArea(): AflsSkillArea {
+  return aflsSkillAreaSchema.parse({ id: newId() })
+}
+
+export function emptyAflsProtocol(): AflsProtocol {
+  return aflsProtocolSchema.parse({ id: newId() })
 }
 
 /** Default section payloads for a new FORM assessment. */
