@@ -4,6 +4,15 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   ArrowLeft,
   Phone,
@@ -35,7 +44,6 @@ import { cn } from '@/lib/utils'
 import AddressAutocomplete, {
   type StructuredAddress,
 } from '@/components/ui/AddressAutocomplete'
-import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 
 type Doc = {
   id: string
@@ -193,6 +201,7 @@ export default function ClientDetailPage({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteAccessCode, setDeleteAccessCode] = useState('')
   const [notesOpen, setNotesOpen] = useState(true)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [expandedNoteIds, setExpandedNoteIds] = useState<Record<string, boolean>>({})
@@ -413,12 +422,18 @@ export default function ClientDetailPage({
 
   const deleteClient = async () => {
     if (!client || !canEditPhi || deleting) return
+    if (!deleteAccessCode.trim()) {
+      setError('Re-enter the Client Services access code to delete this client')
+      return
+    }
     setDeleting(true)
     setError('')
     try {
       const res = await fetch(`/api/client-services/clients/${clientId}?confirmed=1`, {
         method: 'DELETE',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessCode: deleteAccessCode }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -432,6 +447,7 @@ export default function ClientDetailPage({
     } finally {
       setDeleting(false)
       setConfirmDelete(false)
+      setDeleteAccessCode('')
     }
   }
 
@@ -1601,19 +1617,58 @@ export default function ClientDetailPage({
         </Card>
       )}
 
-      <ConfirmDestructiveDialog
+      <Dialog
         open={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        title="Soft-delete this family record?"
-        description={
-          client
-            ? `Hide ${client.firstName} ${client.lastName} (${client.clientCode}) from every caseload and queue.\n\nThe row is not destroyed — it stays in the database with deletedAt set, and a full-access admin can restore it. An audit log is written.`
-            : 'Hide this family from caseloads. The row stays in the database.'
-        }
-        confirmLabel="Soft-delete family"
-        pending={deleting}
-        onConfirm={deleteClient}
-      />
+        onOpenChange={(open) => {
+          setConfirmDelete(open)
+          if (!open) setDeleteAccessCode('')
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Soft-delete this family record?</DialogTitle>
+            <DialogDescription className="whitespace-pre-wrap text-left">
+              {client
+                ? `Hide ${client.firstName} ${client.lastName} (${client.clientCode}) from every caseload and queue.\n\nThe row is not destroyed — it stays in the database with deletedAt set, and a full-access admin can restore it. An audit log is written.\n\nRe-enter the Client Services access code to confirm deletion.`
+                : 'Hide this family from caseloads. The row stays in the database.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-[#1a1d21]">
+              Client Services access code
+            </label>
+            <Input
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              value={deleteAccessCode}
+              onChange={(e) => setDeleteAccessCode(e.target.value.replace(/\s/g, ''))}
+              placeholder="Access code"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setConfirmDelete(false)
+                setDeleteAccessCode('')
+              }}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting || !deleteAccessCode.trim()}
+              onClick={() => void deleteClient()}
+            >
+              {deleting ? 'Deleting…' : 'Soft-delete family'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getClientIpFromRequest } from '@/lib/client-ip'
 import {
@@ -30,6 +31,16 @@ import type { ServiceClientStatus } from '@prisma/client'
 export const dynamic = 'force-dynamic'
 
 type Ctx = { params: Promise<{ id: string }> }
+
+function timingSafeEqualString(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a)
+  const bBuf = Buffer.from(b)
+  if (aBuf.length !== bBuf.length) {
+    crypto.timingSafeEqual(aBuf, aBuf)
+    return false
+  }
+  return crypto.timingSafeEqual(aBuf, bBuf)
+}
 
 export async function GET(request: NextRequest, context: Ctx) {
   const auth = await requireClientServicesSession()
@@ -297,6 +308,25 @@ export async function DELETE(request: NextRequest, context: Ctx) {
       { error: 'Delete requires confirmed=1 query parameter after user confirmation' },
       { status: 400 }
     )
+  }
+
+  let body: { accessCode?: string } = {}
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Access code is required' }, { status: 400 })
+  }
+
+  const expectedAccessCode = process.env.CLIENT_SERVICES_ACCESS_CODE?.trim()
+  if (!expectedAccessCode) {
+    return NextResponse.json({ error: 'Access code not configured' }, { status: 500 })
+  }
+  const submittedAccessCode = (body.accessCode ?? '').trim()
+  if (!submittedAccessCode) {
+    return NextResponse.json({ error: 'Re-enter the Client Services access code' }, { status: 400 })
+  }
+  if (!timingSafeEqualString(submittedAccessCode, expectedAccessCode)) {
+    return NextResponse.json({ error: 'Invalid access code' }, { status: 401 })
   }
 
   const existing = await prisma.serviceClient.findFirst({
