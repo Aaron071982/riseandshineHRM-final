@@ -32,7 +32,6 @@ export type CaseloadRow = {
   scheduledHoursPerWeek: number | null
   authHours: number | null
   insuranceProvider: string | null
-  bcbaName: string | null
 }
 
 const STAGE_TONE: Record<string, string> = {
@@ -234,7 +233,6 @@ export default function CaseloadTable({
   queueFilter,
   groupFilter,
   deptFilter,
-  bcbaFilter,
   onGroupChange,
   onDeptChange,
   needsAttentionOnly,
@@ -247,7 +245,6 @@ export default function CaseloadTable({
   queueFilter?: string | null
   groupFilter: string
   deptFilter?: string | null
-  bcbaFilter?: string | null
   onGroupChange: (g: string) => void
   onDeptChange: (dept: string | null) => void
   needsAttentionOnly: boolean
@@ -304,7 +301,7 @@ export default function CaseloadTable({
   }, [filtered])
 
   const hasFilters =
-    !!(stageFilter || queueFilter || q || deptFilter || bcbaFilter || needsAttentionOnly)
+    !!(stageFilter || queueFilter || q || deptFilter || needsAttentionOnly)
 
   return (
     <div className="space-y-3">
@@ -363,7 +360,7 @@ export default function CaseloadTable({
         )}
       </div>
 
-      {(stageFilter || queueFilter || deptFilter || bcbaFilter) && (
+      {(stageFilter || queueFilter || deptFilter) && (
         <p className="text-xs text-quiet">
           Filter:{' '}
           {stageFilter
@@ -372,9 +369,7 @@ export default function CaseloadTable({
               ? `queue ${queueFilter}`
               : deptFilter
                 ? `department ${DEPT_QUEUES.find((d) => d.id === deptFilter)?.label ?? deptFilter}`
-                : bcbaFilter
-                  ? `BCBA ${bcbaFilter}`
-                  : null}
+                : null}
           {q ? ` · search “${q}”` : ''}
         </p>
       )}

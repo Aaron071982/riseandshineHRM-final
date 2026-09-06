@@ -25,7 +25,6 @@ const ALL_CRM_ROLES: CrmRole[] = [
   'MANAGEMENT',
   'INTAKE',
   'CLINICAL',
-  'CLINICAL_SUPPORT',
   'AUTHORIZATION',
   'STAFFING',
   'CASE_COORDINATION',
@@ -47,7 +46,6 @@ export async function listCrmUsersWithRoles(query?: string): Promise<
       id: string
       name: string | null
       email: string | null
-      baseRole: string
       roles: CrmRole[]
       fullAccess: boolean
       superAdmin: boolean
@@ -63,7 +61,7 @@ export async function listCrmUsersWithRoles(query?: string): Promise<
     const q = query?.trim()
     const users = await prisma.user.findMany({
       where: {
-        role: { in: ['ADMIN', 'BCBA'] },
+        role: 'ADMIN',
         ...(q
           ? {
               OR: [
@@ -77,7 +75,6 @@ export async function listCrmUsersWithRoles(query?: string): Promise<
         id: true,
         name: true,
         email: true,
-        role: true,
         crmRoles: {
           where: { revokedAt: null },
           select: { role: true },
@@ -96,7 +93,6 @@ export async function listCrmUsersWithRoles(query?: string): Promise<
           id: u.id,
           name: u.name,
           email: u.email,
-          baseRole: u.role,
           roles,
           fullAccess: isFullAccess(subject),
           superAdmin: isSuperAdmin(subject),
@@ -134,10 +130,10 @@ export async function grantCrmRole(
         error: 'User must exist first — ask them to log in, then grant the role',
       }
     }
-    if (target.role !== 'ADMIN' && target.role !== 'BCBA') {
+    if (target.role !== 'ADMIN') {
       return {
         ok: false,
-        error: 'CRM roles can only be granted to HRM admin or BCBA users',
+        error: 'CRM roles can only be granted to HRM admin users',
       }
     }
 

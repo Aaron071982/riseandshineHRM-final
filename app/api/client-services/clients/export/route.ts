@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
   const queue = sp.get('queue')?.trim() || ''
   const group = sp.get('group')?.trim() || ''
   const dept = sp.get('dept')?.trim() || ''
-  const bcba = sp.get('bcba')?.trim() || ''
 
   const where: Prisma.ServiceClientWhereInput = {
     ...getVisibleClientsWhere(user),
@@ -66,32 +65,14 @@ export async function GET(request: NextRequest) {
     if (dw) Object.assign(where, dw)
   }
 
-  if (bcba) {
-    where.OR = [
-      { bcbaName: { contains: bcba, mode: 'insensitive' } },
-      { bcbaProfile: { is: { fullName: { contains: bcba, mode: 'insensitive' } } } },
-    ]
-  }
-
   if (q) {
-    const queryOr: Prisma.ServiceClientWhereInput[] = [
+    where.OR = [
       { firstName: { contains: q, mode: 'insensitive' } },
       { lastName: { contains: q, mode: 'insensitive' } },
       { clientCode: { contains: q, mode: 'insensitive' } },
       { parentName: { contains: q, mode: 'insensitive' } },
       { parentEmail: { contains: q, mode: 'insensitive' } },
     ]
-    if (where.OR) {
-      const priorAnd = where.AND
-        ? Array.isArray(where.AND)
-          ? where.AND
-          : [where.AND]
-        : []
-      where.AND = [...priorAnd, { OR: where.OR }, { OR: queryOr }]
-      delete where.OR
-    } else {
-      where.OR = queryOr
-    }
   }
 
   const clients = await prisma.serviceClient.findMany({

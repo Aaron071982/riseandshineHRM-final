@@ -18,7 +18,6 @@ const ROLE_OPTIONS: { value: CrmRole; label: string }[] = [
   { value: 'MANAGEMENT', label: 'Management' },
   { value: 'INTAKE', label: 'Intake' },
   { value: 'CLINICAL', label: 'Clinical' },
-  { value: 'CLINICAL_SUPPORT', label: 'BCBA permissions' },
   { value: 'AUTHORIZATION', label: 'Authorization' },
   { value: 'STAFFING', label: 'Staffing' },
   { value: 'CASE_COORDINATION', label: 'Case coordination' },
@@ -29,7 +28,6 @@ type UserRow = {
   id: string
   name: string | null
   email: string | null
-  baseRole: string
   roles: CrmRole[]
   fullAccess: boolean
   superAdmin: boolean
@@ -127,8 +125,8 @@ export default function AdminManagementClient() {
           Admin Management
         </h1>
         <p className="mt-0.5 text-sm text-quiet">
-          Grant and revoke CRM roles for HRM admin and BCBA users. Super-admin
-          only. Therapist and other non-admin accounts are not listed.
+          Grant and revoke CRM roles for HRM admin users only. Super-admin only.
+          Therapist and other non-admin accounts are not listed.
         </p>
       </div>
 
@@ -146,7 +144,7 @@ export default function AdminManagementClient() {
       <section className="rounded-xl border border-line bg-surface p-4">
         <h2 className="font-display text-sm font-semibold text-ink">Grant role</h2>
         <p className="mt-0.5 text-xs text-quiet">
-          Pick an HRM admin or BCBA user who has logged in at least once.
+          Pick an HRM admin who has logged in at least once.
         </p>
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <label className="min-w-[14rem] flex-1">
@@ -219,7 +217,6 @@ export default function AdminManagementClient() {
             <thead>
               <tr className="border-b border-line bg-line-2/40 text-[11px] uppercase tracking-wide text-faint">
                 <th className="px-3 py-2.5 font-medium">User</th>
-                <th className="px-3 py-2.5 font-medium">Account</th>
                 <th className="px-3 py-2.5 font-medium">Roles</th>
                 <th className="px-3 py-2.5 font-medium">Training</th>
                 <th className="px-3 py-2.5 font-medium">Access</th>
@@ -229,7 +226,7 @@ export default function AdminManagementClient() {
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-quiet">
+                  <td colSpan={5} className="px-3 py-8 text-center text-quiet">
                     {pending ? 'Loading…' : 'No admin users found'}
                   </td>
                 </tr>
@@ -244,9 +241,6 @@ export default function AdminManagementClient() {
                         {u.name || '—'}
                       </Link>
                       <div className="text-xs text-quiet">{u.email || u.id}</div>
-                    </td>
-                    <td className="px-3 py-2.5 text-xs text-quiet">
-                      {u.baseRole.replace(/_/g, ' ')}
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex flex-wrap gap-1">
@@ -323,8 +317,7 @@ export default function AdminManagementClient() {
         </div>
         <p className="text-[11px] text-faint">
           Department roles: {(CRM_DEPARTMENT_ROLES as readonly string[]).join(', ')}.
-          `BCBA permissions` grants `CLINICAL_SUPPORT`. Click a role chip to
-          revoke (soft). Last `SUPER_ADMIN` cannot be removed.
+          Click a role chip to revoke (soft). Last SUPER_ADMIN cannot be removed.
         </p>
       </section>
       <ConfirmDestructiveDialog
