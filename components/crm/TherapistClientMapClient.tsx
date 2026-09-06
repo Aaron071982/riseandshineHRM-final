@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   ClientMarkerColor,
   TherapistClientMapData,
@@ -42,10 +42,15 @@ export default function TherapistClientMapClient() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [geocoding, setGeocoding] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const [showTherapists, setShowTherapists] = useState(true)
   const [showClients, setShowClients] = useState(true)
   const [stateFilter, setStateFilter] = useState<string>('')
+  const [insuranceFilter, setInsuranceFilter] = useState('')
+  const [zipFilter, setZipFilter] = useState('')
+  const [ageMin, setAgeMin] = useState('')
+  const [ageMax, setAgeMax] = useState('')
   const [search, setSearch] = useState('')
   const [hiddenTherapistColors, setHiddenTherapistColors] = useState<
     Set<TherapistMarkerColor>
@@ -56,6 +61,7 @@ export default function TherapistClientMapClient() {
   const [showExcluded, setShowExcluded] = useState(false)
 
   const [selected, setSelected] = useState<MapSelection>(null)
+  const captureRef = useRef<HTMLDivElement>(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -99,6 +105,27 @@ export default function TherapistClientMapClient() {
   }
 
   const q = search.trim().toLowerCase()
+  const zipQuery = zipFilter.trim()
+  const minAge = ageMin.trim() ? Number(ageMin) : null
+  const maxAge = ageMax.trim() ? Number(ageMax) : null
+
+  const insuranceOptions = useMemo(() => {
+    if (!data) return []
+    return [...new Set(
+      data.clients
+        .map((c) => c.insuranceProvider?.trim())
+        .filter((value): value is string => !!value)
+    )].sort((a, b) => a.localeCompare(b))
+  }, [data])
+
+  const activeClientFilters = useMemo(() => {
+    const parts: string[] = []
+    if (insuranceFilter) parts.push(`Insurance: ${insuranceFilter}`)
+    if (zipQuery) parts.push(`ZIP: ${zipQuery}`)
+    if (minAge != null) parts.push(`Age ${minAge}+`)
+    if (maxAge != null) parts.push(`Age up to ${maxAge}`)
+    return parts
+  }, [insuranceFilter, zipQuery, minAge, maxAge])
 
   const filteredTherapists = useMemo(() => {
     if (!data) return []
@@ -118,6 +145,18 @@ export default function TherapistClientMapClient() {
       if (hiddenClientGroups.has(c.markerColor)) return false
       if (stateFilter && normalizeUsState(c.state) !== stateFilter) return false
       if (
+        insuranceFilter &&
+        (c.insuranceProvider?.trim().toLowerCase() ?? '') !==
+          insuranceFilter.trim().toLowerCase()
+      ) {
+        return false
+      }
+      if (zipQuery && !(c.zip ?? '').toLowerCase().includes(zipQuery.toLowerCase())) {
+        return false
+      }
+      if (minAge != null && (c.age == null || c.age < minAge)) return false
+      if (maxAge != null && (c.age == null || c.age > maxAge)) return false
+      if (
         q &&
         !c.name.toLowerCase().includes(q) &&
         !c.clientCode.toLowerCase().includes(q)
@@ -126,7 +165,49 @@ export default function TherapistClientMapClient() {
       }
       return true
     })
-  }, [data, showClients, hiddenClientGroups, stateFilter, q])
+  }, [
+    data,
+    showClients,
+    hiddenClientGroups,
+    stateFilter,
+    insuranceFilter,
+    zipQuery,
+    minAge,
+    maxAge,
+    q,
+  ])
+
+  const exportPng = async () => {
+    const el = captureRef.current
+    if (!el || exporting) return
+    const prevSelected = selected
+    const prevShowExcluded = showExcluded
+    setSelected(null)
+    setShowExcluded(false)
+    setExporting(true)
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 180))
+      const html2canvas = (await import('html2canvas')).default
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
+      const d = new Date()
+      const name = `rise-shine-staff-client-map-${d.getFullYear()}-${String(
+        d.getMonth() + 1
+      ).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.png`
+      const link = document.createElement('a')
+      link.download = name
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } finally {
+      setExporting(false)
+      setSelected(prevSelected)
+      setShowExcluded(prevShowExcluded)
+    }
+  }
 
   const highlightedIds = useMemo(() => {
     const ids = new Set<string>()
@@ -205,7 +286,7 @@ export default function TherapistClientMapClient() {
   if (!data) return null
 
   return (
-    <div className="relative h-full min-h-0 w-full">
+    <div ref={captureRef} className="relative h-full min-h-0 w-full overflow-hidden rounded-2xl bg-white">
       <TherapistClientMap
         therapists={filteredTherapists}
         clients={filteredClients}
@@ -216,7 +297,7 @@ export default function TherapistClientMapClient() {
 
       {/* Top controls */}
       <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex flex-wrap items-start justify-between gap-2 px-3 sm:px-4">
-        <div className="pointer-events-auto flex max-w-full flex-wrap items-center gap-2 rounded-xl border border-line/80 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm">
+        <div className="pointer-events-auto flex max-w-[min(100%,880px)] flex-wrap items-center gap-2 rounded-xl border border-line/80 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -251,13 +332,72 @@ export default function TherapistClientMapClient() {
             />
             Therapists ▲
           </label>
+          <select
+            value={insuranceFilter}
+            onChange={(e) => setInsuranceFilter(e.target.value)}
+            className="h-8 min-w-[150px] rounded-lg border border-line bg-white px-2 text-sm"
+          >
+            <option value="">All insurances</option>
+            {insuranceOptions.map((insurance) => (
+              <option key={insurance} value={insurance}>
+                {insurance}
+              </option>
+            ))}
+          </select>
+          <input
+            value={zipFilter}
+            onChange={(e) => setZipFilter(e.target.value)}
+            placeholder="ZIP code"
+            className="h-8 w-24 rounded-lg border border-line bg-white px-3 text-sm"
+          />
+          <input
+            value={ageMin}
+            onChange={(e) => setAgeMin(e.target.value.replace(/[^\d]/g, ''))}
+            placeholder="Min age"
+            className="h-8 w-24 rounded-lg border border-line bg-white px-3 text-sm"
+          />
+          <input
+            value={ageMax}
+            onChange={(e) => setAgeMax(e.target.value.replace(/[^\d]/g, ''))}
+            placeholder="Max age"
+            className="h-8 w-24 rounded-lg border border-line bg-white px-3 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setInsuranceFilter('')
+              setZipFilter('')
+              setAgeMin('')
+              setAgeMax('')
+            }}
+            className="h-8 rounded-lg border border-line bg-white px-3 text-sm font-medium text-quiet hover:bg-line-2"
+          >
+            Clear subfilters
+          </button>
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={() => void exportPng()}
+            className="h-8 rounded-lg bg-brand px-3 text-sm font-semibold text-white hover:bg-brand-2 disabled:opacity-50"
+          >
+            {exporting ? 'Exporting…' : 'Export PNG'}
+          </button>
         </div>
 
         <div className="pointer-events-auto rounded-xl border border-line/80 bg-white/95 px-3 py-2 text-xs text-quiet shadow-lg backdrop-blur-sm">
-          <span className="font-semibold text-ink">{data.stats.clientMapped}</span>{' '}
-          clients ·{' '}
-          <span className="font-semibold text-ink">{data.stats.therapistMapped}</span>{' '}
-          therapists
+          <div>
+            <span className="font-semibold text-ink">{filteredClients.length}</span> of{' '}
+            <span className="font-semibold text-ink">{data.stats.clientMapped}</span>{' '}
+            clients ·{' '}
+            <span className="font-semibold text-ink">{filteredTherapists.length}</span> of{' '}
+            <span className="font-semibold text-ink">{data.stats.therapistMapped}</span>{' '}
+            therapists
+          </div>
+          {activeClientFilters.length > 0 && (
+            <div className="mt-1 max-w-[280px] text-[11px] leading-snug text-quiet">
+              Client filters: {activeClientFilters.join(' · ')}
+            </div>
+          )}
           {data.stats.excludedCount > 0 && (
             <>
               {' '}
@@ -297,6 +437,9 @@ export default function TherapistClientMapClient() {
       {/* Legend */}
       <div className="pointer-events-none absolute bottom-4 left-3 z-10 max-w-[min(100%-1.5rem,420px)] sm:left-4">
         <div className="pointer-events-auto rounded-xl border border-line/80 bg-white/95 px-3 py-3 shadow-lg backdrop-blur-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand">
+            Staff &amp; Client Map
+          </p>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-quiet">
             Legend
           </p>
@@ -354,7 +497,7 @@ export default function TherapistClientMapClient() {
       </div>
 
       {/* Selection card */}
-      {selectedEntity && (
+      {selectedEntity && !exporting && (
         <div className="pointer-events-auto absolute bottom-4 right-3 z-10 w-[min(100%-1.5rem,320px)] rounded-xl border border-line/80 bg-white/95 p-4 shadow-lg backdrop-blur-sm sm:right-4">
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -384,6 +527,10 @@ export default function TherapistClientMapClient() {
               <p>
                 Code:{' '}
                 <span className="font-medium">{selectedEntity.clientCode}</span>
+              </p>
+              <p className="text-xs text-quiet">
+                {selectedEntity.insuranceProvider || 'No insurance'} · ZIP{' '}
+                {selectedEntity.zip || '—'} · Age {selectedEntity.age ?? '—'}
               </p>
               {selectedEntity.needsStaffing && (
                 <p className="text-[var(--sunrise)]">Needs staffing attention</p>
@@ -428,7 +575,7 @@ export default function TherapistClientMapClient() {
       )}
 
       {/* Excluded list */}
-      {showExcluded && data.excluded.length > 0 && (
+      {showExcluded && data.excluded.length > 0 && !exporting && (
         <div className="pointer-events-auto absolute right-3 top-[4.5rem] z-10 max-h-[min(50vh,360px)] w-[min(100%-1.5rem,340px)] overflow-hidden rounded-xl border border-line/80 bg-white/95 shadow-lg backdrop-blur-sm sm:right-4">
           <div className="flex items-center justify-between border-b border-line px-3 py-2">
             <p className="text-sm font-semibold text-ink">

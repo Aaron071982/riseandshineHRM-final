@@ -43,6 +43,9 @@ export type MapClientEntity = {
   id: string
   clientCode: string
   name: string
+  age: number | null
+  zip: string | null
+  insuranceProvider: string | null
   stage: string
   stageGroup: StageGroupId
   markerColor: ClientMarkerColor

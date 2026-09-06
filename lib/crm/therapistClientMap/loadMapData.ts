@@ -4,6 +4,7 @@ import {
   getVisibleClientsWhere,
   type CrmAccessSubject,
 } from '@/lib/crm/access'
+import { ageFromDob } from '@/lib/client-services/parse'
 import { getClientsNeedingStaffing } from '@/lib/crm/staffing/needsStaffing'
 import { MAP_THERAPIST_WHERE } from '@/lib/crm/therapistClientMap/constants'
 import { validateMapCoordinates } from '@/lib/crm/therapistClientMap/coordinateValidation'
@@ -84,11 +85,13 @@ export async function loadTherapistClientMapData(
           clientCode: true,
           firstName: true,
           lastName: true,
+          dateOfBirth: true,
           stage: true,
           addressLine: true,
           city: true,
           state: true,
           zip: true,
+          insuranceProvider: true,
           latitude: true,
           longitude: true,
           btAssignments: {
@@ -209,6 +212,9 @@ export async function loadTherapistClientMapData(
           id: c.id,
           clientCode: c.clientCode,
           name,
+          age: ageFromDob(c.dateOfBirth),
+          zip: c.zip,
+          insuranceProvider: c.insuranceProvider,
           stage: c.stage,
           stageGroup: stageMarker.stageGroup,
           markerColor: stageMarker.markerColor,

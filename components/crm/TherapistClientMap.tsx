@@ -130,6 +130,7 @@ export default function TherapistClientMap({
       zoom: NYC.zoom,
       style: `https://api.mapbox.com/styles/v1/mapbox/streets-v12?access_token=${MAPBOX_TOKEN}`,
       attributionControl: false,
+      preserveDrawingBuffer: true,
     })
     mapRef.current = map
     map.addControl(new mapboxgl.NavigationControl(), 'top-right')
