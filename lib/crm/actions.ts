@@ -5,6 +5,7 @@ import type {
   AuthStatus,
   AuthDenialClass,
   AuthType,
+  ClientOwnerDept,
   ClientPipelineStatus,
   ClientReferralSource,
   ClientStage,
@@ -17,6 +18,7 @@ import type {
   RequirementStatus,
   ServiceBtAssignmentStatus,
   ServiceClientStatus,
+  TeamTaskPriority,
 } from '@prisma/client'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
@@ -87,6 +89,14 @@ import { CRM_SCHEDULE_PATH } from '@/lib/schedule/paths'
 function revalidateClient(clientId: string) {
   revalidatePath(`/client-services/clients/${clientId}`)
   revalidatePath('/client-services')
+  revalidatePath('/client-services/tasks')
+}
+
+type CaseCoordinationTaskNotification = {
+  assigneeUserId: string | null
+  assignedDept: ClientOwnerDept | null
+  priority: TeamTaskPriority
+  dueAt: Date | null
 }
 
 function pipelineToLegacyStatus(pipeline: ClientPipelineStatus): ServiceClientStatus {
@@ -263,8 +273,7 @@ export async function advanceStage(
       toDept: STAGE_DEFAULT_OWNER_DEPT[toStage],
       caseCoordinatorUserId: client.caseCoordinatorUserId,
     })
-
-    await prisma.$transaction(async (tx) => {
+    const automationResult = await prisma.$transaction(async (tx) => {
       await tx.serviceClientStatusHistory.create({
         data: {
           serviceClientId: clientId,
@@ -329,6 +338,25 @@ export async function advanceStage(
           data: { releasedAt: now, releasedByUserId: user.id },
         })
       }
+
+      const { syncCaseCoordinationAutomation } = await import(
+        '@/lib/crm/caseCoordination/automation'
+      )
+      return await syncCaseCoordinationAutomation({
+        tx,
+        client: {
+          id: client.id,
+          firstName: client.firstName,
+          lastName: client.lastName,
+          clientCode: client.clientCode,
+          stage: client.stage,
+          currentOwnerUserId: client.currentOwnerUserId,
+          caseCoordinatorUserId: client.caseCoordinatorUserId,
+        },
+        toStage,
+        actorUserId: user.id,
+        now,
+      })
     })
 
     await auditClientAction({
@@ -352,6 +380,32 @@ export async function advanceStage(
       await maybeSendStageNotification(clientId, toStage, { actorUserId: user.id })
     } catch (notifyErr) {
       console.error('[crm] stage notification after advance failed', notifyErr)
+    }
+
+    const taskNotification = automationResult.createdTaskNotification
+    if (taskNotification && taskNotification.assigneeUserId) {
+      const { queueAssignmentNotification } = await import(
+        '@/lib/crm/tasks/assignmentNotifyQueue'
+      )
+      queueAssignmentNotification({
+        assigneeUserId: taskNotification.assigneeUserId,
+        actorUserId: user.id,
+        serviceClientId: clientId,
+        assignedDept: taskNotification.assignedDept,
+        priority: taskNotification.priority,
+        dueAt: taskNotification.dueAt,
+      })
+    }
+
+    if (toStage === 'ACTIVE') {
+      try {
+        const { maybeSendClientStartedScheduleEmail } = await import(
+          '@/lib/crm/caseCoordination/automation'
+        )
+        await maybeSendClientStartedScheduleEmail(clientId, user.id)
+      } catch (emailErr) {
+        console.error('[crm] client-started email failed after advance', emailErr)
+      }
     }
 
     revalidateClient(clientId)
@@ -428,8 +482,7 @@ export async function setStage(
       toDept: STAGE_DEFAULT_OWNER_DEPT[toStage],
       caseCoordinatorUserId: client.caseCoordinatorUserId,
     })
-
-    await prisma.$transaction(async (tx) => {
+    const automationResult = await prisma.$transaction(async (tx) => {
       await tx.serviceClientStatusHistory.create({
         data: {
           serviceClientId: clientId,
@@ -470,6 +523,25 @@ export async function setStage(
           data: { releasedAt: now, releasedByUserId: user.id },
         })
       }
+
+      const { syncCaseCoordinationAutomation } = await import(
+        '@/lib/crm/caseCoordination/automation'
+      )
+      return await syncCaseCoordinationAutomation({
+        tx,
+        client: {
+          id: client.id,
+          firstName: client.firstName,
+          lastName: client.lastName,
+          clientCode: client.clientCode,
+          stage: client.stage,
+          currentOwnerUserId: client.currentOwnerUserId,
+          caseCoordinatorUserId: client.caseCoordinatorUserId,
+        },
+        toStage,
+        actorUserId: user.id,
+        now,
+      })
     })
 
     await auditClientAction({
@@ -485,6 +557,32 @@ export async function setStage(
       await maybeSendStageNotification(clientId, toStage, { actorUserId: user.id })
     } catch (notifyErr) {
       console.error('[crm] stage notification after setStage failed', notifyErr)
+    }
+
+    const taskNotification = automationResult.createdTaskNotification
+    if (taskNotification && taskNotification.assigneeUserId) {
+      const { queueAssignmentNotification } = await import(
+        '@/lib/crm/tasks/assignmentNotifyQueue'
+      )
+      queueAssignmentNotification({
+        assigneeUserId: taskNotification.assigneeUserId,
+        actorUserId: user.id,
+        serviceClientId: clientId,
+        assignedDept: taskNotification.assignedDept,
+        priority: taskNotification.priority,
+        dueAt: taskNotification.dueAt,
+      })
+    }
+
+    if (toStage === 'ACTIVE') {
+      try {
+        const { maybeSendClientStartedScheduleEmail } = await import(
+          '@/lib/crm/caseCoordination/automation'
+        )
+        await maybeSendClientStartedScheduleEmail(clientId, user.id)
+      } catch (emailErr) {
+        console.error('[crm] client-started email failed after setStage', emailErr)
+      }
     }
 
     revalidateClient(clientId)
