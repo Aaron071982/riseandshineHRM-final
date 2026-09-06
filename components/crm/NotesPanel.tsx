@@ -21,6 +21,7 @@ import {
   calendarDateKey,
   formatCalendarDate,
 } from '@/lib/billing/calendarDate'
+import { insuranceOptionsForValue } from '@/lib/crm/insuranceOptions'
 import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { cn } from '@/lib/utils'
@@ -658,11 +659,18 @@ export function OverviewPanel({
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
                 Insurance
               </span>
-              <input
+              <select
                 value={form.insuranceProvider}
                 onChange={(e) => setField('insuranceProvider', e.target.value)}
                 className={inputCls}
-              />
+              >
+                <option value="">Select insurance…</option>
+                {insuranceOptionsForValue(form.insuranceProvider).map((insurance) => (
+                  <option key={insurance} value={insurance}>
+                    {insurance}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">

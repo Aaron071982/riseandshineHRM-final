@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { NY_BOROUGHS } from '@/lib/client-services/constants'
+import { insuranceOptionsForValue } from '@/lib/crm/insuranceOptions'
 import { toClientRow, type ApiCaseloadClient, type ClientRow } from '@/lib/clients/viewModel'
 import { STATUS, type CaseStatus } from '@/lib/clients/status'
 import AddressAutocomplete, {
@@ -775,7 +776,23 @@ function AddClientModal({
           </div>
           {field('Parent email', 'parentEmail', { type: 'email' })}
           <div className="grid grid-cols-2 gap-3">
-            {field('Insurance', 'insuranceProvider')}
+            <label className="block text-xs font-medium text-quiet">
+              Insurance
+              <select
+                value={form.insuranceProvider}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, insuranceProvider: e.target.value }))
+                }
+                className="mt-1 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-sm text-ink focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
+              >
+                <option value="">Select insurance…</option>
+                {insuranceOptionsForValue(form.insuranceProvider).map((insurance) => (
+                  <option key={insurance} value={insurance}>
+                    {insurance}
+                  </option>
+                ))}
+              </select>
+            </label>
             {field('Auth hours / week', 'authHours', { type: 'number' })}
           </div>
           {error && <p className="text-sm text-urgent">{error}</p>}

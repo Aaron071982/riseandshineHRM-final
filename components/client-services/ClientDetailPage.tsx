@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import BreakCountdown from '@/components/client-services/BreakCountdown'
 import { parseActivityNote } from '@/lib/client-services/activityNote'
+import { insuranceOptionsForValue } from '@/lib/crm/insuranceOptions'
 import {
   BOARD_BUCKET_LABELS,
   CS_ACCENT,
@@ -918,12 +919,18 @@ export default function ClientDetailPage({
           <Field label="Insurance">
             {editing && f ? (
               <div className="space-y-1.5">
-                <input
+                <select
                   className={inputCls}
-                  placeholder="Provider"
                   value={f.insuranceProvider}
                   onChange={(e) => setForm({ ...f, insuranceProvider: e.target.value })}
-                />
+                >
+                  <option value="">Select insurance…</option>
+                  {insuranceOptionsForValue(f.insuranceProvider).map((insurance) => (
+                    <option key={insurance} value={insurance}>
+                      {insurance}
+                    </option>
+                  ))}
+                </select>
                 <input
                   className={inputCls}
                   placeholder="Member ID"

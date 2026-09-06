@@ -9,6 +9,7 @@ import type {
 } from '@prisma/client'
 import { createServiceClient } from '@/lib/crm/actions'
 import { NY_BOROUGHS } from '@/lib/client-services/constants'
+import { insuranceOptionsForValue } from '@/lib/crm/insuranceOptions'
 import { cn } from '@/lib/utils'
 import AddressAutocomplete, {
   type StructuredAddress,
@@ -184,12 +185,18 @@ export function AddClientForm({
                 />
               </Field>
               <Field label="Insurance">
-                <input
+                <select
                   value={form.insuranceProvider}
                   onChange={(e) => set('insuranceProvider', e.target.value)}
-                  placeholder="Aetna, Medicaid…"
                   className={inputCls}
-                />
+                >
+                  <option value="">Select insurance…</option>
+                  {insuranceOptionsForValue(form.insuranceProvider).map((insurance) => (
+                    <option key={insurance} value={insurance}>
+                      {insurance}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="Referral source">
                 <select
