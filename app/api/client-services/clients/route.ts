@@ -72,18 +72,34 @@ export async function GET(request: NextRequest) {
     where.status = status as ServiceClientStatus
   }
   if (borough) where.borough = borough
-  if (bcba) where.bcbaName = { contains: bcba, mode: 'insensitive' }
+  if (bcba) {
+    where.OR = [
+      { bcbaName: { contains: bcba, mode: 'insensitive' } },
+      { bcbaProfile: { is: { fullName: { contains: bcba, mode: 'insensitive' } } } },
+    ]
+  }
   if (cc) where.caseCoordinatorName = { contains: cc, mode: 'insensitive' }
   if (insurance) where.insuranceProvider = { contains: insurance, mode: 'insensitive' }
 
   if (q) {
-    where.OR = [
+    const queryOr: Prisma.ServiceClientWhereInput[] = [
       { firstName: { contains: q, mode: 'insensitive' } },
       { lastName: { contains: q, mode: 'insensitive' } },
       { clientCode: { contains: q, mode: 'insensitive' } },
       { parentName: { contains: q, mode: 'insensitive' } },
       { parentEmail: { contains: q, mode: 'insensitive' } },
     ]
+    if (where.OR) {
+      const priorAnd = where.AND
+        ? Array.isArray(where.AND)
+          ? where.AND
+          : [where.AND]
+        : []
+      where.AND = [...priorAnd, { OR: where.OR }, { OR: queryOr }]
+      delete where.OR
+    } else {
+      where.OR = queryOr
+    }
   }
 
   const [clients, threshold, period] = await Promise.all([
@@ -100,6 +116,7 @@ export async function GET(request: NextRequest) {
           },
         },
         documents: { select: { collected: true } },
+        bcbaProfile: { select: { fullName: true } },
         authorizations: {
           where: { authType: 'TREATMENT', status: 'APPROVED' },
           orderBy: { expirationDate: 'asc' },
@@ -187,7 +204,7 @@ export async function GET(request: NextRequest) {
       city: c.city,
       state: c.state,
       zip: c.zip,
-      bcbaName: c.bcbaName,
+      bcbaName: c.bcbaProfile?.fullName || c.bcbaName,
       caseCoordinatorName: c.caseCoordinatorName,
       insuranceProvider: c.insuranceProvider,
       authHours: c.authHours,

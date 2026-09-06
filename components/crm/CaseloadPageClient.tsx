@@ -17,10 +17,12 @@ export default function CaseloadPageClient({
   const queue = searchParams.get('queue')
   const initialGroup = searchParams.get('group') || 'all'
   const initialDept = searchParams.get('dept')
+  const initialBcba = searchParams.get('bcba') || ''
 
   const [rows, setRows] = useState<CaseloadRow[]>([])
   const [group, setGroup] = useState(initialGroup)
   const [dept, setDept] = useState<string | null>(initialDept)
+  const [bcba, setBcba] = useState(initialBcba)
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(
     searchParams.get('attention') === '1'
   )
@@ -35,12 +37,14 @@ export default function CaseloadPageClient({
       q?: string
       group?: string
       dept?: string | null
+      bcba?: string
       attention?: boolean
     }) => {
       const params = new URLSearchParams()
       const nextQ = opts.q ?? q
       const nextGroup = opts.group ?? group
       const nextDept = opts.dept !== undefined ? opts.dept : dept
+      const nextBcba = opts.bcba !== undefined ? opts.bcba : bcba
       const nextAttention =
         opts.attention !== undefined ? opts.attention : needsAttentionOnly
 
@@ -51,6 +55,7 @@ export default function CaseloadPageClient({
       else if (nextGroup && nextGroup !== 'all' && !stage && !queue) {
         params.set('group', nextGroup)
       }
+      if (nextBcba) params.set('bcba', nextBcba)
       if (nextAttention) params.set('attention', '1')
 
       const qs = params.toString()
@@ -58,22 +63,24 @@ export default function CaseloadPageClient({
         scroll: false,
       })
     },
-    [dept, group, needsAttentionOnly, q, queue, router, stage]
+    [bcba, dept, group, needsAttentionOnly, q, queue, router, stage]
   )
 
   const load = useCallback(
-    (opts?: { q?: string; group?: string; dept?: string | null }) => {
+    (opts?: { q?: string; group?: string; dept?: string | null; bcba?: string }) => {
       startTransition(async () => {
         setError('')
         const params = new URLSearchParams()
         const query = opts?.q ?? q
         const g = opts?.group ?? group
         const d = opts?.dept !== undefined ? opts.dept : dept
+        const b = opts?.bcba !== undefined ? opts.bcba : bcba
         if (query) params.set('q', query)
         if (stage) params.set('stage', stage)
         if (queue) params.set('queue', queue)
         if (d) params.set('dept', d)
         else if (g && g !== 'all' && !stage && !queue) params.set('group', g)
+        if (b) params.set('bcba', b)
 
         const res = await fetch(`/api/client-services/clients?${params}`, {
           credentials: 'include',
@@ -122,12 +129,16 @@ export default function CaseloadPageClient({
                 typeof c.insuranceProvider === 'string'
                   ? c.insuranceProvider
                   : null,
+              bcbaName:
+                typeof c.bcbaName === 'string'
+                  ? c.bcbaName
+                  : null,
             })
           )
         )
       })
     },
-    [dept, group, q, queue, stage]
+    [bcba, dept, group, q, queue, stage]
   )
 
   useEffect(() => {
@@ -150,10 +161,11 @@ export default function CaseloadPageClient({
   const clearFilters = () => {
     setGroup('all')
     setDept(null)
+    setBcba('')
     setQ('')
     setNeedsAttentionOnly(false)
     router.push('/client-services/clients')
-    load({ q: '', group: 'all', dept: null })
+    load({ q: '', group: 'all', dept: null, bcba: '' })
   }
 
   const onExport = async () => {
@@ -167,6 +179,7 @@ export default function CaseloadPageClient({
       else if (group && group !== 'all' && !stage && !queue) {
         params.set('group', group)
       }
+      if (bcba) params.set('bcba', bcba)
       const res = await fetch(
         `/api/client-services/clients/export?${params}`,
         { credentials: 'include' }
@@ -188,6 +201,14 @@ export default function CaseloadPageClient({
       setExporting(false)
     }
   }
+
+  const bcbaOptions = [
+    ...new Set(
+      rows
+        .map((row) => row.bcbaName)
+        .filter((name): name is string => !!name)
+    ),
+  ].sort()
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 pb-16">
@@ -234,12 +255,40 @@ export default function CaseloadPageClient({
         </p>
       )}
 
+      <section className="rounded-xl border border-line bg-surface p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="min-w-[15rem] flex-1">
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+              BCBA
+            </span>
+            <select
+              value={bcba}
+              onChange={(e) => {
+                const value = e.target.value
+                setBcba(value)
+                load({ bcba: value })
+                syncUrl({ bcba: value })
+              }}
+              className="h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm"
+            >
+              <option value="">All BCBAs</option>
+              {bcbaOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </section>
+
       <CaseloadTable
         rows={rows}
         stageFilter={stage}
         queueFilter={queue}
         groupFilter={group}
         deptFilter={dept}
+        bcbaFilter={bcba}
         onGroupChange={(g) => {
           setGroup(g)
           setDept(null)
