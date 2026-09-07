@@ -110,12 +110,8 @@ export default function ClientServicesLayout({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'logout' }),
     })
-    if (canAccessHrm) {
-      router.push('/admin/dashboard')
-    } else {
-      router.push('/client-services')
-      router.refresh()
-    }
+    router.push('/client-services')
+    router.refresh()
   }
 
   const onDetail =
@@ -217,7 +213,12 @@ export default function ClientServicesLayout({
       moreItems={EMPTY_MORE}
       restricted
       onExit={exitSection}
-      exitLabel={canAccessHrm ? 'Back to Admin' : 'Lock Client Services'}
+      exitLabel="Lock Client Services"
+      footerLink={
+        canAccessHrm
+          ? { href: '/admin/dashboard', label: 'Open HRM', icon: LayoutDashboard }
+          : undefined
+      }
       searchValue={search}
       onSearchChange={setSearch}
       onSearchSubmit={() => {

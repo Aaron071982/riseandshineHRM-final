@@ -1,7 +1,6 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { validateSession } from '@/lib/auth'
-import { isHrmDefaultAdminLoginEmail } from '@/lib/constants'
+import { isAdmin, validateSession } from '@/lib/auth'
 import {
   canAccessClientServices,
   getElevatedClientServicesUser,
@@ -79,7 +78,7 @@ export default async function ClientServicesSectionLayout({
       showAdmin={showAdmin}
       showTherapistSearch={showTherapistSearch}
       showScheduleNav={showScheduleNav}
-      canAccessHrm={isHrmDefaultAdminLoginEmail(user.email)}
+      canAccessHrm={isAdmin(user)}
       departmentNav={departmentNav}
     >
       {elevated ? children : <ElevateGate userEmail={user.email ?? ''} />}

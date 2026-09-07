@@ -2,6 +2,7 @@
 
 import AppSidebar, { type ShellNavItem } from '@/components/shell/AppSidebar'
 import AppTopbar from '@/components/shell/AppTopbar'
+import type { LucideIcon } from 'lucide-react'
 
 export default function AppShell({
   children,
@@ -19,6 +20,7 @@ export default function AppShell({
   onSearchSubmit,
   showSearch = true,
   topbarRight,
+  footerLink,
 }: {
   children: React.ReactNode
   userName: string
@@ -35,6 +37,7 @@ export default function AppShell({
   onSearchSubmit?: () => void
   showSearch?: boolean
   topbarRight?: React.ReactNode
+  footerLink?: { href: string; label: string; icon: LucideIcon }
 }) {
   return (
     <div className="sunrise-shell flex min-h-screen bg-[var(--bg)] text-ink">
@@ -46,6 +49,7 @@ export default function AppShell({
         moreItems={moreItems}
         onExit={onExit}
         exitLabel={exitLabel}
+        footerLink={footerLink}
         restricted={restricted}
       />
       <div className="flex min-w-0 flex-1 flex-col">

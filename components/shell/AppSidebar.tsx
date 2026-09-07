@@ -124,6 +124,7 @@ export default function AppSidebar({
   userRole = 'HR & Operations',
   onExit,
   exitLabel = 'Exit',
+  footerLink,
   restricted = false,
 }: {
   navItems?: ShellNavItem[]
@@ -133,6 +134,7 @@ export default function AppSidebar({
   userRole?: string
   onExit?: () => void
   exitLabel?: string
+  footerLink?: { href: string; label: string; icon: typeof LayoutDashboard }
   restricted?: boolean
 }) {
   const pathname = usePathname()
@@ -260,6 +262,15 @@ export default function AppSidebar({
             <div className="truncate text-[11px] text-side-dim">{userRole}</div>
           </div>
         </div>
+        {footerLink && (
+          <Link
+            href={footerLink.href}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-[13px] text-side-txt hover:bg-white/5 hover:text-side-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand)] min-[1080px]:justify-start"
+          >
+            <footerLink.icon className="h-4 w-4" />
+            <span className="hidden min-[1080px]:inline">{footerLink.label}</span>
+          </Link>
+        )}
         <button
           type="button"
           onClick={handleExit}
