@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { isElevatedSessionExpired } from './sessionExpiry'
 
 const HOUR = 60 * 60 * 1000
-const IDLE = HOUR
-const ABSOLUTE = 12 * HOUR
+const IDLE = 6 * HOUR
+const ABSOLUTE = 6 * HOUR
 
 describe('Client Services idle session expiry', () => {
   const base = {
@@ -23,7 +23,7 @@ describe('Client Services idle session expiry', () => {
     ).toBe(false)
   })
 
-  it('expires after 1h idle even if absolute cap remains', () => {
+  it('expires after 6h idle', () => {
     expect(
       isElevatedSessionExpired({
         ...base,
@@ -37,8 +37,8 @@ describe('Client Services idle session expiry', () => {
     expect(
       isElevatedSessionExpired({
         ...base,
-        nowMs: 90 * 60 * 1000,
-        lastActiveAtMs: 50 * 60 * 1000,
+        nowMs: 5 * HOUR,
+        lastActiveAtMs: 2 * HOUR,
       })
     ).toBe(false)
   })

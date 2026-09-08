@@ -143,7 +143,7 @@ export async function validateElevatedSession(
     return null
   }
 
-  // Sliding idle window — DB is the source of truth (not cookie maxAge).
+  // Sliding access-code window — DB is the source of truth (not cookie maxAge).
   await prisma.clientServicesSession
     .update({
       where: { id: row.id },

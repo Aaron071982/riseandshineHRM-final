@@ -41,7 +41,7 @@ export type UnlockClientServicesResult =
 /**
  * Step-up unlock for Client Services using CLIENT_SERVICES_ACCESS_CODE.
  * On success: mints client_services_sessions + httpOnly cookie.
- * Idle timeout is 1h (sliding); absolute cap is 12h.
+ * Access code lasts 6h and must be re-entered after that window.
  * On failure: logs UNLOCK_FAILED.
  */
 export async function unlockClientServices(

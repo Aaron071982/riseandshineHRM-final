@@ -3,11 +3,11 @@ import { PLATFORM_OWNER_EMAIL } from '@/lib/constants'
 /** Cookie for elevated Client Services PHI session (separate from main HRM session). */
 export const CS_SESSION_COOKIE = 'cs_session'
 
-/** Idle timeout — session expires after this much inactivity (sliding). */
-export const CS_SESSION_IDLE_MS = 60 * 60 * 1000
+/** Idle timeout — elevated CRM access lasts 6 hours since last activity. */
+export const CS_SESSION_IDLE_MS = 6 * 60 * 60 * 1000
 
-/** Absolute max lifetime from unlock, even if the user stays active. */
-export const CS_SESSION_ABSOLUTE_MS = 12 * 60 * 60 * 1000
+/** Absolute max lifetime from unlock before the access code is required again. */
+export const CS_SESSION_ABSOLUTE_MS = 6 * 60 * 60 * 1000
 
 /**
  * @deprecated Prefer CS_SESSION_IDLE_MS / CS_SESSION_ABSOLUTE_MS.

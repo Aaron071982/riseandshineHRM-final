@@ -11,8 +11,6 @@ import {
 } from './constants'
 
 const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000 // 30 days in milliseconds
-/** Server-enforced idle timeout for platform sessions (matches CS elevated sessions). */
-export const SESSION_IDLE_MS = 60 * 60 * 1000 // 1 hour
 
 /** Matches Prisma UserRole so session and compliance routes type-check. */
 export type SessionUserRole =
@@ -122,11 +120,6 @@ async function validateSessionRawSql(token: string): Promise<SessionUser | null>
     `
     const row = rows?.[0]
     if (!row || row.expiresAt < new Date()) return null
-    const idleMs = Date.now() - new Date(row.lastActiveAt).getTime()
-    if (idleMs > SESSION_IDLE_MS) {
-      await prisma.session.deleteMany({ where: { token } }).catch(() => {})
-      return null
-    }
     await prisma.session
       .updateMany({ where: { token }, data: { lastActiveAt: new Date() } })
       .catch(() => {})
@@ -235,12 +228,6 @@ export async function validateSession(token: string): Promise<SessionUser | null
       return null
     }
     if (session.expiresAt < new Date()) {
-      return null
-    }
-    const lastActive = session.lastActiveAt ?? session.createdAt
-    const idleMs = Date.now() - lastActive.getTime()
-    if (idleMs > SESSION_IDLE_MS) {
-      await prisma.session.deleteMany({ where: { token } }).catch(() => {})
       return null
     }
     await prisma.session
