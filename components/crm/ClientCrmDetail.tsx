@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Trash2 } from 'lucide-react'
 import { ClientFiveFieldHeader } from '@/components/crm/ClientFiveFieldHeader'
 import { StageStepper } from '@/components/crm/StageStepper'
 import { RequirementsPanel } from '@/components/crm/RequirementsPanel'
@@ -17,7 +17,9 @@ import { SchedulePanel } from '@/components/crm/SchedulePanel'
 import { ClientDocumentsPanel } from '@/components/crm/ClientDocumentsPanel'
 import { ClientTasksPanel } from '@/components/crm/ClientTasksPanel'
 import { EmailPanel } from '@/components/crm/EmailPanel'
-import { advanceStage, setStage } from '@/lib/crm/actions'
+import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
+import { Button } from '@/components/ui/button'
+import { advanceStage, setStage, softDeleteServiceClient } from '@/lib/crm/actions'
 import type { StageWarningCode } from '@/lib/crm/stageWarnings'
 import { STAGE_LABELS } from '@/lib/crm/stages'
 import type { CommTemplate } from '@prisma/client'
@@ -71,6 +73,10 @@ export default function ClientCrmDetail({
   const router = useRouter()
   const [tab, setTab] = useState<TabId>(() => resolveTab(initialTab))
   const [pending, startTransition] = useTransition()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteAccessCode, setDeleteAccessCode] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [deleting, startDelete] = useTransition()
 
   useEffect(() => {
     setTab(resolveTab(initialTab))
@@ -132,6 +138,24 @@ export default function ClientCrmDetail({
       return
     }
     runStageAction((opts) => setStage(client.id, to, '', opts))
+  }
+
+  const onDeleteClient = () => {
+    setDeleteError('')
+    startDelete(async () => {
+      const res = await softDeleteServiceClient(client.id, {
+        confirmed: true,
+        accessCode: deleteAccessCode,
+      })
+      if (!res.ok) {
+        setDeleteError(res.error || 'Delete failed')
+        return
+      }
+      setConfirmDelete(false)
+      setDeleteAccessCode('')
+      router.push('/client-services/clients')
+      router.refresh()
+    })
   }
 
   const staffingRbts = client.btAssignments
@@ -328,6 +352,77 @@ export default function ClientCrmDetail({
           />
         )}
       </div>
+
+      {user.fullAccess && (
+        <section className="mt-8 rounded-xl border border-[color-mix(in_srgb,var(--urgent)_35%,var(--line))] bg-surface p-4">
+          <h2 className="font-display text-lg font-semibold text-ink">
+            Delete client
+          </h2>
+          <p className="mt-1 text-sm text-quiet">
+            Soft-delete hides this family from every caseload and queue. The
+            record stays in the database and can be restored from Admin →
+            Deleted family records. An audit log is written.
+          </p>
+          {deleteError && !confirmDelete && (
+            <p className="mt-2 text-sm text-[var(--urgent)]">{deleteError}</p>
+          )}
+          <Button
+            type="button"
+            variant="destructive"
+            className="mt-3"
+            disabled={deleting}
+            onClick={() => {
+              setDeleteError('')
+              setDeleteAccessCode('')
+              setConfirmDelete(true)
+            }}
+          >
+            <Trash2 className="mr-1.5 h-4 w-4" />
+            {deleting ? 'Deleting…' : 'Delete this client'}
+          </Button>
+        </section>
+      )}
+
+      <ConfirmDestructiveDialog
+        open={confirmDelete}
+        onOpenChange={(open) => {
+          setConfirmDelete(open)
+          if (!open) {
+            setDeleteAccessCode('')
+            setDeleteError('')
+          }
+        }}
+        title="Soft-delete this family record?"
+        description={`Hide ${client.firstName} ${client.lastName} (${client.clientCode}) from every caseload and queue.\n\nThe row is not destroyed — it stays in the database and a full-access admin can restore it. An audit log is written.\n\nRe-enter the Client Services access code to confirm deletion.`}
+        confirmLabel="Soft-delete family"
+        pending={deleting}
+        confirmDisabled={!deleteAccessCode.trim()}
+        onConfirm={onDeleteClient}
+      >
+        <div className="space-y-2">
+          <label
+            htmlFor="delete-client-access-code"
+            className="block text-sm font-medium text-ink"
+          >
+            Client Services access code
+          </label>
+          <input
+            id="delete-client-access-code"
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            value={deleteAccessCode}
+            onChange={(e) =>
+              setDeleteAccessCode(e.target.value.replace(/\s/g, ''))
+            }
+            placeholder="Access code"
+            className="w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-ink focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
+          />
+          {deleteError && (
+            <p className="text-sm text-[var(--urgent)]">{deleteError}</p>
+          )}
+        </div>
+      </ConfirmDestructiveDialog>
 
       <p className="sr-only">Signed in as {user.email}</p>
     </div>

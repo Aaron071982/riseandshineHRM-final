@@ -1,5 +1,6 @@
 'use server'
 
+import crypto from 'crypto'
 import type {
   AssignmentStage,
   AuthStatus,
@@ -3094,10 +3095,20 @@ export async function resendJourneyEmail(
   }
 }
 
+function timingSafeEqualString(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a)
+  const bBuf = Buffer.from(b)
+  if (aBuf.length !== bBuf.length) {
+    crypto.timingSafeEqual(aBuf, aBuf)
+    return false
+  }
+  return crypto.timingSafeEqual(aBuf, bBuf)
+}
+
 /** Soft-delete a family record. Full-access only. Never hard-deletes. */
 export async function softDeleteServiceClient(
   clientId: string,
-  opts?: { confirmed?: boolean }
+  opts?: { confirmed?: boolean; accessCode?: string }
 ): Promise<ActionResult<{ clientCode: string; name: string }>> {
   try {
     const user = await getClientServicesUser()
@@ -3108,6 +3119,22 @@ export async function softDeleteServiceClient(
       opts?.confirmed,
       'Family delete requires confirmed: true'
     )
+
+    const expectedAccessCode = process.env.CLIENT_SERVICES_ACCESS_CODE?.trim()
+    if (!expectedAccessCode) {
+      throw new CrmAccessError('Access code not configured', 500)
+    }
+    const submittedAccessCode = (opts?.accessCode ?? '').trim()
+    if (!submittedAccessCode) {
+      throw new CrmAccessError(
+        'Re-enter the Client Services access code',
+        400
+      )
+    }
+    if (!timingSafeEqualString(submittedAccessCode, expectedAccessCode)) {
+      throw new CrmAccessError('Invalid access code', 401)
+    }
+
     await assertCanEditClient(user, clientId)
 
     const existing = await prisma.serviceClient.findFirst({
@@ -3136,6 +3163,8 @@ export async function softDeleteServiceClient(
     })
 
     revalidatePath('/client-services')
+    revalidatePath('/client-services/clients')
+    revalidatePath(`/client-services/clients/${clientId}`)
     revalidatePath('/client-services/admin')
     return { ok: true, clientCode: existing.clientCode, name }
   } catch (err) {

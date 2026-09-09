@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -17,6 +18,8 @@ export function ConfirmDestructiveDialog({
   description,
   confirmLabel = 'Confirm',
   pending = false,
+  confirmDisabled = false,
+  children,
   onConfirm,
 }: {
   open: boolean
@@ -25,6 +28,8 @@ export function ConfirmDestructiveDialog({
   description: string
   confirmLabel?: string
   pending?: boolean
+  confirmDisabled?: boolean
+  children?: ReactNode
   onConfirm: () => void | Promise<void>
 }) {
   return (
@@ -36,6 +41,7 @@ export function ConfirmDestructiveDialog({
             {description}
           </DialogDescription>
         </DialogHeader>
+        {children}
         <DialogFooter>
           <Button
             type="button"
@@ -48,7 +54,7 @@ export function ConfirmDestructiveDialog({
           <Button
             type="button"
             variant="destructive"
-            disabled={pending}
+            disabled={pending || confirmDisabled}
             onClick={() => void onConfirm()}
           >
             {pending ? 'Working…' : confirmLabel}
