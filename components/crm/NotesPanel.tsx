@@ -12,6 +12,7 @@ import type {
 import {
   addClientNote,
   logParentContact,
+  setIsCenterClient,
   setPipelineStatus,
   updateClientOverview,
   updateClientPreferences,
@@ -76,6 +77,7 @@ type OverviewClient = {
   preferredRbtGender: GenderPreference | null
   preferredRbtEthnicities: EthnicityPreference[]
   authHours: number | null
+  isCenterClient?: boolean
 }
 
 type OverviewForm = {
@@ -397,10 +399,15 @@ export function OverviewPanel({
   const [ethnicities, setEthnicities] = useState<EthnicityPreference[]>(
     client.preferredRbtEthnicities ?? []
   )
+  const [isCenterClient, setIsCenterClientFlag] = useState(
+    !!client.isCenterClient
+  )
+  const [centerError, setCenterError] = useState('')
 
   useEffect(() => {
     setGender(client.preferredRbtGender ?? '')
     setEthnicities(client.preferredRbtEthnicities ?? [])
+    setIsCenterClientFlag(!!client.isCenterClient)
     if (!editing) {
       setForm(buildOverviewForm(client))
     }
@@ -518,6 +525,59 @@ export function OverviewPanel({
 
   return (
     <div className="space-y-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
+        <h3 className="font-display text-base font-semibold text-ink">
+          Center check-in
+        </h3>
+        <p className="mt-0.5 text-sm text-quiet">
+          Center clients appear in the front-desk kiosk directory for in/out
+          sign-in.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {canEdit ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                const next = !isCenterClient
+                startTransition(async () => {
+                  setCenterError('')
+                  const res = await setIsCenterClient(client.id, next)
+                  if (!res.ok) {
+                    setCenterError(res.error)
+                    return
+                  }
+                  setIsCenterClientFlag(next)
+                  router.refresh()
+                })
+              }}
+              className={cn(
+                'h-9 rounded-lg border px-3 text-sm font-medium disabled:opacity-50',
+                isCenterClient
+                  ? 'border-transparent text-white'
+                  : 'border-line bg-surface text-ink hover:bg-line-2'
+              )}
+              style={
+                isCenterClient ? { backgroundColor: '#E7692C' } : undefined
+              }
+            >
+              {isCenterClient
+                ? 'Center client — checks in at the front desk ✓'
+                : 'Center client — checks in at the front desk'}
+            </button>
+          ) : (
+            <p className="text-sm text-ink">
+              {isCenterClient
+                ? 'Marked as a center client (front-desk check-in)'
+                : 'Not a center client'}
+            </p>
+          )}
+        </div>
+        {centerError && (
+          <p className="mt-2 text-sm text-[var(--urgent)]">{centerError}</p>
+        )}
+      </section>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-display text-base font-semibold text-ink">
           Client information

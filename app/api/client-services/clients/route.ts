@@ -38,9 +38,14 @@ export async function GET(request: NextRequest) {
   const queue = sp.get('queue')?.trim() || ''
   const group = sp.get('group')?.trim() || ''
   const dept = sp.get('dept')?.trim() || ''
+  const center = sp.get('center')?.trim() || ''
 
   const where: Prisma.ServiceClientWhereInput = {
     ...getVisibleClientsWhere(user),
+  }
+
+  if (center === '1' || center === 'true') {
+    where.isCenterClient = true
   }
 
   if (stage && isClientStage(stage)) {
@@ -179,6 +184,7 @@ export async function GET(request: NextRequest) {
       blocked,
       missingDocs,
       hasUnresolvedAlerts: c.alerts.length > 0,
+      isCenterClient: c.isCenterClient,
       rbtName,
       rbtProfileId: primaryBt?.rbtProfileId ?? null,
       authExpirationDate: c.authorizations[0]?.expirationDate ?? null,

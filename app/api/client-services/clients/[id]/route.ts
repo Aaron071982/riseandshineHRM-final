@@ -182,16 +182,20 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     throw err
   }
 
-  // Only full-access users may edit core PHI fields via this legacy endpoint
-  if (!isClientServicesFullAccessEmail(user.email)) {
-    return NextResponse.json({ error: 'Forbidden — edit requires full access' }, { status: 403 })
-  }
-
   let body: Record<string, unknown>
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  const centerOnlyUpdate =
+    Object.keys(body).length === 1 &&
+    typeof body.isCenterClient === 'boolean'
+
+  // Core PHI edits stay full-access; center-client toggle is available to any editor.
+  if (!centerOnlyUpdate && !isClientServicesFullAccessEmail(user.email)) {
+    return NextResponse.json({ error: 'Forbidden — edit requires full access' }, { status: 403 })
   }
 
   const allowed = [
@@ -219,11 +223,16 @@ export async function PATCH(request: NextRequest, context: Ctx) {
     'authHours',
     'currentHoursPerWeek',
     'notes',
+    'isCenterClient',
   ] as const
 
   const data: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) data[key] = body[key]
+  }
+
+  if ('isCenterClient' in data && typeof data.isCenterClient !== 'boolean') {
+    return NextResponse.json({ error: 'isCenterClient must be a boolean' }, { status: 400 })
   }
 
   if (data.status && !['NEW', 'ACTIVE', 'ON_HOLD', 'DISCHARGED'].includes(String(data.status))) {

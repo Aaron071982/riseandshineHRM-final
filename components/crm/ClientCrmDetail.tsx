@@ -17,6 +17,7 @@ import { SchedulePanel } from '@/components/crm/SchedulePanel'
 import { ClientDocumentsPanel } from '@/components/crm/ClientDocumentsPanel'
 import { ClientTasksPanel } from '@/components/crm/ClientTasksPanel'
 import { EmailPanel } from '@/components/crm/EmailPanel'
+import CheckInsPanel from '@/components/crm/CheckInsPanel'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { Button } from '@/components/ui/button'
 import { advanceStage, setStage, softDeleteServiceClient } from '@/lib/crm/actions'
@@ -40,6 +41,7 @@ type TabId =
   | 'assessment'
   | 'schedule'
   | 'email'
+  | 'check-ins'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -50,6 +52,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'authorization', label: 'Authorization' },
   { id: 'assessment', label: 'Assessment' },
   { id: 'schedule', label: 'Schedule' },
+  { id: 'check-ins', label: 'Check-ins' },
   { id: 'email', label: 'Email' },
   { id: 'documents', label: 'Documents' },
   { id: 'activity', label: 'Activity' },
@@ -180,7 +183,17 @@ export default function ClientCrmDetail({
         </Link>
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
-            {client.firstName} {client.lastName}
+            <span className="inline-flex flex-wrap items-center gap-2">
+              {client.firstName} {client.lastName}
+              {client.isCenterClient && (
+                <span
+                  className="inline-flex rounded-md px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-white"
+                  style={{ backgroundColor: '#E7692C' }}
+                >
+                  Center
+                </span>
+              )}
+            </span>
           </h1>
           <p className="text-sm tabular-nums text-quiet">{client.clientCode}</p>
         </div>
@@ -369,6 +382,13 @@ export default function ClientCrmDetail({
             assignedRbtIds={client.btAssignments
               .map((a) => a.rbtProfileId)
               .filter((id): id is string => !!id)}
+            canEdit={canEdit}
+          />
+        )}
+        {tab === 'check-ins' && (
+          <CheckInsPanel
+            clientId={client.id}
+            firstName={client.firstName}
             canEdit={canEdit}
           />
         )}

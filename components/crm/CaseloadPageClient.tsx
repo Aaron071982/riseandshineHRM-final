@@ -24,6 +24,9 @@ export default function CaseloadPageClient({
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(
     searchParams.get('attention') === '1'
   )
+  const [centerClientsOnly, setCenterClientsOnly] = useState(
+    searchParams.get('center') === '1'
+  )
   const [q, setQ] = useState(searchParams.get('q') || '')
   const [error, setError] = useState('')
   const [showAdd, setShowAdd] = useState(false)
@@ -36,6 +39,7 @@ export default function CaseloadPageClient({
       group?: string
       dept?: string | null
       attention?: boolean
+      center?: boolean
     }) => {
       const params = new URLSearchParams()
       const nextQ = opts.q ?? q
@@ -43,6 +47,8 @@ export default function CaseloadPageClient({
       const nextDept = opts.dept !== undefined ? opts.dept : dept
       const nextAttention =
         opts.attention !== undefined ? opts.attention : needsAttentionOnly
+      const nextCenter =
+        opts.center !== undefined ? opts.center : centerClientsOnly
 
       if (nextQ) params.set('q', nextQ)
       if (stage) params.set('stage', stage)
@@ -52,28 +58,37 @@ export default function CaseloadPageClient({
         params.set('group', nextGroup)
       }
       if (nextAttention) params.set('attention', '1')
+      if (nextCenter) params.set('center', '1')
 
       const qs = params.toString()
       router.replace(`/client-services/clients${qs ? `?${qs}` : ''}`, {
         scroll: false,
       })
     },
-    [dept, group, needsAttentionOnly, q, queue, router, stage]
+    [centerClientsOnly, dept, group, needsAttentionOnly, q, queue, router, stage]
   )
 
   const load = useCallback(
-    (opts?: { q?: string; group?: string; dept?: string | null }) => {
+    (opts?: {
+      q?: string
+      group?: string
+      dept?: string | null
+      center?: boolean
+    }) => {
       startTransition(async () => {
         setError('')
         const params = new URLSearchParams()
         const query = opts?.q ?? q
         const g = opts?.group ?? group
         const d = opts?.dept !== undefined ? opts.dept : dept
+        const center =
+          opts?.center !== undefined ? opts.center : centerClientsOnly
         if (query) params.set('q', query)
         if (stage) params.set('stage', stage)
         if (queue) params.set('queue', queue)
         if (d) params.set('dept', d)
         else if (g && g !== 'all' && !stage && !queue) params.set('group', g)
+        if (center) params.set('center', '1')
 
         const res = await fetch(`/api/client-services/clients?${params}`, {
           credentials: 'include',
@@ -108,6 +123,7 @@ export default function CaseloadPageClient({
               blocked: !!c.blocked,
               missingDocs: !!c.missingDocs,
               hasUnresolvedAlerts: !!c.hasUnresolvedAlerts,
+              isCenterClient: !!c.isCenterClient,
               rbtName: c.rbtName,
               rbtProfileId: c.rbtProfileId,
               authExpirationDate: c.authExpirationDate
@@ -127,7 +143,7 @@ export default function CaseloadPageClient({
         )
       })
     },
-    [dept, group, q, queue, stage]
+    [centerClientsOnly, dept, group, q, queue, stage]
   )
 
   useEffect(() => {
@@ -152,8 +168,9 @@ export default function CaseloadPageClient({
     setDept(null)
     setQ('')
     setNeedsAttentionOnly(false)
+    setCenterClientsOnly(false)
     router.push('/client-services/clients')
-    load({ q: '', group: 'all', dept: null })
+    load({ q: '', group: 'all', dept: null, center: false })
   }
 
   const onExport = async () => {
@@ -259,6 +276,12 @@ export default function CaseloadPageClient({
         onNeedsAttentionChange={(on) => {
           setNeedsAttentionOnly(on)
           syncUrl({ attention: on })
+        }}
+        centerClientsOnly={centerClientsOnly}
+        onCenterClientsChange={(on) => {
+          setCenterClientsOnly(on)
+          load({ center: on })
+          syncUrl({ center: on })
         }}
         q={q}
         onClear={clearFilters}

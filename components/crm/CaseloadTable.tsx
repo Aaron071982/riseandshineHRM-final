@@ -26,6 +26,7 @@ export type CaseloadRow = {
   blocked: boolean
   missingDocs: boolean
   hasUnresolvedAlerts: boolean
+  isCenterClient: boolean
   rbtName: string | null
   rbtProfileId: string | null
   authExpirationDate: string | null
@@ -158,9 +159,19 @@ function CaseloadRowCells({ r }: { r: CaseloadRow }) {
       <td className="px-3 py-2.5">
         <Link
           href={`/client-services/clients/${r.id}`}
-          className="font-medium text-ink hover:text-brand"
+          className="inline-flex flex-wrap items-center gap-1.5 font-medium text-ink hover:text-brand"
         >
-          {r.firstName} {r.lastName}
+          <span>
+            {r.firstName} {r.lastName}
+          </span>
+          {r.isCenterClient && (
+            <span
+              className="inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
+              style={{ backgroundColor: '#E7692C' }}
+            >
+              Center
+            </span>
+          )}
         </Link>
         <div className="text-xs tabular-nums text-quiet">
           {r.clientCode}
@@ -237,6 +248,8 @@ export default function CaseloadTable({
   onDeptChange,
   needsAttentionOnly,
   onNeedsAttentionChange,
+  centerClientsOnly,
+  onCenterClientsChange,
   q,
   onClear,
 }: {
@@ -249,6 +262,8 @@ export default function CaseloadTable({
   onDeptChange: (dept: string | null) => void
   needsAttentionOnly: boolean
   onNeedsAttentionChange: (on: boolean) => void
+  centerClientsOnly?: boolean
+  onCenterClientsChange?: (on: boolean) => void
   q?: string
   onClear?: () => void
 }) {
@@ -301,7 +316,14 @@ export default function CaseloadTable({
   }, [filtered])
 
   const hasFilters =
-    !!(stageFilter || queueFilter || q || deptFilter || needsAttentionOnly)
+    !!(
+      stageFilter ||
+      queueFilter ||
+      q ||
+      deptFilter ||
+      needsAttentionOnly ||
+      centerClientsOnly
+    )
 
   return (
     <div className="space-y-3">
@@ -349,6 +371,23 @@ export default function CaseloadTable({
         >
           Needs attention
         </button>
+        {onCenterClientsChange && (
+          <button
+            type="button"
+            onClick={() => onCenterClientsChange(!centerClientsOnly)}
+            className={cn(
+              'h-8 rounded-lg border px-3 text-sm font-medium',
+              centerClientsOnly
+                ? 'border-transparent text-white'
+                : 'border-line bg-surface text-quiet hover:text-ink'
+            )}
+            style={
+              centerClientsOnly ? { backgroundColor: '#E7692C' } : undefined
+            }
+          >
+            Center clients only
+          </button>
+        )}
         {hasFilters && (
           <button
             type="button"

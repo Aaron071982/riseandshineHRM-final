@@ -2461,6 +2461,38 @@ export async function updateStaffingCoverageNeeds(
   }
 }
 
+/** Mark / unmark a family as a center (front-desk check-in) client. */
+export async function setIsCenterClient(
+  clientId: string,
+  isCenterClient: boolean
+): Promise<ActionResult> {
+  try {
+    const user = await getClientServicesUser()
+    await assertCanEditClient(user, clientId)
+
+    const existing = await prisma.serviceClient.findFirst({
+      where: { id: clientId, deletedAt: null },
+      select: { id: true },
+    })
+    if (!existing) return { ok: false, error: 'Not found', status: 404 }
+
+    await prisma.serviceClient.update({
+      where: { id: clientId },
+      data: { isCenterClient },
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: clientId,
+      action: isCenterClient ? 'CENTER_CLIENT_MARKED' : 'CENTER_CLIENT_CLEARED',
+    })
+    revalidateClient(clientId)
+    return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 export async function flagRbtReplacement(
   clientId: string,
   input: {

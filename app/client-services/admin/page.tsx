@@ -6,6 +6,7 @@ import { bootstrapCrmSuperAdmins } from '@/lib/crm/bootstrapRoles'
 import AdminManagementClient from '@/components/crm/AdminManagementClient'
 import DeletedFamiliesPanel from '@/components/crm/DeletedFamiliesPanel'
 import BoardMigrationReviewPanel from '@/components/crm/BoardMigrationReviewPanel'
+import KioskDevicesPanel from '@/components/crm/KioskDevicesPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,7 @@ export default async function ClientServicesAdminPage() {
     <div className="space-y-8">
       <AdminManagementClient />
       <BoardMigrationReviewPanel />
+      <KioskDevicesPanel />
       <DeletedFamiliesPanel />
     </div>
   )
