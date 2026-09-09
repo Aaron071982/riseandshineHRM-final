@@ -52,16 +52,12 @@ export function parentFormPublicUrl(slug: ParentFormSlug): string {
 export function templateFormDownloadLinks(
   template: CommTemplate
 ): { url: string; label: string }[] {
-  if (template === 'WELCOME') {
+  if (template === 'WELCOME' || template === 'CONSENT_REQUEST') {
     return [
       {
         url: parentFormPublicUrl('welcome-packet'),
         label: PARENT_FORM_FILES['welcome-packet'].label,
       },
-    ]
-  }
-  if (template === 'CONSENT_REQUEST') {
-    return [
       {
         url: parentFormPublicUrl('intake-form'),
         label: PARENT_FORM_FILES['intake-form'].label,

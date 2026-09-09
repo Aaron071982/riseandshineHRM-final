@@ -19,8 +19,14 @@ const TEMPLATE_FORMS: Partial<Record<CommTemplate, { file: string; fileName: str
   {
     WELCOME: [
       { file: 'WelcomePacket.pdf', fileName: 'WelcomePacket.pdf' },
+      { file: 'IntakeForm.pdf', fileName: 'IntakeForm.pdf' },
+      { file: 'ConsentForm.pdf', fileName: 'ConsentForm.pdf' },
     ],
-    CONSENT_REQUEST: [],
+    CONSENT_REQUEST: [
+      { file: 'WelcomePacket.pdf', fileName: 'WelcomePacket.pdf' },
+      { file: 'IntakeForm.pdf', fileName: 'IntakeForm.pdf' },
+      { file: 'ConsentForm.pdf', fileName: 'ConsentForm.pdf' },
+    ],
   }
 
 export function templateFormSpecs(template: CommTemplate) {

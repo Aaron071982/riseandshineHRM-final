@@ -136,37 +136,41 @@ describe('lib/crm/emails/templates branded render', () => {
     ],
   }
 
-  it('WELCOME uses v1 packet voice and Dear greeting', () => {
+  it('WELCOME combines welcome, intake/consent, and documents checklist', () => {
     const email = renderStaffEmail('WELCOME', fields)
     expect(email?.subject).toMatch(/Welcome to Rise & Shine ABA/)
+    expect(email?.subject).toMatch(/packet, forms, and documents/)
     expect(email?.html).toContain('Dear Maria Rivera,')
     expect(email?.html).toContain('Parent Welcome Packet')
-    expect(email?.html).toContain('rather answer a question twice')
+    expect(email?.html).toContain('Client Intake Form (Form 01)')
+    expect(email?.html).toContain('Consent &amp; Authorization Form (Form 02)')
+    expect(email?.html).toContain('Documents we need from you')
+    expect(email?.html).toContain('Insurance card — front and back')
+    expect(email?.html).toContain('Physician referral or prescription for ABA')
+    expect(email?.html).toContain('single most important step')
+    expect(email?.html).toContain('email the finished copies back')
     expect(email?.html).toContain('The Rise &amp; Shine ABA Team')
     expect(email?.html).toContain(EMAIL_LOGO_URL)
     expect(email?.html).not.toContain('localhost')
     expect(email?.html).not.toContain('#3b82f6')
+    expect(email?.html).not.toContain('second email')
     expect(email?.html).not.toContain('What to expect next')
   })
 
-  it('CONSENT_REQUEST is intake + consent with email-return instructions', () => {
+  it('CONSENT_REQUEST uses the same combined welcome packet', () => {
     const email = renderStaffEmail('CONSENT_REQUEST', fields)
-    expect(email?.subject).toMatch(/intake, consent/)
+    expect(email?.subject).toMatch(/Welcome to Rise & Shine ABA/)
     expect(email?.html).toContain('Client Intake Form (Form 01)')
     expect(email?.html).toContain('Consent &amp; Authorization Form (Form 02)')
-    expect(email?.html).toContain('email the finished copies back')
-    expect(email?.html).toContain('info@riseandshineaba.com')
+    expect(email?.html).toContain('Documents we need from you')
     expect(email?.html).toContain('Dear Maria Rivera,')
-    expect(email?.html).toContain('Jordan Lee')
     expect(email?.html).not.toContain('Open secure portal')
-    expect(email?.html).not.toContain('isn&apos;t encrypted')
-    expect(email?.html).not.toContain('don&apos;t email documents')
     expect(email?.html).not.toContain('How to complete consent')
   })
 
   it('WELCOME does not push a secure portal for forms', () => {
     const email = renderStaffEmail('WELCOME', fields)
-    expect(email?.html).toContain('Intake and Consent forms')
+    expect(email?.html).toContain('Client Intake Form')
     expect(email?.html).not.toContain('secure link')
     expect(email?.html).not.toContain('isn&apos;t encrypted')
   })
@@ -185,7 +189,7 @@ describe('lib/crm/emails/templates branded render', () => {
         links: [{ url: 'https://portal.example.com/upload' }],
       }
     )
-    expect(email?.subject).toMatch(/One step left/)
+    expect(email?.subject).toMatch(/Friendly reminder/)
     expect(email?.html).toContain('gentle reminder')
     expect(email?.html).toContain('Insurance card — front and back')
     expect(email?.html).toContain('Physician referral')
@@ -281,8 +285,9 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(welcome?.html).not.toContain('Your journey with us')
 
     const consent = renderStaffEmail('CONSENT_REQUEST', fields, { locale: 'es' })
-    expect(consent?.subject).toMatch(/admisión/i)
+    expect(consent?.subject).toMatch(/Bienvenido/i)
     expect(consent?.html).toContain('Formularios a completar')
+    expect(consent?.html).toContain('Documentos que necesitamos')
 
     const meet = renderStaffEmail('MEET_AND_GREET', fields, { locale: 'es' })
     expect(meet?.subject).toMatch(/Presentación|presentación/)
@@ -321,21 +326,32 @@ describe('lib/crm/emails/templates branded render', () => {
 })
 
 describe('template form PDF attachments', () => {
-  it('maps Welcome → WelcomePacket; Consent request has no auto-attachments', () => {
+  it('maps Welcome and Consent request → full packet PDFs', () => {
     expect(templateFormSpecs('WELCOME').map((s) => s.fileName)).toEqual([
       'WelcomePacket.pdf',
+      'IntakeForm.pdf',
+      'ConsentForm.pdf',
     ])
-    expect(templateFormSpecs('CONSENT_REQUEST')).toEqual([])
+    expect(templateFormSpecs('CONSENT_REQUEST').map((s) => s.fileName)).toEqual([
+      'WelcomePacket.pdf',
+      'IntakeForm.pdf',
+      'ConsentForm.pdf',
+    ])
     expect(templateFormSpecs('DOCS_NEEDED')).toEqual([])
   })
 
   it('loads Welcome PDF bytes from assets/crm-parent-forms', () => {
     const welcome = loadTemplateFormAttachments('WELCOME')
-    expect(welcome).toHaveLength(1)
+    expect(welcome).toHaveLength(3)
     expect(welcome[0]!.fileName).toBe('WelcomePacket.pdf')
     expect(welcome[0]!.contentBytes.length).toBeGreaterThan(1000)
     expect(welcome[0]!.contentBytes.subarray(0, 4).toString()).toBe('%PDF')
+    expect(welcome.map((a) => a.fileName)).toEqual([
+      'WelcomePacket.pdf',
+      'IntakeForm.pdf',
+      'ConsentForm.pdf',
+    ])
 
-    expect(loadTemplateFormAttachments('CONSENT_REQUEST')).toEqual([])
+    expect(loadTemplateFormAttachments('CONSENT_REQUEST')).toHaveLength(3)
   })
 })

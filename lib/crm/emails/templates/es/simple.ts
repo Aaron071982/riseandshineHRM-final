@@ -22,16 +22,41 @@ export function renderWelcomeEs(fields: StaffMergeFields): StaffEmailContent {
   const child = childName(fields, LOCALE)
   const phone = officePhone(fields)
   const email = officeEmail(fields)
+  const docs =
+    fields.missingDocsList.length > 0
+      ? fields.missingDocsList
+      : DEFAULT_MISSING_DOCS_COPY_ES
+  const docsLis = docs
+    .map(
+      (item) =>
+        `<li style="margin:0 0 10px;padding:0;line-height:1.55;color:#2f2318;">${item}</li>`
+    )
+    .join('')
 
   return {
-    subject: 'Bienvenido/a a Rise & Shine ABA — esto es lo que sigue',
+    subject: `Bienvenido/a a Rise & Shine ABA — paquete, formularios y documentos de ${child}`,
     bodyHtml: `
       ${para(dearGreeting(fields, LOCALE))}
       ${para(`Bienvenido/a a Rise &amp; Shine ABA, y gracias por confiar en nosotros con la atención de <strong>${child}</strong>. Elegir un proveedor de ABA es una decisión importante, y estamos agradecidos de que nos haya elegido para acompañar a su familia.`)}
-      ${para(`Hemos incluido su <strong>Paquete de Bienvenida para Padres</strong> como archivo adjunto. Tómese unos minutos para leerlo cuando pueda — explica, en un lenguaje sencillo, exactamente cómo funcionan los servicios de ABA, quién formará parte del equipo de ${child} y el recorrido paso a paso desde hoy hasta la primera sesión de su hijo/a. No hay sorpresas ocultas, y no se espera que ya sepa todo.`)}
-      ${para(`Queremos decirle con claridad desde el principio: gran parte de la rapidez con la que ${child} puede comenzar depende de su compañía de seguros, no de nosotros. Seremos honestos con usted en cada etapa sobre cómo van las cosas — incluyendo los momentos en que la demora es del asegurador y genuinamente no hay nada más que podamos hacer para acelerarlo. Nunca se quedará sin saber.`)}
-      ${para(`En el próximo día o dos, recibirá un segundo correo nuestro con los formularios de <strong>Admisión y Consentimiento</strong> adjuntos. Complete esos formularios y devuélvalos por correo electrónico según las indicaciones de ese mensaje — devolverlos completos y correctos la primera vez es lo más importante que puede hacer para ayudar a que ${child} comience antes.`)}
-      ${para(`Si surge alguna pregunta antes de entonces, no dude en llamarnos al <a href="tel:+18888984774" style="color:#f2652a;text-decoration:none;">${phone}</a> o escribir a <a href="mailto:${email}" style="color:#f2652a;text-decoration:none;">${email}</a>. Preferimos responder una pregunta dos veces antes que que usted se preocupe una sola vez.`)}
+      ${para(`Hemos adjuntado su <strong>Paquete de Bienvenida para Padres</strong>. Tómese unos minutos para leerlo cuando pueda — explica, en un lenguaje sencillo, cómo funcionan los servicios de ABA, quién formará parte del equipo de ${child} y el recorrido paso a paso hasta la primera sesión.`)}
+      ${para(`Queremos decirle con claridad desde el principio: gran parte de la rapidez con la que ${child} puede comenzar depende de su <strong>compañía de seguros</strong>, no de nosotros. Seremos honestos en cada etapa — incluyendo cuando la demora sea del asegurador. Nunca se quedará sin saber.`)}
+
+      ${sectionRule('Sus acciones — por favor complete esto')}
+      ${para(`<strong style="color:${ACCENT};">Este es el paso más importante que puede dar ahora mismo.</strong> Completar los formularios y enviar los documentos a continuación — de forma completa y precisa la primera vez — es lo que nos permite verificar el seguro y solicitar autorización para que ${child} comience antes.`)}
+
+      ${infoBlock('1. Formularios a completar y devolver', [
+        `El <strong>Formulario de Admisión del Cliente (Formulario 01)</strong> — todo lo necesario para verificar el seguro de ${child} y solicitar autorización.`,
+        `El <strong>Formulario de Consentimiento y Autorización (Formulario 02)</strong> — su permiso para evaluar y tratar a ${child}, y para compartir con el seguro solo lo que requieran. Usted consiente cada punto por separado.`,
+      ])}
+      ${para(`Las copias en blanco de ambos formularios van adjuntas. Por favor <strong>complételos y envíenos las copias terminadas por correo</strong> — responda a este mensaje o envíelos a <a href="mailto:${email}" style="color:${ACCENT};text-decoration:none;">${email}</a>.`)}
+
+      ${sectionRule('Documentos que necesitamos de usted')}
+      <ul style="margin:0 0 8px;padding-left:20px;font-size:14px;">${docsLis}</ul>
+      ${para(`<strong>Priorice primero</strong>: <strong>tarjeta de seguro (frente y reverso)</strong>, <strong>evaluación diagnóstica</strong> y <strong>referencia médica para ABA</strong>. Envíe lo que tenga ahora; siempre puede enviar el resto después.`)}
+      ${para(`Si una pregunta no aplica a ${child}, escriba <strong>&quot;N/A&quot;</strong> en lugar de dejarla en blanco. Copie nombres y números exactamente como aparecen en la tarjeta de seguro.`)}
+
+      ${para(`Si algo no está claro, llámenos al <a href="tel:+18888984774" style="color:${ACCENT};text-decoration:none;">${phone}</a> o escriba a <a href="mailto:${email}" style="color:${ACCENT};text-decoration:none;">${email}</a> antes de firmar.`)}
+      ${para(`Haremos un seguimiento más adelante solo si algo sigue pendiente. Gracias de nuevo por elegir Rise &amp; Shine.`)}
       ${teamSignature(LOCALE)}
     `,
   }
@@ -40,30 +65,7 @@ export function renderWelcomeEs(fields: StaffMergeFields): StaffEmailContent {
 export function renderConsentRequestEs(
   fields: StaffMergeFields
 ): StaffEmailContent {
-  const child = childName(fields, LOCALE)
-  const phone = officePhone(fields)
-  const email = officeEmail(fields)
-
-  return {
-    subject:
-      'Su siguiente paso con Rise & Shine — admisión, consentimiento y documentos',
-    bodyHtml: `
-      ${para(dearGreeting(fields, LOCALE))}
-      ${para(`Ahora que ${child} está registrado/a en nuestro sistema, este es el siguiente paso — y es el que genuinamente está en sus manos. Completarlo a fondo es lo que nos permite avanzar con todo lo demás.`)}
-      ${para(`Complete ambos formularios a continuación y envíenos por correo electrónico las copias terminadas (responda a este mensaje o envíelas a <a href="mailto:${email}" style="color:${ACCENT};text-decoration:none;">${email}</a>). Si los formularios en blanco no están adjuntos a este correo, responda y se los enviaremos de inmediato.`)}
-      ${infoBlock('Formularios a completar', [
-        `El <strong>Formulario de Admisión del Cliente (Formulario 01)</strong> — nos proporciona todo lo necesario para verificar el seguro de ${child} y solicitar la autorización de servicios.`,
-        `El <strong>Formulario de Consentimiento y Autorización (Formulario 02)</strong> — nos da su permiso para evaluar y tratar a ${child}, y para compartir con su seguro solo lo que requieran para pagar esa atención. Usted consiente cada punto por separado; nada es todo o nada.`,
-      ])}
-      ${sectionRule()}
-      ${para(`<strong>Cuando responda, adjunte los formularios completados</strong> (y cualquier documento de apoyo que tenga listo). Por ejemplo:`)}
-      ${para(`Tarjeta de seguro (frente y reverso), tarjeta de Medicaid si aplica, evaluación diagnóstica, referencia médica para ABA, IEP/IFSP si ${child} tiene uno, documentos de custodia si aplica, y registros previos de ABA.`)}
-      ${para(`No podemos comenzar a verificar el seguro sin la tarjeta de seguro, y no podemos solicitar autorización sin la evaluación diagnóstica y la referencia médica — así que esas son las que debe priorizar si está reuniendo documentos poco a poco. Envíe lo que tenga ahora; siempre puede enviar el resto después.`)}
-      ${para(`Si una pregunta no aplica a ${child}, escriba &quot;N/A&quot; en lugar de dejarla en blanco — una respuesta en blanco nos retrasa porque no podemos distinguir entre &quot;no aplica&quot; y &quot;se olvidó&quot;. Copie nombres y números de identificación exactamente como aparecen en la tarjeta de seguro; un solo carácter incorrecto puede retrasar la aprobación semanas.`)}
-      ${para(`Si algo no está claro, llámenos al <a href="tel:+18888984774" style="color:${ACCENT};text-decoration:none;">${phone}</a> antes de firmar — preferimos explicarlo dos veces.`)}
-      ${coordinatorSignature(fields, LOCALE)}
-    `,
-  }
+  return renderWelcomeEs(fields)
 }
 
 export const DEFAULT_MISSING_DOCS_COPY_ES = [
@@ -74,6 +76,8 @@ export const DEFAULT_MISSING_DOCS_COPY_ES = [
   'IEP o IFSP, si aplica',
   'Orden de custodia o tutela, si aplica',
   'Registros previos de ABA, si aplica',
+  'Formulario de Admisión del Cliente completado (Formulario 01)',
+  'Formulario de Consentimiento y Autorización firmado (Formulario 02)',
 ]
 
 function missingDocsHtmlEs(fields: StaffMergeFields): string {
@@ -96,16 +100,15 @@ export function renderDocsNeededEs(fields: StaffMergeFields): StaffEmailContent 
   const phone = officePhone(fields)
 
   return {
-    subject: `Un paso más para que los servicios de ${child} sigan avanzando`,
+    subject: `Recordatorio amable — aún necesitamos documentos de ${child}`,
     bodyHtml: `
       ${para(dearGreeting(fields, LOCALE))}
-      ${para(`Le escribimos con un recordatorio amable, porque no queremos que nada retrase el progreso de ${child} hacia el inicio de servicios.`)}
-      ${para(`Para seguir avanzando, aún necesitamos algunos documentos de su parte. En este momento, estos son los elementos pendientes:`)}
+      ${para(`Le escribimos con un <strong>recordatorio amable</strong>. Ya enviamos el paquete de bienvenida de ${child} con los formularios de admisión y la lista de documentos, y no queremos que nada retrase el inicio de servicios.`)}
+      ${para(`Para seguir avanzando, aún necesitamos lo siguiente:`)}
       ${missingDocsHtmlEs(fields)}
-      ${para(`Tan pronto como los recibamos, podremos continuar con la verificación del seguro y solicitar las aprobaciones que ${child} necesita — cuanto antes los envíe, antes podremos seguir avanzando de nuestro lado.`)}
-      ${para(`Envíe los documentos por correo electrónico usando la información de contacto a continuación, o llámenos si necesita ayuda.`)}
-      ${portalCta(fields.portalLink, 'Subir documentos de forma segura', LOCALE)}
-      ${para(`Si alguno de estos documentos es difícil de obtener — una referencia con un detalle faltante, una evaluación que aún está esperando — llámenos al <a href="tel:+18888984774" style="color:${ACCENT};text-decoration:none;">${phone}</a>. Es común, tiene solución, y le diremos exactamente qué pedir. No tiene que resolverlo solo/a.`)}
+      ${para(`Tan pronto como los recibamos, podremos continuar con la verificación del seguro y solicitar las aprobaciones que ${child} necesita — <strong style="color:${ACCENT};">cuanto antes los envíe, antes podremos seguir avanzando</strong> de nuestro lado.`)}
+      ${para(`Responda a este correo con los formularios y documentos adjuntos, o llámenos si necesita ayuda.`)}
+      ${para(`Si alguno es difícil de obtener — una referencia con un detalle faltante, una evaluación que aún espera — llámenos al <a href="tel:+18888984774" style="color:${ACCENT};text-decoration:none;">${phone}</a>. Es común, tiene solución, y le diremos exactamente qué pedir.`)}
       ${coordinatorSignature(fields, LOCALE)}
     `,
   }

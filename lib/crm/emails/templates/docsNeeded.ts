@@ -1,11 +1,11 @@
 import type { StaffEmailContent, StaffMergeFields } from './types'
 import {
   ACCENT,
+  BODY_TEXT,
   coordinatorSignature,
   dearGreeting,
   officePhone,
   para,
-  portalCta,
   sectionRule,
 } from './shell'
 import { childName } from './helpers'
@@ -19,9 +19,14 @@ export const DEFAULT_MISSING_DOCS_COPY = [
   'IEP or IFSP, if applicable',
   'Custody or guardianship order, if applicable',
   'Prior ABA records, if applicable',
+  'Completed Client Intake Form (Form 01)',
+  'Signed Consent & Authorization Form (Form 02)',
 ]
 
-function missingDocsHtml(fields: StaffMergeFields): string {
+export function missingDocsListHtml(
+  fields: StaffMergeFields,
+  heading = 'Outstanding documents'
+): string {
   const items =
     fields.missingDocsList.length > 0
       ? fields.missingDocsList
@@ -29,28 +34,28 @@ function missingDocsHtml(fields: StaffMergeFields): string {
   const lis = items
     .map(
       (item) =>
-        `<li style="margin:0 0 10px;padding:0;line-height:1.5;color:#2f2318;">${item}</li>`
+        `<li style="margin:0 0 10px;padding:0;line-height:1.5;color:${BODY_TEXT};">${item}</li>`
     )
     .join('')
-  return `${sectionRule('Outstanding documents')}
+  return `${sectionRule(heading)}
 <ul style="margin:0 0 16px;padding-left:20px;font-size:14px;">${lis}</ul>`
 }
 
+/** Follow-up nudge when documents/forms are still outstanding after the welcome packet. */
 export function renderDocsNeeded(fields: StaffMergeFields): StaffEmailContent {
   const child = childName(fields)
   const phone = officePhone(fields)
 
   return {
-    subject: `One step left so we can keep ${child}'s services moving`,
+    subject: `Friendly reminder — documents still needed for ${child}`,
     bodyHtml: `
       ${para(dearGreeting(fields))}
-      ${para(`We&apos;re writing with a gentle reminder, because we don&apos;t want anything to hold up ${child}&apos;s progress toward starting services.`)}
-      ${para(`To continue moving forward, we still need a few documents from you. Right now, these are the items outstanding:`)}
-      ${missingDocsHtml(fields)}
-      ${para(`As soon as we have them, we can carry on with verifying insurance and requesting the approvals ${child} needs — so the sooner these come in, the sooner we can keep things moving on our end.`)}
-      ${para(`Please send documents back to us by email using the contact information below, or call us if you need help.`)}
-      ${portalCta(fields.portalLink, 'Upload documents securely')}
-      ${para(`If any of these are hard to get hold of — a referral that&apos;s missing a required detail, an evaluation you&apos;re still waiting on — please call us at <a href="tel:+18888984774" style="color:${ACCENT};text-decoration:none;">${phone}</a>. This is common, it&apos;s fixable, and we&apos;ll tell you exactly what to ask for. You don&apos;t have to sort it out alone.`)}
+      ${para(`We&apos;re checking in with a <strong>gentle reminder</strong>. We previously sent ${child}&apos;s welcome packet with the intake forms and document checklist, and we don&apos;t want anything to hold up progress toward starting services.`)}
+      ${para(`To keep moving forward, we still need the following from you:`)}
+      ${missingDocsListHtml(fields)}
+      ${para(`As soon as we have these, we can continue verifying insurance and requesting the approvals ${child} needs — <strong style="color:${ACCENT};">the sooner these come in, the sooner we can keep things moving</strong> on our end.`)}
+      ${para(`Please reply to this email with the completed forms and documents attached, or call us if you need help gathering anything.`)}
+      ${para(`If any of these are hard to get — a referral missing a required detail, an evaluation you&apos;re still waiting on — please call us at <a href="tel:+18888984774" style="color:${ACCENT};text-decoration:none;">${phone}</a>. This is common, it&apos;s fixable, and we&apos;ll tell you exactly what to ask for.`)}
       ${coordinatorSignature(fields)}
     `,
   }

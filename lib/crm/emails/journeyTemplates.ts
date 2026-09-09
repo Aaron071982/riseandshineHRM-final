@@ -72,15 +72,15 @@ const RENDERERS: Partial<
 <p>In the meantime, feel free to reply to this email with any questions.</p>`,
   }),
   CONSENT_REQUEST: (f) => ({
-    subject: `Consent forms for ${child(f)} — next step`,
+    subject: `Welcome to Rise & Shine ABA — ${child(f)}'s packet, forms, and documents`,
     body: `<p>${greeting(f)}</p>
-<p>We're ready for the next step in ${child(f)}'s journey. Please review and complete the consent forms so we can continue intake.</p>
+<p>Welcome to Rise &amp; Shine ABA. Please complete the attached intake and consent forms and return the documents listed in your welcome email so we can continue ${child(f)}'s intake.</p>
 <p>Your case coordinator${f.coordinatorName ? ` (${f.coordinatorName})` : ''} is available if you need help.</p>`,
   }),
   DOCS_NEEDED: (f) => ({
-    subject: `Documents needed for ${child(f)}`,
+    subject: `Friendly reminder — documents still needed for ${child(f)}`,
     body: `<p>${greeting(f)}</p>
-<p>To keep ${child(f)}'s intake moving, we still need a few documents (insurance card, diagnostic evaluation, and related items).</p>
+<p>This is a gentle reminder that we still need a few documents for ${child(f)} (insurance card, diagnostic evaluation, and related items).</p>
 <p>You can reply to this email with attachments or ask us how to upload securely.</p>`,
   }),
   BENEFITS_UPDATE: (f) => ({

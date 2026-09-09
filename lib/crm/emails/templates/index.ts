@@ -109,8 +109,8 @@ export function renderStaffEmail(
 
 export function staffTemplateLabel(template: CommTemplate): string {
   const labels: Partial<Record<CommTemplate, string>> = {
-    WELCOME: 'Welcome (packet)',
-    CONSENT_REQUEST: 'Intake & consent',
+    WELCOME: 'Welcome + intake packet',
+    CONSENT_REQUEST: 'Welcome + intake packet',
     DOCS_NEEDED: 'Documents needed (nudge)',
     BENEFITS_UPDATE: 'Benefits update',
     ASSESSMENT_SCHEDULED: 'Assessment scheduled',
