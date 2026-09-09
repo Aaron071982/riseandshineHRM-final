@@ -239,7 +239,38 @@ export default function ClientCrmDetail({
 
       <div className="pt-2">
         {tab === 'overview' && (
-          <OverviewPanel client={client} canEdit={canEdit} />
+          <div className="space-y-4">
+            <OverviewPanel client={client} canEdit={canEdit} />
+            {user.fullAccess && (
+              <section className="rounded-xl border border-[color-mix(in_srgb,var(--urgent)_35%,var(--line))] bg-surface p-4">
+                <h2 className="font-display text-lg font-semibold text-ink">
+                  Delete client
+                </h2>
+                <p className="mt-1 text-sm text-quiet">
+                  Soft-delete hides this family from every caseload and queue. The
+                  record stays in the database and can be restored from Admin →
+                  Deleted family records. An audit log is written.
+                </p>
+                {deleteError && !confirmDelete && (
+                  <p className="mt-2 text-sm text-[var(--urgent)]">{deleteError}</p>
+                )}
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="mt-3"
+                  disabled={deleting}
+                  onClick={() => {
+                    setDeleteError('')
+                    setDeleteAccessCode('')
+                    setConfirmDelete(true)
+                  }}
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" />
+                  {deleting ? 'Deleting…' : 'Delete this client'}
+                </Button>
+              </section>
+            )}
+          </div>
         )}
         {tab === 'requirements' && (
           <RequirementsPanel
@@ -352,36 +383,6 @@ export default function ClientCrmDetail({
           />
         )}
       </div>
-
-      {user.fullAccess && (
-        <section className="mt-8 rounded-xl border border-[color-mix(in_srgb,var(--urgent)_35%,var(--line))] bg-surface p-4">
-          <h2 className="font-display text-lg font-semibold text-ink">
-            Delete client
-          </h2>
-          <p className="mt-1 text-sm text-quiet">
-            Soft-delete hides this family from every caseload and queue. The
-            record stays in the database and can be restored from Admin →
-            Deleted family records. An audit log is written.
-          </p>
-          {deleteError && !confirmDelete && (
-            <p className="mt-2 text-sm text-[var(--urgent)]">{deleteError}</p>
-          )}
-          <Button
-            type="button"
-            variant="destructive"
-            className="mt-3"
-            disabled={deleting}
-            onClick={() => {
-              setDeleteError('')
-              setDeleteAccessCode('')
-              setConfirmDelete(true)
-            }}
-          >
-            <Trash2 className="mr-1.5 h-4 w-4" />
-            {deleting ? 'Deleting…' : 'Delete this client'}
-          </Button>
-        </section>
-      )}
 
       <ConfirmDestructiveDialog
         open={confirmDelete}
