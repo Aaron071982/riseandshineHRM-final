@@ -49,7 +49,7 @@ export default function ElevateGate({ userEmail }: { userEmail: string }) {
         <p className="mx-auto mt-2 mb-6 text-center text-sm leading-relaxed text-quiet">
           Enter the Client Services access code to unlock this section for{' '}
           <span className="font-medium text-ink">{userEmail}</span>. You will
-          need to re-enter the access code every 6 hours.
+          need to re-enter the access code every 24 hours.
         </p>
 
         <form onSubmit={unlock} className="space-y-4">

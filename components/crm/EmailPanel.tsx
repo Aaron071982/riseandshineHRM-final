@@ -385,7 +385,7 @@ export function EmailPanel({
             Client Services access expired
           </p>
           <p className="mt-1 text-quiet">
-            Your access-code session timed out (every 6 hours). Re-enter the
+            Your access-code session timed out (every 24 hours). Re-enter the
             Client Services access code, then come back and send. This is
             separate from the yellow email-consent checkbox below.
           </p>
