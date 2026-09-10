@@ -142,6 +142,17 @@ export function EmailPanel({
   const [templateAttachments, setTemplateAttachments] = useState<
     { fileName: string; sizeBytes: number }[]
   >([])
+  const stepUpRequired =
+    /step-up required|CS_STEP_UP/i.test(error) ||
+    error === 'Client Services step-up required'
+
+  const handleError = (message: string) => {
+    setError(message)
+    if (/step-up required|CS_STEP_UP/i.test(message)) {
+      // Force layout to re-check elevated cookie and show the access-code gate.
+      router.refresh()
+    }
+  }
 
   const localPreviewLogoUrl =
     typeof window !== 'undefined'
@@ -163,7 +174,7 @@ export function EmailPanel({
         locale: emailLocale,
       })
       if (!res.ok) {
-        setError(res.error)
+        handleError(res.error)
         setPreviewHtml(null)
         setTemplateAttachments([])
         return
@@ -339,7 +350,7 @@ export function EmailPanel({
         locale: emailLocale,
       })
       if (!res.ok) {
-        setError(res.error)
+        handleError(res.error)
         return
       }
       if (res.status === 'SKIPPED') {
@@ -363,10 +374,31 @@ export function EmailPanel({
 
   return (
     <div className="space-y-6">
-      {error && (
+      {error && !stepUpRequired && (
         <p className="rounded-lg bg-[var(--urgent-bg)] px-3 py-2 text-sm text-[var(--urgent)]">
           {error}
         </p>
+      )}
+      {stepUpRequired && (
+        <div className="rounded-lg border border-[var(--urgent)] bg-[var(--urgent-bg)] px-3 py-3 text-sm text-ink">
+          <p className="font-medium text-[var(--urgent)]">
+            Client Services access expired
+          </p>
+          <p className="mt-1 text-quiet">
+            Your access-code session timed out (every 6 hours). Re-enter the
+            Client Services access code, then come back and send. This is
+            separate from the yellow email-consent checkbox below.
+          </p>
+          <button
+            type="button"
+            className="mt-3 h-9 rounded-lg bg-brand px-3.5 text-sm font-medium text-white hover:bg-brand-2"
+            onClick={() => {
+              window.location.assign('/client-services')
+            }}
+          >
+            Re-enter access code
+          </button>
+        </div>
       )}
       {notice && (
         <p className="rounded-lg bg-[var(--green-bg)] px-3 py-2 text-sm text-[var(--green)]">
@@ -395,14 +427,19 @@ export function EmailPanel({
           </p>
           <p className="mt-1 text-quiet">
             Consent Form 02 “Communication — email” is not initialed for this
-            family. You can still send, but confirm you’re choosing to email PHI
-            without that preference line.
+            family yet (common at Inquiry). Check the box to unlock Send — that
+            acknowledgment is enough for CRM; it is not the access-code step-up.
           </p>
-          <label className="mt-2 flex items-start gap-2 text-sm text-ink">
+          <label className="mt-2 flex cursor-pointer items-start gap-2 text-sm text-ink">
             <input
               type="checkbox"
               checked={consentAcknowledged}
-              onChange={(e) => setConsentAcknowledged(e.target.checked)}
+              onChange={(e) => {
+                setConsentAcknowledged(e.target.checked)
+                if (e.target.checked && error.includes('email-consent')) {
+                  setError('')
+                }
+              }}
               className="mt-0.5"
             />
             <span>I understand and want to proceed with this email.</span>
