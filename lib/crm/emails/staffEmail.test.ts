@@ -149,6 +149,7 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email?.html).toContain('Physician referral or prescription for ABA')
     expect(email?.html).toContain('single most important step')
     expect(email?.html).toContain('email the finished copies back')
+    expect(email?.html).toContain('Download Intake Form')
     expect(email?.html).toContain('The Rise &amp; Shine ABA Team')
     expect(email?.html).toContain(EMAIL_LOGO_URL)
     expect(email?.html).not.toContain('localhost')

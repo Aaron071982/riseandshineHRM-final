@@ -576,6 +576,11 @@ export async function sendStaffClientEmail(
     }
   }
 
+  const sentExtras =
+    graphAttachments.length && !delivery.usedAttachments
+      ? `${extras}:ATTACH_FALLBACK:links-only`
+      : extras
+
   const row = await prisma.clientCommunication.create({
     data: {
       serviceClientId: clientId,
@@ -600,7 +605,7 @@ export async function sendStaffClientEmail(
   await auditClientAction({
     userId: user.id,
     serviceClientId: clientId,
-    action: `EMAIL_SEND:${input.template}${extras}:TO:${to}`,
+    action: `EMAIL_SEND:${input.template}${sentExtras}:TO:${to}`,
   })
 
   if (input.template === 'CASE_COORDINATION') {
@@ -611,7 +616,14 @@ export async function sendStaffClientEmail(
     })
   }
 
-  return { status: 'SENT', communicationId: row.id }
+  return {
+    status: 'SENT',
+    communicationId: row.id,
+    reason:
+      graphAttachments.length && !delivery.usedAttachments
+        ? 'Sent with download links (Outlook rejected the PDF attachments — parents can still download forms from the email).'
+        : undefined,
+  }
 }
 
 export type { EmailAttachmentRecord }

@@ -359,7 +359,13 @@ export function EmailPanel({
             'Recorded as SKIPPED — Microsoft Graph sending is not enabled yet.'
         )
       } else if (res.status === 'SENT') {
-        setNotice('Email sent successfully.')
+        setNotice(res.reason ?? 'Email sent successfully.')
+      } else if (res.status === 'FAILED') {
+        handleError(
+          res.reason ??
+            'Email failed to send through Microsoft 365. Try again in a moment.'
+        )
+        return
       } else {
         setNotice(res.reason ?? `Status: ${res.status}`)
       }

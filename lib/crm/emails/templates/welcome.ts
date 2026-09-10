@@ -2,6 +2,7 @@ import type { StaffEmailContent, StaffMergeFields } from './types'
 import {
   ACCENT,
   BODY_TEXT,
+  ctaButton,
   dearGreeting,
   infoBlock,
   officeEmail,
@@ -12,6 +13,10 @@ import {
 } from './shell'
 import { childName } from './helpers'
 import { DEFAULT_MISSING_DOCS_COPY } from './docsNeeded'
+import {
+  PARENT_FORM_FILES,
+  parentFormPublicUrl,
+} from '@/lib/crm/emails/parentFormDownloads'
 
 function documentsNeededListHtml(fields: StaffMergeFields): string {
   const items =
@@ -26,6 +31,24 @@ function documentsNeededListHtml(fields: StaffMergeFields): string {
     .join('')
   return `${sectionRule('Documents we need from you')}
 <ul style="margin:0 0 8px;padding-left:20px;font-size:14px;">${lis}</ul>`
+}
+
+function blankFormsDownloadBlock(): string {
+  const rows = (
+    [
+      ['welcome-packet', PARENT_FORM_FILES['welcome-packet'].label],
+      ['intake-form', PARENT_FORM_FILES['intake-form'].label],
+      ['consent-form', PARENT_FORM_FILES['consent-form'].label],
+    ] as const
+  )
+    .map(
+      ([slug, label]) =>
+        `<tr><td style="padding:6px 0;">${ctaButton(label, parentFormPublicUrl(slug))}</td></tr>`
+    )
+    .join('')
+  return `${sectionRule('Blank forms — download if needed')}
+<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:${BODY_TEXT};">These forms are also attached to this email. If an attachment is missing, use the buttons below:</p>
+<table role="presentation" cellpadding="0" cellspacing="0">${rows}</table>`
 }
 
 /**
@@ -52,7 +75,8 @@ export function renderWelcome(fields: StaffMergeFields): StaffEmailContent {
         `The <strong>Client Intake Form (Form 01)</strong> — everything we need to verify ${child}&apos;s insurance and request authorization for services.`,
         `The <strong>Consent &amp; Authorization Form (Form 02)</strong> — your permission to assess and treat ${child}, and to share with your insurance only what they require to pay for that care. You consent to each item separately; nothing is all-or-nothing.`,
       ])}
-      ${para(`Blank copies of both forms are attached to this email (and linked where available). Please <strong>complete them and email the finished copies back</strong> — reply to this message or send them to <a href="mailto:${email}" style="color:${ACCENT};text-decoration:none;">${email}</a>.`)}
+      ${para(`Blank copies of both forms are attached to this email (and linked below). Please <strong>complete them and email the finished copies back</strong> — reply to this message or send them to <a href="mailto:${email}" style="color:${ACCENT};text-decoration:none;">${email}</a>.`)}
+      ${blankFormsDownloadBlock()}
 
       ${documentsNeededListHtml(fields)}
       ${para(`<strong>Prioritize these first</strong> if you&apos;re gathering things piece by piece: <strong>insurance card (front and back)</strong>, <strong>diagnostic evaluation</strong>, and <strong>physician referral for ABA</strong>. We can&apos;t begin verifying benefits without the card, and we can&apos;t request authorization without the evaluation and referral. Send whatever you have now; you can always follow up with the rest.`)}

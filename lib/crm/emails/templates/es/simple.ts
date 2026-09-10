@@ -1,22 +1,52 @@
 import type { StaffEmailContent, StaffMergeFields } from '../types'
 import {
   ACCENT,
-  COMPANY_EMAIL,
   coordinatorSignature,
+  ctaButton,
   dearGreeting,
   greeting,
   infoBlock,
   officeEmail,
   officePhone,
   para,
-  portalCta,
   sectionRule,
   staffSignature,
   teamSignature,
 } from '../shell'
 import { childInitialLast, childName, scheduleTable } from '../helpers'
+import { parentFormPublicUrl } from '@/lib/crm/emails/parentFormDownloads'
 
 const LOCALE = 'es' as const
+
+export const DEFAULT_MISSING_DOCS_COPY_ES = [
+  'Tarjeta de seguro — frente y reverso',
+  'Tarjeta de Medicaid, si aplica — frente y reverso',
+  'Informe de evaluación diagnóstica (DSM-5 / diagnóstico de autismo)',
+  'Referencia médica o prescripción para ABA',
+  'IEP o IFSP, si aplica',
+  'Orden de custodia o tutela, si aplica',
+  'Registros previos de ABA, si aplica',
+  'Formulario de Admisión del Cliente completado (Formulario 01)',
+  'Formulario de Consentimiento y Autorización firmado (Formulario 02)',
+]
+
+function blankFormsDownloadBlockEs(): string {
+  const rows = (
+    [
+      ['welcome-packet', 'Descargar paquete de bienvenida (PDF)'],
+      ['intake-form', 'Descargar formulario de admisión (PDF)'],
+      ['consent-form', 'Descargar formulario de consentimiento (PDF)'],
+    ] as const
+  )
+    .map(
+      ([slug, label]) =>
+        `<tr><td style="padding:6px 0;">${ctaButton(label, parentFormPublicUrl(slug))}</td></tr>`
+    )
+    .join('')
+  return `${sectionRule('Formularios en blanco — descargue si es necesario')}
+<p style="margin:0 0 12px;font-size:14px;line-height:1.55;color:#2f2318;">Estos formularios también van adjuntos. Si falta un archivo, use los botones:</p>
+<table role="presentation" cellpadding="0" cellspacing="0">${rows}</table>`
+}
 
 export function renderWelcomeEs(fields: StaffMergeFields): StaffEmailContent {
   const child = childName(fields, LOCALE)
@@ -49,6 +79,7 @@ export function renderWelcomeEs(fields: StaffMergeFields): StaffEmailContent {
         `El <strong>Formulario de Consentimiento y Autorización (Formulario 02)</strong> — su permiso para evaluar y tratar a ${child}, y para compartir con el seguro solo lo que requieran. Usted consiente cada punto por separado.`,
       ])}
       ${para(`Las copias en blanco de ambos formularios van adjuntas. Por favor <strong>complételos y envíenos las copias terminadas por correo</strong> — responda a este mensaje o envíelos a <a href="mailto:${email}" style="color:${ACCENT};text-decoration:none;">${email}</a>.`)}
+      ${blankFormsDownloadBlockEs()}
 
       ${sectionRule('Documentos que necesitamos de usted')}
       <ul style="margin:0 0 8px;padding-left:20px;font-size:14px;">${docsLis}</ul>
@@ -67,18 +98,6 @@ export function renderConsentRequestEs(
 ): StaffEmailContent {
   return renderWelcomeEs(fields)
 }
-
-export const DEFAULT_MISSING_DOCS_COPY_ES = [
-  'Tarjeta de seguro — frente y reverso',
-  'Tarjeta de Medicaid, si aplica — frente y reverso',
-  'Informe de evaluación diagnóstica (DSM-5 / diagnóstico de autismo)',
-  'Referencia médica o prescripción para ABA',
-  'IEP o IFSP, si aplica',
-  'Orden de custodia o tutela, si aplica',
-  'Registros previos de ABA, si aplica',
-  'Formulario de Admisión del Cliente completado (Formulario 01)',
-  'Formulario de Consentimiento y Autorización firmado (Formulario 02)',
-]
 
 function missingDocsHtmlEs(fields: StaffMergeFields): string {
   const items =

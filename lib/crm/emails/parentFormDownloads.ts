@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { CommTemplate } from '@prisma/client'
-import { makePublicUrl } from '@/lib/baseUrl'
+import { getPublicBaseUrl } from '@/lib/baseUrl'
 
 /** Safe public slugs → on-disk PDF file names. */
 export const PARENT_FORM_FILES = {
@@ -45,7 +45,13 @@ export function resolveParentFormPath(fileName: string): string | null {
 
 export function parentFormPublicUrl(slug: ParentFormSlug): string {
   // Static file under public/ — always available on Vercel CDN (no serverless FS).
-  return makePublicUrl(`/parent-forms/${PARENT_FORM_FILES[slug].file}`)
+  // Emails must never point at localhost — use the production site when BASE_URL is unset/local.
+  const base = getPublicBaseUrl()
+  const origin =
+    /localhost|127\.0\.0\.1/i.test(base)
+      ? 'https://www.riseandshinehrm.com'
+      : base.replace(/\/$/, '')
+  return `${origin}/parent-forms/${PARENT_FORM_FILES[slug].file}`
 }
 
 /** Branded download buttons auto-injected for journey emails. */
