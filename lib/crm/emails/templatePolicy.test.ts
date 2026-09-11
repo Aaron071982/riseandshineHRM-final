@@ -43,9 +43,14 @@ describe('lib/crm/emails/templatePolicy', () => {
     expect(isTemplateAllowedForUser(cc, 'DOCS_NEEDED')).toBe(false)
   })
 
-  it('CLINICAL sees assessment template', () => {
+  it('CLINICAL sees assessment and BCBA assignment templates', () => {
     expect(isTemplateAllowedForUser(clinical, 'ASSESSMENT_SCHEDULED')).toBe(true)
+    expect(isTemplateAllowedForUser(clinical, 'BCBA_ASSIGNED')).toBe(true)
     expect(isTemplateAllowedForUser(clinical, 'WELCOME')).toBe(false)
+  })
+
+  it('CASE_COORDINATION includes BCBA assignment', () => {
+    expect(isTemplateAllowedForUser(cc, 'BCBA_ASSIGNED')).toBe(true)
   })
 
   it('full-access sees all staff templates', () => {

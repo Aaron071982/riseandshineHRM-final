@@ -2854,6 +2854,8 @@ enum CommTemplate {
   MEET_AND_GREET
   /// Internal team assignment letter (BCBA, BTs, coordinator).
   CASE_COORDINATION
+  /// Internal notice to supervising BCBA when a case is assigned / approved for ABA.
+  BCBA_ASSIGNED
   /// Retired from compose UI; kept so prod `db push` does not drop the PG enum value.
   CC_INTRODUCTION
   CASE_COORDINATION_FORM

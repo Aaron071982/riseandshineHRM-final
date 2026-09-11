@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation'
 import type { CommTemplate } from '@prisma/client'
 import { previewClientEmail, sendClientEmail } from '@/lib/crm/actions'
-import { staffTemplateLabel } from '@/lib/crm/emails/templates'
+import { staffTemplateLabel } from '@/lib/crm/emails/templateLabels'
 import { EMAIL_LOGO_URL } from '@/lib/crm/emails/templates/shell'
 import { cn } from '@/lib/utils'
 
@@ -93,6 +93,7 @@ export type StaffingRbtEmailOption = {
 export function EmailPanel({
   clientId,
   parentEmail,
+  bcbaEmail,
   senderEmail,
   communications,
   emailSend,
@@ -100,6 +101,7 @@ export function EmailPanel({
 }: {
   clientId: string
   parentEmail: string | null
+  bcbaEmail?: string | null
   senderEmail: string | null
   communications: Comm[]
   emailSend: EmailSendContext
@@ -126,8 +128,14 @@ export function EmailPanel({
     'IN_HOME' | 'TELEHEALTH' | ''
   >('')
   const [rbtAssignmentId, setRbtAssignmentId] = useState('')
+  const [bcbaClientName, setBcbaClientName] = useState('')
+  const [bcbaDateOfBirth, setBcbaDateOfBirth] = useState('')
+  const [bcbaApprovedHoursText, setBcbaApprovedHoursText] = useState('')
+  const [bcbaServiceDates, setBcbaServiceDates] = useState('')
+  const [bcbaFieldsTouched, setBcbaFieldsTouched] = useState(false)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewSubject, setPreviewSubject] = useState('')
+  const [previewTo, setPreviewTo] = useState<string | null>(null)
   const [emailLocale, setEmailLocale] = useState<'en' | 'es'>('en')
   const [consentAcknowledged, setConsentAcknowledged] = useState(false)
   const [ccTouched, setCcTouched] = useState(false)
@@ -136,9 +144,15 @@ export function EmailPanel({
   const isAssessment = template === 'ASSESSMENT_SCHEDULED'
   const isRbtAssigned = template === 'RBT_ASSIGNED'
   const isMeetAndGreet = template === 'MEET_AND_GREET'
+  const isBcbaAssigned = template === 'BCBA_ASSIGNED'
   const isRbtPick = isRbtAssigned || isMeetAndGreet
   const needsPortalLink = template === 'DOCS_NEEDED'
-  const needsConsentWarn = emailSend.emailConsentOk === false
+  const needsConsentWarn = !isBcbaAssigned && emailSend.emailConsentOk === false
+  const recipientEmail = isBcbaAssigned ? bcbaEmail ?? null : parentEmail
+  const recipientLabel = isBcbaAssigned ? 'To (BCBA)' : 'To (parent)'
+  const recipientMissingLabel = isBcbaAssigned
+    ? 'No BCBA email on file'
+    : 'No parent email on file'
   const [templateAttachments, setTemplateAttachments] = useState<
     { fileName: string; sizeBytes: number }[]
   >([])
@@ -172,6 +186,14 @@ export function EmailPanel({
         rbtAssignmentId:
           isRbtPick && rbtAssignmentId ? rbtAssignmentId : null,
         locale: emailLocale,
+        bcbaAssignment: isBcbaAssigned && bcbaFieldsTouched
+          ? {
+              clientName: bcbaClientName,
+              dateOfBirth: bcbaDateOfBirth,
+              approvedHoursText: bcbaApprovedHoursText,
+              serviceDates: bcbaServiceDates,
+            }
+          : null,
       })
       if (!res.ok) {
         handleError(res.error)
@@ -180,11 +202,25 @@ export function EmailPanel({
         return
       }
       setPreviewSubject(res.subject)
+      setPreviewTo(res.to)
       setPreviewHtml(res.html.replaceAll(EMAIL_LOGO_URL, localPreviewLogoUrl))
       setTemplateAttachments(res.templateAttachments ?? [])
       if (!isManual) setSubject(res.subject)
       if (
-        (template === 'MEET_AND_GREET' || template === 'CASE_COORDINATION') &&
+        isBcbaAssigned &&
+        !bcbaFieldsTouched &&
+        res.bcbaAssignmentDefaults
+      ) {
+        setBcbaClientName(res.bcbaAssignmentDefaults.clientName)
+        setBcbaDateOfBirth(res.bcbaAssignmentDefaults.dateOfBirth)
+        setBcbaApprovedHoursText(res.bcbaAssignmentDefaults.approvedHoursText)
+        setBcbaServiceDates(res.bcbaAssignmentDefaults.serviceDates)
+        setBcbaFieldsTouched(true)
+      }
+      if (
+        (template === 'MEET_AND_GREET' ||
+          template === 'CASE_COORDINATION' ||
+          template === 'BCBA_ASSIGNED') &&
         !ccTouched &&
         res.suggestedCc?.length
       ) {
@@ -201,6 +237,12 @@ export function EmailPanel({
     assessmentModality,
     isRbtPick,
     rbtAssignmentId,
+    isBcbaAssigned,
+    bcbaClientName,
+    bcbaDateOfBirth,
+    bcbaApprovedHoursText,
+    bcbaServiceDates,
+    bcbaFieldsTouched,
     localPreviewLogoUrl,
     attachments,
     links,
@@ -227,6 +269,13 @@ export function EmailPanel({
     }
     if (template !== 'RBT_ASSIGNED' && template !== 'MEET_AND_GREET') {
       setRbtAssignmentId('')
+    }
+    if (template !== 'BCBA_ASSIGNED') {
+      setBcbaClientName('')
+      setBcbaDateOfBirth('')
+      setBcbaApprovedHoursText('')
+      setBcbaServiceDates('')
+      setBcbaFieldsTouched(false)
     }
   }, [template])
 
@@ -348,6 +397,14 @@ export function EmailPanel({
         rbtAssignmentId:
           isRbtPick && rbtAssignmentId ? rbtAssignmentId : null,
         locale: emailLocale,
+        bcbaAssignment: isBcbaAssigned
+          ? {
+              clientName: bcbaClientName,
+              dateOfBirth: bcbaDateOfBirth,
+              approvedHoursText: bcbaApprovedHoursText,
+              serviceDates: bcbaServiceDates,
+            }
+          : null,
       })
       if (!res.ok) {
         handleError(res.error)
@@ -496,11 +553,11 @@ export function EmailPanel({
           </label>
 
           <label className="text-xs text-quiet">
-            To (parent)
+            {recipientLabel}
             <input
               readOnly
-              value={parentEmail ?? ''}
-              placeholder="No parent email on file"
+              value={previewTo ?? recipientEmail ?? ''}
+              placeholder={recipientMissingLabel}
               className="mt-1 h-9 w-full rounded-lg border border-line bg-line-2/40 px-2.5 text-sm text-quiet"
             />
           </label>
@@ -518,6 +575,61 @@ export function EmailPanel({
               className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)] disabled:opacity-50"
             />
           </label>
+
+          {isBcbaAssigned && (
+            <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2 rounded-xl border border-line bg-line-2/20 p-3">
+              <p className="sm:col-span-2 text-xs text-quiet">
+                Enterable case details for the BCBA (prefilled from the client record — edit before sending).
+              </p>
+              <label className="text-xs text-quiet">
+                Client name
+                <input
+                  value={bcbaClientName}
+                  onChange={(e) => {
+                    setBcbaFieldsTouched(true)
+                    setBcbaClientName(e.target.value)
+                  }}
+                  className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
+                />
+              </label>
+              <label className="text-xs text-quiet">
+                Date of birth
+                <input
+                  value={bcbaDateOfBirth}
+                  onChange={(e) => {
+                    setBcbaFieldsTouched(true)
+                    setBcbaDateOfBirth(e.target.value)
+                  }}
+                  className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
+                />
+              </label>
+              <label className="text-xs text-quiet sm:col-span-2">
+                Service dates
+                <input
+                  value={bcbaServiceDates}
+                  onChange={(e) => {
+                    setBcbaFieldsTouched(true)
+                    setBcbaServiceDates(e.target.value)
+                  }}
+                  placeholder="March 1, 2026 – August 31, 2026"
+                  className="mt-1 h-9 w-full rounded-lg border border-line bg-surface px-2.5 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
+                />
+              </label>
+              <label className="text-xs text-quiet sm:col-span-2">
+                Approved hours (all CPT codes)
+                <textarea
+                  value={bcbaApprovedHoursText}
+                  onChange={(e) => {
+                    setBcbaFieldsTouched(true)
+                    setBcbaApprovedHoursText(e.target.value)
+                  }}
+                  rows={4}
+                  placeholder={'97153 — Adaptive behavior treatment by protocol: 20 hrs/week\n97155 — Protocol modification: 2 hrs/week'}
+                  className="mt-1 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
+                />
+              </label>
+            </div>
+          )}
 
           {isRbtPick && (
             <label className="text-xs text-quiet sm:col-span-2">
@@ -752,7 +864,7 @@ export function EmailPanel({
             disabled={
               pending ||
               !emailSend.canSend ||
-              !parentEmail ||
+              !recipientEmail ||
               (needsConsentWarn && !consentAcknowledged)
             }
             onClick={onSend}
@@ -771,7 +883,9 @@ export function EmailPanel({
         <div className="border-b border-line bg-surface px-4 py-2">
           <h3 className="font-display text-sm font-semibold text-ink">Preview</h3>
           <p className="text-xs text-quiet">
-            Branded output parents will receive
+            {isBcbaAssigned
+              ? 'Internal notice the supervising BCBA will receive'
+              : 'Branded output parents will receive'}
             {attachments.length
               ? ` · Files: ${attachments.map((a) => a.fileName).join(', ')}`
               : ''}

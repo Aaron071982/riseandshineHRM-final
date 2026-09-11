@@ -93,6 +93,7 @@ describe('lib/crm/emails/templates branded render', () => {
   const fields: StaffMergeFields = {
     childFirstName: 'Alex',
     childLastName: 'Rivera',
+    childDateOfBirth: 'January 15, 2019',
     parentName: 'Maria Rivera',
     parentFirstName: 'Maria',
     parentEmail: 'maria@example.com',
@@ -124,6 +125,23 @@ describe('lib/crm/emails/templates branded render', () => {
     startDate: 'March 1, 2026',
     assessmentDate: null,
     assessmentModality: null,
+    authServiceDates: 'March 1, 2026 – August 31, 2026',
+    approvedHoursByCpt: [
+      {
+        cptCode: '97153',
+        label: 'Adaptive behavior treatment by protocol',
+        hoursOrUnits: '40 units',
+      },
+      {
+        cptCode: '97155',
+        label: 'Adaptive behavior treatment with protocol modification',
+        hoursOrUnits: '4 units',
+      },
+    ],
+    bcbaAssignmentClientName: null,
+    bcbaAssignmentDateOfBirth: null,
+    bcbaAssignmentApprovedHoursText: null,
+    bcbaAssignmentServiceDates: null,
     staffName: 'Intake Team',
     staffEmail: 'intake@riseandshineaba.com',
     companyPhone: '888-898-4774',
@@ -323,6 +341,30 @@ describe('lib/crm/emails/templates branded render', () => {
     expect(email.html).toContain('Internal operations summary')
     expect(email.html).not.toContain('Your journey with us')
     expect(email.html).toContain(EMAIL_LOGO_URL)
+  })
+
+  it('BCBA_ASSIGNED addresses the BCBA with enterable case details', () => {
+    const email = renderStaffEmail('BCBA_ASSIGNED', fields, {
+      bcbaAssignment: {
+        clientName: 'Alex Rivera',
+        dateOfBirth: 'January 15, 2019',
+        approvedHoursText:
+          '97153 — Adaptive behavior treatment by protocol: 20 hrs/week\n97155 — Protocol modification: 2 hrs/week',
+        serviceDates: 'March 1, 2026 – August 31, 2026',
+      },
+    })
+    expect(email?.subject).toMatch(/Case assigned/)
+    expect(email?.subject).toMatch(/Alex Rivera/)
+    expect(email?.html).toContain('Dear Dr. Pat Chen,')
+    expect(email?.html).toContain('approved to begin ABA services')
+    expect(email?.html).toContain('Alex Rivera')
+    expect(email?.html).toContain('January 15, 2019')
+    expect(email?.html).toContain('97153')
+    expect(email?.html).toContain('20 hrs/week')
+    expect(email?.html).toContain('Artemis')
+    expect(email?.html).toContain('pairing goals')
+    expect(email?.html).toContain('Internal operations summary')
+    expect(email?.html).not.toContain('Your journey with us')
   })
 })
 

@@ -16,7 +16,9 @@ import {
 import { mailboxBlockedReason } from '@/lib/crm/emails/mailbox'
 import {
   buildStaffMergeFields,
+  formatApprovedHoursText,
   isValidEmail,
+  loadApprovedHoursByCpt,
   loadStaffEmailMergeContext,
   meetAndGreetCcEmails,
   mergeCcLists,
@@ -26,7 +28,10 @@ import { caseCoordinationTeamCcEmails } from '@/lib/crm/emails/templates/caseCoo
 import { auditCaseCoordinationAction } from '@/lib/crm/caseCoordination/audit'
 import { buildMissingDocsList } from '@/lib/crm/emails/missingDocs'
 import { renderStaffEmail } from '@/lib/crm/emails/templates'
-import type { AssessmentModality } from '@/lib/crm/emails/templates/types'
+import type {
+  AssessmentModality,
+  BcbaAssignmentOverrides,
+} from '@/lib/crm/emails/templates/types'
 import type { EmailLocale } from '@/lib/crm/emails/locale'
 import { normalizeEmailLocale } from '@/lib/crm/emails/locale'
 import type { EmailLinkMeta } from '@/lib/crm/emails/templates/shell'
@@ -221,26 +226,50 @@ async function enrichMergeFieldsForTemplate(
   template: CommTemplate,
   fields: ReturnType<typeof buildStaffMergeFields>
 ) {
-  if (template !== 'DOCS_NEEDED') return fields
+  if (template === 'DOCS_NEEDED') {
+    const requirements = await prisma.clientRequirement.findMany({
+      where: {
+        serviceClientId: clientId,
+        deletedAt: null,
+        type: 'DOCUMENT',
+      },
+      select: {
+        key: true,
+        label: true,
+        status: true,
+        expiresAt: true,
+      },
+    })
 
-  const requirements = await prisma.clientRequirement.findMany({
-    where: {
-      serviceClientId: clientId,
-      deletedAt: null,
-      type: 'DOCUMENT',
-    },
-    select: {
-      key: true,
-      label: true,
-      status: true,
-      expiresAt: true,
-    },
-  })
-
-  return {
-    ...fields,
-    missingDocsList: buildMissingDocsList(requirements),
+    return {
+      ...fields,
+      missingDocsList: buildMissingDocsList(requirements),
+    }
   }
+
+  if (template === 'BCBA_ASSIGNED') {
+    const auth = await loadApprovedHoursByCpt(clientId)
+    const clientName = `${fields.childFirstName} ${fields.childLastName}`.trim()
+    return {
+      ...fields,
+      approvedHoursByCpt: auth.rows,
+      authServiceDates: auth.authServiceDates || fields.authServiceDates,
+      bcbaAssignmentClientName: fields.bcbaAssignmentClientName || clientName || null,
+      bcbaAssignmentDateOfBirth:
+        fields.bcbaAssignmentDateOfBirth || fields.childDateOfBirth,
+      bcbaAssignmentApprovedHoursText:
+        fields.bcbaAssignmentApprovedHoursText ||
+        formatApprovedHoursText(auth.rows) ||
+        null,
+      bcbaAssignmentServiceDates:
+        fields.bcbaAssignmentServiceDates ||
+        auth.authServiceDates ||
+        fields.authServiceDates ||
+        fields.startDate,
+    }
+  }
+
+  return fields
 }
 
 export async function previewStaffClientEmail(
@@ -255,6 +284,7 @@ export async function previewStaffClientEmail(
     assessmentModality?: AssessmentModality | null
     rbtAssignmentId?: string | null
     locale?: EmailLocale | null
+    bcbaAssignment?: BcbaAssignmentOverrides | null
   }
 ) {
   await assertCanSendStaffEmail(user, clientId)
@@ -300,24 +330,51 @@ export async function previewStaffClientEmail(
     links,
     assessmentModality: input.assessmentModality ?? null,
     locale,
+    bcbaAssignment: input.bcbaAssignment ?? null,
   })
   if (!rendered) throw new Error(`No renderer for ${input.template}`)
+
+  const isBcbaAssigned = input.template === 'BCBA_ASSIGNED'
+  const to = isBcbaAssigned
+    ? fields.bcbaEmail?.trim().toLowerCase() || null
+    : client.parentEmail
 
   return {
     subject: rendered.subject,
     html: rendered.html,
     text: rendered.text,
-    to: client.parentEmail,
-    emailConsentOk: clientHasEmailConsent(
-      client.consent && !client.consent.deletedAt ? client.consent : null
-    ),
+    to,
+    emailConsentOk: isBcbaAssigned
+      ? true
+      : clientHasEmailConsent(
+          client.consent && !client.consent.deletedAt ? client.consent : null
+        ),
     suggestedCc:
       input.template === 'MEET_AND_GREET'
         ? meetAndGreetCcEmails(fields)
         : input.template === 'CASE_COORDINATION'
           ? caseCoordinationTeamCcEmails(fields)
-          : [],
+          : input.template === 'BCBA_ASSIGNED' && fields.coordinatorEmail
+            ? [fields.coordinatorEmail.trim().toLowerCase()]
+            : [],
     templateAttachments: formMetas,
+    bcbaAssignmentDefaults: isBcbaAssigned
+      ? {
+          clientName:
+            fields.bcbaAssignmentClientName ||
+            `${fields.childFirstName} ${fields.childLastName}`.trim(),
+          dateOfBirth:
+            fields.bcbaAssignmentDateOfBirth || fields.childDateOfBirth || '',
+          approvedHoursText:
+            fields.bcbaAssignmentApprovedHoursText ||
+            formatApprovedHoursText(fields.approvedHoursByCpt),
+          serviceDates:
+            fields.bcbaAssignmentServiceDates ||
+            fields.authServiceDates ||
+            fields.startDate ||
+            '',
+        }
+      : undefined,
   }
 }
 
@@ -356,6 +413,7 @@ export async function sendStaffClientEmail(
     assessmentModality?: AssessmentModality | null
     rbtAssignmentId?: string | null
     locale?: EmailLocale | null
+    bcbaAssignment?: BcbaAssignmentOverrides | null
   }
 ): Promise<StaffEmailSendResult> {
   await assertCanSendStaffEmail(user, clientId)
@@ -372,11 +430,6 @@ export async function sendStaffClientEmail(
 
   assertRbtAssignmentForClient(client, input.rbtAssignmentId)
 
-  const to = client.parentEmail?.trim().toLowerCase()
-  if (!to || !isValidEmail(to)) {
-    throw new CrmAccessError('Client has no valid parent email on file', 400)
-  }
-
   const fields = await enrichMergeFieldsForTemplate(
     clientId,
     input.template,
@@ -390,12 +443,29 @@ export async function sendStaffClientEmail(
     )
   )
 
+  const isBcbaAssigned = input.template === 'BCBA_ASSIGNED'
+  const to = (
+    isBcbaAssigned ? fields.bcbaEmail : client.parentEmail
+  )
+    ?.trim()
+    .toLowerCase()
+  if (!to || !isValidEmail(to)) {
+    throw new CrmAccessError(
+      isBcbaAssigned
+        ? 'Assigned BCBA has no valid email on file'
+        : 'Client has no valid parent email on file',
+      400
+    )
+  }
+
   const autoCc =
     input.template === 'MEET_AND_GREET'
       ? meetAndGreetCcEmails(fields)
       : input.template === 'CASE_COORDINATION'
         ? caseCoordinationTeamCcEmails(fields)
-        : []
+        : input.template === 'BCBA_ASSIGNED' && fields.coordinatorEmail
+          ? [fields.coordinatorEmail.trim().toLowerCase()]
+          : []
   const ccList = mergeCcLists(parseCcList(input.cc), autoCc)
   for (const cc of ccList) {
     if (!isValidEmail(cc)) {
@@ -447,6 +517,7 @@ export async function sendStaffClientEmail(
     links,
     assessmentModality: input.assessmentModality ?? null,
     locale,
+    bcbaAssignment: input.bcbaAssignment ?? null,
   })
   if (!rendered) throw new Error(`No renderer for ${input.template}`)
 

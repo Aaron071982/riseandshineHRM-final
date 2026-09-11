@@ -249,9 +249,7 @@ export async function loadClientCrmDetail(clientId: string) {
       canSend: canSendEmail,
       blockedReason: !claimed
         ? 'Claim this client or be assigned as case coordinator to send email.'
-        : mailboxReason ?? (!client.parentEmail?.trim()
-            ? 'No parent email on file for this client.'
-            : null),
+        : mailboxReason ?? null,
       graphEnabled: graphEmailEnabled(),
       hasMailbox: hasRiseAndShineMailbox(user.email),
       emailConsentOk,

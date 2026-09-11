@@ -1,6 +1,7 @@
 import type { CommTemplate } from '@prisma/client'
 import { renderAssessmentScheduled } from './assessmentScheduled'
 import { renderAuthApproved } from './authApproved'
+import { renderBcbaAssigned } from './bcbaAssigned'
 import { renderBenefitsUpdate } from './benefitsUpdate'
 import { renderConsentRequest } from './consentRequest'
 import { renderDocsNeeded } from './docsNeeded'
@@ -41,6 +42,7 @@ const RENDERERS: Partial<
   SCHEDULE_CONFIRMED: renderScheduleConfirmed,
   MEET_AND_GREET: renderMeetAndGreet,
   CASE_COORDINATION: renderCaseCoordination,
+  BCBA_ASSIGNED: renderBcbaAssigned,
   ...LEGACY_RENDERERS,
 }
 
@@ -68,6 +70,22 @@ export function renderStaffEmail(
       overrides?.assessmentModality !== undefined
         ? overrides.assessmentModality
         : fields.assessmentModality,
+    bcbaAssignmentClientName:
+      overrides?.bcbaAssignment?.clientName !== undefined
+        ? overrides.bcbaAssignment.clientName?.trim() || null
+        : fields.bcbaAssignmentClientName,
+    bcbaAssignmentDateOfBirth:
+      overrides?.bcbaAssignment?.dateOfBirth !== undefined
+        ? overrides.bcbaAssignment.dateOfBirth?.trim() || null
+        : fields.bcbaAssignmentDateOfBirth,
+    bcbaAssignmentApprovedHoursText:
+      overrides?.bcbaAssignment?.approvedHoursText !== undefined
+        ? overrides.bcbaAssignment.approvedHoursText?.trim() || null
+        : fields.bcbaAssignmentApprovedHoursText,
+    bcbaAssignmentServiceDates:
+      overrides?.bcbaAssignment?.serviceDates !== undefined
+        ? overrides.bcbaAssignment.serviceDates?.trim() || null
+        : fields.bcbaAssignmentServiceDates,
   }
 
   let subject: string
@@ -98,6 +116,7 @@ export function renderStaffEmail(
     links: linksForShell?.length ? linksForShell : undefined,
     template,
     locale,
+    internal: template === 'BCBA_ASSIGNED',
   })
   return {
     template,
@@ -107,26 +126,7 @@ export function renderStaffEmail(
   }
 }
 
-export function staffTemplateLabel(template: CommTemplate): string {
-  const labels: Partial<Record<CommTemplate, string>> = {
-    WELCOME: 'Welcome + intake packet',
-    CONSENT_REQUEST: 'Welcome + intake packet',
-    DOCS_NEEDED: 'Documents needed (nudge)',
-    BENEFITS_UPDATE: 'Benefits update',
-    ASSESSMENT_SCHEDULED: 'Assessment scheduled',
-    AUTH_APPROVED: 'Authorization approved',
-    READY_FOR_STAFFING: 'Ready for staffing',
-    RBT_ASSIGNED: 'RBT assigned',
-    SCHEDULE_CONFIRMED: 'Schedule confirmed',
-    MEET_AND_GREET: 'Meet & greet',
-    CASE_COORDINATION: 'Case coordination (team)',
-    CASE_COORDINATION_FORM: 'Case coordination form (legacy)',
-    MANUAL: 'Manual / freeform',
-    INQUIRY_ACK: 'Inquiry acknowledgment',
-    SERVICES_STARTED: 'Services started',
-  }
-  return labels[template] ?? template.replace(/_/g, ' ').toLowerCase()
-}
+export { staffTemplateLabel } from '@/lib/crm/emails/templateLabels'
 
 export type { StaffMergeFields, RenderedStaffEmail, StaffEmailRenderOverrides } from './types'
 export type { EmailLocale } from '@/lib/crm/emails/locale'

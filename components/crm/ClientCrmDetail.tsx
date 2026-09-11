@@ -396,6 +396,7 @@ export default function ClientCrmDetail({
           <EmailPanel
             clientId={client.id}
             parentEmail={client.parentEmail}
+            bcbaEmail={client.bcbaProfile?.email ?? null}
             senderEmail={user.email}
             communications={client.communications}
             emailSend={emailSend}

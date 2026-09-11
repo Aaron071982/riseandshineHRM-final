@@ -3015,6 +3015,12 @@ export async function previewClientEmail(
     assessmentModality?: 'IN_HOME' | 'TELEHEALTH' | null
     rbtAssignmentId?: string | null
     locale?: 'en' | 'es' | null
+    bcbaAssignment?: {
+      clientName?: string | null
+      dateOfBirth?: string | null
+      approvedHoursText?: string | null
+      serviceDates?: string | null
+    } | null
   }
 ): Promise<
   ActionResult<{
@@ -3024,6 +3030,12 @@ export async function previewClientEmail(
     emailConsentOk: boolean
     suggestedCc?: string[]
     templateAttachments?: { fileName: string; sizeBytes: number }[]
+    bcbaAssignmentDefaults?: {
+      clientName: string
+      dateOfBirth: string
+      approvedHoursText: string
+      serviceDates: string
+    }
   }>
 > {
   try {
@@ -3043,6 +3055,7 @@ export async function previewClientEmail(
       emailConsentOk: preview.emailConsentOk,
       suggestedCc: preview.suggestedCc,
       templateAttachments: preview.templateAttachments,
+      bcbaAssignmentDefaults: preview.bcbaAssignmentDefaults,
     }
   } catch (err) {
     return fail(err)
@@ -3069,6 +3082,12 @@ export async function sendClientEmail(
     rbtAssignmentId?: string | null
     confirmed?: boolean
     locale?: 'en' | 'es' | null
+    bcbaAssignment?: {
+      clientName?: string | null
+      dateOfBirth?: string | null
+      approvedHoursText?: string | null
+      serviceDates?: string | null
+    } | null
   }
 ): Promise<
   ActionResult<{ status: string; communicationId: string; reason?: string }>

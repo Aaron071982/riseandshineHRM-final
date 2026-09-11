@@ -10,9 +10,24 @@ export type ScheduleSlotRow = {
 
 export type AssessmentModality = 'IN_HOME' | 'TELEHEALTH'
 
+export type ApprovedHoursCptRow = {
+  cptCode: string
+  label: string
+  hoursOrUnits: string
+}
+
+/** Compose-time overrides for the BCBA assignment email (editable in EmailPanel). */
+export type BcbaAssignmentOverrides = {
+  clientName?: string | null
+  dateOfBirth?: string | null
+  approvedHoursText?: string | null
+  serviceDates?: string | null
+}
+
 export type StaffMergeFields = {
   childFirstName: string
   childLastName: string
+  childDateOfBirth: string | null
   parentName: string | null
   parentFirstName: string | null
   parentEmail: string | null
@@ -48,6 +63,15 @@ export type StaffMergeFields = {
   assessmentDate: string | null
   /** Compose-time choice for ASSESSMENT_SCHEDULED — not stored on client. */
   assessmentModality: AssessmentModality | null
+  /** Active treatment auth window (effective – expiration), when available. */
+  authServiceDates: string | null
+  /** CPT lines from the active approved treatment authorization. */
+  approvedHoursByCpt: ApprovedHoursCptRow[]
+  /** Enterable overrides for BCBA_ASSIGNED (win over DB defaults when set). */
+  bcbaAssignmentClientName: string | null
+  bcbaAssignmentDateOfBirth: string | null
+  bcbaAssignmentApprovedHoursText: string | null
+  bcbaAssignmentServiceDates: string | null
   staffName: string
   staffEmail: string | null
   companyPhone: string
@@ -76,4 +100,5 @@ export type StaffEmailRenderOverrides = {
   links?: import('./shell').EmailLinkMeta[]
   assessmentModality?: AssessmentModality | null
   locale?: EmailLocale
+  bcbaAssignment?: BcbaAssignmentOverrides | null
 }

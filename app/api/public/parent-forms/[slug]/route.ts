@@ -3,8 +3,8 @@ import { readFile } from 'fs/promises'
 import {
   isParentFormSlug,
   PARENT_FORM_FILES,
-  resolveParentFormPath,
 } from '@/lib/crm/emails/parentFormDownloads'
+import { resolveParentFormPath } from '@/lib/crm/emails/parentFormFs'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'

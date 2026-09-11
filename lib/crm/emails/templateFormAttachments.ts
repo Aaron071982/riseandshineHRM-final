@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { CommTemplate } from '@prisma/client'
-import { resolveParentFormPath } from '@/lib/crm/emails/parentFormDownloads'
+import { resolveParentFormPath } from '@/lib/crm/emails/parentFormFs'
 
 /**
  * Static parent forms auto-attached to journey emails.

@@ -1,6 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { parentFirstNameFromFull } from '@/lib/crm/emails/templates/shell'
-import type { StaffMergeFields, ScheduleSlotRow } from '@/lib/crm/emails/templates/types'
+import { cptLabel } from '@/lib/crm/cpt'
+import type {
+  ApprovedHoursCptRow,
+  StaffMergeFields,
+  ScheduleSlotRow,
+} from '@/lib/crm/emails/templates/types'
 
 export function formatEmailDate(d: Date | null | undefined): string | null {
   if (!d) return null
@@ -18,6 +23,7 @@ export async function loadStaffEmailMergeContext(clientId: string) {
       id: true,
       firstName: true,
       lastName: true,
+      dateOfBirth: true,
       parentName: true,
       parentEmail: true,
       parentPhone: true,
@@ -30,6 +36,7 @@ export async function loadStaffEmailMergeContext(clientId: string) {
       caseCoordinatorName: true,
       actualServiceStartDate: true,
       serviceStartDate: true,
+      serviceEndDate: true,
       caseCoordinatorUser: { select: { name: true, email: true, phoneNumber: true } },
       bcbaProfile: { select: { fullName: true, email: true, phone: true } },
       bcbaName: true,
@@ -186,6 +193,7 @@ export function buildStaffMergeFields(
   return {
     childFirstName: client.firstName,
     childLastName: client.lastName,
+    childDateOfBirth: formatEmailDate(client.dateOfBirth),
     parentName: client.parentName,
     parentFirstName: parentFirstNameFromFull(client.parentName),
     parentEmail: client.parentEmail,
@@ -217,12 +225,91 @@ export function buildStaffMergeFields(
     ),
     assessmentDate: null,
     assessmentModality: null,
+    authServiceDates: formatServiceDateRange(
+      client.actualServiceStartDate ?? client.serviceStartDate,
+      client.serviceEndDate
+    ),
+    approvedHoursByCpt: [],
+    bcbaAssignmentClientName: null,
+    bcbaAssignmentDateOfBirth: null,
+    bcbaAssignmentApprovedHoursText: null,
+    bcbaAssignmentServiceDates: null,
     staffName: staff.name?.trim() || staff.email || 'Rise & Shine Team',
     staffEmail: staff.email,
     companyPhone: '888-898-4774',
     companyEmail: 'info@riseandshineaba.com',
     companyName: 'Rise & Shine ABA',
     teamStaffEmails,
+  }
+}
+
+export function formatServiceDateRange(
+  start: Date | null | undefined,
+  end: Date | null | undefined
+): string | null {
+  const s = formatEmailDate(start)
+  const e = formatEmailDate(end)
+  if (s && e) return `${s} – ${e}`
+  if (s) return `Starting ${s}`
+  if (e) return `Through ${e}`
+  return null
+}
+
+export function formatApprovedHoursText(
+  rows: { cptCode: string; label: string; hoursOrUnits: string }[]
+): string {
+  return rows
+    .map((row) => `${row.cptCode} — ${row.label}: ${row.hoursOrUnits}`)
+    .join('\n')
+}
+
+/** Load approved treatment auth CPT lines for BCBA assignment emails. */
+export async function loadApprovedHoursByCpt(
+  clientId: string
+): Promise<{
+  rows: ApprovedHoursCptRow[]
+  authServiceDates: string | null
+}> {
+  const auth = await prisma.clientAuthorization.findFirst({
+    where: {
+      serviceClientId: clientId,
+      deletedAt: null,
+      authType: 'TREATMENT',
+      status: 'APPROVED',
+    },
+    orderBy: [{ approvedAt: 'desc' }, { updatedAt: 'desc' }],
+    select: {
+      effectiveDate: true,
+      expirationDate: true,
+      lines: {
+        where: { deletedAt: null },
+        orderBy: { cptCode: 'asc' },
+        select: {
+          cptCode: true,
+          description: true,
+          unitsApproved: true,
+          unitsAuthorized: true,
+        },
+      },
+    },
+  })
+
+  if (!auth) {
+    return { rows: [], authServiceDates: null }
+  }
+
+  const rows: ApprovedHoursCptRow[] = auth.lines.map((line) => {
+    const units = line.unitsApproved ?? line.unitsAuthorized
+    return {
+      cptCode: line.cptCode,
+      label: line.description?.trim() || cptLabel(line.cptCode),
+      hoursOrUnits: `${units} units`,
+    }
+  })
+
+  return {
+    rows,
+    authServiceDates: formatServiceDateRange(auth.effectiveDate, auth.expirationDate),
   }
 }
 

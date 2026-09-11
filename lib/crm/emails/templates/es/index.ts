@@ -2,6 +2,7 @@ import type { CommTemplate } from '@prisma/client'
 import type { StaffEmailContent, StaffMergeFields } from '../types'
 import { renderCaseCoordinationEs } from './caseCoordination'
 import { renderMeetAndGreetEs } from './meetAndGreet'
+import { renderBcbaAssigned } from '../bcbaAssigned'
 import {
   LEGACY_RENDERERS_ES,
   renderAssessmentScheduledEs,
@@ -29,5 +30,7 @@ export const RENDERERS_ES: Partial<
   SCHEDULE_CONFIRMED: renderScheduleConfirmedEs,
   MEET_AND_GREET: renderMeetAndGreetEs,
   CASE_COORDINATION: renderCaseCoordinationEs,
+  /** Internal BCBA notice — English copy is the source of truth. */
+  BCBA_ASSIGNED: renderBcbaAssigned,
   ...LEGACY_RENDERERS_ES,
 }
