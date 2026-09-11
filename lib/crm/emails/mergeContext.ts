@@ -259,11 +259,18 @@ export function formatApprovedHoursText(
   rows: { cptCode: string; label: string; hoursOrUnits: string }[]
 ): string {
   return rows
-    .map((row) => `${row.cptCode} — ${row.label}: ${row.hoursOrUnits}`)
+    .map((row) => {
+      const hours = row.hoursOrUnits.trim()
+      return hours
+        ? `${row.cptCode} — ${row.label}: ${hours}`
+        : `${row.cptCode} — ${row.label}: `
+    })
     .join('\n')
 }
 
-/** Load approved treatment auth CPT lines for BCBA assignment emails. */
+/** Load approved treatment auth CPT lines for BCBA assignment emails.
+ * Hours are left blank for staff to enter manually (not auth unit counts).
+ */
 export async function loadApprovedHoursByCpt(
   clientId: string
 ): Promise<{
@@ -287,8 +294,6 @@ export async function loadApprovedHoursByCpt(
         select: {
           cptCode: true,
           description: true,
-          unitsApproved: true,
-          unitsAuthorized: true,
         },
       },
     },
@@ -298,14 +303,12 @@ export async function loadApprovedHoursByCpt(
     return { rows: [], authServiceDates: null }
   }
 
-  const rows: ApprovedHoursCptRow[] = auth.lines.map((line) => {
-    const units = line.unitsApproved ?? line.unitsAuthorized
-    return {
-      cptCode: line.cptCode,
-      label: line.description?.trim() || cptLabel(line.cptCode),
-      hoursOrUnits: `${units} units`,
-    }
-  })
+  const rows: ApprovedHoursCptRow[] = auth.lines.map((line) => ({
+    cptCode: line.cptCode,
+    label: line.description?.trim() || cptLabel(line.cptCode),
+    // Staff enter hours manually in EmailPanel — do not pull auth unit counts.
+    hoursOrUnits: '',
+  }))
 
   return {
     rows,

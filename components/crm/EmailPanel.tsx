@@ -616,7 +616,7 @@ export function EmailPanel({
                 />
               </label>
               <label className="text-xs text-quiet sm:col-span-2">
-                Approved hours (all CPT codes)
+                Approved hours by CPT (enter hours manually — not auth units)
                 <textarea
                   value={bcbaApprovedHoursText}
                   onChange={(e) => {
@@ -624,9 +624,12 @@ export function EmailPanel({
                     setBcbaApprovedHoursText(e.target.value)
                   }}
                   rows={4}
-                  placeholder={'97153 — Adaptive behavior treatment by protocol: 20 hrs/week\n97155 — Protocol modification: 2 hrs/week'}
+                  placeholder={'97153 — Adaptive behavior treatment by protocol: 20 hrs/week\n97155 — Protocol modification: 2 hrs/week\n97156 — Parent training: 3 hrs/week'}
                   className="mt-1 w-full rounded-lg border border-line bg-surface px-2.5 py-2 text-sm focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
                 />
+                <span className="mt-1 block text-[11px] text-quiet">
+                  CPT lines are prefilled from the treatment auth. Type the weekly/monthly hours after each colon before sending.
+                </span>
               </label>
             </div>
           )}

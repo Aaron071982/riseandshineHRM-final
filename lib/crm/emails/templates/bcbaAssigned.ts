@@ -35,7 +35,7 @@ function approvedHoursBlock(fields: StaffMergeFields): string {
       (row) => `<tr>
       <td style="padding:8px 10px;border:1px solid #d8d0c8;font-size:14px;">${escapeHtml(row.cptCode)}</td>
       <td style="padding:8px 10px;border:1px solid #d8d0c8;font-size:14px;">${escapeHtml(row.label)}</td>
-      <td style="padding:8px 10px;border:1px solid #d8d0c8;font-size:14px;">${escapeHtml(row.hoursOrUnits)}</td>
+      <td style="padding:8px 10px;border:1px solid #d8d0c8;font-size:14px;">${escapeHtml(row.hoursOrUnits.trim() || '—')}</td>
     </tr>`
     )
     .join('')
@@ -43,7 +43,7 @@ function approvedHoursBlock(fields: StaffMergeFields): string {
     <tr style="background:#f7f0e8;">
       <th align="left" style="padding:8px 10px;border:1px solid #d8d0c8;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:#8a7a6c;">CPT</th>
       <th align="left" style="padding:8px 10px;border:1px solid #d8d0c8;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:#8a7a6c;">Service</th>
-      <th align="left" style="padding:8px 10px;border:1px solid #d8d0c8;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:#8a7a6c;">Approved</th>
+      <th align="left" style="padding:8px 10px;border:1px solid #d8d0c8;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:#8a7a6c;">Hours</th>
     </tr>
     ${body}
   </table>`

@@ -130,12 +130,12 @@ describe('lib/crm/emails/templates branded render', () => {
       {
         cptCode: '97153',
         label: 'Adaptive behavior treatment by protocol',
-        hoursOrUnits: '40 units',
+        hoursOrUnits: '20 hrs/week',
       },
       {
         cptCode: '97155',
         label: 'Adaptive behavior treatment with protocol modification',
-        hoursOrUnits: '4 units',
+        hoursOrUnits: '2 hrs/week',
       },
     ],
     bcbaAssignmentClientName: null,
