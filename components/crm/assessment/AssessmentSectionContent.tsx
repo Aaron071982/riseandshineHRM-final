@@ -366,7 +366,7 @@ function InstrumentsSection(props: Props) {
           disabled={props.readOnly}
           className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
         >
-          {(['AFLS', 'ATEC', 'BVMAP', 'OTHER'] as const).map((type) => (
+          {(['AFLS', 'ATEC', 'VB_MAPP', 'OTHER'] as const).map((type) => (
             <option key={type} value={type}>
               {SKILLS_ASSESSMENT_TYPE_LABELS[type]}
             </option>
@@ -393,8 +393,8 @@ function InstrumentsSection(props: Props) {
       {i.skillsAssessmentType === 'ATEC' && (
         <PrefilledTextArea label="Autism Treatment Evaluation Checklist (ATEC)" value={i.atecAssessment} onChange={(v) => set('atecAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       )}
-      {i.skillsAssessmentType === 'BVMAP' && (
-        <PrefilledTextArea label="BVMAP" value={i.bvmapAssessment} onChange={(v) => set('bvmapAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      {i.skillsAssessmentType === 'VB_MAPP' && (
+        <PrefilledTextArea label="VB-MAPP" value={i.vbMappAssessment} onChange={(v) => set('vbMappAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       )}
       {i.skillsAssessmentType === 'OTHER' && (
         <PrefilledTextArea label={selectedLabel} value={i.otherSkillsAssessmentSummary} onChange={(v) => set('otherSkillsAssessmentSummary', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
@@ -477,15 +477,15 @@ function PresentLevelsSection(props: Props) {
         />
       )}
 
-      {selectedType === 'BVMAP' && (
+      {selectedType === 'VB_MAPP' && (
         <SimplePresentLevelBlock
-          title="BVMAP"
-          sectionKey="present_levels.bvmap"
-          value={p.bvmap}
-          setValue={(bvmap) =>
+          title="VB-MAPP"
+          sectionKey="present_levels.vbMapp"
+          value={p.vbMapp}
+          setValue={(vbMapp) =>
             props.setSections((prev) => ({
               ...prev,
-              presentLevels: { ...prev.presentLevels, bvmap },
+              presentLevels: { ...prev.presentLevels, vbMapp },
             }))
           }
           readOnly={props.readOnly}

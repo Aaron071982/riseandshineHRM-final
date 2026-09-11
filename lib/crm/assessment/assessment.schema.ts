@@ -95,26 +95,43 @@ export const bioPsychosocialSchema = z.object({
 })
 
 /** §3.5 Instruments & Methods */
-export const skillsAssessmentTypeSchema = z
-  .enum(['AFLS', 'ATEC', 'BVMAP', 'OTHER'])
-  .optional()
-  .default('AFLS')
+export const skillsAssessmentTypeSchema = z.preprocess(
+  (value) => {
+    if (value === 'BVMAP' || value === 'VBMAP' || value === 'VB-MAPP') return 'VB_MAPP'
+    return value
+  },
+  z.enum(['AFLS', 'ATEC', 'VB_MAPP', 'OTHER']).optional().default('AFLS')
+)
 
-export const instrumentsSchema = z.object({
-  skillsAssessmentType: skillsAssessmentTypeSchema,
-  otherSkillsAssessmentLabel: optionalTextSchema,
-  familyCaregiverInterview: optionalTextSchema,
-  recordsReviewed: optionalTextSchema,
-  vinelandCompletedDate: optionalDateStringSchema,
-  fastAssessment: optionalTextSchema,
-  aflsAssessment: optionalTextSchema,
-  atecAssessment: optionalTextSchema,
-  bvmapAssessment: optionalTextSchema,
-  otherSkillsAssessmentSummary: optionalTextSchema,
-  observation1: optionalTextSchema,
-  observation2: optionalTextSchema,
-  preferenceAssessment: optionalTextSchema,
-})
+export const instrumentsSchema = z.preprocess(
+  (raw) => {
+    if (!raw || typeof raw !== 'object') return raw
+    const obj = raw as Record<string, unknown>
+    if (
+      !(typeof obj.vbMappAssessment === 'string' && obj.vbMappAssessment.trim()) &&
+      typeof obj.bvmapAssessment === 'string' &&
+      obj.bvmapAssessment.trim()
+    ) {
+      return { ...obj, vbMappAssessment: obj.bvmapAssessment }
+    }
+    return raw
+  },
+  z.object({
+    skillsAssessmentType: skillsAssessmentTypeSchema,
+    otherSkillsAssessmentLabel: optionalTextSchema,
+    familyCaregiverInterview: optionalTextSchema,
+    recordsReviewed: optionalTextSchema,
+    vinelandCompletedDate: optionalDateStringSchema,
+    fastAssessment: optionalTextSchema,
+    aflsAssessment: optionalTextSchema,
+    atecAssessment: optionalTextSchema,
+    vbMappAssessment: optionalTextSchema,
+    otherSkillsAssessmentSummary: optionalTextSchema,
+    observation1: optionalTextSchema,
+    observation2: optionalTextSchema,
+    preferenceAssessment: optionalTextSchema,
+  })
+)
 
 /** §3.6 Present Levels */
 export const presentLevelInstrumentSchema = z.object({
@@ -166,14 +183,24 @@ export const aflsPresentLevelSchema = z.object({
   legacyMigratedFromAtec: z.boolean().optional().default(false),
 })
 
-export const presentLevelsSchema = z.object({
-  vineland: presentLevelInstrumentSchema.default({}),
-  afls: aflsPresentLevelSchema.default({}),
-  atec: presentLevelInstrumentSchema.default({}),
-  bvmap: presentLevelInstrumentSchema.default({}),
-  other: presentLevelInstrumentSchema.default({}),
-  fast: presentLevelInstrumentSchema.default({}),
-})
+export const presentLevelsSchema = z.preprocess(
+  (raw) => {
+    if (!raw || typeof raw !== 'object') return raw
+    const obj = raw as Record<string, unknown>
+    if (!obj.vbMapp && obj.bvmap) {
+      return { ...obj, vbMapp: obj.bvmap }
+    }
+    return raw
+  },
+  z.object({
+    vineland: presentLevelInstrumentSchema.default({}),
+    afls: aflsPresentLevelSchema.default({}),
+    atec: presentLevelInstrumentSchema.default({}),
+    vbMapp: presentLevelInstrumentSchema.default({}),
+    other: presentLevelInstrumentSchema.default({}),
+    fast: presentLevelInstrumentSchema.default({}),
+  })
+)
 
 /** §3.7 Environmental */
 export const environmentalSchema = z.object({
@@ -504,7 +531,7 @@ export type LocationSchedule = z.infer<typeof locationScheduleSchema>
 export type BioPsychosocial = z.infer<typeof bioPsychosocialSchema>
 export type Instruments = z.infer<typeof instrumentsSchema>
 export type PresentLevels = z.infer<typeof presentLevelsSchema>
-export type SkillsAssessmentType = z.infer<typeof skillsAssessmentTypeSchema>
+export type SkillsAssessmentType = 'AFLS' | 'ATEC' | 'VB_MAPP' | 'OTHER'
 export type AflsSummaryScore = z.infer<typeof aflsSummaryScoreSchema>
 export type AflsSkillScore = z.infer<typeof aflsSkillScoreSchema>
 export type AflsSkill = z.infer<typeof aflsSkillSchema>

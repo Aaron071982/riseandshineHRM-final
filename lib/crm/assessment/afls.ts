@@ -11,7 +11,7 @@ import type {
 export const SKILLS_ASSESSMENT_TYPE_LABELS: Record<SkillsAssessmentType, string> = {
   AFLS: 'AFLS',
   ATEC: 'ATEC',
-  BVMAP: 'BVMAP',
+  VB_MAPP: 'VB-MAPP',
   OTHER: 'Other',
 }
 
@@ -42,10 +42,14 @@ export function normalizeSkillsAssessmentType(input: {
   if (
     input.rawType === 'AFLS' ||
     input.rawType === 'ATEC' ||
-    input.rawType === 'BVMAP' ||
+    input.rawType === 'VB_MAPP' ||
     input.rawType === 'OTHER'
   ) {
     return input.rawType
+  }
+  // Brief misspelling used before rename to VB-MAPP
+  if (input.rawType === 'BVMAP' || input.rawType === 'VBMAP' || input.rawType === 'VB-MAPP') {
+    return 'VB_MAPP'
   }
   const joined = [input.atecAssessment, input.atecInterpretation].join('\n')
   if (isLikelyLegacyAflsText(joined)) return 'AFLS'

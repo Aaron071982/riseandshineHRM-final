@@ -208,8 +208,8 @@ export function AssessmentPrintView(props: Props) {
                   {props.sections.instruments.skillsAssessmentType === 'ATEC' && (
                     <Block title="Autism Treatment Evaluation Checklist (ATEC)" text={props.sections.instruments.atecAssessment} />
                   )}
-                  {props.sections.instruments.skillsAssessmentType === 'BVMAP' && (
-                    <Block title="BVMAP" text={props.sections.instruments.bvmapAssessment} />
+                  {props.sections.instruments.skillsAssessmentType === 'VB_MAPP' && (
+                    <Block title="VB-MAPP" text={props.sections.instruments.vbMappAssessment} />
                   )}
                   {props.sections.instruments.skillsAssessmentType === 'OTHER' && (
                     <Block title={selectedSkillsLabel} text={props.sections.instruments.otherSkillsAssessmentSummary} />
@@ -248,15 +248,15 @@ export function AssessmentPrintView(props: Props) {
                       <Block title="Interpretation" text={props.sections.presentLevels.atec.interpretation} />
                     </div>
                   )}
-                  {props.sections.instruments.skillsAssessmentType === 'BVMAP' && (
+                  {props.sections.instruments.skillsAssessmentType === 'VB_MAPP' && (
                     <div className="section-block">
-                      <p className="subheading">BVMAP</p>
+                      <p className="subheading">VB-MAPP</p>
                       <AttachmentImages
-                        attachments={attachmentsFor('present_levels.bvmap')}
+                        attachments={attachmentsFor('present_levels.vbMapp')}
                         urls={props.attachmentUrls}
                       />
-                      <AttachmentFileList attachments={attachmentsFor('present_levels.bvmap')} />
-                      <Block title="Interpretation" text={props.sections.presentLevels.bvmap.interpretation} />
+                      <AttachmentFileList attachments={attachmentsFor('present_levels.vbMapp')} />
+                      <Block title="Interpretation" text={props.sections.presentLevels.vbMapp.interpretation} />
                     </div>
                   )}
                   {props.sections.instruments.skillsAssessmentType === 'OTHER' && (
