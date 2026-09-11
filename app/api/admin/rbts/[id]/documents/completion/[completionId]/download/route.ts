@@ -5,7 +5,7 @@ import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
 import { mimeTypeFromFileName } from '@/lib/rbtDocumentsSync'
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string; completionId: string }> }
 ) {
   try {
@@ -13,6 +13,10 @@ export async function GET(
     if (auth.response) return auth.response
 
     const { id: rbtProfileId, completionId } = await params
+    const url = new URL(request.url)
+    const wantInline =
+      url.searchParams.get('inline') === '1' || url.searchParams.get('preview') === '1'
+    const disposition = wantInline ? 'inline' : 'attachment'
 
     const completion = await prisma.onboardingCompletion.findUnique({
       where: { id: completionId },
@@ -42,7 +46,7 @@ export async function GET(
       return new NextResponse(new Uint8Array(buf), {
         headers: {
           'Content-Type': contentType,
-          'Content-Disposition': `attachment; filename="${fileName}"`,
+          'Content-Disposition': `${disposition}; filename="${fileName}"`,
           'Content-Length': buf.length.toString(),
         },
       })
@@ -59,7 +63,7 @@ export async function GET(
         return new NextResponse(new Uint8Array(buf), {
           headers: {
             'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="${fileName}"`,
+            'Content-Disposition': `${disposition}; filename="${fileName}"`,
             'Content-Length': buf.length.toString(),
           },
         })

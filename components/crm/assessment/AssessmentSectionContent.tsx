@@ -10,7 +10,6 @@ import {
   PrefilledTextArea,
 } from '@/components/crm/assessment/PrefilledTextArea'
 import { CheckboxGroup } from '@/components/crm/assessment/CheckboxGroup'
-import { ContactFieldEditor } from '@/components/crm/assessment/ContactFieldEditor'
 import { GoalTable } from '@/components/crm/assessment/GoalTable'
 import { AttachmentUploader } from '@/components/crm/assessment/AttachmentUploader'
 import { AflsEditor } from '@/components/crm/assessment/AflsEditor'
@@ -29,6 +28,7 @@ import {
 } from '@/lib/crm/assessment/boilerplate'
 import {
   emptyBehaviorBlock,
+  emptyCoordinationRow,
   emptyScheduleRow,
   emptyTransitionCriteriaRow,
   type AssessmentSectionData,
@@ -57,7 +57,7 @@ export const SECTION_NAV: { key: AssessmentSectionKey; label: string }[] = [
   { key: 'parentTraining', label: 'Parent Training' },
   { key: 'servicesProtocols', label: 'Services Protocols' },
   { key: 'transitionPlan', label: 'Transition Plan' },
-  { key: 'coordination', label: 'Team Coordination' },
+  { key: 'coordination', label: 'Coordination of Care' },
   { key: 'recommendations', label: 'Recommendations' },
   { key: 'crisisPlan', label: 'Crisis Plan' },
   { key: 'signatures', label: 'Signatures' },
@@ -366,7 +366,7 @@ function InstrumentsSection(props: Props) {
           disabled={props.readOnly}
           className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink"
         >
-          {(['AFLS', 'ATEC', 'OTHER'] as const).map((type) => (
+          {(['AFLS', 'ATEC', 'BVMAP', 'OTHER'] as const).map((type) => (
             <option key={type} value={type}>
               {SKILLS_ASSESSMENT_TYPE_LABELS[type]}
             </option>
@@ -392,6 +392,9 @@ function InstrumentsSection(props: Props) {
       )}
       {i.skillsAssessmentType === 'ATEC' && (
         <PrefilledTextArea label="Autism Treatment Evaluation Checklist (ATEC)" value={i.atecAssessment} onChange={(v) => set('atecAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      )}
+      {i.skillsAssessmentType === 'BVMAP' && (
+        <PrefilledTextArea label="BVMAP" value={i.bvmapAssessment} onChange={(v) => set('bvmapAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       )}
       {i.skillsAssessmentType === 'OTHER' && (
         <PrefilledTextArea label={selectedLabel} value={i.otherSkillsAssessmentSummary} onChange={(v) => set('otherSkillsAssessmentSummary', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
@@ -463,6 +466,26 @@ function PresentLevelsSection(props: Props) {
             props.setSections((prev) => ({
               ...prev,
               presentLevels: { ...prev.presentLevels, atec },
+            }))
+          }
+          readOnly={props.readOnly}
+          onBlur={props.onBlur}
+          clientId={props.clientId}
+          assessmentId={props.assessmentId}
+          attachments={props.attachments}
+          onUploaded={props.onUploaded}
+        />
+      )}
+
+      {selectedType === 'BVMAP' && (
+        <SimplePresentLevelBlock
+          title="BVMAP"
+          sectionKey="present_levels.bvmap"
+          value={p.bvmap}
+          setValue={(bvmap) =>
+            props.setSections((prev) => ({
+              ...prev,
+              presentLevels: { ...prev.presentLevels, bvmap },
             }))
           }
           readOnly={props.readOnly}
@@ -664,6 +687,16 @@ function GoalsSection(props: Props) {
         <p className="mb-2 mt-4 text-sm font-medium">Behavior Reduction Goals</p>
         <GoalTable variant="A" rows={g.behaviorReduction.rows} onChange={(rows) => setGoals({ behaviorReduction: { ...g.behaviorReduction, rows } })} readOnly={props.readOnly} onBlur={props.onBlur} />
       </div>
+      <div>
+        <p className="mb-2 text-sm font-medium">Replacement Behavior Goals</p>
+        <GoalTable
+          variant="A"
+          rows={g.replacementBehavior.rows}
+          onChange={(rows) => setGoals({ replacementBehavior: { rows } })}
+          readOnly={props.readOnly}
+          onBlur={props.onBlur}
+        />
+      </div>
       {([
         ['communication', 'Communication Goals', 'Current level of communication skills'],
         ['social', 'Social Interaction & Social Communication Goals', 'Current level of social skills'],
@@ -745,31 +778,121 @@ function TransitionPlanSection(props: Props) {
 
 function CoordinationSection(props: Props) {
   const c = props.sections.coordination
-  const setContact = (role: keyof Pick<typeof c, 'speechTherapist' | 'occupationalTherapist' | 'classTeacher' | 'physicalTherapist' | 'primaryCareProvider'>, v: typeof c.speechTherapist) =>
-    props.setSections((prev) => ({ ...prev, coordination: { ...prev.coordination, [role]: v } }))
-  return wrap(props, 'coordination', 'Coordination with Team', (
-    <div className="space-y-4">
-      <ContactFieldEditor label="Speech Therapist" value={c.speechTherapist} onChange={(v) => setContact('speechTherapist', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <ContactFieldEditor label="Occupational Therapist" value={c.occupationalTherapist} onChange={(v) => setContact('occupationalTherapist', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <ContactFieldEditor label="Class teacher" value={c.classTeacher} onChange={(v) => setContact('classTeacher', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <ContactFieldEditor label="Physical Therapist" value={c.physicalTherapist} onChange={(v) => setContact('physicalTherapist', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <ContactFieldEditor label="Primary care provider" value={c.primaryCareProvider} onChange={(v) => setContact('primaryCareProvider', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
-      {c.additionalMembers.map((m, i) => (
-        <div key={m.id} className="space-y-2">
-          <Input value={m.role} placeholder="Role" onChange={(e) => props.setSections((prev) => ({ ...prev, coordination: { ...prev.coordination, additionalMembers: prev.coordination.additionalMembers.map((x, j) => j === i ? { ...x, role: e.target.value } : x) } }))} readOnly={props.readOnly} />
-          <ContactFieldEditor label="Contact" value={m.contact} onChange={(v) => props.setSections((prev) => ({ ...prev, coordination: { ...prev.coordination, additionalMembers: prev.coordination.additionalMembers.map((x, j) => j === i ? { ...x, contact: v } : x) } }))} readOnly={props.readOnly} onBlur={props.onBlur} />
-        </div>
-      ))}
+  const setRows = (rows: typeof c.rows) =>
+    props.setSections((prev) => ({
+      ...prev,
+      coordination: { rows },
+    }))
+
+  return wrap(props, 'coordination', 'Coordination of Care', (
+    <div className="space-y-3 overflow-x-auto">
+      <table className="w-full min-w-[720px] border border-line text-left text-xs">
+        <thead className="bg-canvas/60">
+          <tr>
+            <th className="p-2 font-medium text-ink">Name</th>
+            <th className="p-2 font-medium text-ink">Phone Number</th>
+            <th className="p-2 font-medium text-ink">Date</th>
+            <th className="p-2 font-medium text-ink">What was discussed</th>
+            {!props.readOnly && <th className="p-2 w-20" />}
+          </tr>
+        </thead>
+        <tbody>
+          {c.rows.map((row) => (
+            <tr key={row.id} className="border-t border-line">
+              <td className="p-1 align-top">
+                <Input
+                  value={row.name}
+                  onChange={(e) =>
+                    setRows(
+                      c.rows.map((r) =>
+                        r.id === row.id ? { ...r, name: e.target.value } : r
+                      )
+                    )
+                  }
+                  onBlur={props.onBlur}
+                  readOnly={props.readOnly}
+                  className="min-w-[120px] text-xs"
+                />
+              </td>
+              <td className="p-1 align-top">
+                <Input
+                  value={row.phone}
+                  onChange={(e) =>
+                    setRows(
+                      c.rows.map((r) =>
+                        r.id === row.id ? { ...r, phone: e.target.value } : r
+                      )
+                    )
+                  }
+                  onBlur={props.onBlur}
+                  readOnly={props.readOnly}
+                  className="min-w-[120px] text-xs"
+                />
+              </td>
+              <td className="p-1 align-top">
+                <Input
+                  type="date"
+                  value={row.date}
+                  onChange={(e) =>
+                    setRows(
+                      c.rows.map((r) =>
+                        r.id === row.id ? { ...r, date: e.target.value } : r
+                      )
+                    )
+                  }
+                  onBlur={props.onBlur}
+                  readOnly={props.readOnly}
+                  className="min-w-[140px] text-xs"
+                />
+              </td>
+              <td className="p-1 align-top">
+                <Textarea
+                  value={row.discussion}
+                  onChange={(e) =>
+                    setRows(
+                      c.rows.map((r) =>
+                        r.id === row.id ? { ...r, discussion: e.target.value } : r
+                      )
+                    )
+                  }
+                  onBlur={props.onBlur}
+                  readOnly={props.readOnly}
+                  rows={2}
+                  className="min-w-[200px] text-xs"
+                />
+              </td>
+              {!props.readOnly && (
+                <td className="p-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRows(c.rows.filter((r) => r.id !== row.id))}
+                  >
+                    Remove
+                  </Button>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
       {!props.readOnly && (
-        <Button type="button" variant="outline" size="sm" onClick={() => props.setSections((prev) => ({ ...prev, coordination: { ...prev.coordination, additionalMembers: [...prev.coordination.additionalMembers, { id: crypto.randomUUID(), role: '', contact: { name: '', organization: '', phone: '', email: '' } }] } }))}>Add team member</Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setRows([...c.rows, emptyCoordinationRow()])}
+        >
+          Add row
+        </Button>
       )}
-      <PrefilledTextArea label="Treatment Plan Review and Change" value={c.treatmentPlanReview} onChange={(v) => props.setSections((prev) => ({ ...prev, coordination: { ...prev.coordination, treatmentPlanReview: v } }))} readOnly={props.readOnly} onBlur={props.onBlur} rows={6} />
     </div>
   ))
 }
 
 function RecommendationsSection(props: Props) {
-  return wrap(props, 'recommendations', 'Recommendations for Treatment', (
+  return wrap(props, 'recommendations', 'Medical Necessity rational', (
     <PrefilledTextArea value={props.sections.recommendations.narrative} onChange={(v) => props.setSections((prev) => ({ ...prev, recommendations: { narrative: v } }))} readOnly={props.readOnly} onBlur={props.onBlur} rows={12} />
   ))
 }

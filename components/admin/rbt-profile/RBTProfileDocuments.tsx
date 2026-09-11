@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { FileText, Download, Trash2, Upload, Loader2, FileArchive, ScrollText } from 'lucide-react'
+import { FileText, Download, Trash2, Upload, Loader2, FileArchive, ScrollText, Eye } from 'lucide-react'
 import { useToast } from '@/components/ui/toast'
 import {
   Dialog,
@@ -467,6 +467,22 @@ export default function RBTProfileDocuments({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:border-[var(--border-subtle)] dark:text-[var(--orange-primary)] dark:hover:bg-[var(--bg-elevated-hover)]"
+                    onClick={() =>
+                      window.open(
+                        `/api/admin/rbts/${rbtProfileId}/documents/completion/${c.id}/download?inline=1`,
+                        '_blank',
+                        'noopener,noreferrer'
+                      )
+                    }
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    Preview
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

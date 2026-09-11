@@ -73,12 +73,26 @@ export function BehaviorBlockEditor({
       </Field>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Severity">
-          <Input
-            value={block.severity}
-            onChange={(e) => set('severity', e.target.value)}
-            onBlur={onBlur}
-            readOnly={readOnly}
-          />
+          <Select
+            value={
+              block.severity === 'Low' ||
+              block.severity === 'Moderate' ||
+              block.severity === 'Severe'
+                ? block.severity
+                : ''
+            }
+            onValueChange={(v) => set('severity', v)}
+            disabled={readOnly}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select severity" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Low">Low</SelectItem>
+              <SelectItem value="Moderate">Moderate</SelectItem>
+              <SelectItem value="Severe">Severe</SelectItem>
+            </SelectContent>
+          </Select>
         </Field>
         <Field label="Example">
           <Input

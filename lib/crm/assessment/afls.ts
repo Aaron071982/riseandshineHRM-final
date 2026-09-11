@@ -11,6 +11,7 @@ import type {
 export const SKILLS_ASSESSMENT_TYPE_LABELS: Record<SkillsAssessmentType, string> = {
   AFLS: 'AFLS',
   ATEC: 'ATEC',
+  BVMAP: 'BVMAP',
   OTHER: 'Other',
 }
 
@@ -38,7 +39,12 @@ export function normalizeSkillsAssessmentType(input: {
   aflsAssessment: string
   atecInterpretation: string
 }): SkillsAssessmentType {
-  if (input.rawType === 'AFLS' || input.rawType === 'ATEC' || input.rawType === 'OTHER') {
+  if (
+    input.rawType === 'AFLS' ||
+    input.rawType === 'ATEC' ||
+    input.rawType === 'BVMAP' ||
+    input.rawType === 'OTHER'
+  ) {
     return input.rawType
   }
   const joined = [input.atecAssessment, input.atecInterpretation].join('\n')

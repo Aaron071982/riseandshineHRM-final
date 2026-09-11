@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, XCircle, FileText, Download } from 'lucide-react'
+import { CheckCircle2, XCircle, FileText, Download, Eye } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import { getAcknowledgmentAdminSummary } from '@/lib/acknowledgment-admin-summary'
 import { ONBOARDING_CATALOG, RBT_VISIBLE_STEPS } from '@/lib/onboarding/catalog'
@@ -157,6 +157,14 @@ export default function RBTProfileOnboarding({
       console.error('Error downloading PDF:', error)
       showToast('An error occurred while downloading the PDF', 'error')
     }
+  }
+
+  const handlePreviewCompletion = (completionId: string) => {
+    window.open(
+      `/api/admin/onboarding/completions/${rbtProfile.id}/${completionId}/download?inline=1`,
+      '_blank',
+      'noopener,noreferrer'
+    )
   }
 
   const legacySsnTasks = rbtProfile.onboardingTasks.filter(
@@ -363,14 +371,24 @@ export default function RBTProfileOnboarding({
                             : 'Not Started'}
                       </Badge>
                       {completion.status === 'COMPLETED' && completion.document.type === 'FILLABLE_PDF' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDownloadCompletion(completion.id, completion.document.title)}
-                        >
-                          <Download className="w-4 h-4" />
-                          Download PDF
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePreviewCompletion(completion.id)}
+                          >
+                            <Eye className="w-4 h-4" />
+                            Preview
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownloadCompletion(completion.id, completion.document.title)}
+                          >
+                            <Download className="w-4 h-4" />
+                            Download PDF
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>

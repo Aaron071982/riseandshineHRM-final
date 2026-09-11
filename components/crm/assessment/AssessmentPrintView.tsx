@@ -208,6 +208,9 @@ export function AssessmentPrintView(props: Props) {
                   {props.sections.instruments.skillsAssessmentType === 'ATEC' && (
                     <Block title="Autism Treatment Evaluation Checklist (ATEC)" text={props.sections.instruments.atecAssessment} />
                   )}
+                  {props.sections.instruments.skillsAssessmentType === 'BVMAP' && (
+                    <Block title="BVMAP" text={props.sections.instruments.bvmapAssessment} />
+                  )}
                   {props.sections.instruments.skillsAssessmentType === 'OTHER' && (
                     <Block title={selectedSkillsLabel} text={props.sections.instruments.otherSkillsAssessmentSummary} />
                   )}
@@ -243,6 +246,17 @@ export function AssessmentPrintView(props: Props) {
                       />
                       <AttachmentFileList attachments={attachmentsFor('present_levels.atec')} />
                       <Block title="Interpretation" text={props.sections.presentLevels.atec.interpretation} />
+                    </div>
+                  )}
+                  {props.sections.instruments.skillsAssessmentType === 'BVMAP' && (
+                    <div className="section-block">
+                      <p className="subheading">BVMAP</p>
+                      <AttachmentImages
+                        attachments={attachmentsFor('present_levels.bvmap')}
+                        urls={props.attachmentUrls}
+                      />
+                      <AttachmentFileList attachments={attachmentsFor('present_levels.bvmap')} />
+                      <Block title="Interpretation" text={props.sections.presentLevels.bvmap.interpretation} />
                     </div>
                   )}
                   {props.sections.instruments.skillsAssessmentType === 'OTHER' && (
@@ -329,6 +343,7 @@ export function AssessmentPrintView(props: Props) {
                 <PrintSection title="Treatment Goals" pageBreak>
                   <Block text={props.sections.goals.behaviorReduction.analysisNarrative} />
                   <GoalTableA title="Behavior Reduction Goals" rows={props.sections.goals.behaviorReduction.rows} />
+                  <GoalTableA title="Replacement Behavior Goals" rows={props.sections.goals.replacementBehavior.rows} />
                   <Block title="Current level of communication skills" text={props.sections.goals.communication.currentLevel} />
                   <GoalTableA title="Communication Goals" rows={props.sections.goals.communication.rows} />
                   <Block title="Current level of social skills" text={props.sections.goals.social.currentLevel} />
@@ -366,16 +381,11 @@ export function AssessmentPrintView(props: Props) {
                   <Block text={props.sections.transitionPlan.dischargeNarrative} />
                 </PrintSection>
 
-                <PrintSection title="Coordination with Team" pageBreak>
-                  <ContactBlock label="Speech Therapist" contact={props.sections.coordination.speechTherapist} />
-                  <ContactBlock label="Occupational Therapist" contact={props.sections.coordination.occupationalTherapist} />
-                  <ContactBlock label="Class teacher" contact={props.sections.coordination.classTeacher} />
-                  <ContactBlock label="Physical Therapist" contact={props.sections.coordination.physicalTherapist} />
-                  <ContactBlock label="Primary care provider" contact={props.sections.coordination.primaryCareProvider} />
-                  <Block text={props.sections.coordination.treatmentPlanReview} />
+                <PrintSection title="Coordination of Care" pageBreak>
+                  <CoordinationTable rows={props.sections.coordination.rows} />
                 </PrintSection>
 
-                <PrintSection title="Recommendations for Treatment" pageBreak>
+                <PrintSection title="Medical Necessity rational" pageBreak>
                   <Block text={props.sections.recommendations.narrative} />
                 </PrintSection>
 
@@ -820,21 +830,32 @@ function TransitionTable({
   )
 }
 
-function ContactBlock({
-  label,
-  contact,
+function CoordinationTable({
+  rows,
 }: {
-  label: string
-  contact: AssessmentSectionData['coordination']['speechTherapist']
+  rows: AssessmentSectionData['coordination']['rows']
 }) {
-  if (!contact.name && !contact.organization && !contact.phone && !contact.email) return null
+  if (!rows.length) return null
   return (
-    <div className="section-block">
-      <p className="subheading">{label}</p>
-      <Field label="Name" value={contact.name} />
-      <Field label="Organization" value={contact.organization} />
-      <Field label="Phone" value={contact.phone} />
-      <Field label="Email" value={contact.email} />
-    </div>
+    <table className="print-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone Number</th>
+          <th>Date</th>
+          <th>What was discussed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.id}>
+            <td>{row.name || '—'}</td>
+            <td>{row.phone || '—'}</td>
+            <td>{row.date || '—'}</td>
+            <td>{row.discussion || '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }

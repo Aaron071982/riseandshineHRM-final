@@ -63,6 +63,10 @@ export async function GET(
     // Generate filename
     const sanitizedTitle = completion.document.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()
     const filename = `${sanitizedTitle}_${completion.rbtProfile.firstName}_${completion.rbtProfile.lastName}.pdf`
+    const wantInline =
+      request.nextUrl.searchParams.get('inline') === '1' ||
+      request.nextUrl.searchParams.get('preview') === '1'
+    const disposition = wantInline ? 'inline' : 'attachment'
 
     // Check if PDF is stored in Supabase Storage
     // signedPdfUrl contains the storage path for files stored in Supabase
@@ -85,7 +89,7 @@ export async function GET(
           return new NextResponse(pdfBuffer, {
             headers: {
               'Content-Type': 'application/pdf',
-              'Content-Disposition': `attachment; filename="${filename}"`,
+              'Content-Disposition': `${disposition}; filename="${filename}"`,
               'Content-Length': pdfBuffer.length.toString(),
             },
           })
@@ -105,7 +109,7 @@ export async function GET(
       return new NextResponse(pdfBuffer, {
         headers: {
           'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Content-Disposition': `${disposition}; filename="${filename}"`,
           'Content-Length': pdfBuffer.length.toString(),
         },
       })

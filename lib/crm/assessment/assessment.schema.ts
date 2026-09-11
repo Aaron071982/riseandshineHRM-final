@@ -17,7 +17,6 @@ import {
   SERVICES_PROTOCOL_GROUP_PARENT_TRAINING,
   SERVICES_PROTOCOL_PARENT_TRAINING,
   SERVICES_PROTOCOL_REASSESSMENT,
-  COORDINATION_TREATMENT_PLAN_REVIEW_DEFAULT,
   RECOMMENDATIONS_FOR_TREATMENT_DEFAULT,
   TRANSITION_COMMUNICATION_CRITERIA_DEFAULT,
   TRANSITION_DISCHARGE_DEFAULT,
@@ -97,7 +96,7 @@ export const bioPsychosocialSchema = z.object({
 
 /** §3.5 Instruments & Methods */
 export const skillsAssessmentTypeSchema = z
-  .enum(['AFLS', 'ATEC', 'OTHER'])
+  .enum(['AFLS', 'ATEC', 'BVMAP', 'OTHER'])
   .optional()
   .default('AFLS')
 
@@ -110,6 +109,7 @@ export const instrumentsSchema = z.object({
   fastAssessment: optionalTextSchema,
   aflsAssessment: optionalTextSchema,
   atecAssessment: optionalTextSchema,
+  bvmapAssessment: optionalTextSchema,
   otherSkillsAssessmentSummary: optionalTextSchema,
   observation1: optionalTextSchema,
   observation2: optionalTextSchema,
@@ -170,6 +170,7 @@ export const presentLevelsSchema = z.object({
   vineland: presentLevelInstrumentSchema.default({}),
   afls: aflsPresentLevelSchema.default({}),
   atec: presentLevelInstrumentSchema.default({}),
+  bvmap: presentLevelInstrumentSchema.default({}),
   other: presentLevelInstrumentSchema.default({}),
   fast: presentLevelInstrumentSchema.default({}),
 })
@@ -251,6 +252,11 @@ export const goalDomainWithLevelColumnASchema = z.object({
 
 export const goalsSchema = z.object({
   behaviorReduction: goalDomainColumnASchema.default({}),
+  replacementBehavior: z
+    .object({
+      rows: z.array(goalRowColumnASchema).default([]),
+    })
+    .default({}),
   communication: goalDomainWithLevelColumnASchema.default({}),
   social: goalDomainWithLevelColumnASchema.default({}),
   adaptive: goalDomainWithLevelColumnASchema.default({}),
@@ -327,27 +333,82 @@ export const contactFieldSchema = z.object({
   email: optionalTextSchema,
 })
 
-/** §3.15 Coordination with Team */
-export const coordinationSchema = z.object({
-  speechTherapist: contactFieldSchema.default({}),
-  occupationalTherapist: contactFieldSchema.default({}),
-  classTeacher: contactFieldSchema.default({}),
-  physicalTherapist: contactFieldSchema.default({}),
-  primaryCareProvider: contactFieldSchema.default({}),
-  additionalMembers: z
-    .array(
-      z.object({
-        id: z.string(),
-        role: optionalTextSchema,
-        contact: contactFieldSchema.default({}),
-      })
-    )
-    .default([]),
-  treatmentPlanReview: z
-    .string()
-    .optional()
-    .default(COORDINATION_TREATMENT_PLAN_REVIEW_DEFAULT),
+/** §3.15 Coordination of Care (table rows) */
+export const coordinationRowSchema = z.object({
+  id: z.string(),
+  name: optionalTextSchema,
+  phone: optionalTextSchema,
+  date: optionalDateStringSchema,
+  discussion: optionalTextSchema,
 })
+
+const LEGACY_COORDINATION_ROLES = [
+  'speechTherapist',
+  'occupationalTherapist',
+  'classTeacher',
+  'physicalTherapist',
+  'primaryCareProvider',
+] as const
+
+function migrateCoordinationInput(raw: unknown): { rows: unknown[] } {
+  if (!raw || typeof raw !== 'object') return { rows: [] }
+  const obj = raw as Record<string, unknown>
+  if (Array.isArray(obj.rows)) return { rows: obj.rows }
+
+  const rows: Array<{
+    id: string
+    name: string
+    phone: string
+    date: string
+    discussion: string
+  }> = []
+
+  for (const role of LEGACY_COORDINATION_ROLES) {
+    const contact = obj[role] as
+      | { name?: string; phone?: string; organization?: string }
+      | undefined
+    if (!contact) continue
+    const name = (contact.name ?? '').trim()
+    const phone = (contact.phone ?? '').trim()
+    if (!name && !phone) continue
+    rows.push({
+      id: `legacy-${role}`,
+      name: name || role,
+      phone,
+      date: '',
+      discussion: '',
+    })
+  }
+
+  const members = Array.isArray(obj.additionalMembers) ? obj.additionalMembers : []
+  for (const member of members) {
+    if (!member || typeof member !== 'object') continue
+    const m = member as {
+      id?: string
+      role?: string
+      contact?: { name?: string; phone?: string }
+    }
+    const name = (m.contact?.name ?? m.role ?? '').trim()
+    const phone = (m.contact?.phone ?? '').trim()
+    if (!name && !phone) continue
+    rows.push({
+      id: m.id || `legacy-member-${rows.length}`,
+      name,
+      phone,
+      date: '',
+      discussion: '',
+    })
+  }
+
+  return { rows }
+}
+
+export const coordinationSchema = z.preprocess(
+  migrateCoordinationInput,
+  z.object({
+    rows: z.array(coordinationRowSchema).default([]),
+  })
+)
 
 /** §3.16 Recommendations */
 export const recommendationsSchema = z.object({
@@ -551,6 +612,10 @@ export function emptyScheduleRow(
 
 export function emptyTransitionCriteriaRow(): z.infer<typeof transitionCriteriaRowSchema> {
   return transitionCriteriaRowSchema.parse({ id: newId() })
+}
+
+export function emptyCoordinationRow(): z.infer<typeof coordinationRowSchema> {
+  return coordinationRowSchema.parse({ id: newId() })
 }
 
 export function emptyAflsSummaryScore(): AflsSummaryScore {

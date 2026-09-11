@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
-import { Download, Upload, FileText, CheckCircle2, Loader2 } from 'lucide-react'
+import { Download, Upload, FileText, CheckCircle2, Loader2, Eye } from 'lucide-react'
 import { rbtOnboardingPdfUrl } from '@/lib/onboarding/pdf'
 
 interface OnboardingDocument {
@@ -40,6 +40,7 @@ export default function FillablePdfFlow({
   const { showToast } = useToast()
   const [isCompleted, setIsCompleted] = useState(completion?.status === 'COMPLETED')
   const [uploading, setUploading] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -48,22 +49,43 @@ export default function FillablePdfFlow({
     }
   }, [completion])
 
+  const openPdfBlob = async (opts: { download: boolean }) => {
+    const url = rbtOnboardingPdfUrl(document.id, { download: opts.download })
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) {
+      showToast('PDF not available', 'error')
+      return null
+    }
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('pdf')) {
+      showToast('PDF not available', 'error')
+      return null
+    }
+    const blob = await res.blob()
+    return URL.createObjectURL(blob)
+  }
+
+  const handlePreview = async () => {
+    try {
+      setPreviewing(true)
+      const objectUrl = await openPdfBlob({ download: false })
+      if (!objectUrl) return
+      window.open(objectUrl, '_blank', 'noopener,noreferrer')
+      // Revoke after the new tab has a chance to load the blob URL
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+    } catch (error) {
+      console.error('Error previewing PDF:', error)
+      showToast('Failed to preview PDF. Please try again.', 'error')
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
   const handleDownload = async () => {
     onDownload?.()
     try {
-      const url = rbtOnboardingPdfUrl(document.id, { download: true })
-      const res = await fetch(url, { credentials: 'include' })
-      if (!res.ok) {
-        showToast('PDF not available', 'error')
-        return
-      }
-      const contentType = res.headers.get('content-type') || ''
-      if (!contentType.includes('pdf')) {
-        showToast('PDF not available', 'error')
-        return
-      }
-      const blob = await res.blob()
-      const objectUrl = URL.createObjectURL(blob)
+      const objectUrl = await openPdfBlob({ download: true })
+      if (!objectUrl) return
       const link = window.document.createElement('a')
       link.href = objectUrl
       link.download = `${document.slug || document.title.replace(/[^a-z0-9]/gi, '_')}.pdf`
@@ -163,10 +185,10 @@ export default function FillablePdfFlow({
           </h3>
           <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
             <li>
-              <strong>Download the PDF</strong> using the button below. This is a fillable PDF form.
+              <strong>Preview or download the PDF</strong> using the buttons below. This is a fillable PDF form.
             </li>
             <li>
-              <strong>Open the PDF</strong> in a PDF viewer (Adobe Acrobat, Preview on Mac, Adobe Reader, or similar).
+              <strong>Open the PDF</strong> in a PDF viewer (Adobe Acrobat, Preview on Mac, Adobe Reader, or similar) to fill fields.
             </li>
             <li>
               <strong>Fill out all required fields</strong> directly in the PDF form.
@@ -179,21 +201,41 @@ export default function FillablePdfFlow({
             </li>
           </ol>
           <p className="text-xs text-blue-700 mt-3 italic">
-            Note: The PDF must be opened in a PDF viewer application (not just a web browser) to properly fill out the form fields.
+            Note: Browser preview is read-only. Download and open the PDF in a PDF viewer application to fill out form fields.
           </p>
         </div>
 
-        {/* Download Button */}
+        {/* Download / Preview */}
         <div className="flex flex-col items-center gap-4">
-          <Button
-            onClick={handleDownload}
-            className="w-full sm:w-auto"
-            variant="outline"
-            disabled={uploading}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Download PDF Form
-          </Button>
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <Button
+              onClick={handlePreview}
+              className="w-full sm:w-auto"
+              variant="outline"
+              disabled={uploading || previewing}
+            >
+              {previewing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Opening…
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview Form
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleDownload}
+              className="w-full sm:w-auto"
+              variant="outline"
+              disabled={uploading || previewing}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF Form
+            </Button>
+          </div>
 
           {/* Upload Section */}
           <div className="w-full space-y-3">
