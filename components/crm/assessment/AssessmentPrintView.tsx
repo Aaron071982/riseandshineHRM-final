@@ -168,12 +168,7 @@ export function AssessmentPrintView(props: Props) {
 
                 <PrintSection title="Treatment Requests" pageBreak>
                   <p className="prose-block">{TREATMENT_REQUESTS_INTRO}</p>
-                  <Field label="97151 — Initial assessment (hrs per auth period)" value={props.sections.treatmentRequest.hrs97151} />
-                  <Field label="97153 — Direct 1:1 ABA (initial weekly hrs)" value={props.sections.treatmentRequest.hrs97153Initial} />
-                  <Field label="97155 — BCBA supervision (initial weekly hrs)" value={props.sections.treatmentRequest.hrs97155Initial} />
-                  <Field label="97156 — Parent / caregiver training" value={props.sections.treatmentRequest.hrs97156} />
-                  <Field label="97157 — Group parent training (monthly hrs)" value={props.sections.treatmentRequest.hrs97157} />
-                  <Field label="Service Period" value={props.sections.treatmentRequest.servicePeriod} />
+                  <TreatmentRequestsTable request={props.sections.treatmentRequest} />
                 </PrintSection>
 
                 <PrintSection title="Location of Services & Schedule" pageBreak>
@@ -713,6 +708,69 @@ function ScheduleTable({
         ))}
       </tbody>
     </table>
+  )
+}
+
+function TreatmentRequestsTable({
+  request,
+}: {
+  request: AssessmentSectionData['treatmentRequest']
+}) {
+  const rows: { code: string; service: string; hours: string }[] = [
+    {
+      code: '97151',
+      service: 'Initial assessment (hrs per auth period)',
+      hours: request.hrs97151,
+    },
+    {
+      code: '97153',
+      service: 'Direct 1:1 ABA (initial weekly hrs)',
+      hours: request.hrs97153Initial,
+    },
+    {
+      code: '97155',
+      service: 'BCBA supervision (initial weekly hrs)',
+      hours: request.hrs97155Initial,
+    },
+    {
+      code: '97156',
+      service: 'Parent / caregiver training',
+      hours: request.hrs97156,
+    },
+    {
+      code: '97157',
+      service: 'Group parent training (monthly hrs)',
+      hours: request.hrs97157,
+    },
+  ]
+
+  return (
+    <div className="section-block">
+      <table className="print-table">
+        <thead>
+          <tr>
+            <th>CPT Code</th>
+            <th>Service</th>
+            <th>Hours / Units</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.code}>
+              <td>{row.code}</td>
+              <td>{row.service}</td>
+              <td>{row.hours?.trim() || '—'}</td>
+            </tr>
+          ))}
+          <tr>
+            <td colSpan={2}>
+              <strong>Service Period</strong>
+            </td>
+            <td>{request.servicePeriod?.trim() || '—'}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   )
 }
 
