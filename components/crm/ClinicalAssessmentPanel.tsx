@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, Eye, Loader2, Lock } from 'lucide-react'
+import { Download, Eye, Loader2, Lock, Trash2 } from 'lucide-react'
 import type { AssessmentArtifactType, MilestoneStatus } from '@prisma/client'
 import { AssessmentDetailsPanel } from '@/components/crm/AssessmentDetailsPanel'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
@@ -78,6 +78,7 @@ export function ClinicalAssessmentPanel({
   const [error, setError] = useState('')
   const [uploadType, setUploadType] = useState<AssessmentArtifactType | null>(null)
   const [uploadPct, setUploadPct] = useState<number | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [lockOpen, setLockOpen] = useState(false)
   const [unlockOpen, setUnlockOpen] = useState(false)
   const [versionOpen, setVersionOpen] = useState(false)
@@ -127,9 +128,35 @@ export function ClinicalAssessmentPanel({
       inline ? '?inline=1&branded=1' : '?branded=1'
     }`
 
+  const onDeleteArtifact = (artifact: Artifact) => {
+    if (!canUpload || !isDraft || deletingId) return
+    const label = ASSESSMENT_ARTIFACT_LABELS[artifact.artifactType]
+    if (!confirm(`Delete “${label}”? You can upload a new file afterward.`)) return
+    startTransition(async () => {
+      setError('')
+      setDeletingId(artifact.id)
+      try {
+        const res = await fetch(
+          `/api/client-services/clients/${clientId}/clinical-assessment/artifacts/${artifact.id}`,
+          { method: 'DELETE', credentials: 'include' }
+        )
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        if (!res.ok) {
+          throw new Error(data.error || 'Delete failed')
+        }
+        router.refresh()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Delete failed')
+      } finally {
+        setDeletingId(null)
+      }
+    })
+  }
+
   const renderArtifactRow = (type: AssessmentArtifactType, required: boolean) => {
     const artifact = artifactByType.get(type)
     const busy = pending && uploadType === type
+    const deleting = deletingId === artifact?.id
     return (
       <li key={type} className="flex flex-wrap items-center gap-3 px-3 py-3">
         <div className="min-w-0 flex-1">
@@ -162,6 +189,21 @@ export function ClinicalAssessmentPanel({
               <Download className="h-3.5 w-3.5" />
               Download
             </a>
+            {canUpload && isDraft && (
+              <button
+                type="button"
+                disabled={pending || deleting}
+                onClick={() => onDeleteArtifact(artifact)}
+                className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                {deleting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Delete
+              </button>
+            )}
           </div>
         )}
         {canUpload && isDraft && (

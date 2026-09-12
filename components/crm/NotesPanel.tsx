@@ -68,6 +68,8 @@ type OverviewClient = {
   parentRelationship: string | null
   bcbaName: string | null
   caseCoordinatorName: string | null
+  assignedBcbaId?: string | null
+  assignedBcba?: { id: string; name: string | null; email: string | null } | null
   bcbaProfile: { fullName: string; email: string | null } | null
   caseCoordinatorUser: { name: string | null; email: string | null } | null
   referralSource: string | null
@@ -384,8 +386,10 @@ export function NotesPanel({
 export function OverviewPanel({
   client,
   canEdit = false,
+  canAssignPortalBcba = false,
 }: {
   canEdit?: boolean
+  canAssignPortalBcba?: boolean
   client: OverviewClient
 }) {
   const router = useRouter()
@@ -403,15 +407,37 @@ export function OverviewPanel({
     !!client.isCenterClient
   )
   const [centerError, setCenterError] = useState('')
+  const [bcbaUsers, setBcbaUsers] = useState<
+    { id: string; name: string | null; email: string | null }[]
+  >([])
+  const [assignedBcbaId, setAssignedBcbaId] = useState(
+    client.assignedBcbaId ?? client.assignedBcba?.id ?? ''
+  )
+  const [assignError, setAssignError] = useState('')
 
   useEffect(() => {
     setGender(client.preferredRbtGender ?? '')
     setEthnicities(client.preferredRbtEthnicities ?? [])
     setIsCenterClientFlag(!!client.isCenterClient)
+    setAssignedBcbaId(client.assignedBcbaId ?? client.assignedBcba?.id ?? '')
     if (!editing) {
       setForm(buildOverviewForm(client))
     }
   }, [client, editing])
+
+  useEffect(() => {
+    if (!canAssignPortalBcba) return
+    let cancelled = false
+    void (async () => {
+      const { listAssignableBcbaUsers } = await import('@/lib/crm/bcbaAssignActions')
+      const res = await listAssignableBcbaUsers()
+      if (cancelled || !res.ok) return
+      setBcbaUsers(res.users)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [canAssignPortalBcba])
 
   const setField = <K extends keyof OverviewForm>(
     key: K,
@@ -484,7 +510,14 @@ export function OverviewPanel({
     { label: 'Parent email', value: client.parentEmail || '—' },
     { label: 'Relationship', value: client.parentRelationship || '—' },
     {
-      label: 'BCBA',
+      label: 'Assigned BCBA (portal)',
+      value:
+        client.assignedBcba?.name ||
+        client.assignedBcba?.email ||
+        '—',
+    },
+    {
+      label: 'BCBA (staffing profile)',
       value: client.bcbaProfile?.fullName || client.bcbaName || '—',
     },
     {
@@ -577,6 +610,65 @@ export function OverviewPanel({
           <p className="mt-2 text-sm text-[var(--urgent)]">{centerError}</p>
         )}
       </section>
+
+      {canAssignPortalBcba && (
+        <section className="rounded-xl border border-line bg-surface p-4">
+          <h3 className="font-display text-base font-semibold text-ink">
+            Assigned BCBA
+          </h3>
+          <p className="mt-0.5 text-sm text-quiet">
+            Controls who can open this client in the BCBA portal (Overview +
+            Assessment only). Audited admin action.
+          </p>
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <label className="min-w-[220px] flex-1">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
+                Portal assignee
+              </span>
+              <select
+                value={assignedBcbaId}
+                disabled={pending}
+                onChange={(e) => setAssignedBcbaId(e.target.value)}
+                className="h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm"
+              >
+                <option value="">Unassigned</option>
+                {bcbaUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name || u.email || u.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                startTransition(async () => {
+                  setAssignError('')
+                  const { assignPortalBcba } = await import(
+                    '@/lib/crm/bcbaAssignActions'
+                  )
+                  const res = await assignPortalBcba(
+                    client.id,
+                    assignedBcbaId || null
+                  )
+                  if (!res.ok) {
+                    setAssignError(res.error)
+                    return
+                  }
+                  router.refresh()
+                })
+              }}
+              className="h-9 rounded-lg bg-brand px-3 text-sm font-medium text-white hover:bg-brand-2 disabled:opacity-50"
+            >
+              {pending ? 'Saving…' : 'Save assignment'}
+            </button>
+          </div>
+          {assignError && (
+            <p className="mt-2 text-sm text-[var(--urgent)]">{assignError}</p>
+          )}
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-display text-base font-semibold text-ink">

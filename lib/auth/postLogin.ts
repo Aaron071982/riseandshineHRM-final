@@ -62,13 +62,13 @@ export function getPostLoginPath(
       return '/billing/dashboard'
     case 'RBT':
       return '/rbt/dashboard'
-    case 'TRAINER':
     case 'BCBA':
+      // External BCBA portal lives under Client Services (CRM elevate gate).
+      return CLIENT_SERVICES_HOME_PATH
+    case 'TRAINER':
     case 'MARKETING':
     case 'CALL_CENTER':
     case 'DEV':
-      // No dedicated portal yet; session is valid — land on admin employees (admin users only).
-      // Non-admin staff with these roles should be rare; billing/trainer use their portals above.
       return '/admin/employees'
     default:
       return null

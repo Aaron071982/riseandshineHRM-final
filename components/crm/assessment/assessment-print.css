@@ -1,4 +1,4 @@
-/* Branded assessment print / Save-as-PDF layout */
+/* Branded assessment print / Save-as-PDF layout (Paged.js + CSS Paged Media) */
 
 .assessment-print-root {
   --rs-orange: #e7692c;
@@ -7,7 +7,7 @@
   --rs-cream: #faf8f5;
   background: var(--rs-cream);
   color: var(--rs-ink);
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans), Inter, system-ui, -apple-system, sans-serif;
   font-size: 11pt;
   line-height: 1.45;
   min-height: 100vh;
@@ -47,6 +47,11 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
+.assessment-print-toolbar button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .assessment-print-toolbar button.secondary {
   background: #fff;
   border: 1px solid #ddd;
@@ -60,115 +65,170 @@
   color: var(--rs-muted);
   font-size: 12px;
   line-height: 1.35;
-  max-width: 220px;
+  max-width: 260px;
   padding: 8px 12px;
 }
 
-/* Table wrapper — thead/tfoot repeat on every printed page without overlapping body */
-.print-layout-table {
-  border-collapse: collapse;
+/* Hidden until Paged.js moves content into .assessment-print-render */
+.assessment-print-source.is-paged {
+  display: none !important;
+}
+
+.assessment-print-source:not(.is-paged) {
   margin: 0 auto;
   max-width: 8.5in;
-  table-layout: fixed;
+  padding: 24px 32px 64px;
+}
+
+.assessment-print-render {
+  margin: 0 auto;
+  padding: 24px 0 64px;
+}
+
+/* Named string for running footer (pages 2+) */
+.running-client {
+  height: 1px;
+  left: -9999px;
+  overflow: hidden;
+  position: absolute;
+  string-set: clientident content(text);
+  width: 1px;
+}
+
+/* ——— Cover page ——— */
+.assessment-cover {
+  background: #fff;
+  break-after: page;
+  display: flex;
+  flex-direction: column;
+  min-height: 10.5in;
+  page-break-after: always;
+  position: relative;
+}
+
+.assessment-cover-toprule {
+  background: var(--rs-orange);
+  flex: 0 0 auto;
+  height: 14px;
   width: 100%;
 }
 
-.print-layout-table td {
-  padding: 0;
-  vertical-align: top;
-}
-
-.print-page-header {
-  align-items: center;
-  border-bottom: 2px solid var(--rs-orange);
+.assessment-cover-inner {
   display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  padding: 0 32px 8px;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding: 36px 48px 24px;
 }
 
-.print-page-header .brand-mini {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.print-page-header img {
-  height: 28px;
+.assessment-cover-logo {
+  display: block;
+  height: auto;
+  margin: 12px auto 28px;
+  max-width: 560px;
   object-fit: contain;
-  width: 28px;
+  width: 78%;
 }
 
-.print-page-header .brand-mini span {
+.assessment-cover-eyebrow {
   color: var(--rs-orange);
-  font-family: 'Bricolage Grotesque', Georgia, serif;
-  font-size: 13pt;
-  font-weight: 700;
+  font-family: var(--font-sans), Inter, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  margin: 0 0 10px;
+  text-align: center;
+  text-transform: uppercase;
 }
 
-.print-page-header .doc-label {
-  color: var(--rs-muted);
-  font-size: 8pt;
-  text-align: right;
-}
-
-.print-page-footer {
-  align-items: center;
-  border-top: 1px solid #e8dfd6;
-  color: var(--rs-muted);
-  display: flex;
-  font-size: 8.5pt;
-  justify-content: space-between;
-  padding: 8px 32px 0;
-}
-
-.print-page-footer .page-num::after {
-  content: '';
-}
-
-.print-body {
-  padding: 16px 32px 32px;
-}
-
-.print-cover-block {
-  align-items: flex-end;
-  border-bottom: 3px solid var(--rs-orange);
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  padding-bottom: 14px;
-}
-
-.print-cover-block h1 {
-  color: var(--rs-orange);
-  font-family: 'Bricolage Grotesque', Georgia, serif;
-  font-size: 22px;
+.assessment-cover-title {
+  color: var(--rs-ink);
+  font-family: var(--font-display), 'Bricolage Grotesque', Georgia, serif;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1.15;
   margin: 0;
+  text-align: center;
 }
 
-.print-cover-block .print-client-code {
-  color: var(--rs-muted);
-  font-size: 10pt;
-  margin: 4px 0 0;
+.assessment-cover-title-rule {
+  background: var(--rs-orange);
+  height: 3px;
+  margin: 14px auto 28px;
+  width: 120px;
 }
 
-.print-title-meta {
+.assessment-cover-summary {
+  border: 1px solid #e8dfd6;
+  border-radius: 10px;
+  display: grid;
+  gap: 8px 36px;
+  grid-template-columns: 1fr 1fr;
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 22px 26px;
+  width: 100%;
+}
+
+.assessment-cover-field {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.assessment-cover-field-label {
   color: var(--rs-muted);
-  font-size: 9pt;
-  line-height: 1.4;
+  font-size: 8.5pt;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.assessment-cover-field-value {
+  color: var(--rs-ink);
+  font-size: 11pt;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.assessment-cover-company {
+  align-items: flex-end;
+  background: var(--rs-ink);
+  border-top: 3px solid var(--rs-orange);
+  color: #f5efe8;
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 9.5pt;
+  gap: 16px;
+  justify-content: space-between;
+  line-height: 1.45;
+  margin-top: auto;
+  padding: 18px 48px 22px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.assessment-cover-company strong {
+  color: #fff;
+  display: block;
+  font-size: 11pt;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.assessment-cover-company-right {
   text-align: right;
 }
 
-.print-section {
-  margin-bottom: 4px;
+.print-body {
+  padding: 0;
 }
 
-.print-section.page-break-before {
-  break-before: page;
-  page-break-before: always;
+.print-section {
+  break-before: auto;
+  break-inside: auto;
+  margin-bottom: 4px;
+  page-break-before: auto;
+  page-break-inside: auto;
 }
 
 .section-band {
@@ -176,11 +236,13 @@
   break-after: avoid;
   break-inside: avoid;
   color: #fff;
-  font-family: 'Bricolage Grotesque', Georgia, serif;
+  font-family: var(--font-display), 'Bricolage Grotesque', Georgia, serif;
   font-size: 11pt;
   font-weight: 700;
-  margin: 22px 0 12px;
+  margin: 16px 0 10px;
   padding: 8px 14px;
+  page-break-after: avoid;
+  page-break-inside: avoid;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -190,15 +252,18 @@
 }
 
 .section-block {
-  break-inside: avoid-page;
-  margin-bottom: 14px;
+  break-inside: auto;
+  margin-bottom: 12px;
+  page-break-inside: auto;
 }
 
 .field-grid {
+  break-inside: avoid;
   display: grid;
   gap: 6px 16px;
   grid-template-columns: 190px 1fr;
   margin-bottom: 4px;
+  page-break-inside: avoid;
 }
 
 .field-label {
@@ -211,20 +276,31 @@
 
 .prose-block {
   margin: 0 0 12px;
+  orphans: 3;
+  widows: 3;
   white-space: pre-wrap;
 }
 
 .subheading {
+  break-after: avoid;
   font-size: 10.5pt;
   font-weight: 700;
   margin: 12px 0 6px;
+  page-break-after: avoid;
 }
 
 .print-table {
   border-collapse: collapse;
+  break-inside: auto;
   font-size: 9pt;
   margin: 8px 0 14px;
+  page-break-inside: auto;
   width: 100%;
+}
+
+.print-table tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .print-table th,
@@ -251,16 +327,20 @@
 
 .print-image-grid img {
   border: 1px solid #ddd;
+  break-inside: avoid;
   max-height: 220px;
   max-width: 100%;
   object-fit: contain;
+  page-break-inside: avoid;
 }
 
 .signature-card {
   border: 1px solid #ddd;
   border-radius: 8px;
+  break-inside: avoid;
   margin-bottom: 16px;
   padding: 14px;
+  page-break-inside: avoid;
 }
 
 .signature-card h4 {
@@ -289,15 +369,97 @@
   margin: 2px 0;
 }
 
-@media print {
-  @page {
-    margin: 0.55in 0.65in;
-    size: letter;
+/* ——— Paged Media (Paged.js polyfill) ——— */
+@page {
+  size: Letter;
+  margin: 22mm 16mm 20mm 16mm;
+
+  @top-left {
+    color: #2a2019;
+    content: 'Rise & Shine';
+    font-family: var(--font-display), 'Bricolage Grotesque', Georgia, serif;
+    font-size: 10pt;
+    font-weight: 700;
   }
 
+  @top-right {
+    color: #6b7280;
+    content: 'Initial Assessment and Treatment Plan';
+    font-family: var(--font-sans), Inter, system-ui, sans-serif;
+    font-size: 8.5pt;
+  }
+
+  @top-center {
+    content: '';
+  }
+
+  @bottom-left {
+    color: #6b7280;
+    content: string(clientident);
+    font-family: var(--font-sans), Inter, system-ui, sans-serif;
+    font-size: 8.5pt;
+  }
+
+  @bottom-right {
+    color: #6b7280;
+    content: 'Page ' counter(page) ' of ' counter(pages);
+    font-family: var(--font-sans), Inter, system-ui, sans-serif;
+    font-size: 8.5pt;
+  }
+}
+
+/* Cover: own logo + company band; suppress running chrome */
+@page :first {
+  margin: 0;
+
+  @top-left {
+    content: none;
+  }
+  @top-right {
+    content: none;
+  }
+  @top-center {
+    content: none;
+  }
+  @bottom-left {
+    content: none;
+  }
+  @bottom-right {
+    content: none;
+  }
+}
+
+/* Screen preview of Paged.js pages */
+.pagedjs_pages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0 auto;
+}
+
+.pagedjs_page {
+  background: #fff;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.08);
+  margin: 0 auto;
+}
+
+.pagedjs_sheet {
+  background: #fff;
+}
+
+/* Orange hairline under running header (pages 2+) */
+.pagedjs_margin-top-left,
+.pagedjs_margin-top-right,
+.pagedjs_margin-top-center {
+  border-bottom: 1px solid rgba(231, 105, 44, 0.55);
+}
+
+@media print {
   html,
   body {
     background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .assessment-print-root {
@@ -309,46 +471,62 @@
     display: none !important;
   }
 
-  .print-layout-table thead {
-    display: table-header-group;
+  .assessment-print-render {
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  .print-layout-table tfoot {
-    display: table-footer-group;
+  .pagedjs_pages {
+    display: block;
+    gap: 0;
   }
 
-  .print-layout-table tbody tr {
+  .pagedjs_page {
+    box-shadow: none;
+    margin: 0;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .pagedjs_page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .field-grid,
+  .print-table tr,
+  .signature-card,
+  .print-image-grid img {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .section-block,
+  .print-table,
+  .prose-block {
     break-inside: auto;
     page-break-inside: auto;
-  }
-
-  .print-page-header {
-    padding: 0 0 8px;
-  }
-
-  .print-page-footer {
-    padding: 8px 0 0;
-  }
-
-  .print-page-footer .page-num::after {
-    content: 'Page ' counter(page) ' of ' counter(pages);
-  }
-
-  .print-body {
-    padding: 0 0 8px;
-  }
-
-  .print-cover-block {
-    break-after: avoid;
   }
 
   .print-section .section-band {
     break-after: avoid;
     break-inside: avoid;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+@media (max-width: 720px) {
+  .assessment-cover-summary {
+    grid-template-columns: 1fr;
   }
 
-  .signature-card,
-  .print-image-grid img {
-    break-inside: avoid;
+  .assessment-cover-company {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .assessment-cover-company-right {
+    text-align: left;
   }
 }

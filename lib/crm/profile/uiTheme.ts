@@ -8,6 +8,9 @@ export const CRM_ROLE_CHIP: Record<CrmRole, string> = {
   CLINICAL: 'bg-[var(--stage-clinical-bg)] text-[var(--stage-clinical)] ring-[var(--stage-clinical)]/25',
   CLINICAL_SUPPORT:
     'bg-[var(--stage-clinical-bg)] text-[var(--stage-clinical)] ring-[var(--stage-clinical)]/20',
+  BCBA: 'bg-[var(--stage-clinical-bg)] text-[var(--stage-clinical)] ring-[var(--stage-clinical)]/30',
+  CLINICAL_LEAD:
+    'bg-[var(--stage-clinical-bg)] text-[var(--stage-clinical)] ring-[var(--stage-clinical)]/35',
   AUTHORIZATION: 'bg-[var(--amber-bg)] text-[var(--amber)] ring-[var(--amber)]/30',
   STAFFING: 'bg-[var(--stage-staffing-bg)] text-[var(--stage-staffing)] ring-[var(--stage-staffing)]/25',
   CASE_COORDINATION:

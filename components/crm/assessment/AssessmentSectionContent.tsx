@@ -26,6 +26,7 @@ import {
   PRIMARY_LOCATION_OPTIONS,
   TREATMENT_REQUESTS_INTRO,
 } from '@/lib/crm/assessment/boilerplate'
+import { personalizeClientReferences } from '@/lib/crm/assessment/personalize'
 import {
   emptyBehaviorBlock,
   emptyCoordinationRow,
@@ -80,6 +81,7 @@ type Props = {
   savingSection?: AssessmentSectionKey | null
   clientId: string
   assessmentId: string
+  clientName: string
   attachments: AttachmentRecord[]
   onUploaded: () => void
 }
@@ -206,7 +208,9 @@ function TreatmentRequestSection(props: Props) {
 
   return wrap(props, 'treatmentRequest', 'Treatment Requests & Intensity', (
     <div className="space-y-4">
-      <DisplayBoilerplate text={TREATMENT_REQUESTS_INTRO} />
+      <DisplayBoilerplate
+        text={personalizeClientReferences(TREATMENT_REQUESTS_INTRO, props.clientName)}
+      />
       <table className="w-full border border-line text-sm">
         <thead><tr className="bg-canvas/60"><th className="p-2 text-left">Code</th><th className="p-2 text-left">Service</th><th className="p-2 text-left">Requested Hours</th></tr></thead>
         <tbody>
@@ -240,7 +244,9 @@ function LocationScheduleSection(props: Props) {
   return wrap(props, 'locationSchedule', 'Location of Services & Schedule', (
     <div className="space-y-4">
       <DisplayBoilerplate text={LOCATION_OF_SERVICES_INTRO} />
-      <DisplayBoilerplate text={LOCATION_OF_SERVICES_BACB_QUOTE} />
+      <DisplayBoilerplate
+        text={personalizeClientReferences(LOCATION_OF_SERVICES_BACB_QUOTE, props.clientName)}
+      />
       <CheckboxGroup
         options={PRIMARY_LOCATION_OPTIONS.map((k) => ({
           key: k,
@@ -929,7 +935,9 @@ function CrisisPlanSection(props: Props) {
         otherText={cp.otherText}
         onOtherTextChange={(v) => props.setSections((prev) => ({ ...prev, crisisPlan: { riskFactors: { ...prev.crisisPlan.riskFactors, otherText: v } } }))}
       />
-      <DisplayBoilerplate text={CRISIS_ESCALATION_INSTRUCTIONS} />
+      <DisplayBoilerplate
+        text={personalizeClientReferences(CRISIS_ESCALATION_INSTRUCTIONS, props.clientName)}
+      />
     </div>
   ))
 }

@@ -440,6 +440,7 @@ model User {
   serviceClientsCreated        ServiceClient[]           @relation("ServiceClientCreatedBy")
   serviceClientsOwned          ServiceClient[]           @relation("ServiceClientCurrentOwner")
   serviceClientsCaseCoordinated ServiceClient[]          @relation("ServiceClientCaseCoordinator")
+  serviceClientsAssignedBcba     ServiceClient[]          @relation("ServiceClientAssignedBcba")
   serviceClientDocsCollected   ServiceClientDocument[]   @relation("ServiceClientDocCollectedBy")
   serviceClientNotesAuthored   ServiceClientNote[]       @relation("ServiceClientNoteAuthor")
   clientAccessLogs             ClientAccessLog[]
@@ -2932,6 +2933,10 @@ enum CrmRole {
   INTAKE
   CLINICAL
   CLINICAL_SUPPORT
+  /// External / limited supervising BCBA — assigned caseload only (Overview + Assessment).
+  BCBA
+  /// Clinical lead (e.g. Shazia) — all clients' clinical/assessment surfaces.
+  CLINICAL_LEAD
   AUTHORIZATION
   STAFFING
   CASE_COORDINATION
@@ -3065,6 +3070,8 @@ model ServiceClient {
   currentOwnerUserId   String?
   caseCoordinatorUserId String?
   bcbaProfileId        String?
+  /// Portal assignee (User with CrmRole BCBA / CLINICAL_LEAD). Distinct from staffing bcbaProfileId.
+  assignedBcbaId       String?
   nextAction           String?
   nextActionDueAt      DateTime?
   referralSource       ClientReferralSource?
@@ -3123,6 +3130,7 @@ model ServiceClient {
   currentOwnerUser    User?                        @relation("ServiceClientCurrentOwner", fields: [currentOwnerUserId], references: [id], onDelete: SetNull)
   caseCoordinatorUser User?                        @relation("ServiceClientCaseCoordinator", fields: [caseCoordinatorUserId], references: [id], onDelete: SetNull)
   bcbaProfile         BCBAProfile?                 @relation("ServiceClientBcbaProfile", fields: [bcbaProfileId], references: [id], onDelete: SetNull)
+  assignedBcba        User?                        @relation("ServiceClientAssignedBcba", fields: [assignedBcbaId], references: [id], onDelete: SetNull)
   btAssignments       ServiceClientBtAssignment[]
   documents           ServiceClientDocument[]
   clientNotes         ServiceClientNote[]
@@ -3157,6 +3165,7 @@ model ServiceClient {
   @@index([currentOwnerUserId])
   @@index([caseCoordinatorUserId])
   @@index([bcbaProfileId])
+  @@index([assignedBcbaId])
   @@index([deletedAt])
   @@index([isCenterClient])
   @@map("service_clients")

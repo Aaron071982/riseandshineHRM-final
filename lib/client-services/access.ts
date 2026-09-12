@@ -18,12 +18,25 @@ export type ClientScope = 'ALL' | { clientIds: string[] }
 
 /**
  * Whether the user may enter Client Services at all (before step-up).
- * HRM admins only, plus break-glass allowlist emails.
+ * HRM admins, break-glass allowlist, or CRM clinical/BCBA portal roles.
  */
 export async function canAccessClientServices(user: SessionUser | null): Promise<boolean> {
   if (!user) return false
   if (isClientServicesFullAccessEmail(user.email)) return true
-  return isAdmin(user)
+  // Avoid isAdmin()'s `user is SessionUser` predicate (false branch → never).
+  if ((user.role ?? '').toUpperCase() === 'ADMIN') return true
+  try {
+    const { fetchUserCrmRoles } = await import('@/lib/crm/access')
+    const { hasBcbaPortalAccess } = await import('@/lib/crm/bcbaPortal')
+    const crmRoles = await fetchUserCrmRoles(user.id)
+    return hasBcbaPortalAccess({
+      id: user.id,
+      email: user.email,
+      crmRoles,
+    })
+  } catch {
+    return false
+  }
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   type AssessmentSectionData,
   type AssessmentSummary,
 } from '@/lib/crm/assessment/assessment.schema'
+import { personalizeAssessmentValue } from '@/lib/crm/assessment/personalize'
 
 export function computeAgeFromDob(dob: Date | null): string {
   if (!dob) return ''
@@ -68,11 +69,15 @@ export function sectionsWithClientPrefill(
     | 'referringProvider'
   >
 ): AssessmentSectionData {
+  const clientName = `${client.firstName} ${client.lastName}`.trim()
   const defaults = defaultAssessmentSections()
-  return {
-    ...defaults,
-    summary: prefillSummaryFromClient(client),
-  }
+  return personalizeAssessmentValue(
+    {
+      ...defaults,
+      summary: prefillSummaryFromClient(client),
+    },
+    clientName
+  )
 }
 
 export function parseStoredSections(

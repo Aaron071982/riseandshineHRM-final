@@ -174,6 +174,37 @@ export async function attachClinicalAssessmentArtifactRecord(input: {
   })
 }
 
+export async function softDeleteClinicalAssessmentArtifact(input: {
+  artifactId: string
+  clientId: string
+  userId: string
+}) {
+  const artifact = await prisma.clientClinicalAssessmentArtifact.findFirst({
+    where: {
+      id: input.artifactId,
+      deletedAt: null,
+      assessment: {
+        serviceClientId: input.clientId,
+        lockState: 'DRAFT',
+      },
+    },
+    select: { id: true, artifactType: true, assessmentId: true },
+  })
+  if (!artifact) {
+    throw new Error('Artifact not found or assessment is locked')
+  }
+
+  await prisma.clientClinicalAssessmentArtifact.update({
+    where: { id: artifact.id },
+    data: {
+      deletedAt: new Date(),
+      deletedByUserId: input.userId,
+    },
+  })
+
+  return artifact
+}
+
 export async function createClinicalAssessmentGraphSignedUrl(
   storagePath: string,
   ttlSeconds = 60

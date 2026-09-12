@@ -211,6 +211,17 @@ export function getVisibleClientsWhere(
 ): Prisma.ServiceClientWhereInput {
   if (isFullAccess(user)) return { ...NOT_DELETED }
   if (!user.id) return { id: { in: [] } }
+
+  const roles = getUserCrmRoles(user)
+  // Clinical lead sees every live client for assessment/overview work.
+  if (roles.includes('CLINICAL_LEAD')) return { ...NOT_DELETED }
+  // External BCBA — only clients assigned to them.
+  if (roles.includes('BCBA')) {
+    return {
+      AND: [{ ...NOT_DELETED }, { assignedBcbaId: user.id }],
+    }
+  }
+
   return {
     AND: [{ ...NOT_DELETED }, { claims: { some: { userId: user.id } } }],
   }
@@ -223,10 +234,12 @@ export type ClientAccessSnapshot = {
   pipelineStatus?: ClientPipelineStatus
   /** Any client_claims row for this user (including released). */
   hasClaimGrant?: boolean
+  /** Portal assignee (User id). */
+  assignedBcbaId?: string | null
 }
 
 /**
- * View = full-visibility OR an ever-claim grant.
+ * View = full-visibility OR clinical-lead OR assigned BCBA OR an ever-claim grant.
  * A department role alone is not enough to open a profile.
  */
 export function canViewClientRecord(
@@ -234,12 +247,15 @@ export function canViewClientRecord(
   client: ClientAccessSnapshot
 ): boolean {
   if (isFullAccess(user) || isSuperAdmin(user)) return true
+  const roles = getUserCrmRoles(user)
+  if (roles.includes('CLINICAL_LEAD')) return true
+  if (roles.includes('BCBA') && client.assignedBcbaId === user.id) return true
   return client.hasClaimGrant === true
 }
 
 /**
- * Act = view access AND (full-visibility, assigned CC, or role for the
- * department that currently owns the client).
+ * Act = view access AND (full-visibility, clinical lead/assigned BCBA,
+ * assigned CC, or role for the department that currently owns the client).
  */
 export function canEditClientRecord(
   user: CrmAccessSubject,
@@ -247,8 +263,11 @@ export function canEditClientRecord(
 ): boolean {
   if (isFullAccess(user) || isSuperAdmin(user)) return true
   if (!canViewClientRecord(user, client)) return false
+  const roles = getUserCrmRoles(user)
+  if (roles.includes('CLINICAL_LEAD')) return true
+  // External BCBA may view assigned clients; assessment edit is gated separately.
   if (
-    getUserCrmRoles(user).includes('CASE_COORDINATION') &&
+    roles.includes('CASE_COORDINATION') &&
     client.caseCoordinatorUserId === user.id
   ) {
     return true
@@ -270,6 +289,7 @@ export async function assertCanViewClient(
       id: true,
       caseCoordinatorUserId: true,
       currentOwnerDept: true,
+      assignedBcbaId: true,
       claims: {
         where: { userId: user.id },
         select: { id: true },
@@ -285,6 +305,7 @@ export async function assertCanViewClient(
       caseCoordinatorUserId: client.caseCoordinatorUserId,
       currentOwnerDept: client.currentOwnerDept,
       hasClaimGrant: client.claims.length > 0,
+      assignedBcbaId: client.assignedBcbaId,
     })
   ) {
     const staffingCrossList =
@@ -320,6 +341,7 @@ export async function assertCanEditClient(
       id: true,
       caseCoordinatorUserId: true,
       currentOwnerDept: true,
+      assignedBcbaId: true,
       claims: {
         where: { userId: user.id },
         select: { id: true, releasedAt: true },
@@ -334,6 +356,7 @@ export async function assertCanEditClient(
     caseCoordinatorUserId: client.caseCoordinatorUserId,
     currentOwnerDept: client.currentOwnerDept,
     hasClaimGrant: client.claims.length > 0,
+    assignedBcbaId: client.assignedBcbaId,
   }
   if (!canViewClientRecord(user, snapshot)) {
     await auditClientAction({

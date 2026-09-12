@@ -39,6 +39,7 @@ import {
 } from '@/lib/crm/assessment/load'
 import { canViewCaseCoordination } from '@/lib/crm/caseCoordination/access'
 import { loadCaseCoordinationPanelData } from '@/lib/crm/caseCoordination/actions'
+import { isClinicalSurfaceOnly } from '@/lib/crm/bcbaPortal'
 
 export async function loadClientCrmDetail(clientId: string) {
   const user = await getClientServicesUser()
@@ -74,6 +75,7 @@ export async function loadClientCrmDetail(clientId: string) {
         },
       },
       bcbaProfile: { select: { id: true, fullName: true, email: true } },
+      assignedBcba: { select: { id: true, name: true, email: true } },
       caseCoordinatorUser: { select: { id: true, name: true, email: true } },
       currentOwnerUser: { select: { id: true, name: true, email: true } },
       accessLogs: {
@@ -164,12 +166,20 @@ export async function loadClientCrmDetail(clientId: string) {
   const claimed =
     user.fullAccess ||
     client.currentOwnerUserId === user.id ||
-    client.caseCoordinatorUserId === user.id
+    client.caseCoordinatorUserId === user.id ||
+    client.assignedBcbaId === user.id
+  const hasClaimGrant =
+    user.fullAccess ||
+    (await prisma.clientClaim.count({
+      where: { serviceClientId: clientId, userId: user.id },
+    })) > 0
   const canEdit = canEditClientRecord(user, {
     caseCoordinatorUserId: client.caseCoordinatorUserId,
     currentOwnerDept: client.currentOwnerDept,
-    hasClaimGrant: true,
+    hasClaimGrant,
+    assignedBcbaId: client.assignedBcbaId,
   })
+  const clinicalSurfaceOnly = isClinicalSurfaceOnly(user)
   const mailboxReason = mailboxBlockedReason(user.email)
   const canSendEmail = claimed && !mailboxReason && !!client.parentEmail?.trim()
   const consentLive =
@@ -242,6 +252,8 @@ export async function loadClientCrmDetail(clientId: string) {
     daysInStage,
     weeklyScheduleHours,
     canEdit,
+    clinicalSurfaceOnly,
+    canAssignPortalBcba: user.fullAccess || user.superAdmin,
     canOverrideStage: user.fullAccess,
     stageNumber: stageIndex(client.stage) + 1,
     emailSend: {

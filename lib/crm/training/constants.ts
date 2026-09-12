@@ -7,6 +7,8 @@ export const TRAINING_MODULE_ROLE_LABELS: Record<CrmRole, string> = {
   INTAKE: 'Intake',
   CLINICAL: 'Clinical',
   CLINICAL_SUPPORT: 'Clinical support',
+  BCBA: 'BCBA (portal)',
+  CLINICAL_LEAD: 'Clinical lead',
   AUTHORIZATION: 'Authorization',
   STAFFING: 'Staffing',
   CASE_COORDINATION: 'Case coordination',

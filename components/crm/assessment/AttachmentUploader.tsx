@@ -42,6 +42,7 @@ export function AttachmentUploader({
 }: AttachmentUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
@@ -78,6 +79,28 @@ export function AttachmentUploader({
     }
   }
 
+  const handleDelete = async (attachmentId: string, fileName: string) => {
+    if (readOnly || deletingId) return
+    if (!confirm(`Delete “${fileName}”? This cannot be undone from the form.`)) return
+    setError(null)
+    setDeletingId(attachmentId)
+    try {
+      const res = await fetch(
+        `/api/client-services/clients/${clientId}/assessments/attachments/${attachmentId}`,
+        { method: 'DELETE', credentials: 'include' }
+      )
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        throw new Error(data.error || 'Delete failed')
+      }
+      onUploaded()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className="space-y-2">
       {!readOnly && (
@@ -94,7 +117,7 @@ export function AttachmentUploader({
             type="button"
             variant="outline"
             size="sm"
-            disabled={uploading}
+            disabled={uploading || Boolean(deletingId)}
             onClick={() => inputRef.current?.click()}
           >
             {uploading ? `Uploading ${progress}%…` : label}
@@ -108,7 +131,7 @@ export function AttachmentUploader({
       {sectionAttachments.length > 0 && (
         <ul className="space-y-1 text-sm">
           {sectionAttachments.map((a) => (
-            <li key={a.id}>
+            <li key={a.id} className="flex flex-wrap items-center gap-2">
               <a
                 href={`/api/client-services/clients/${clientId}/assessments/attachments/${a.id}/download`}
                 target="_blank"
@@ -117,6 +140,18 @@ export function AttachmentUploader({
               >
                 {a.fileName}
               </a>
+              {!readOnly && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                  disabled={uploading || deletingId === a.id}
+                  onClick={() => handleDelete(a.id, a.fileName)}
+                >
+                  {deletingId === a.id ? 'Deleting…' : 'Delete'}
+                </Button>
+              )}
             </li>
           ))}
         </ul>

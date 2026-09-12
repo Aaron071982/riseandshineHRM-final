@@ -16,6 +16,7 @@ import {
   signTreatmentAssessment,
 } from '@/lib/crm/assessment/actions'
 import type { AssessmentSectionData, AssessmentSectionKey } from '@/lib/crm/assessment/assessment.schema'
+import { personalizeAssessmentValue } from '@/lib/crm/assessment/personalize'
 import type { TreatmentAssessmentStatus, TreatmentAssessmentSource } from '@prisma/client'
 
 type AttachmentRecord = {
@@ -49,7 +50,9 @@ export function AssessmentFormClient({
   canEdit,
 }: Props) {
   const router = useRouter()
-  const [sections, setSections] = useState(initialSections)
+  const [sections, setSections] = useState(() =>
+    personalizeAssessmentValue(initialSections, clientName)
+  )
   const [attachments, setAttachments] = useState(initialAttachments)
   const [activeSection, setActiveSection] = useState<AssessmentSectionKey>('summary')
   const [lastSaved, setLastSaved] = useState(initialUpdatedAt)
@@ -229,6 +232,7 @@ export function AssessmentFormClient({
             savingSection={savingSection}
             clientId={clientId}
             assessmentId={assessmentId}
+            clientName={clientName}
             attachments={attachments}
             onUploaded={onUploaded}
           />

@@ -58,7 +58,10 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'activity', label: 'Activity' },
 ]
 
-function resolveTab(value?: string | null): TabId {
+function resolveTab(value?: string | null, clinicalSurfaceOnly = false): TabId {
+  if (clinicalSurfaceOnly) {
+    return value === 'assessment' ? 'assessment' : 'overview'
+  }
   if (value === 'communications') return 'email'
   // Former Case Coordination tab — keep old deep links from breaking
   if (value === 'case-coordination') return 'overview'
@@ -74,7 +77,24 @@ export default function ClientCrmDetail({
   initialTab?: string | null
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<TabId>(() => resolveTab(initialTab))
+  const {
+    client,
+    daysInStage,
+    canOverrideStage,
+    user,
+    weeklyScheduleHours,
+    emailSend,
+    canEdit,
+    clinicalSurfaceOnly,
+    canAssignPortalBcba,
+    teamTasks,
+    taskUsers,
+    billing,
+    treatmentAssessment,
+  } = data
+  const [tab, setTab] = useState<TabId>(() =>
+    resolveTab(initialTab, clinicalSurfaceOnly)
+  )
   const [pending, startTransition] = useTransition()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteAccessCode, setDeleteAccessCode] = useState('')
@@ -82,13 +102,13 @@ export default function ClientCrmDetail({
   const [deleting, startDelete] = useTransition()
 
   useEffect(() => {
-    setTab(resolveTab(initialTab))
-  }, [initialTab])
-
-  const { client, daysInStage, canOverrideStage, user, weeklyScheduleHours, emailSend, canEdit, teamTasks, taskUsers, billing, treatmentAssessment } =
-    data
+    setTab(resolveTab(initialTab, clinicalSurfaceOnly))
+  }, [initialTab, clinicalSurfaceOnly])
 
   const visibleTabs = TABS.filter((t) => {
+    if (clinicalSurfaceOnly) {
+      return t.id === 'overview' || t.id === 'assessment'
+    }
     if (t.id === 'assessment') return treatmentAssessment?.canView
     return true
   })
@@ -175,11 +195,11 @@ export default function ClientCrmDetail({
     <div className="mx-auto max-w-6xl space-y-4 pb-16">
       <div className="flex flex-wrap items-center gap-3">
         <Link
-          href="/client-services/clients"
+          href={clinicalSurfaceOnly ? '/client-services' : '/client-services/clients'}
           className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm text-quiet hover:bg-line-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Caseload
+          {clinicalSurfaceOnly ? 'Portal home' : 'Caseload'}
         </Link>
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
@@ -223,14 +243,16 @@ export default function ClientCrmDetail({
         canEdit={canEdit}
       />
 
-      <StageStepper
-        stage={client.stage}
-        onAdvance={onAdvance}
-        advancing={pending}
-        canEdit={canEdit}
-        fullAccess={canOverrideStage}
-        onSetStage={onSetStage}
-      />
+      {!clinicalSurfaceOnly && (
+        <StageStepper
+          stage={client.stage}
+          onAdvance={onAdvance}
+          advancing={pending}
+          canEdit={canEdit}
+          fullAccess={canOverrideStage}
+          onSetStage={onSetStage}
+        />
+      )}
 
       <div className="flex gap-1 overflow-x-auto border-b border-line pb-px">
         {visibleTabs.map((t) => (
@@ -253,7 +275,11 @@ export default function ClientCrmDetail({
       <div className="pt-2">
         {tab === 'overview' && (
           <div className="space-y-4">
-            <OverviewPanel client={client} canEdit={canEdit} />
+            <OverviewPanel
+              client={client}
+              canEdit={canEdit && !clinicalSurfaceOnly}
+              canAssignPortalBcba={canAssignPortalBcba}
+            />
             {user.fullAccess && (
               <section className="rounded-xl border border-[color-mix(in_srgb,var(--urgent)_35%,var(--line))] bg-surface p-4">
                 <h2 className="font-display text-lg font-semibold text-ink">
@@ -457,6 +483,8 @@ export type SerializeClientDetail = {
   weeklyScheduleHours: number
   canOverrideStage: boolean
   canEdit: boolean
+  clinicalSurfaceOnly?: boolean
+  canAssignPortalBcba?: boolean
   emailSend: EmailSendContext & { allowedTemplates: CommTemplate[] }
   billing?: ClientCrmDetailData['billing']
   treatmentAssessment?: ClientCrmDetailData['treatmentAssessment']

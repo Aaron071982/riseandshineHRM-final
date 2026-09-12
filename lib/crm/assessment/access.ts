@@ -11,6 +11,8 @@ import {
 const VIEW_ROLES: readonly CrmRole[] = [
   'CLINICAL',
   'CLINICAL_SUPPORT',
+  'BCBA',
+  'CLINICAL_LEAD',
   'BILLING',
   'AUTHORIZATION',
   'CASE_COORDINATION',
@@ -35,11 +37,16 @@ export function assertCanViewTreatmentAssessment(user: CrmAccessSubject): void {
   }
 }
 
-/** Create / edit form sections — BCBA / clinical owner (not clinical support). */
+/** Create / edit form sections — BCBA / clinical owner / clinical lead (not clinical support). */
 export function canEditTreatmentAssessment(user: CrmAccessSubject): boolean {
   if (isFullAccess(user) || isSuperAdmin(user)) return true
   if (isClinicalSupportUser(user)) return false
-  return getUserCrmRoles(user).includes('CLINICAL')
+  const roles = getUserCrmRoles(user)
+  return (
+    roles.includes('CLINICAL') ||
+    roles.includes('BCBA') ||
+    roles.includes('CLINICAL_LEAD')
+  )
 }
 
 export function assertCanEditTreatmentAssessment(user: CrmAccessSubject): void {
@@ -48,11 +55,16 @@ export function assertCanEditTreatmentAssessment(user: CrmAccessSubject): void {
   }
 }
 
-/** Upload attachments / completed PDF — clinical or clinical support. */
+/** Upload attachments / completed PDF — clinical, BCBA portal, or clinical support. */
 export function canUploadTreatmentAssessmentFiles(user: CrmAccessSubject): boolean {
   if (isFullAccess(user)) return true
   const roles = getUserCrmRoles(user)
-  return roles.includes('CLINICAL') || roles.includes('CLINICAL_SUPPORT')
+  return (
+    roles.includes('CLINICAL') ||
+    roles.includes('CLINICAL_SUPPORT') ||
+    roles.includes('BCBA') ||
+    roles.includes('CLINICAL_LEAD')
+  )
 }
 
 export function assertCanUploadTreatmentAssessmentFiles(

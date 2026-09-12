@@ -11,6 +11,8 @@ import {
 const VIEW_ROLES: readonly CrmRole[] = [
   'CLINICAL',
   'CLINICAL_SUPPORT',
+  'BCBA',
+  'CLINICAL_LEAD',
   'BILLING',
   'AUTHORIZATION',
   'CASE_COORDINATION',

@@ -45,6 +45,7 @@ export default async function ClientServicesSectionLayout({
   let showTherapistSearch = false
   let showScheduleNav = false
   let departmentNav: { href: string; label: string }[] = []
+  // Skip department nav for clinical-surface-only portal users.
   if (elevated && elevatedUser) {
     try {
       await bootstrapCrmSuperAdmins()
@@ -57,18 +58,22 @@ export default async function ClientServicesSectionLayout({
       email: elevatedUser.email,
       crmRoles,
     }
-    showAdmin = isSuperAdmin(subject)
-    showTherapistSearch = canAccessDepartment(subject, 'STAFFING')
-    showScheduleNav = canAccessCrmSchedule(subject)
+    const { isClinicalSurfaceOnly } = await import('@/lib/crm/bcbaPortal')
+    const clinicalOnly = isClinicalSurfaceOnly(subject)
+    showAdmin = isSuperAdmin(subject) && !clinicalOnly
+    showTherapistSearch =
+      !clinicalOnly && canAccessDepartment(subject, 'STAFFING')
+    showScheduleNav = !clinicalOnly && canAccessCrmSchedule(subject)
     const full = isFullAccess(subject)
-    // Skip authorization slug only — it shares the Billing label/queue with billing.
-    departmentNav = DEPT_SLUGS.filter((slug) => {
-      if (slug === 'authorization') return false
-      return full ? true : canAccessDepartment(subject, DEPT_SLUG_TO_OWNER[slug])
-    }).map((slug) => ({
-      href: deptHref(slug),
-      label: deptLabel(slug),
-    }))
+    departmentNav = clinicalOnly
+      ? []
+      : DEPT_SLUGS.filter((slug) => {
+          if (slug === 'authorization') return false
+          return full ? true : canAccessDepartment(subject, DEPT_SLUG_TO_OWNER[slug])
+        }).map((slug) => ({
+          href: deptHref(slug),
+          label: deptLabel(slug),
+        }))
   }
 
   return (
