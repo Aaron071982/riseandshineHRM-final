@@ -106,19 +106,18 @@
 }
 
 /* ——— Cover page ——— */
-/* Avoid min-height near full letter + break-after: that overflows into a blank page 2. */
+/* Exact letter height fills page 1 (@page :first margin: 0) so the company
+   bar can pin to the bottom via flex. No break-after — print-body starts page 2. */
 .assessment-cover {
   background: #fff;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  height: 11in;
+  max-height: 11in;
+  overflow: hidden;
   position: relative;
-}
-
-/* Screen-only tall cover for unpaged preview; never apply during Paged.js pagination. */
-@media screen {
-  .assessment-print-source:not(.is-paged) .assessment-cover {
-    min-height: 10in;
-  }
+  width: 100%;
 }
 
 .assessment-cover-toprule {
@@ -133,6 +132,7 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  min-height: 0;
   padding: 36px 48px 24px;
   text-align: center;
 }
@@ -223,6 +223,7 @@
   line-height: 1.45;
   margin-top: auto;
   padding: 18px 48px 22px;
+  width: 100%;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }

@@ -62,13 +62,23 @@ export function BehaviorBlockEditor({
           </Button>
         )}
       </div>
+      <Field label="Behavior">
+        <Input
+          value={block.behaviorName}
+          onChange={(e) => set('behaviorName', e.target.value)}
+          onBlur={onBlur}
+          readOnly={readOnly}
+          placeholder="e.g. Crying"
+        />
+      </Field>
       <Field label="Operational Definition">
         <Textarea
           value={block.operationalDefinition}
           onChange={(e) => set('operationalDefinition', e.target.value)}
           onBlur={onBlur}
           readOnly={readOnly}
-          rows={2}
+          rows={3}
+          placeholder="Describe how the behavior is defined and observed…"
         />
       </Field>
       <div className="grid gap-3 sm:grid-cols-2">

@@ -328,7 +328,12 @@ export function AssessmentPrintView(props: Props) {
                 <PrintSection title="Functional Behavior Assessment & BIP">
                   {sections.behaviors.blocks.map((b, i) => (
                     <div key={b.id} className="section-block">
-                      <p className="subheading">Behavior {i + 1}</p>
+                      <p className="subheading">
+                        {b.behaviorName?.trim()
+                          ? `Behavior ${i + 1}: ${b.behaviorName.trim()}`
+                          : `Behavior ${i + 1}`}
+                      </p>
+                      <Field label="Behavior" value={b.behaviorName} />
                       <Field label="Operational Definition" value={b.operationalDefinition} />
                       <Field label="Severity" value={b.severity} />
                       <Field label="Example" value={b.example} />

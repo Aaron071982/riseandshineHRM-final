@@ -220,8 +220,32 @@ export const interventionsSchema = z.object({
 export const behaviorMeasurementSchema = z.enum(['FREQUENCY', 'DURATION', 'BOTH'])
 
 /** §3.10 Behavior block */
-export const behaviorBlockSchema = z.object({
+export const behaviorBlockSchema = z.preprocess((raw) => {
+  if (!raw || typeof raw !== 'object') return raw
+  const o = { ...(raw as Record<string, unknown>) }
+  const existingName =
+    typeof o.behaviorName === 'string' ? o.behaviorName.trim() : ''
+  const def =
+    typeof o.operationalDefinition === 'string' ? o.operationalDefinition : ''
+  // Migrate legacy "Name\nDefinition…" stored in a single field.
+  if (!existingName && def.includes('\n')) {
+    const [firstLine = '', ...rest] = def.split(/\r?\n/)
+    const name = firstLine.trim()
+    const remainder = rest.join('\n').replace(/^\s+/, '')
+    if (
+      name.length > 0 &&
+      name.length <= 80 &&
+      !name.endsWith('.') &&
+      remainder.length > 0
+    ) {
+      o.behaviorName = name
+      o.operationalDefinition = remainder
+    }
+  }
+  return o
+}, z.object({
   id: z.string(),
+  behaviorName: optionalTextSchema,
   operationalDefinition: optionalTextSchema,
   severity: optionalTextSchema,
   example: optionalTextSchema,
@@ -236,7 +260,7 @@ export const behaviorBlockSchema = z.object({
   replacementStrategies: optionalTextSchema,
   responseStrategies: optionalTextSchema,
   antecedentsSettingEvents: optionalTextSchema,
-})
+}))
 
 export const behaviorsSchema = z.object({
   blocks: z.array(behaviorBlockSchema).default([]),
