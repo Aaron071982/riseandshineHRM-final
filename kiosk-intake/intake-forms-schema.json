@@ -8,6 +8,7 @@
       "template": "F01_Photo_Video_Release.pdf",
       "enabled": true,
       "required": false,
+      "signaturePlacement": { "x": 200, "y": 270, "maxWidth": 220, "maxHeight": 40 },
       "fields": [
         { "name": "p_internal", "type": "checkbox", "required": false },
         { "name": "p_website", "type": "checkbox", "required": false },
@@ -23,6 +24,7 @@
       "template": "F02_Release_of_Information.pdf",
       "enabled": true,
       "required": false,
+      "signaturePlacement": { "x": 200, "y": 133, "maxWidth": 220, "maxHeight": 40 },
       "fields": [
         { "name": "roi_org", "type": "text", "required": true },
         { "name": "roi_contact", "type": "text", "required": false },
@@ -44,6 +46,7 @@
       "template": "F03_Medication_Administration.pdf",
       "enabled": true,
       "required": false,
+      "signaturePlacement": { "x": 200, "y": 179, "maxWidth": 220, "maxHeight": 40 },
       "fields": [
         { "name": "med_name", "type": "text", "required": true },
         { "name": "med_dose", "type": "text", "required": false },
@@ -67,6 +70,7 @@
       "template": "F04_Personal_Care_Toileting.pdf",
       "enabled": true,
       "required": true,
+      "signaturePlacement": { "x": 200, "y": 210, "maxWidth": 220, "maxHeight": 40 },
       "fields": [
         { "name": "t_independent", "type": "checkbox", "required": false },
         { "name": "t_prompt", "type": "checkbox", "required": false },
@@ -85,6 +89,7 @@
       "template": "F05_Illness_Exclusion_Policy.pdf",
       "enabled": true,
       "required": true,
+      "signaturePlacement": { "x": 200, "y": 210, "maxWidth": 220, "maxHeight": 40 },
       "fields": [
         { "name": "ill_ack", "type": "checkbox", "required": true }
       ]
@@ -95,6 +100,7 @@
       "template": "F06_Emergency_Safety_Acknowledgment.pdf",
       "enabled": true,
       "required": true,
+      "signaturePlacement": { "x": 200, "y": 219, "maxWidth": 220, "maxHeight": 40 },
       "fields": [
         { "name": "e_sensory", "type": "text", "required": false },
         { "name": "e_mobility", "type": "text", "required": false },
@@ -108,6 +114,7 @@
       "template": "F07_Behavior_Intervention_Crisis_Consent.pdf",
       "enabled": false,
       "required": false,
+      "signaturePlacement": { "x": 200, "y": 88, "maxWidth": 220, "maxHeight": 40 },
       "fields": [
         { "name": "b_consent", "type": "checkbox", "required": false },
         { "name": "b_decline", "type": "checkbox", "required": false }
@@ -119,6 +126,7 @@
       "template": "F08_Community_Outing_Consent.pdf",
       "enabled": true,
       "required": false,
+      "signaturePlacement": { "x": 200, "y": 218, "maxWidth": 220, "maxHeight": 40 },
       "fields": [
         { "name": "o_walk", "type": "checkbox", "required": false },
         { "name": "o_parent", "type": "checkbox", "required": false },
@@ -135,6 +143,7 @@
       "template": "F09_Food_Allergy_Form.pdf",
       "enabled": true,
       "required": true,
+      "signaturePlacement": { "x": 200, "y": 140, "maxWidth": 220, "maxHeight": 40 },
       "fields": [
         { "name": "a_none", "type": "checkbox", "required": false },
         { "name": "a_food", "type": "text", "required": false },

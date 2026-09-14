@@ -12,12 +12,20 @@ export type IntakeFieldDef = {
   required: boolean
 }
 
+export type SignaturePlacement = {
+  x: number
+  y: number
+  maxWidth: number
+  maxHeight: number
+}
+
 export type IntakeFormDef = {
   code: string
   title: string
   template: string
   enabled: boolean
   required: boolean
+  signaturePlacement: SignaturePlacement
   fields: IntakeFieldDef[]
 }
 

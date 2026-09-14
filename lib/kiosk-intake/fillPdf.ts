@@ -7,6 +7,7 @@ import {
   assertTemplateExists,
   isCheckboxField,
   type IntakeFormDef,
+  type SignaturePlacement,
 } from '@/lib/kiosk-intake/schema'
 
 function todayMmDdYyyy(): string {
@@ -31,6 +32,29 @@ function setCheckboxMaybe(form: PDFForm, name: string, checked: boolean) {
   }
 }
 
+async function stampSignature(
+  pdf: PDFDocument,
+  placement: SignaturePlacement,
+  signaturePngBytes: Buffer
+): Promise<void> {
+  // Do not catch — embed/draw failures must fail the submit loudly.
+  const png = await pdf.embedPng(signaturePngBytes)
+  const page = pdf.getPages()[0]
+  if (!page) {
+    throw new Error('Intake template has no pages to stamp signature')
+  }
+  const scale = Math.min(
+    placement.maxWidth / png.width,
+    placement.maxHeight / png.height
+  )
+  page.drawImage(png, {
+    x: placement.x,
+    y: placement.y,
+    width: png.width * scale,
+    height: png.height * scale,
+  })
+}
+
 export type FillIntakePdfParams = {
   formDef: IntakeFormDef
   client: {
@@ -40,9 +64,11 @@ export type FillIntakePdfParams = {
   }
   signerName: string
   values: Record<string, unknown>
+  /** Raw PNG bytes (data-URL prefix already stripped). */
+  signaturePngBytes: Buffer
 }
 
-/** Load template, fill fields, flatten, return base64 PDF. */
+/** Load template, fill fields, flatten, stamp signature, return base64 PDF. */
 export async function fillIntakePdf(params: FillIntakePdfParams): Promise<string> {
   const templatePath = assertTemplateExists(params.formDef.template)
   const bytes = fs.readFileSync(templatePath)
@@ -72,6 +98,15 @@ export async function fillIntakePdf(params: FillIntakePdfParams): Promise<string
   }
 
   form.flatten()
+
+  const placement = params.formDef.signaturePlacement
+  if (!placement) {
+    throw new Error(
+      `Form ${params.formDef.code} is missing signaturePlacement in intake-forms-schema.json`
+    )
+  }
+  await stampSignature(pdf, placement, params.signaturePngBytes)
+
   const saved = await pdf.save()
   return Buffer.from(saved).toString('base64')
 }

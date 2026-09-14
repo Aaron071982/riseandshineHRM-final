@@ -90,6 +90,12 @@ export async function POST(request: NextRequest) {
   }
 
   const signatureImageData = stripDataUrlPrefix(signaturePngBase64Raw)
+  console.info('[kiosk/intake] signaturePngBase64 length', {
+    raw: signaturePngBase64Raw.length,
+    stripped: signatureImageData.length,
+    wasDataUrl: signaturePngBase64Raw.trimStart().startsWith('data:'),
+  })
+
   let pngBytes: Buffer
   try {
     pngBytes = Buffer.from(signatureImageData, 'base64')
@@ -100,6 +106,8 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     )
   }
+
+  console.info('[kiosk/intake] signature PNG bytes', pngBytes.length)
 
   const computedHash = createHash('sha256').update(pngBytes).digest('hex')
   if (computedHash.toLowerCase() !== signatureHash.toLowerCase()) {
@@ -122,6 +130,7 @@ export async function POST(request: NextRequest) {
         client,
         signerName,
         values,
+        signaturePngBytes: pngBytes,
       })
 
       const row = await prisma.clientIntakeSubmission.create({
@@ -148,8 +157,10 @@ export async function POST(request: NextRequest) {
     }
   } catch (err) {
     console.error('[kiosk/intake] submit failed', err)
+    const message =
+      err instanceof Error ? err.message : 'Failed to save intake packet'
     return NextResponse.json(
-      { error: 'Failed to save intake packet' },
+      { error: message },
       { status: 500 }
     )
   }
