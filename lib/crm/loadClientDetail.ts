@@ -244,6 +244,45 @@ export async function loadClientCrmDetail(clientId: string) {
     ? await loadCaseCoordinationPanelData(clientId)
     : null
 
+  const [latestIntakeRow, allIntakeCodes] = await Promise.all([
+    prisma.clientIntakeSubmission.findFirst({
+      where: { serviceClientId: clientId },
+      orderBy: { submittedAt: 'desc' },
+      select: { packetId: true },
+    }),
+    prisma.clientIntakeSubmission.findMany({
+      where: { serviceClientId: clientId },
+      select: { formCode: true },
+      distinct: ['formCode'],
+    }),
+  ])
+
+  const intakePacketForms = latestIntakeRow
+    ? await prisma.clientIntakeSubmission.findMany({
+        where: {
+          serviceClientId: clientId,
+          packetId: latestIntakeRow.packetId,
+        },
+        orderBy: { formCode: 'asc' },
+        select: {
+          id: true,
+          packetId: true,
+          formCode: true,
+          formTitle: true,
+          submittedAt: true,
+          signedByName: true,
+          signedByRelationship: true,
+        },
+      })
+    : []
+
+  const { getRequiredFormCodes, getFormDef } = await import(
+    '@/lib/kiosk-intake/schema'
+  )
+  const requiredCodes = getRequiredFormCodes()
+  const submittedCodes = new Set(allIntakeCodes.map((r) => r.formCode))
+  const missingRequired = requiredCodes.filter((code) => !submittedCodes.has(code))
+
   return {
     user,
     client,
@@ -291,6 +330,15 @@ export async function loadClientCrmDetail(clientId: string) {
           document: caseCoordination?.document ?? null,
         }
       : { canView: false },
+    intakeForms: {
+      complete: requiredCodes.length > 0 && missingRequired.length === 0,
+      missingRequired: missingRequired.map((code) => ({
+        code,
+        title: getFormDef(code)?.title ?? code,
+      })),
+      packetId: latestIntakeRow?.packetId ?? null,
+      forms: intakePacketForms,
+    },
   }
 }
 

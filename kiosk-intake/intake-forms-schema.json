@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "requiredFormCodes": ["F04", "F05", "F06", "F09"],
+  "forms": [
+    {
+      "code": "F01",
+      "title": "Photo / Video Release",
+      "template": "F01_Photo_Video_Release.pdf",
+      "enabled": true,
+      "required": false,
+      "fields": [
+        { "name": "p_internal", "type": "checkbox", "required": false },
+        { "name": "p_website", "type": "checkbox", "required": false },
+        { "name": "p_social", "type": "checkbox", "required": false },
+        { "name": "p_print", "type": "checkbox", "required": false },
+        { "name": "p_press", "type": "checkbox", "required": false },
+        { "name": "p_none", "type": "checkbox", "required": false }
+      ]
+    },
+    {
+      "code": "F02",
+      "title": "Release of Information",
+      "template": "F02_Release_of_Information.pdf",
+      "enabled": true,
+      "required": false,
+      "fields": [
+        { "name": "roi_org", "type": "text", "required": true },
+        { "name": "roi_contact", "type": "text", "required": false },
+        { "name": "roi_rel", "type": "text", "required": false },
+        { "name": "roi_release", "type": "checkbox", "required": false },
+        { "name": "roi_obtain", "type": "checkbox", "required": false },
+        { "name": "i_tx", "type": "checkbox", "required": false },
+        { "name": "i_notes", "type": "checkbox", "required": false },
+        { "name": "i_iep", "type": "checkbox", "required": false },
+        { "name": "i_med", "type": "checkbox", "required": false },
+        { "name": "i_ins", "type": "checkbox", "required": false },
+        { "name": "i_other", "type": "checkbox", "required": false },
+        { "name": "roi_purpose", "type": "text", "required": false }
+      ]
+    },
+    {
+      "code": "F03",
+      "title": "Medication Administration",
+      "template": "F03_Medication_Administration.pdf",
+      "enabled": true,
+      "required": false,
+      "fields": [
+        { "name": "med_name", "type": "text", "required": true },
+        { "name": "med_dose", "type": "text", "required": false },
+        { "name": "med_route", "type": "text", "required": false },
+        { "name": "med_time", "type": "text", "required": false },
+        { "name": "med_reason", "type": "text", "required": false },
+        { "name": "med_provider", "type": "text", "required": false },
+        { "name": "med_start", "type": "text", "required": false },
+        { "name": "med_end", "type": "text", "required": false },
+        { "name": "med_rescue", "type": "checkbox", "required": false },
+        { "name": "med_signs", "type": "text", "required": false },
+        { "name": "med_after", "type": "text", "required": false },
+        { "name": "med_side", "type": "text", "required": false },
+        { "name": "med_storage", "type": "text", "required": false },
+        { "name": "med_auth", "type": "checkbox", "required": true }
+      ]
+    },
+    {
+      "code": "F04",
+      "title": "Personal Care / Toileting",
+      "template": "F04_Personal_Care_Toileting.pdf",
+      "enabled": true,
+      "required": true,
+      "fields": [
+        { "name": "t_independent", "type": "checkbox", "required": false },
+        { "name": "t_prompt", "type": "checkbox", "required": false },
+        { "name": "t_assist", "type": "checkbox", "required": false },
+        { "name": "t_diaper", "type": "checkbox", "required": false },
+        { "name": "t_training", "type": "checkbox", "required": false },
+        { "name": "t_supplies", "type": "checkbox", "required": false },
+        { "name": "t_allergy", "type": "text", "required": false },
+        { "name": "t_pref", "type": "text", "required": false },
+        { "name": "t_consent", "type": "checkbox", "required": true }
+      ]
+    },
+    {
+      "code": "F05",
+      "title": "Illness Exclusion Policy",
+      "template": "F05_Illness_Exclusion_Policy.pdf",
+      "enabled": true,
+      "required": true,
+      "fields": [
+        { "name": "ill_ack", "type": "checkbox", "required": true }
+      ]
+    },
+    {
+      "code": "F06",
+      "title": "Emergency Safety Acknowledgment",
+      "template": "F06_Emergency_Safety_Acknowledgment.pdf",
+      "enabled": true,
+      "required": true,
+      "fields": [
+        { "name": "e_sensory", "type": "text", "required": false },
+        { "name": "e_mobility", "type": "text", "required": false },
+        { "name": "e_calm", "type": "text", "required": false },
+        { "name": "e_ack", "type": "checkbox", "required": true }
+      ]
+    },
+    {
+      "code": "F07",
+      "title": "Behavior Intervention / Crisis Consent",
+      "template": "F07_Behavior_Intervention_Crisis_Consent.pdf",
+      "enabled": false,
+      "required": false,
+      "fields": [
+        { "name": "b_consent", "type": "checkbox", "required": false },
+        { "name": "b_decline", "type": "checkbox", "required": false }
+      ]
+    },
+    {
+      "code": "F08",
+      "title": "Community Outing Consent",
+      "template": "F08_Community_Outing_Consent.pdf",
+      "enabled": true,
+      "required": false,
+      "fields": [
+        { "name": "o_walk", "type": "checkbox", "required": false },
+        { "name": "o_parent", "type": "checkbox", "required": false },
+        { "name": "o_staff", "type": "checkbox", "required": false },
+        { "name": "e_elope", "type": "text", "required": false },
+        { "name": "o_avoid", "type": "text", "required": false },
+        { "name": "o_safety", "type": "text", "required": false },
+        { "name": "o_consent", "type": "checkbox", "required": true }
+      ]
+    },
+    {
+      "code": "F09",
+      "title": "Food Allergy Form",
+      "template": "F09_Food_Allergy_Form.pdf",
+      "enabled": true,
+      "required": true,
+      "fields": [
+        { "name": "a_none", "type": "checkbox", "required": false },
+        { "name": "a_food", "type": "text", "required": false },
+        { "name": "a_react", "type": "text", "required": false },
+        { "name": "a_epi", "type": "checkbox", "required": false },
+        { "name": "a_nonfood", "type": "checkbox", "required": false },
+        { "name": "d_none", "type": "checkbox", "required": false },
+        { "name": "d_relig", "type": "checkbox", "required": false },
+        { "name": "d_texture", "type": "checkbox", "required": false },
+        { "name": "d_avoid", "type": "text", "required": false },
+        { "name": "d_prefer", "type": "text", "required": false },
+        { "name": "s_parent", "type": "checkbox", "required": false },
+        { "name": "s_center", "type": "checkbox", "required": false },
+        { "name": "s_reinforce", "type": "checkbox", "required": false },
+        { "name": "f_ack", "type": "checkbox", "required": true }
+      ]
+    }
+  ]
+}

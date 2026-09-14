@@ -43,6 +43,7 @@ export default async function ClientServicesClientPage({
             emailSend: serialized.emailSend,
             billing: serialized.billing,
             treatmentAssessment: serialized.treatmentAssessment,
+            intakeForms: serialized.intakeForms,
             client: serialized.client,
             teamTasks: serialized.teamTasks,
             taskUsers: serialized.taskUsers,

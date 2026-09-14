@@ -95,9 +95,24 @@ function canInlinePreview(contentType: string | null, fileName: string): boolean
 export function ClientDocumentsPanel({
   clientId,
   requirements,
+  intakeForms,
 }: {
   clientId: string
   requirements: ClientDocumentRequirement[]
+  intakeForms?: {
+    complete: boolean
+    missingRequired: { code: string; title: string }[]
+    packetId: string | null
+    forms: {
+      id: string
+      packetId: string
+      formCode: string
+      formTitle: string
+      submittedAt: Date | string
+      signedByName: string
+      signedByRelationship: string
+    }[]
+  }
   currentStage?: ClientStage
   canEdit?: boolean
   consent?: unknown
@@ -106,6 +121,12 @@ export function ClientDocumentsPanel({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<PreviewState | null>(null)
+  const [intakePreview, setIntakePreview] = useState<{
+    id: string
+    title: string
+    fileName: string
+    blobUrl: string
+  } | null>(null)
 
   const grouped = useMemo(() => {
     const docs = requirements.filter(
@@ -123,14 +144,88 @@ export function ClientDocumentsPanel({
   useEffect(() => {
     return () => {
       if (preview?.blobUrl) URL.revokeObjectURL(preview.blobUrl)
+      if (intakePreview?.blobUrl) URL.revokeObjectURL(intakePreview.blobUrl)
     }
-  }, [preview?.blobUrl])
+  }, [preview?.blobUrl, intakePreview?.blobUrl])
 
   const closePreview = () => {
     setPreview((prev) => {
       if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl)
       return null
     })
+  }
+
+  const closeIntakePreview = () => {
+    setIntakePreview((prev) => {
+      if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl)
+      return null
+    })
+  }
+
+  const fetchIntakePdf = async (submissionId: string, inline: boolean) => {
+    const qs = inline ? '?inline=1' : ''
+    const res = await fetch(
+      `/api/client-services/clients/${clientId}/intake/${submissionId}/pdf${qs}`,
+      { credentials: 'include' }
+    )
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string }
+      throw new Error(data.error || (inline ? 'Preview failed' : 'Download failed'))
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition')
+    return {
+      blob,
+      fileName: parseContentDispositionFileName(disposition),
+    }
+  }
+
+  const onIntakeDownload = async (
+    submissionId: string,
+    formCode: string,
+    formTitle: string
+  ) => {
+    setError('')
+    setBusyId(submissionId)
+    try {
+      const { blob, fileName } = await fetchIntakePdf(submissionId, false)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName ?? `${formCode}_${formTitle.replace(/\s+/g, '_')}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Download failed')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const onIntakePreview = async (
+    submissionId: string,
+    formCode: string,
+    formTitle: string
+  ) => {
+    setError('')
+    setBusyId(submissionId)
+    try {
+      closePreview()
+      closeIntakePreview()
+      const { blob, fileName } = await fetchIntakePdf(submissionId, true)
+      setIntakePreview({
+        id: submissionId,
+        title: formTitle,
+        fileName: fileName ?? `${formCode}.pdf`,
+        blobUrl: URL.createObjectURL(blob),
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Preview failed')
+    } finally {
+      setBusyId(null)
+    }
   }
 
   const fetchStoredBlob = async (requirementId: string, inline: boolean) => {
@@ -185,6 +280,7 @@ export function ClientDocumentsPanel({
     setBusyId(req.id)
     try {
       closePreview()
+      closeIntakePreview()
       const contentType = guessContentType(req)
 
       if (isStoredRequirementPath(req.fileUrl)) {
@@ -192,7 +288,6 @@ export function ClientDocumentsPanel({
         const name = fetched.fileName ?? displayFileName
         const type = fetched.contentType || contentType
         if (!canInlinePreview(type, name)) {
-          // Fall back to download for office docs etc.
           const url = URL.createObjectURL(fetched.blob)
           const a = document.createElement('a')
           a.href = url
@@ -239,7 +334,10 @@ export function ClientDocumentsPanel({
     }
   }
 
-  if (grouped.length === 0) {
+  const hasIntakeSection = !!intakeForms
+  const hasRequirementDocs = grouped.length > 0
+
+  if (!hasRequirementDocs && !hasIntakeSection) {
     return (
       <div className="rounded-xl border border-dashed border-line bg-surface px-4 py-10 text-center">
         <FileText className="mx-auto h-8 w-8 text-faint" />
@@ -277,6 +375,102 @@ export function ClientDocumentsPanel({
         here; upload and status updates happen on the{' '}
         <strong className="font-medium text-ink">Requirements</strong> tab.
       </p>
+
+      {intakeForms && (
+        <section>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h3 className="font-display text-base font-semibold text-ink">
+              Intake forms
+            </h3>
+            {intakeForms.complete ? (
+              <span className="rounded-md bg-[var(--green-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--green)]">
+                Intake complete
+              </span>
+            ) : (
+              <span className="rounded-md bg-[var(--amber-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--amber)]">
+                Incomplete
+              </span>
+            )}
+          </div>
+          {!intakeForms.complete && intakeForms.missingRequired.length > 0 && (
+            <p className="mb-2 text-xs text-quiet">
+              Missing required:{' '}
+              {intakeForms.missingRequired
+                .map((m) => `${m.code} (${m.title})`)
+                .join(', ')}
+            </p>
+          )}
+          {intakeForms.forms.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-line bg-surface px-4 py-6 text-sm text-quiet">
+              No kiosk intake packet submitted yet.
+            </div>
+          ) : (
+            <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
+              {intakeForms.forms.map((form) => {
+                const busy = busyId === form.id
+                return (
+                  <li key={form.id} className="px-3 py-3">
+                    <div className="flex flex-wrap items-start gap-3">
+                      <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                        <FileText className="mt-0.5 h-4 w-4 shrink-0 text-quiet" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium text-ink">
+                            {form.formCode} · {form.formTitle}
+                          </div>
+                          <div className="mt-0.5 text-xs text-quiet">
+                            Submitted{' '}
+                            {new Date(form.submittedAt).toLocaleDateString()} ·{' '}
+                            {form.signedByName}
+                            {form.signedByRelationship
+                              ? ` (${form.signedByRelationship})`
+                              : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void onIntakePreview(
+                              form.id,
+                              form.formCode,
+                              form.formTitle
+                            )
+                          }
+                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
+                        >
+                          {busy ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5" />
+                          )}
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void onIntakeDownload(
+                              form.id,
+                              form.formCode,
+                              form.formTitle
+                            )
+                          }
+                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+      )}
 
       {grouped.map(({ group, items }) => (
         <section key={group}>
@@ -435,6 +629,61 @@ export function ClientDocumentsPanel({
                   className="h-[75vh] w-full rounded-lg border border-line bg-white"
                 />
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {intakePreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[1px]"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`View ${intakePreview.title}`}
+          onClick={closeIntakePreview}
+        >
+          <div
+            className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-ink">
+                  {intakePreview.title}
+                </div>
+                <div className="truncate text-xs text-quiet">
+                  {intakePreview.fileName}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  void onIntakeDownload(
+                    intakePreview.id,
+                    intakePreview.fileName.split('_')[0] || 'form',
+                    intakePreview.title
+                  )
+                }
+                className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download
+              </button>
+              <button
+                type="button"
+                onClick={closeIntakePreview}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-line text-ink hover:bg-line-2"
+                aria-label="Close preview"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto bg-[var(--bg)] p-3">
+              <iframe
+                title={intakePreview.title}
+                src={intakePreview.blobUrl}
+                className="h-[75vh] w-full rounded-lg border border-line bg-white"
+              />
             </div>
           </div>
         </div>

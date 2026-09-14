@@ -3154,6 +3154,7 @@ model ServiceClient {
   treatmentAssessments   ClientTreatmentAssessment[]
   caseCoordinations      ClientCaseCoordination[]
   attendanceEvents       ClientAttendanceEvent[]
+  intakeSubmissions      ClientIntakeSubmission[]
 
   @@index([status])
   @@index([stage])
@@ -3199,6 +3200,33 @@ model ClientAttendanceEvent {
 
   @@index([serviceClientId, eventAt])
   @@map("client_attendance_events")
+}
+
+/// Append-only first-session kiosk intake packet forms. Table + immutability trigger live in SQL.
+model ClientIntakeSubmission {
+  id                    String   @id @default(cuid())
+  serviceClientId       String
+  packetId              String
+  formCode              String
+  formTitle             String
+  fieldValuesJson       Json
+  filledPdfData         String?
+  signedByName          String
+  signedByRelationship  String
+  signatureImageData    String?
+  signatureHash         String?
+  signatureConsentGiven Boolean  @default(true)
+  signatureIpAddress    String?
+  signatureUserAgent    String?
+  kioskDeviceId         String?
+  locationLabel         String?
+  submittedAt           DateTime @default(now())
+  createdAt             DateTime @default(now())
+
+  serviceClient ServiceClient @relation(fields: [serviceClientId], references: [id])
+
+  @@index([serviceClientId, submittedAt])
+  @@map("client_intake_submissions")
 }
 
 /// Provisioned iPad / front-desk devices. Token plaintext is shown once; only tokenHash is stored.

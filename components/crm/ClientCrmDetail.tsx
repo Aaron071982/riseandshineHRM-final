@@ -322,6 +322,7 @@ export default function ClientCrmDetail({
           <ClientDocumentsPanel
             clientId={client.id}
             requirements={client.requirements}
+            intakeForms={data.intakeForms}
           />
         )}
         {tab === 'tasks' && (
@@ -488,6 +489,7 @@ export type SerializeClientDetail = {
   emailSend: EmailSendContext & { allowedTemplates: CommTemplate[] }
   billing?: ClientCrmDetailData['billing']
   treatmentAssessment?: ClientCrmDetailData['treatmentAssessment']
+  intakeForms?: ClientCrmDetailData['intakeForms']
   client: ClientCrmDetailData['client']
   teamTasks: ClientCrmDetailData['teamTasks']
   taskUsers: ClientCrmDetailData['taskUsers']
