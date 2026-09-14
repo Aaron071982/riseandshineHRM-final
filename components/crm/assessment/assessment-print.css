@@ -7,10 +7,14 @@
   --rs-cream: #faf8f5;
   background: var(--rs-cream);
   color: var(--rs-ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   font-family: var(--font-sans), Inter, system-ui, -apple-system, sans-serif;
   font-size: 11pt;
   line-height: 1.45;
   min-height: 100vh;
+  width: 100%;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -78,11 +82,17 @@
   margin: 0 auto;
   max-width: 8.5in;
   padding: 24px 32px 64px;
+  width: 100%;
 }
 
 .assessment-print-render {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   margin: 0 auto;
-  padding: 24px 0 64px;
+  padding: 24px 16px 64px;
+  width: 100%;
 }
 
 /* Named string for running footer (pages 2+) */
@@ -96,14 +106,19 @@
 }
 
 /* ——— Cover page ——— */
+/* Avoid min-height near full letter + break-after: that overflows into a blank page 2. */
 .assessment-cover {
   background: #fff;
-  break-after: page;
   display: flex;
   flex-direction: column;
-  min-height: 10.5in;
-  page-break-after: always;
   position: relative;
+}
+
+/* Screen-only tall cover for unpaged preview; never apply during Paged.js pagination. */
+@media screen {
+  .assessment-print-source:not(.is-paged) .assessment-cover {
+    min-height: 10in;
+  }
 }
 
 .assessment-cover-toprule {
@@ -114,10 +129,12 @@
 }
 
 .assessment-cover-inner {
+  align-items: center;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   padding: 36px 48px 24px;
+  text-align: center;
 }
 
 .assessment-cover-logo {
@@ -138,6 +155,7 @@
   margin: 0 0 10px;
   text-align: center;
   text-transform: uppercase;
+  width: 100%;
 }
 
 .assessment-cover-title {
@@ -148,6 +166,7 @@
   line-height: 1.15;
   margin: 0;
   text-align: center;
+  width: 100%;
 }
 
 .assessment-cover-title-rule {
@@ -166,6 +185,7 @@
   margin: 0 auto;
   max-width: 720px;
   padding: 22px 26px;
+  text-align: left;
   width: 100%;
 }
 
@@ -220,6 +240,8 @@
 }
 
 .print-body {
+  break-before: page;
+  page-break-before: always;
   padding: 0;
 }
 
@@ -429,22 +451,27 @@
   }
 }
 
-/* Screen preview of Paged.js pages */
+/* Screen preview of Paged.js pages — keep letter sheets centered in the viewport */
 .pagedjs_pages {
+  align-items: center;
   display: flex;
   flex-direction: column;
   gap: 16px;
   margin: 0 auto;
+  width: 100%;
 }
 
 .pagedjs_page {
   background: #fff;
   box-shadow: 0 1px 8px rgba(0, 0, 0, 0.08);
-  margin: 0 auto;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 .pagedjs_sheet {
   background: #fff;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Orange hairline under running header (pages 2+) */

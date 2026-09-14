@@ -1,4 +1,4 @@
-import { formatCalendarDate, parseCalendarDate } from '@/lib/billing/calendarDate'
+import { calendarDateKey, parseCalendarDate } from '@/lib/billing/calendarDate'
 import type { ServiceClient } from '@prisma/client'
 import {
   defaultAssessmentSections,
@@ -20,12 +20,12 @@ export function computeAgeFromDob(dob: Date | null): string {
 }
 
 export function todayCalendarDateString(): string {
-  return formatCalendarDate(new Date()) ?? ''
+  return calendarDateKey(new Date())
 }
 
 export function dobToInputString(dob: Date | null | undefined): string {
   if (!dob) return ''
-  return formatCalendarDate(dob) ?? ''
+  return calendarDateKey(dob)
 }
 
 /** Prefill summary from ServiceClient for a new FORM assessment. */

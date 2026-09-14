@@ -1,4 +1,4 @@
-import { formatCalendarDate } from '@/lib/billing/calendarDate'
+import { formatUsMmDdYyyy } from '@/lib/billing/calendarDate'
 import {
   ASSESSOR_CREDENTIALS_SUFFIX,
   CRISIS_ESCALATION_INSTRUCTIONS,
@@ -86,9 +86,12 @@ export function AssessmentPrintView(props: Props) {
   const clientName = `${props.client.firstName} ${props.client.lastName}`.trim()
   const sections = personalizeAssessmentValue(props.sections, clientName)
   const s = sections.summary
+  const displayDate = (value?: string | Date | null) =>
+    formatUsMmDdYyyy(value) || ''
+
   const dobDisplay =
-    s.dateOfBirth ||
-    (props.client.dateOfBirth ? formatCalendarDate(props.client.dateOfBirth) : '')
+    displayDate(s.dateOfBirth) ||
+    displayDate(props.client.dateOfBirth)
 
   const attachmentsFor = (prefix: string) =>
     props.attachments.filter((a) => a.sectionKey.startsWith(prefix))
@@ -109,17 +112,11 @@ export function AssessmentPrintView(props: Props) {
   const assessorDisplay =
     `${s.assessorName || ''}${ASSESSOR_CREDENTIALS_SUFFIX}`.trim() || '—'
 
-  const dobForFooter = (() => {
-    if (props.client.dateOfBirth) {
-      const d = props.client.dateOfBirth
-      const m = String(d.getUTCMonth() + 1).padStart(2, '0')
-      const day = String(d.getUTCDate()).padStart(2, '0')
-      return `${m}/${day}/${d.getUTCFullYear()}`
-    }
-    return dobDisplay || '—'
-  })()
+  const dobForFooter = dobDisplay || '—'
 
   const coverValue = (value?: string | null) => value?.trim() || '—'
+  const coverDate = (value?: string | Date | null) =>
+    formatUsMmDdYyyy(value) || '—'
 
   return (
     <AssessmentPrintPager
@@ -149,13 +146,13 @@ export function AssessmentPrintView(props: Props) {
           <div className="assessment-cover-summary">
             <div className="assessment-cover-col">
               <CoverField label="Patient Name" value={coverValue(s.patientName || clientName)} />
-              <CoverField label="Date of Birth" value={coverValue(dobDisplay)} />
+              <CoverField label="Date of Birth" value={coverDate(dobDisplay || s.dateOfBirth || props.client.dateOfBirth)} />
               <CoverField label="Diagnosis" value={coverValue(s.diagnosis)} />
               {s.comorbidDiagnosis?.trim() ? (
                 <CoverField label="Comorbid Diagnosis" value={s.comorbidDiagnosis} />
               ) : null}
               <CoverField label="Parent / Guardian" value={coverValue(s.parentName)} />
-              <CoverField label="Report Date" value={coverValue(s.reportDate)} />
+              <CoverField label="Report Date" value={coverDate(s.reportDate)} />
               <CoverField label="Assessor Name" value={assessorDisplay} />
             </div>
             <div className="assessment-cover-col">
@@ -214,7 +211,7 @@ export function AssessmentPrintView(props: Props) {
                   <Block title="Family/caregiver(s) interview" text={sections.instruments.familyCaregiverInterview} />
                   <Block title="Records reviewed" text={sections.instruments.recordsReviewed} />
                   <Field label="Skills assessment instrument" value={selectedSkillsLabel} />
-                  <Field label="Vineland completed by parent on" value={sections.instruments.vinelandCompletedDate} />
+                  <Field label="Vineland completed by parent on" value={displayDate(sections.instruments.vinelandCompletedDate)} />
                   <Block title="Behavior Assessment (FAST)" text={sections.instruments.fastAssessment} />
                   {sections.instruments.skillsAssessmentType === 'AFLS' && (
                     <Block title="Assessment of Functional Living Skills (AFLS)" text={sections.instruments.aflsAssessment} />
@@ -236,7 +233,7 @@ export function AssessmentPrintView(props: Props) {
                 <PrintSection title="Present Levels of Performance">
                   <div className="section-block">
                     <p className="subheading">Vineland</p>
-                    <Field label="Date" value={sections.presentLevels.vineland.date} />
+                    <Field label="Date" value={displayDate(sections.presentLevels.vineland.date)} />
                     <AttachmentImages
                       attachments={attachmentsFor('present_levels.vineland')}
                       urls={props.attachmentUrls}
@@ -434,7 +431,7 @@ export function AssessmentPrintView(props: Props) {
                         ) : (
                           <Field label="Signature (typed)" value={sig.signatureTypedName} always />
                         )}
-                        <Field label="Date" value={sig.date} always />
+                        <Field label="Date" value={displayDate(sig.date)} always />
                       </div>
                     )
                   })}
@@ -681,7 +678,7 @@ function AflsSkillGridPrint({
           <tr>
             <th>Skill</th>
             {dates.map((date) => (
-              <th key={date}>{date}</th>
+              <th key={date}>{formatUsMmDdYyyy(date) || date}</th>
             ))}
           </tr>
         </thead>
@@ -828,7 +825,7 @@ function GoalTableA({
               <td>{r.previousAssessmentScore || '—'}</td>
               <td>{r.currentPerformance || '—'}</td>
               <td>{r.masteryCriteria || '—'}</td>
-              <td>{r.targetMasteryDate || '—'}</td>
+              <td>{formatUsMmDdYyyy(r.targetMasteryDate) || r.targetMasteryDate || '—'}</td>
             </tr>
           ))}
         </tbody>
@@ -868,7 +865,7 @@ function GoalTableB({
               <td>{r.previousAssessmentPerformance || '—'}</td>
               <td>{r.currentPerformance || '—'}</td>
               <td>{r.masteryCriteria || '—'}</td>
-              <td>{r.targetMasteryDate || '—'}</td>
+              <td>{formatUsMmDdYyyy(r.targetMasteryDate) || r.targetMasteryDate || '—'}</td>
               <td>{r.methodsToBeUtilized || '—'}</td>
             </tr>
           ))}
@@ -902,7 +899,7 @@ function TransitionTable({
             <td>{r.directHoursChangeTo || '—'}</td>
             <td>{r.parentTrainingIncrease || '—'}</td>
             <td>{r.supervisionDecrease || '—'}</td>
-            <td>{r.dateExpected || '—'}</td>
+            <td>{formatUsMmDdYyyy(r.dateExpected) || r.dateExpected || '—'}</td>
           </tr>
         ))}
       </tbody>
@@ -931,7 +928,7 @@ function CoordinationTable({
           <tr key={row.id}>
             <td>{row.name || '—'}</td>
             <td>{row.phone || '—'}</td>
-            <td>{row.date || '—'}</td>
+            <td>{formatUsMmDdYyyy(row.date) || row.date || '—'}</td>
             <td>{row.discussion || '—'}</td>
           </tr>
         ))}

@@ -61,6 +61,20 @@ export function formatCalendarDate(d: Date | string): string {
   return `${m}/${day}/${y}`
 }
 
+/**
+ * Display any calendar date as zero-padded mm/dd/yyyy.
+ * Accepts Date, YYYY-MM-DD, M/D/YYYY, or MM/DD/YYYY. Returns '' for empty/invalid.
+ */
+export function formatUsMmDdYyyy(value: Date | string | null | undefined): string {
+  if (value == null || value === '') return ''
+  const date = value instanceof Date ? value : parseCalendarDate(value)
+  if (!date || Number.isNaN(date.getTime())) return ''
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  const y = date.getUTCFullYear()
+  return `${m}/${day}/${y}`
+}
+
 /** Noon UTC avoids Excel timezone edge cases when writing date cells. */
 export function calendarDateForExcel(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0))
