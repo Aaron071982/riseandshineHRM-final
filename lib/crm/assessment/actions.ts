@@ -362,14 +362,8 @@ export async function reopenTreatmentAssessment(
         status: 400,
       }
     }
-    if (assessment.status === 'SIGNED') {
-      return {
-        ok: false,
-        error: 'Signed assessments cannot be reopened',
-        status: 400,
-      }
-    }
-    if (assessment.status !== 'COMPLETED') {
+    if (assessment.status !== 'COMPLETED' && assessment.status !== 'SIGNED') {
+      // Already editable (DRAFT / IN_PROGRESS)
       return { ok: true, assessmentId: assessment.id }
     }
 
@@ -380,6 +374,7 @@ export async function reopenTreatmentAssessment(
       data: {
         status: 'IN_PROGRESS',
         completedAt: null,
+        signedAt: null,
         updatedByUserId: user.id,
       },
     })
@@ -389,7 +384,7 @@ export async function reopenTreatmentAssessment(
       serviceClientId: assessment.serviceClientId,
       assessmentId,
       action: 'UPDATED',
-      detail: 'REOPENED',
+      detail: assessment.status === 'SIGNED' ? 'REOPENED_FROM_SIGNED' : 'REOPENED',
     })
 
     revalidateAssessmentPaths(assessment.serviceClientId, assessmentId)

@@ -138,9 +138,11 @@ export function AssessmentFormClient({
   }
 
   const onReopen = () => {
-    if (!confirm('Re-open this assessment for editing? You can mark it complete again later.')) {
-      return
-    }
+    const message =
+      status === 'SIGNED'
+        ? 'Re-open this signed assessment for editing? Signing will be cleared; you can complete and sign again later.'
+        : 'Re-open this assessment for editing? You can mark it complete again later.'
+    if (!confirm(message)) return
     setError(null)
     startTransition(async () => {
       const result = await reopenTreatmentAssessment(assessmentId)
@@ -184,7 +186,7 @@ export function AssessmentFormClient({
                 Mark complete
               </button>
             )}
-            {canEdit && source === 'FORM' && status === 'COMPLETED' && (
+            {canEdit && source === 'FORM' && (status === 'COMPLETED' || status === 'SIGNED') && (
               <button type="button" onClick={onReopen} disabled={pending} className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand/90 disabled:opacity-50">
                 Re-open for editing
               </button>

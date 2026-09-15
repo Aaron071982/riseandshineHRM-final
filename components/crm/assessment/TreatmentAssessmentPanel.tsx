@@ -115,15 +115,20 @@ export function TreatmentAssessmentPanel({
     })
   }
 
-  const onReopen = (assessmentId: string) => {
-    if (!confirm('Re-open this assessment for editing? You can mark it complete again later.')) {
-      return
-    }
+  const onReopen = (assessmentId: string, status: TreatmentAssessmentStatus) => {
+    const message =
+      status === 'SIGNED'
+        ? 'Re-open this signed assessment for editing? Signing will be cleared; you can complete and sign again later.'
+        : 'Re-open this assessment for editing? You can mark it complete again later.'
+    if (!confirm(message)) return
     setError(null)
     startTransition(async () => {
       const result = await reopenTreatmentAssessment(assessmentId)
-      if (!result.ok) setError(result.error)
-      else router.refresh()
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      router.push(`/client-services/clients/${clientId}/assessments/${assessmentId}`)
     })
   }
 
@@ -230,10 +235,12 @@ export function TreatmentAssessmentPanel({
                     View
                   </Link>
                 )}
-                {a.source === 'FORM' && a.status === 'COMPLETED' && canEdit && (
+                {a.source === 'FORM' &&
+                  (a.status === 'COMPLETED' || a.status === 'SIGNED') &&
+                  canEdit && (
                   <button
                     type="button"
-                    onClick={() => onReopen(a.id)}
+                    onClick={() => onReopen(a.id, a.status)}
                     disabled={pending}
                     className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand/90 disabled:opacity-50"
                   >
