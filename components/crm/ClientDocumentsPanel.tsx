@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { Download, Eye, FileText, Loader2, X } from 'lucide-react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { Download, Eye, FileText, Loader2, Trash2, X } from 'lucide-react'
 import type { ClientStage, RequirementGroup, RequirementStatus } from '@prisma/client'
 import {
   DOCUMENT_BY_KEY,
   DOCUMENT_GROUP_LABELS,
   DOCUMENT_GROUP_ORDER,
 } from '@/lib/crm/documents'
+import { clearRequirementDocument } from '@/lib/crm/actions'
 import { isStoredRequirementPath } from '@/lib/crm/requirementDocuments.shared'
 import { parseContentDispositionFileName } from '@/lib/http/contentDisposition'
 import { STAGE_LABELS } from '@/lib/crm/stages'
@@ -96,6 +98,7 @@ export function ClientDocumentsPanel({
   clientId,
   requirements,
   intakeForms,
+  canEdit = false,
 }: {
   clientId: string
   requirements: ClientDocumentRequirement[]
@@ -118,6 +121,8 @@ export function ClientDocumentsPanel({
   consent?: unknown
   referralCheck?: unknown
 }) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<PreviewState | null>(null)
@@ -273,6 +278,29 @@ export function ClientDocumentsPanel({
     } finally {
       setBusyId(null)
     }
+  }
+
+  const onDeleteDocument = (req: ClientDocumentRequirement) => {
+    if (
+      !confirm(
+        `Remove “${req.label}” from this client’s documents? The requirement will go back to pending.`
+      )
+    ) {
+      return
+    }
+    setError('')
+    setBusyId(req.id)
+    startTransition(async () => {
+      const result = await clearRequirementDocument(req.id)
+      if (!result.ok) {
+        setError(result.error || 'Delete failed')
+        setBusyId(null)
+        return
+      }
+      closePreview()
+      setBusyId(null)
+      router.refresh()
+    })
   }
 
   const onPreview = async (req: ClientDocumentRequirement, displayFileName: string) => {
@@ -535,30 +563,46 @@ export function ClientDocumentsPanel({
                       {req.status.replace(/_/g, ' ')}
                     </span>
 
-                    {(hasStoredFile || hasHttp) && (
+                    {(hasStoredFile || hasHttp || canEdit) && (
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void onPreview(req, displayFileName)}
-                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink hover:bg-line-2 disabled:opacity-50"
-                        >
-                          {busy ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Eye className="h-3.5 w-3.5" />
-                          )}
-                          Preview
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void onDownload(req, displayFileName)}
-                          className="inline-flex h-8 items-center gap-1 rounded-lg border border-line px-2 text-xs text-ink hover:bg-line-2 disabled:opacity-50"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          Download
-                        </button>
+                        {(hasStoredFile || hasHttp) && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={busy || pending}
+                              onClick={() => void onPreview(req, displayFileName)}
+                              className="inline-flex h-7 items-center gap-1 rounded-md border border-line bg-surface px-1.5 text-[11px] font-medium text-ink hover:bg-line-2 disabled:opacity-50"
+                            >
+                              {busy ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Eye className="h-3 w-3" />
+                              )}
+                              Preview
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy || pending}
+                              onClick={() => void onDownload(req, displayFileName)}
+                              className="inline-flex h-7 items-center gap-1 rounded-md border border-line px-1.5 text-[11px] text-ink hover:bg-line-2 disabled:opacity-50"
+                            >
+                              <Download className="h-3 w-3" />
+                              Download
+                            </button>
+                          </>
+                        )}
+                        {canEdit && (hasStoredFile || hasHttp) && (
+                          <button
+                            type="button"
+                            disabled={busy || pending}
+                            onClick={() => onDeleteDocument(req)}
+                            className="inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[11px] text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            aria-label={`Delete ${req.label}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

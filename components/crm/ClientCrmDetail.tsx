@@ -323,6 +323,7 @@ export default function ClientCrmDetail({
             clientId={client.id}
             requirements={client.requirements}
             intakeForms={data.intakeForms}
+            canEdit={canEdit}
           />
         )}
         {tab === 'tasks' && (

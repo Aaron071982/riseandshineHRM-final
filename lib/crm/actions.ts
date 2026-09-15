@@ -1142,6 +1142,57 @@ export async function markRequirementReceived(
   })
 }
 
+/** Remove the uploaded file from a document requirement and reset to PENDING. */
+export async function clearRequirementDocument(
+  requirementId: string
+): Promise<ActionResult> {
+  try {
+    const user = await getClientServicesUser()
+    const existing = await prisma.clientRequirement.findFirst({
+      where: { id: requirementId, deletedAt: null },
+      select: {
+        id: true,
+        serviceClientId: true,
+        key: true,
+        type: true,
+        fileUrl: true,
+      },
+    })
+    if (!existing) return { ok: false, error: 'Not found', status: 404 }
+    if (existing.type !== 'DOCUMENT') {
+      return { ok: false, error: 'Only document files can be cleared here', status: 400 }
+    }
+
+    await assertCanEditClient(user, existing.serviceClientId)
+
+    await prisma.clientRequirement.update({
+      where: { id: requirementId },
+      data: {
+        status: 'PENDING',
+        fileUrl: null,
+        fileName: null,
+        fileContentType: null,
+        fileSizeBytes: null,
+        expiresAt: null,
+        completedAt: null,
+        completedByUserId: null,
+        attestedAt: null,
+        attestedByUserId: null,
+      },
+    })
+
+    await auditClientAction({
+      userId: user.id,
+      serviceClientId: existing.serviceClientId,
+      action: `REQUIREMENT_DOCUMENT_CLEARED:${existing.key}`,
+    })
+    revalidateClient(existing.serviceClientId)
+    return { ok: true }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 async function upsertConsentRow(clientId: string) {
   const existing = await prisma.clientConsent.findUnique({
     where: { serviceClientId: clientId },
