@@ -131,7 +131,7 @@ export default function RatesPageClient() {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/billing/dashboard" className="text-sm text-[#0D9488] hover:underline">
+        <Link href="/billing/dashboard" className="text-sm text-[#E7692C] hover:underline">
           ← Dashboard
         </Link>
         <h2 className="text-2xl font-bold mt-2">Pay Rates &amp; Mappings</h2>
@@ -149,7 +149,7 @@ export default function RatesPageClient() {
             className={cn(
               'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
               tab === t
-                ? 'border-[#0D9488] text-[#0D9488]'
+                ? 'border-[#E7692C] text-[#E7692C]'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
             )}
           >

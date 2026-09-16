@@ -2624,6 +2624,8 @@ export async function addScheduleEntry(
 ): Promise<ActionResult<{ id: string; warning?: string }>> {
   try {
     const user = await getClientServicesUser()
+    const { assertPortalScheduleReadOnly } = await import('@/lib/crm/bcbaPortal')
+    assertPortalScheduleReadOnly(user)
     await assertCanEditClient(user, clientId)
 
     if (input.dayOfWeek < 0 || input.dayOfWeek > 6) {
@@ -2763,6 +2765,8 @@ export async function addScheduleEntries(
 > {
   try {
     const user = await getClientServicesUser()
+    const { assertPortalScheduleReadOnly } = await import('@/lib/crm/bcbaPortal')
+    assertPortalScheduleReadOnly(user)
     await assertCanEditClient(user, clientId)
     if (!input.days.length) return { ok: false, error: 'Select at least one day' }
 
@@ -2922,6 +2926,8 @@ export async function updateScheduleEntry(
   try {
     const parsedInput = ScheduleEntryUpdateSchema.parse(input)
     const user = await getClientServicesUser()
+    const { assertPortalScheduleReadOnly } = await import('@/lib/crm/bcbaPortal')
+    assertPortalScheduleReadOnly(user)
     const existing = await prisma.rbtScheduleAssignment.findUnique({
       where: { id: entryId },
     })
@@ -2964,6 +2970,8 @@ export async function updateScheduleEntry(
 export async function removeScheduleEntry(entryId: string): Promise<ActionResult> {
   try {
     const user = await getClientServicesUser()
+    const { assertPortalScheduleReadOnly } = await import('@/lib/crm/bcbaPortal')
+    assertPortalScheduleReadOnly(user)
     const existing = await prisma.rbtScheduleAssignment.findUnique({
       where: { id: entryId },
     })

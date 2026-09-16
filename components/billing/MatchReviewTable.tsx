@@ -262,7 +262,7 @@ export default function MatchReviewTable({
                     {isResolved ? (
                       <button
                         type="button"
-                        className="text-left hover:underline text-[#0D9488] font-medium"
+                        className="text-left hover:underline text-[#E7692C] font-medium"
                         onClick={() => setEditingEntry(e)}
                       >
                         {displayName(e)}
@@ -417,7 +417,7 @@ export default function MatchReviewTable({
               Cancel
             </Button>
             <Button
-              className="bg-[#0D9488] hover:bg-teal-700 text-white"
+              className="bg-[#E7692C] hover:bg-[#D45C22] text-white"
               onClick={() => {
                 if (!payrollModal) return
                 patchEntry(payrollModal.id, {

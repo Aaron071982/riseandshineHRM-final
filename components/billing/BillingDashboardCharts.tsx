@@ -12,9 +12,17 @@ import {
   YAxis,
 } from 'recharts'
 import { formatUsd } from '@/lib/billing/format'
+import { PAYROLL_THEME } from '@/lib/payroll/theme'
 
-const TEAL = '#0D9488'
-const PIE_COLORS = ['#0D9488', '#14B8A6', '#2DD4BF', '#5EEAD4', '#99F6E4', '#CCFBF1']
+const ACCENT = PAYROLL_THEME.orange
+const PIE_COLORS = [
+  PAYROLL_THEME.espresso,
+  PAYROLL_THEME.orange,
+  PAYROLL_THEME.money,
+  '#8B7355',
+  '#C4A484',
+  '#5C4A3A',
+]
 
 export function PayoutTrendChart({
   data,
@@ -31,7 +39,7 @@ export function PayoutTrendChart({
         <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={50} />
         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
         <Tooltip formatter={(v) => [formatUsd(Number(v ?? 0)), 'Payout']} />
-        <Bar dataKey="payout" fill={TEAL} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="payout" fill={ACCENT} radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )

@@ -60,7 +60,9 @@ const TABS: { id: TabId; label: string }[] = [
 
 function resolveTab(value?: string | null, clinicalSurfaceOnly = false): TabId {
   if (clinicalSurfaceOnly) {
-    return value === 'assessment' ? 'assessment' : 'overview'
+    const allowed: TabId[] = ['overview', 'authorization', 'assessment', 'schedule']
+    if (value && allowed.includes(value as TabId)) return value as TabId
+    return 'overview'
   }
   if (value === 'communications') return 'email'
   // Former Case Coordination tab — keep old deep links from breaking
@@ -107,7 +109,12 @@ export default function ClientCrmDetail({
 
   const visibleTabs = TABS.filter((t) => {
     if (clinicalSurfaceOnly) {
-      return t.id === 'overview' || t.id === 'assessment'
+      return (
+        t.id === 'overview' ||
+        t.id === 'authorization' ||
+        t.id === 'assessment' ||
+        t.id === 'schedule'
+      )
     }
     if (t.id === 'assessment') return treatmentAssessment?.canView
     return true
@@ -195,7 +202,7 @@ export default function ClientCrmDetail({
     <div className="mx-auto max-w-6xl space-y-4 pb-16">
       <div className="flex flex-wrap items-center gap-3">
         <Link
-          href={clinicalSurfaceOnly ? '/client-services' : '/client-services/clients'}
+          href={clinicalSurfaceOnly ? '/portal' : '/client-services/clients'}
           className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm text-quiet hover:bg-line-2"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -368,7 +375,7 @@ export default function ClientCrmDetail({
           />
         )}
         {tab === 'authorization' &&
-          (billing?.canAccess ? (
+          (billing?.canAccess && !clinicalSurfaceOnly ? (
             <BillingAuthorizationPanel
               clientId={client.id}
               stage={client.stage}
@@ -386,7 +393,7 @@ export default function ClientCrmDetail({
             <AuthorizationPanel
               clientId={client.id}
               authorizations={client.authorizations}
-              canEdit={canEdit}
+              canEdit={canEdit && !clinicalSurfaceOnly}
               authRequired={client.authRequired}
               paAutoSatisfied={!client.authRequired}
             />
@@ -399,6 +406,7 @@ export default function ClientCrmDetail({
             hasAssessmentOnFile={treatmentAssessment.hasAssessmentOnFile ?? false}
             canEdit={treatmentAssessment.canEdit ?? false}
             canUpload={treatmentAssessment.canUpload ?? false}
+            basePath={clinicalSurfaceOnly ? '/portal' : '/client-services'}
           />
         )}
         {tab === 'schedule' && (
@@ -410,7 +418,7 @@ export default function ClientCrmDetail({
             assignedRbtIds={client.btAssignments
               .map((a) => a.rbtProfileId)
               .filter((id): id is string => !!id)}
-            canEdit={canEdit}
+            canEdit={canEdit && !clinicalSurfaceOnly}
           />
         )}
         {tab === 'check-ins' && (

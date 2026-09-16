@@ -1,10 +1,10 @@
+import { redirect } from 'next/navigation'
 import { getClientServicesPageUser } from '@/lib/crm/access'
 import { loadManagerDashboard } from '@/lib/crm/dashboard'
 import { canAccessOperations } from '@/lib/operations/access'
 import ManagerDashboardWithOps from '@/components/crm/ManagerDashboardWithOps'
-import { BcbaPortalDashboardClient } from '@/components/crm/BcbaPortalDashboardClient'
-import { isClinicalLead, isClinicalSurfaceOnly } from '@/lib/crm/bcbaPortal'
-import { loadBcbaPortalDashboard } from '@/lib/crm/bcbaPortalDashboard'
+import { isClinicalSurfaceOnly } from '@/lib/crm/bcbaPortal'
+import { PORTAL_HOME_PATH } from '@/lib/crm/portalRouting'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,11 +12,9 @@ export default async function ClientServicesHomePage() {
   const user = await getClientServicesPageUser()
   if (!user) return null
 
+  // Portal-only clinicians use the dedicated /portal shell.
   if (isClinicalSurfaceOnly(user)) {
-    const data = await loadBcbaPortalDashboard(user)
-    return (
-      <BcbaPortalDashboardClient data={data} isLead={isClinicalLead(user)} />
-    )
+    redirect(PORTAL_HOME_PATH)
   }
 
   const data = await loadManagerDashboard(user)

@@ -63,7 +63,7 @@ export function getPostLoginPath(
     case 'RBT':
       return '/rbt/dashboard'
     case 'BCBA':
-      // External BCBA portal lives under Client Services (CRM elevate gate).
+      // Prefer /portal when CRM roles are portal-only (see getPostLoginPathForCrmUser).
       return CLIENT_SERVICES_HOME_PATH
     case 'TRAINER':
     case 'MARKETING':

@@ -52,7 +52,7 @@ export default function PayRateInput({
           type="button"
           onClick={save}
           disabled={saving}
-          className="text-xs text-[#0D9488] font-medium"
+          className="text-xs text-[#E7692C] font-medium"
         >
           Save
         </button>

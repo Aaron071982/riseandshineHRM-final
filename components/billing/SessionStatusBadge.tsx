@@ -10,7 +10,7 @@ const STATUS_STYLES: Record<ArtemisSessionStatusKey, string> = {
   [ARTEMIS_STATUS.SCHEDULED]: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
   [ARTEMIS_STATUS.INCOMPLETE]: 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
   [ARTEMIS_STATUS.COMPLETED]: 'bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-200',
-  [ARTEMIS_STATUS.READY_TO_BILL]: 'bg-teal-100 text-teal-800 dark:bg-teal-950/40 dark:text-teal-200',
+  [ARTEMIS_STATUS.READY_TO_BILL]: 'bg-[#E7692C]/15 text-[#2A2019] dark:bg-[#2A2019]/15 dark:text-[#E7692C]',
   [ARTEMIS_STATUS.IN_PROGRESS]: 'bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200',
   [ARTEMIS_STATUS.CANCELLED]: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
   [ARTEMIS_STATUS.DELETED]: 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400',

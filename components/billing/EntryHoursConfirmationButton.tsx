@@ -151,8 +151,8 @@ export default function EntryHoursConfirmationButton({
           )}
 
           {sent && (
-            <div className="rounded-lg bg-teal-50 dark:bg-teal-950/30 p-4 text-sm">
-              <p className="font-medium text-teal-900 dark:text-teal-200">Email sent</p>
+            <div className="rounded-lg bg-[#FAF8F4] dark:bg-[#2A2019]/10 p-4 text-sm">
+              <p className="font-medium text-[#2A2019] dark:text-[#E7692C]">Email sent</p>
               <p className="mt-1">
                 Hours confirmation sent to {preview?.email ?? recipientName}.
               </p>
@@ -165,7 +165,7 @@ export default function EntryHoursConfirmationButton({
             </Button>
             {!sent && preview && (
               <Button
-                className="bg-[#0D9488] hover:bg-teal-700 text-white"
+                className="bg-[#E7692C] hover:bg-[#D45C22] text-white"
                 onClick={sendOne}
                 disabled={sending || !preview.canEmail}
                 title={!preview.canEmail ? 'No email or no payable hours' : undefined}

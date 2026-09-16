@@ -32,17 +32,29 @@ export async function generateLs54HrPdfForRbt(
     }
   }
 
-  const overtimeRate = input.overtimeRate || formatOvertimeRate(hourly)
+  const employeeName = input.employeeName.trim()
+  if (!employeeName) {
+    return { ok: false, error: 'Employee name is required for LS-54' }
+  }
+
+  const overtimeParsed = parseHourlyRate(input.overtimeRate)
+  const overtimeRate = (overtimeParsed ?? hourly * 1.5).toFixed(2)
+  const rateOfPay = hourly.toFixed(2)
+
   let filledBuffer: Buffer
   try {
     filledBuffer = await fillLs54Pdf(pdfBytes, {
-      employeeName: input.employeeName,
-      employeeRateOfPay: String(hourly),
+      employeeName,
+      employeeRateOfPay: rateOfPay,
       overtimeRate,
     })
   } catch (fillErr) {
     console.error('[ls54-hr-send] fill PDF', fillErr)
-    return { ok: false, error: 'Failed to fill LS-54 form' }
+    return {
+      ok: false,
+      error: 'Failed to fill LS-54 form',
+      details: fillErr instanceof Error ? fillErr.message : String(fillErr),
+    }
   }
 
   if (!supabaseAdmin) {
@@ -67,9 +79,9 @@ export async function generateLs54HrPdfForRbt(
     buffer: filledBuffer,
     storagePath,
     formMeta: {
-      employeeRateOfPay: String(hourly),
+      employeeRateOfPay: rateOfPay,
       overtimeRate,
-      employeeName: input.employeeName,
+      employeeName,
     },
   }
 }
@@ -79,20 +91,45 @@ export async function regenerateLs54HrPdfFromTask(
   taskId: string,
   rbtProfileId: string
 ): Promise<GenerateLs54HrPdfResult> {
-  const task = await prisma.hRDocumentTask.findFirst({
-    where: { id: taskId, rbtProfileId, documentType: LS54_SLUG },
-    select: { id: true, notes: true, status: true },
-  })
+  const [task, profile] = await Promise.all([
+    prisma.hRDocumentTask.findFirst({
+      where: { id: taskId, rbtProfileId, documentType: LS54_SLUG },
+      select: { id: true, notes: true, status: true },
+    }),
+    prisma.rBTProfile.findUnique({
+      where: { id: rbtProfileId },
+      select: { firstName: true, lastName: true, hourlyPayRate: true },
+    }),
+  ])
   if (!task) return { ok: false, error: 'Task not found' }
+  if (!profile) return { ok: false, error: 'RBT profile not found' }
 
   const meta = parseLs54FormMeta(task.notes)
-  if (!meta) {
-    return { ok: false, error: 'No pay rate data saved for this task — cannot regenerate' }
+  const employeeName =
+    meta?.employeeName ||
+    `${profile.firstName} ${profile.lastName}`.trim()
+  const employeeRateOfPay =
+    meta?.employeeRateOfPay ||
+    (profile.hourlyPayRate != null && profile.hourlyPayRate > 0
+      ? String(profile.hourlyPayRate)
+      : '')
+  const overtimeRate =
+    meta?.overtimeRate ||
+    (parseHourlyRate(employeeRateOfPay)
+      ? formatOvertimeRate(parseHourlyRate(employeeRateOfPay)!)
+      : '')
+
+  if (!employeeRateOfPay) {
+    return {
+      ok: false,
+      error:
+        'No pay rate saved for this task and no hourly rate on the RBT profile — enter a rate and send again, or set hourly pay on the profile.',
+    }
   }
 
   return generateLs54HrPdfForRbt(rbtProfileId, {
-    employeeName: meta.employeeName,
-    employeeRateOfPay: meta.employeeRateOfPay,
-    overtimeRate: meta.overtimeRate,
+    employeeName,
+    employeeRateOfPay,
+    overtimeRate,
   })
 }

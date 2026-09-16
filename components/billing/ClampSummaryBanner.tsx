@@ -17,8 +17,8 @@ export default function ClampSummaryBanner({
 
   if (varianceCount === 0 && needsReviewCount === 0) {
     return (
-      <div className="rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-950 dark:border-teal-900/40 dark:bg-teal-950/20 dark:text-teal-100">
-        <p className="font-medium text-[#0D9488] dark:text-teal-300">Appointed-hours payable</p>
+      <div className="rounded-lg border border-[#2A2019]/15 bg-[#FAF8F4] px-4 py-3 text-sm text-[#2A2019] dark:border-[#2A2019]/20 dark:bg-[#2A2019]/10 dark:text-white/70">
+        <p className="font-medium text-[#E7692C] dark:text-[#E7692C]">Appointed-hours payable</p>
         <p className="mt-1">
           Paying appointment start–end for each session. Actual stay times are shown for reference
           only.
@@ -32,10 +32,10 @@ export default function ClampSummaryBanner({
       className={`rounded-lg border px-4 py-3 text-sm ${
         needsReviewCount > 0
           ? 'border-red-200 bg-red-50 text-red-950 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-100'
-          : 'border-teal-200 bg-teal-50 text-teal-950 dark:border-teal-900/40 dark:bg-teal-950/20 dark:text-teal-100'
+          : 'border-[#2A2019]/15 bg-[#FAF8F4] text-[#2A2019] dark:border-[#2A2019]/20 dark:bg-[#2A2019]/10 dark:text-white/70'
       }`}
     >
-      <p className="font-medium text-[#0D9488] dark:text-teal-300">Appointed-hours payable</p>
+      <p className="font-medium text-[#E7692C] dark:text-[#E7692C]">Appointed-hours payable</p>
       <p className="mt-1">
         Paying appointment start–end (not early/late clock times).{' '}
         {varianceCount > 0 && (

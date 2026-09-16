@@ -42,6 +42,7 @@ type Props = {
   attachmentUrls: Record<string, string>
   status: TreatmentAssessmentStatus
   source: TreatmentAssessmentSource
+  basePath?: '/portal' | '/client-services'
 }
 
 const CRISIS_LABELS: Record<string, string> = {
@@ -123,12 +124,14 @@ export function AssessmentPrintView(props: Props) {
       clientId={props.clientId}
       assessmentId={props.assessmentId}
       clientName={clientName}
+      basePath={props.basePath}
     >
-      <span className="running-client" aria-hidden="true">
-        {clientName} · DOB {dobForFooter}
-      </span>
-
       <section className="assessment-cover">
+        {/* Keep running string inside the first page box — a preceding sibling
+            can make Paged.js emit a blank sheet before the cover. */}
+        <span className="running-client" aria-hidden="true">
+          {clientName} · DOB {dobForFooter}
+        </span>
         <div className="assessment-cover-toprule" aria-hidden="true" />
         <div className="assessment-cover-inner">
           {/* eslint-disable-next-line @next/next/no-img-element */}

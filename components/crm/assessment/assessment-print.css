@@ -106,16 +106,21 @@
 }
 
 /* ——— Cover page ——— */
-/* Exact letter height fills page 1 (@page :first margin: 0) so the company
-   bar can pin to the bottom via flex. No break-after — print-body starts page 2. */
+/* Named page + break-after opens page 2 for .print-body. Height fills the
+   first page box (@page cover / :first margin: 0) so the company bar pins
+   via flex — do NOT also break-before on .print-body (that inserts a blank). */
 .assessment-cover {
   background: #fff;
   box-sizing: border-box;
+  break-after: page;
   display: flex;
   flex-direction: column;
+  /* Full letter — @page cover has margin: 0 during pagination. */
   height: 11in;
   max-height: 11in;
   overflow: hidden;
+  page: cover;
+  page-break-after: always;
   position: relative;
   width: 100%;
 }
@@ -241,8 +246,9 @@
 }
 
 .print-body {
-  break-before: page;
-  page-break-before: always;
+  /* Cover already break-after: page — no break-before here (avoids blank sheet). */
+  break-before: auto;
+  page-break-before: auto;
   padding: 0;
 }
 
@@ -432,6 +438,26 @@
 }
 
 /* Cover: own logo + company band; suppress running chrome */
+@page cover {
+  margin: 0;
+
+  @top-left {
+    content: none;
+  }
+  @top-right {
+    content: none;
+  }
+  @top-center {
+    content: none;
+  }
+  @bottom-left {
+    content: none;
+  }
+  @bottom-right {
+    content: none;
+  }
+}
+
 @page :first {
   margin: 0;
 
@@ -483,15 +509,44 @@
 }
 
 @media print {
+  /*
+   * Paged.js already painted Letter sheets (margins + running headers baked
+   * into .pagedjs_page). Re-applying @page margins here makes each sheet
+   * overflow → blank odd pages in Chrome “Save as PDF”. Zero the print
+   * page box so one .pagedjs_page == one PDF page.
+   */
+  @page {
+    size: Letter;
+    margin: 0 !important;
+  }
+
+  @page cover {
+    margin: 0 !important;
+  }
+
+  @page :first {
+    margin: 0 !important;
+  }
+
   html,
   body {
     background: #fff !important;
+    height: auto !important;
     margin: 0 !important;
+    min-height: 0 !important;
     padding: 0 !important;
   }
 
+  .min-h-screen {
+    min-height: 0 !important;
+  }
+
   .assessment-print-root {
+    align-items: stretch !important;
     background: #fff !important;
+    display: block !important;
+    min-height: 0 !important;
+    width: 100% !important;
   }
 
   .no-print,
@@ -500,25 +555,36 @@
   }
 
   .assessment-print-render {
+    display: block !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: auto !important;
   }
 
   .pagedjs_pages {
-    display: block;
-    gap: 0;
+    display: block !important;
+    gap: 0 !important;
+    margin: 0 !important;
+    width: auto !important;
   }
 
   .pagedjs_page {
-    box-shadow: none;
-    margin: 0;
-    page-break-after: always;
+    box-shadow: none !important;
     break-after: page;
+    margin: 0 !important;
+    max-height: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    page-break-after: always;
   }
 
   .pagedjs_page:last-child {
-    page-break-after: auto;
     break-after: auto;
+    page-break-after: auto;
+  }
+
+  .pagedjs_sheet {
+    margin: 0 !important;
   }
 
   .field-grid,

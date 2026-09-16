@@ -206,6 +206,46 @@ describe('lib/crm/access Phase 17 claim-scoped', () => {
     ).toBe(true)
   })
 
+  it('portal CLINICAL_LEAD / BCBA stay assignment-scoped even on CS email allowlist', () => {
+    const clinicalLead = {
+      id: 'user-cl',
+      email: 'shazia@riseandshineaba.com',
+      crmRoles: ['CLINICAL_LEAD'] as CrmRole[],
+    }
+    const bcba = {
+      id: 'user-bcba',
+      email: 'bcba@outside.test',
+      crmRoles: ['BCBA'] as CrmRole[],
+    }
+    expect(isFullAccess(clinicalLead)).toBe(false)
+    expect(isFullAccess(bcba)).toBe(false)
+    expect(getVisibleClientsWhere(clinicalLead)).toEqual({ deletedAt: null })
+    expect(getVisibleClientsWhere(bcba)).toEqual({
+      AND: [{ deletedAt: null }, { assignedBcbaId: 'user-bcba' }],
+    })
+    expect(
+      canViewClientRecord(bcba, {
+        caseCoordinatorUserId: null,
+        hasClaimGrant: false,
+        assignedBcbaId: 'user-bcba',
+      })
+    ).toBe(true)
+    expect(
+      canViewClientRecord(bcba, {
+        caseCoordinatorUserId: null,
+        hasClaimGrant: false,
+        assignedBcbaId: 'someone-else',
+      })
+    ).toBe(false)
+    expect(
+      canViewClientRecord(clinicalLead, {
+        caseCoordinatorUserId: null,
+        hasClaimGrant: false,
+        assignedBcbaId: null,
+      })
+    ).toBe(true)
+  })
+
   it('email super-admin allowlist is break-glass for isSuperAdmin', () => {
     expect(isSuperAdmin({ id: 'x', email: PLATFORM_OWNER_EMAIL, crmRoles: [] })).toBe(
       true

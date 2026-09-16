@@ -53,8 +53,7 @@ const DEFAULT_BILLING_MANAGER_EMAILS = [
   'fardeenhassansardar12@gmail.com',
   'fardeen@riseandshineaba.com',
   'fardeen@riseandshine.nyc',
-  // Shazia
-  'shaziakhaliq37@gmail.com',
+  // Clinical lead (Shazia) intentionally omitted — portal clinical surfaces only.
 ] as const
 
 export function getBillingManagerEmails(): string[] {
@@ -217,6 +216,15 @@ export const ASSESSMENT_FILES_BUCKET = 'assessment-files'
  * clients/{serviceClientId}/assessments/{assessmentId}/{sectionKey}/{uuid}-{filename}
  */
 export const ASSESSMENT_FILES_PREFIX = 'clients'
+
+/**
+ * Unified payroll pay stubs (financial PII) — private bucket.
+ * Objects live at: payroll-statements/{bcba|rbt}/{payeeKey}/{statementId}.pdf
+ * Never serve via public URLs; use short-lived signed links after app-layer ACL.
+ */
+export const PAYROLL_STATEMENTS_BUCKET = 'payroll-statements'
+
+export const PAYROLL_STATEMENTS_PREFIX = 'payroll-statements'
 
 export { UserRole }
 

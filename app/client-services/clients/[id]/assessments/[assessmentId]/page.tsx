@@ -3,7 +3,11 @@ import { AssessmentFormClient } from '@/components/crm/assessment/AssessmentForm
 import { loadTreatmentAssessmentDetail } from '@/lib/crm/assessment/load'
 import { parseAssessmentRecord } from '@/lib/crm/assessment/serialize'
 import { prisma } from '@/lib/prisma'
-import { getClientServicesUser, assertCanViewClient } from '@/lib/crm/access'
+import {
+  getClientServicesUser,
+  assertCanViewClient,
+  getVisibleClientsWhere,
+} from '@/lib/crm/access'
 import { assertCanViewTreatmentAssessment } from '@/lib/crm/assessment/access'
 
 type Props = { params: Promise<{ id: string; assessmentId: string }> }
@@ -18,7 +22,7 @@ export default async function AssessmentFormPage({ params }: Props) {
   if (!detail) notFound()
 
   const client = await prisma.serviceClient.findFirst({
-    where: { id: clientId, deletedAt: null },
+    where: { id: clientId, ...getVisibleClientsWhere(user) },
     select: { firstName: true, lastName: true },
   })
   if (!client) notFound()

@@ -27,17 +27,28 @@ describe('lib/crm/emails/mailbox', () => {
 })
 
 describe('lib/crm/emails/graphSend flag', () => {
-  it('defaults to disabled', () => {
+  it('defaults to enabled when unset (so missing Vercel env cannot skip sends)', () => {
     const prev = process.env.GRAPH_EMAIL_ENABLED
     delete process.env.GRAPH_EMAIL_ENABLED
-    expect(graphEmailEnabled()).toBe(false)
+    expect(graphEmailEnabled()).toBe(true)
     process.env.GRAPH_EMAIL_ENABLED = prev
   })
 
-  it('enables when env is true (trim/case tolerant)', () => {
+  it('stays enabled for true / yes / 1 / on / enabled / empty-ish truthy', () => {
     const prev = process.env.GRAPH_EMAIL_ENABLED
-    process.env.GRAPH_EMAIL_ENABLED = ' True '
-    expect(graphEmailEnabled()).toBe(true)
+    for (const value of ['true', ' True ', 'yes', 'YES', '1', 'on', 'enabled', 'anything']) {
+      process.env.GRAPH_EMAIL_ENABLED = value
+      expect(graphEmailEnabled()).toBe(true)
+    }
+    process.env.GRAPH_EMAIL_ENABLED = prev
+  })
+
+  it('disables only for explicit false / no / 0 / off / disabled', () => {
+    const prev = process.env.GRAPH_EMAIL_ENABLED
+    for (const value of ['false', 'FALSE', 'no', '0', 'off', 'disabled']) {
+      process.env.GRAPH_EMAIL_ENABLED = value
+      expect(graphEmailEnabled()).toBe(false)
+    }
     process.env.GRAPH_EMAIL_ENABLED = prev
   })
 })

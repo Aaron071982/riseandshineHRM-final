@@ -15,6 +15,8 @@ import {
   normalizeLoginRole,
   roleAllowedInOtpResponse,
 } from '@/lib/auth/postLogin'
+import { getPostLoginPathForCrmUser } from '@/lib/crm/portalRouting'
+import { fetchUserCrmRoles } from '@/lib/crm/access'
 import {
   clearElevatedSessionCookie,
   revokeAllClientServicesElevatedSessions,
@@ -383,7 +385,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const redirectTo = getPostLoginPath(roleNormalized, user.email)
+    let crmRoles: Awaited<ReturnType<typeof fetchUserCrmRoles>> = []
+    try {
+      crmRoles = await fetchUserCrmRoles(user.id)
+    } catch (error) {
+      console.warn('[auth][verify-otp] fetchUserCrmRoles failed', error)
+    }
+    const redirectTo =
+      getPostLoginPathForCrmUser({
+        role: roleNormalized,
+        email: user.email,
+        crmRoles,
+      }) ?? getPostLoginPath(roleNormalized, user.email)
 
     const response = NextResponse.json({
       success: true,

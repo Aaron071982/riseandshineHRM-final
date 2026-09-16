@@ -1,8 +1,6 @@
-import PayrollAdminPage from '@/components/admin/PayrollAdminPage'
+import { redirect } from 'next/navigation'
 
-export const dynamic = 'force-dynamic'
-
-/** Billing managers (non-admin) access the same payroll UI here. */
-export default function BillingPayrollPage() {
-  return <PayrollAdminPage />
+/** Legacy billing payroll path → unified hub (Payroll tab). */
+export default function BillingPayrollRedirect() {
+  redirect('/billing?tab=payroll')
 }

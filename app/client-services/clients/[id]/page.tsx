@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { redirect } from 'next/navigation'
 import ClientCrmDetail from '@/components/crm/ClientCrmDetail'
 import { CrmAccessError } from '@/lib/crm/access'
 import { loadClientCrmDetail } from '@/lib/crm/loadClientDetail'
@@ -19,6 +20,10 @@ export default async function ClientServicesClientPage({
 
   try {
     const data = await loadClientCrmDetail(id)
+    if (data.clinicalSurfaceOnly) {
+      const qs = tab ? `?tab=${encodeURIComponent(tab)}` : ''
+      redirect(`/portal/clients/${id}${qs}`)
+    }
     const serialized = JSON.parse(JSON.stringify(data)) as typeof data
     return (
       <Suspense
@@ -40,6 +45,8 @@ export default async function ClientServicesClientPage({
             weeklyScheduleHours: serialized.weeklyScheduleHours,
             canOverrideStage: serialized.canOverrideStage,
             canEdit: serialized.canEdit,
+            clinicalSurfaceOnly: serialized.clinicalSurfaceOnly,
+            canAssignPortalBcba: serialized.canAssignPortalBcba,
             emailSend: serialized.emailSend,
             billing: serialized.billing,
             treatmentAssessment: serialized.treatmentAssessment,

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { CrmRole } from '@prisma/client'
 import {
+  assertPortalScheduleReadOnly,
+  canMutateClientSchedule,
   canViewClientAsAssignedBcba,
   getBcbaPortalClientsWhere,
   hasBcbaPortalAccess,
@@ -38,6 +40,17 @@ describe('bcbaPortal access', () => {
     expect(isClinicalSurfaceOnly(bcbaPlusIntake)).toBe(false)
   })
 
+  it('keeps clinical surface when email allowlist would otherwise grant full CRM', () => {
+    const leadOnAllowlist = {
+      id: 'lead-2',
+      email: 'shazia@riseandshineaba.com',
+      crmRoles: ['CLINICAL_LEAD'] as CrmRole[],
+      fullAccess: false,
+    }
+    expect(isClinicalSurfaceOnly(leadOnAllowlist)).toBe(true)
+    expect(seesAllClinicalClients(leadOnAllowlist)).toBe(true)
+  })
+
   it('lets clinical lead see all clients; BCBA only assigned', () => {
     expect(seesAllClinicalClients(lead)).toBe(true)
     expect(seesAllClinicalClients(bcba)).toBe(false)
@@ -51,5 +64,13 @@ describe('bcbaPortal access', () => {
     expect(canViewClientAsAssignedBcba(bcba, 'bcba-1')).toBe(true)
     expect(canViewClientAsAssignedBcba(bcba, 'other')).toBe(false)
     expect(canViewClientAsAssignedBcba(lead, 'other')).toBe(true)
+  })
+
+  it('blocks schedule mutations for portal clinical roles', () => {
+    expect(canMutateClientSchedule(bcba)).toBe(false)
+    expect(canMutateClientSchedule(lead)).toBe(false)
+    expect(canMutateClientSchedule(bcbaPlusIntake)).toBe(true)
+    expect(() => assertPortalScheduleReadOnly(bcba)).toThrow(/view-only/i)
+    expect(() => assertPortalScheduleReadOnly(intake)).not.toThrow()
   })
 })

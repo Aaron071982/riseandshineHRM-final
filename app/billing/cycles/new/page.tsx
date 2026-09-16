@@ -261,7 +261,7 @@ export default function NewCycleWizardPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
-        <Link href="/billing/dashboard" className="text-sm text-[#0D9488] hover:underline">
+        <Link href="/billing/dashboard" className="text-sm text-[#E7692C] hover:underline">
           ← Dashboard
         </Link>
         <h2 className="text-2xl font-bold mt-2">New Payroll Cycle</h2>
@@ -274,9 +274,9 @@ export default function NewCycleWizardPage() {
             className={cn(
               'px-3 py-1 rounded-full text-xs font-medium',
               i === step
-                ? 'bg-[#0D9488] text-white'
+                ? 'bg-[#E7692C] text-white'
                 : i < step
-                  ? 'bg-teal-100 text-teal-800'
+                  ? 'bg-[#E7692C]/15 text-[#2A2019]'
                   : 'bg-gray-100 text-gray-500'
             )}
           >
@@ -323,7 +323,7 @@ export default function NewCycleWizardPage() {
             <Button
               onClick={createCycle}
               disabled={loading}
-              className="bg-[#0D9488] hover:bg-teal-700 text-white"
+              className="bg-[#E7692C] hover:bg-[#D45C22] text-white"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Continue to Upload
@@ -352,7 +352,7 @@ export default function NewCycleWizardPage() {
               }}
               className={cn(
                 'border-2 border-dashed rounded-lg p-12 text-center transition-colors',
-                dragOver ? 'border-[#0D9488] bg-teal-50 dark:bg-teal-950/20' : 'border-gray-300'
+                dragOver ? 'border-[#E7692C] bg-[#FAF8F4] dark:bg-[#2A2019]/10' : 'border-gray-300'
               )}
             >
               <Upload className="w-10 h-10 mx-auto text-gray-400 mb-4" />
@@ -369,7 +369,7 @@ export default function NewCycleWizardPage() {
                 }}
               />
               {loading && (
-                <p className="mt-4 text-sm text-[#0D9488] flex items-center justify-center gap-2">
+                <p className="mt-4 text-sm text-[#E7692C] flex items-center justify-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Parsing file…
                 </p>
@@ -382,7 +382,7 @@ export default function NewCycleWizardPage() {
       {step === 2 && (
         <div className="space-y-4">
           {uploadPreview && (
-            <div className="rounded-md bg-teal-50 dark:bg-teal-950/30 px-4 py-3 text-sm text-teal-900 dark:text-teal-200">
+            <div className="rounded-md bg-[#FAF8F4] dark:bg-[#2A2019]/10 px-4 py-3 text-sm text-[#2A2019] dark:text-[#E7692C]">
               {uploadPreview}
             </div>
           )}
@@ -539,7 +539,7 @@ export default function NewCycleWizardPage() {
             </Button>
             <Button
               onClick={() => setStep(4)}
-              className="bg-[#0D9488] hover:bg-teal-700 text-white"
+              className="bg-[#E7692C] hover:bg-[#D45C22] text-white"
             >
               Review & Finalize
             </Button>
@@ -624,7 +624,7 @@ export default function NewCycleWizardPage() {
                 <Button
                   onClick={finalize}
                   disabled={loading || blockers.length > 0}
-                  className="bg-[#0D9488] hover:bg-teal-700 text-white"
+                  className="bg-[#E7692C] hover:bg-[#D45C22] text-white"
                 >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />

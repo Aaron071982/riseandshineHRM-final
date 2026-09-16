@@ -5,6 +5,7 @@ import { NOT_DELETED } from '@/lib/crm/softDelete'
 
 export type BcbaPortalDashboard = {
   greetingName: string
+  credentialsLine: string | null
   clientCount: number
   assessmentMix: { draft: number; inProgress: number; signed: number; completed: number }
   authExpiring30: number
@@ -24,6 +25,7 @@ export type BcbaPortalDashboard = {
     dateOfBirth: Date | null
     stage: string
     assessmentStatus: string | null
+    nextReassessmentDate: Date | null
     authEndDate: Date | null
     updatedAt: Date
   }[]
@@ -33,6 +35,17 @@ function addMonths(d: Date, months: number): Date {
   const out = new Date(d)
   out.setUTCMonth(out.getUTCMonth() + months)
   return out
+}
+
+function nextReassessmentFrom(latest: {
+  status: string
+  signedAt: Date | null
+  updatedAt: Date
+} | null): Date | null {
+  if (!latest) return null
+  if (latest.status !== 'SIGNED' && latest.status !== 'COMPLETED') return null
+  const anchor = latest.signedAt ?? latest.updatedAt
+  return addMonths(anchor, 6)
 }
 
 export async function loadBcbaPortalDashboard(
@@ -78,12 +91,12 @@ export async function loadBcbaPortalDashboard(
   const rows: BcbaPortalDashboard['clients'] = clients.map((c) => {
     const latest = c.treatmentAssessments[0] ?? null
     const status = latest?.status ?? null
-    if (!latest) {
-      // no assessment yet — count as draft backlog for mix? skip
-    } else if (status === 'DRAFT') assessmentMix.draft += 1
-    else if (status === 'IN_PROGRESS') assessmentMix.inProgress += 1
-    else if (status === 'SIGNED') assessmentMix.signed += 1
-    else if (status === 'COMPLETED') assessmentMix.completed += 1
+    if (latest) {
+      if (status === 'DRAFT') assessmentMix.draft += 1
+      else if (status === 'IN_PROGRESS') assessmentMix.inProgress += 1
+      else if (status === 'SIGNED') assessmentMix.signed += 1
+      else if (status === 'COMPLETED') assessmentMix.completed += 1
+    }
 
     const authEnd = c.authorizations[0]?.expirationDate ?? null
     if (authEnd && authEnd >= now && authEnd <= in30) {
@@ -93,14 +106,13 @@ export async function loadBcbaPortalDashboard(
         clientId: c.id,
         clientName: `${c.firstName} ${c.lastName}`.trim(),
         clientCode: c.clientCode,
-        reason: 'Authorization expires within 30 days',
+        reason: 'Authorization ends within 30 days',
       })
     }
 
-    // 6-month reassessment cadence from last signed/completed assessment
+    const nextReassessmentDate = nextReassessmentFrom(latest)
     if (latest && (latest.status === 'SIGNED' || latest.status === 'COMPLETED')) {
-      const anchor = latest.signedAt ?? latest.updatedAt
-      const due = addMonths(anchor, 6)
+      const due = nextReassessmentDate!
       if (due <= in90) {
         reassessmentsDue += 1
         if (due <= now) {
@@ -119,7 +131,7 @@ export async function loadBcbaPortalDashboard(
         clientId: c.id,
         clientName: `${c.firstName} ${c.lastName}`.trim(),
         clientCode: c.clientCode,
-        reason: latest ? 'Assessment in progress' : 'Assessment not started',
+        reason: latest ? 'Assessment in progress' : 'Assessment not started yet',
       })
     }
 
@@ -131,13 +143,23 @@ export async function loadBcbaPortalDashboard(
       dateOfBirth: c.dateOfBirth,
       stage: c.stage,
       assessmentStatus: status,
+      nextReassessmentDate,
       authEndDate: authEnd,
       updatedAt: c.updatedAt,
     }
   })
 
+  const fullName = user.name?.trim() || null
+  const lead = user.crmRoles?.includes('CLINICAL_LEAD')
+  const credentialsLine = fullName
+    ? `${fullName}${lead ? ', Clinical Lead' : ', BCBA'}`
+    : user.email
+      ? `${user.email}`
+      : null
+
   return {
-    greetingName: user.name?.split(' ')[0] || user.email || 'there',
+    greetingName: fullName?.split(' ')[0] || user.email || 'there',
+    credentialsLine,
     clientCount: await prisma.serviceClient.count({
       where: { ...where, ...NOT_DELETED },
     }),

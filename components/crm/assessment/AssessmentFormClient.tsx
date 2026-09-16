@@ -36,6 +36,8 @@ type Props = {
   initialUpdatedAt: string
   attachments: AttachmentRecord[]
   canEdit: boolean
+  /** App base for back/print links. Default Client Services. */
+  basePath?: '/portal' | '/client-services'
 }
 
 export function AssessmentFormClient({
@@ -48,8 +50,10 @@ export function AssessmentFormClient({
   initialUpdatedAt,
   attachments: initialAttachments,
   canEdit,
+  basePath = '/client-services',
 }: Props) {
   const router = useRouter()
+  const clientBase = `${basePath}/clients/${clientId}`
   const [sections, setSections] = useState(() =>
     personalizeAssessmentValue(initialSections, clientName)
   )
@@ -164,7 +168,7 @@ export function AssessmentFormClient({
       <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur px-4 py-3">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
           <div>
-            <Link href={`/client-services/clients/${clientId}?tab=assessment`} className="text-sm text-brand hover:underline">
+            <Link href={`${clientBase}?tab=assessment`} className="text-sm text-brand hover:underline">
               ← {clientName}
             </Link>
             <h1 className="font-display text-lg font-semibold text-ink">Initial Assessment & Treatment Plan</h1>
@@ -175,7 +179,7 @@ export function AssessmentFormClient({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`/client-services/clients/${clientId}/assessments/${assessmentId}/print?auto=1`}
+              href={`${clientBase}/assessments/${assessmentId}/print?auto=1`}
               target="_blank"
               className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas"
             >

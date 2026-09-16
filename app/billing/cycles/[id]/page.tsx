@@ -185,7 +185,7 @@ export default async function CycleDetailPage({ params }: { params: { id: string
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <Link href="/billing/dashboard" className="text-sm text-[#0D9488] hover:underline">
+          <Link href="/billing/dashboard" className="text-sm text-[#E7692C] hover:underline">
             ← Dashboard
           </Link>
           <h2 className="text-2xl font-bold mt-2">{cycle.label}</h2>
@@ -228,33 +228,33 @@ export default async function CycleDetailPage({ params }: { params: { id: string
       )}
 
       {cycle.status === 'REVIEW' && blockers.length === 0 && (
-        <div className="rounded-lg border border-teal-200 bg-teal-50/60 dark:bg-teal-950/20 px-4 py-3 text-sm text-teal-900 dark:text-teal-100">
+        <div className="rounded-lg border border-[#2A2019]/15 bg-[#FAF8F4]/60 dark:bg-[#2A2019]/10 px-4 py-3 text-sm text-[#2A2019] dark:text-white/70">
           Ready to finalize — all providers are matched with pay rates. Confirm payable statuses and
           totals below, then click <strong>Finalize Cycle</strong> (top right).
         </div>
       )}
 
-      <div className="rounded-xl bg-gradient-to-r from-[#0D9488] to-teal-600 text-white p-6 shadow-md">
+      <div className="rounded-xl bg-gradient-to-r from-[#2A2019] to-[#E7692C] text-white p-6 shadow-md">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
           <div>
-            <p className="text-teal-100 text-xs uppercase tracking-wide">BTs</p>
+            <p className="text-white/70 text-xs uppercase tracking-wide">BTs</p>
             <p className="text-3xl font-bold mt-1">{displayStats.rbtCount}</p>
           </div>
           <div>
-            <p className="text-teal-100 text-xs uppercase tracking-wide">Total Hours</p>
+            <p className="text-white/70 text-xs uppercase tracking-wide">Total Hours</p>
             <p className="text-3xl font-bold mt-1">{formatHours(displayStats.totalHours)}</p>
           </div>
           <div>
-            <p className="text-teal-100 text-xs uppercase tracking-wide">Gross Pay</p>
+            <p className="text-white/70 text-xs uppercase tracking-wide">Gross Pay</p>
             <p className="text-3xl font-bold mt-1">{formatUsd(displayStats.totalGrossPay)}</p>
           </div>
           <div>
-            <p className="text-teal-100 text-xs uppercase tracking-wide">Avg Hrs / BT</p>
+            <p className="text-white/70 text-xs uppercase tracking-wide">Avg Hrs / BT</p>
             <p className="text-3xl font-bold mt-1">{avgHours.toFixed(1)}</p>
           </div>
         </div>
         {cycle.sourceFileName && (
-          <p className="text-teal-100 text-xs mt-4">Source: {cycle.sourceFileName}</p>
+          <p className="text-white/70 text-xs mt-4">Source: {cycle.sourceFileName}</p>
         )}
       </div>
 

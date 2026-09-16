@@ -69,8 +69,7 @@ const secondaryBaseWithoutDocs: NavItem[] = [
 
 const themeOrder: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
 
-const billingNavItem: NavItem = { href: '/billing/dashboard', label: 'Billing', icon: DollarSign }
-const payrollNavItem: NavItem = { href: '/admin/payroll', label: 'Payroll', icon: DollarSign }
+const billingNavItem: NavItem = { href: '/billing', label: 'Payroll & Billing', icon: DollarSign }
 const operationsNavItem: NavItem = { href: '/operations', label: 'Operations', icon: LineChart }
 const clientServicesNavItem: NavItem = {
   href: '/client-services',
@@ -82,9 +81,7 @@ const EXEC_ACCENT = '#4F46E5'
 
 function pathIsActive(pathname: string, href: string): boolean {
   if (href === '/admin/org-chart') return pathname.startsWith('/admin/org-chart')
-  if (href === '/billing/dashboard') return pathname.startsWith('/billing') && !pathname.startsWith('/billing/payroll')
-  if (href === '/admin/payroll')
-    return pathname.startsWith('/admin/payroll') || pathname.startsWith('/billing/payroll')
+  if (href === '/billing') return pathname.startsWith('/billing') || pathname.startsWith('/admin/payroll')
   if (href === '/operations') return pathname.startsWith('/operations')
   if (href === '/schedule') return pathname.startsWith('/schedule')
   if (href === '/client-services') return pathname.startsWith('/client-services')
@@ -105,8 +102,7 @@ function pathIsActive(pathname: string, href: string): boolean {
 
 function isPortalHref(href: string): boolean {
   return (
-    href === '/billing/dashboard' ||
-    href === '/admin/payroll' ||
+    href === '/billing' ||
     href === '/operations' ||
     href === '/schedule' ||
     href === '/client-services' ||
@@ -149,7 +145,6 @@ export default function AdminLayout({
     if (!isExecutive) return standardMainNav
     const top: NavItem[] = [{ href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard }]
     if (showBillingNav) {
-      top.push(payrollNavItem)
       top.push(billingNavItem)
     }
     if (showDocumentsNav) {
@@ -182,7 +177,7 @@ export default function AdminLayout({
       return items
     }
     return [
-      ...(showBillingNav ? [billingNavItem, payrollNavItem] : []),
+      ...(showBillingNav ? [billingNavItem] : []),
       ...(showOperationsNav ? [operationsNavItem] : []),
       ...(showClientServicesNav ? [clientServicesNavItem] : []),
       ...(showDocumentsNav ? [documentsNavItem] : []),

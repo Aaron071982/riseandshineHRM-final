@@ -30,6 +30,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfileId: string }) {
   const { showToast } = useToast()
   const [tasks, setTasks] = useState<HrTaskRow[]>([])
+  const [profileHourlyPayRate, setProfileHourlyPayRate] = useState<number | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loadErrorDetails, setLoadErrorDetails] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -61,6 +62,17 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
         return
       }
       setTasks(data.tasks ?? [])
+      const profileRate =
+        typeof data.profileHourlyPayRate === 'number' &&
+        Number.isFinite(data.profileHourlyPayRate) &&
+        data.profileHourlyPayRate > 0
+          ? data.profileHourlyPayRate
+          : null
+      setProfileHourlyPayRate(profileRate)
+      setHourlyRate((prev) => {
+        if (prev.trim()) return prev
+        return profileRate != null ? profileRate.toFixed(2) : ''
+      })
     } catch {
       const msg = 'Failed to load HR documents'
       setLoadError(msg)
@@ -261,11 +273,19 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
                             <p className="font-medium">{LS54_EMPLOYER.employerName}</p>
                           </div>
                           <div>
+                            <span className="text-gray-500">DBA</span>
+                            <p className="font-medium">{LS54_EMPLOYER.dbaName}</p>
+                          </div>
+                          <div>
                             <span className="text-gray-500">Phone</span>
                             <p className="font-medium">{LS54_EMPLOYER.phone}</p>
                           </div>
+                          <div>
+                            <span className="text-gray-500">Preparer</span>
+                            <p className="font-medium">{LS54_EMPLOYER.preparerNameAndTitle}</p>
+                          </div>
                           <div className="sm:col-span-2">
-                            <span className="text-gray-500">Physical address</span>
+                            <span className="text-gray-500">Physical / mailing address</span>
                             <p className="font-medium">{LS54_EMPLOYER.physicalAddress}</p>
                           </div>
                           <div>
@@ -289,6 +309,18 @@ export default function AdminHrInitiatedDocuments({ rbtProfileId }: { rbtProfile
                               value={hourlyRate}
                               onChange={(e) => setHourlyRate(e.target.value)}
                             />
+                            {profileHourlyPayRate != null ? (
+                              <p className="text-xs text-gray-500">
+                                Prefills from RBT profile hourly pay ($
+                                {profileHourlyPayRate.toFixed(2)}). Edit before sending if
+                                needed.
+                              </p>
+                            ) : (
+                              <p className="text-xs text-amber-700">
+                                No hourly pay on this RBT profile yet — enter the rate here
+                                (or set it under Billing → Rates).
+                              </p>
+                            )}
                           </div>
                           <div className="space-y-2">
                             <Label>Overtime rate (1.5×)</Label>

@@ -24,7 +24,7 @@ export async function GET(
     const { id: rbtProfileId } = await params
     const profile = await prisma.rBTProfile.findUnique({
       where: { id: rbtProfileId },
-      select: { id: true, firstName: true, lastName: true },
+      select: { id: true, firstName: true, lastName: true, hourlyPayRate: true },
     })
     if (!profile) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -46,6 +46,11 @@ export async function GET(
     const catalogBySlug = new Map(HR_SLUGS.map((e) => [e.slug, e]))
 
     return NextResponse.json({
+      profileHourlyPayRate:
+        profile.hourlyPayRate != null && Number.isFinite(profile.hourlyPayRate)
+          ? profile.hourlyPayRate
+          : null,
+      employeeName: `${profile.firstName} ${profile.lastName}`.trim(),
       tasks: tasks
         .filter((t) => catalogBySlug.has(t.documentType))
         .map((t) => {

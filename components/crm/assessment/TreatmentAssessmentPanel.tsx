@@ -35,6 +35,8 @@ type Props = {
   hasAssessmentOnFile: boolean
   canEdit: boolean
   canUpload: boolean
+  /** App base for client/assessment URLs. Default Client Services. */
+  basePath?: '/portal' | '/client-services'
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -51,12 +53,14 @@ export function TreatmentAssessmentPanel({
   hasAssessmentOnFile,
   canEdit,
   canUpload,
+  basePath = '/client-services',
 }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
+  const clientBase = `${basePath}/clients/${clientId}`
 
   const onNewForm = () => {
     setError(null)
@@ -66,7 +70,7 @@ export function TreatmentAssessmentPanel({
         setError(result.error)
         return
       }
-      router.push(`/client-services/clients/${clientId}/assessments/${result.assessmentId}`)
+      router.push(`${clientBase}/assessments/${result.assessmentId}`)
     })
   }
 
@@ -128,7 +132,7 @@ export function TreatmentAssessmentPanel({
         setError(result.error)
         return
       }
-      router.push(`/client-services/clients/${clientId}/assessments/${assessmentId}`)
+      router.push(`${clientBase}/assessments/${assessmentId}`)
     })
   }
 
@@ -136,7 +140,7 @@ export function TreatmentAssessmentPanel({
     if (a.source === 'UPLOAD') {
       return `/api/client-services/clients/${clientId}/assessments/${a.id}/download`
     }
-    return `/client-services/clients/${clientId}/assessments/${a.id}/print?auto=1`
+    return `${clientBase}/assessments/${a.id}/print?auto=1`
   }
 
   return (
@@ -197,7 +201,7 @@ export function TreatmentAssessmentPanel({
 
       {assessments.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line p-8 text-center text-sm text-quiet">
-          No assessments yet. Fill a new assessment in-app or upload a completed PDF.
+          No assessment started yet — create one when you&apos;re ready.
         </p>
       ) : (
         <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
@@ -221,15 +225,15 @@ export function TreatmentAssessmentPanel({
               <div className="flex flex-wrap gap-2">
                 {a.source === 'FORM' && a.status !== 'COMPLETED' && a.status !== 'SIGNED' && canEdit && (
                   <Link
-                    href={`/client-services/clients/${clientId}/assessments/${a.id}`}
+                    href={`${clientBase}/assessments/${a.id}`}
                     className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand/90"
                   >
                     Continue
                   </Link>
                 )}
-                {(a.status === 'COMPLETED' || a.status === 'SIGNED') && a.source === 'FORM' && canEdit && (
+                {(a.status === 'COMPLETED' || a.status === 'SIGNED') && a.source === 'FORM' && (
                   <Link
-                    href={`/client-services/clients/${clientId}/assessments/${a.id}`}
+                    href={`${clientBase}/assessments/${a.id}`}
                     className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas"
                   >
                     View

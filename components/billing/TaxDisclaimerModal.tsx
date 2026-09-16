@@ -107,8 +107,8 @@ export default function TaxDisclaimerModal({
           )}
 
           {result && (
-            <div className="rounded-lg bg-teal-50 dark:bg-teal-950/30 p-4 text-sm">
-              <p className="font-medium text-teal-900 dark:text-teal-200">Send complete</p>
+            <div className="rounded-lg bg-[#FAF8F4] dark:bg-[#2A2019]/10 p-4 text-sm">
+              <p className="font-medium text-[#2A2019] dark:text-[#E7692C]">Send complete</p>
               <p className="mt-1">
                 {result.sent} sent · {result.failed} failed · {result.skipped} skipped
               </p>
@@ -121,7 +121,7 @@ export default function TaxDisclaimerModal({
             </Button>
             {!result && preview && (
               <Button
-                className="bg-[#0D9488] hover:bg-teal-700 text-white"
+                className="bg-[#E7692C] hover:bg-[#D45C22] text-white"
                 onClick={sendAll}
                 disabled={sending || preview.recipientCount === 0}
               >

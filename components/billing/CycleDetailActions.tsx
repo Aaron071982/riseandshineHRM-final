@@ -124,7 +124,7 @@ export default function CycleDetailActions({
         )}
         {canFinalize && (
           <Button
-            className="bg-[#0D9488] hover:bg-teal-700 text-white"
+            className="bg-[#E7692C] hover:bg-[#D45C22] text-white"
             onClick={finalize}
             disabled={loading || blockers.length > 0}
             title={blockers.length > 0 ? 'Resolve blockers before finalizing' : undefined}

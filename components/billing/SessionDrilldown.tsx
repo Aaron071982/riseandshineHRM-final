@@ -42,7 +42,7 @@ export default function SessionDrilldown({ sessions }: { sessions: DrilldownSess
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 text-xs text-[#0D9488] font-medium"
+        className="flex items-center gap-1 text-xs text-[#E7692C] font-medium"
       >
         {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         {sessions.length} session{sessions.length !== 1 ? 's' : ''}
@@ -108,7 +108,7 @@ export default function SessionDrilldown({ sessions }: { sessions: DrilldownSess
                       {formatArtemisClockWindow(s.actualStart, s.actualEnd)}
                     </td>
                     <td className="px-2 py-1 text-right tabular-nums">{formatHours(raw / 60)}</td>
-                    <td className="px-2 py-1 text-right tabular-nums font-medium text-[#0D9488]">
+                    <td className="px-2 py-1 text-right tabular-nums font-medium text-[#E7692C]">
                       {formatHours(s.actualMinutes / 60)}
                     </td>
                     <td

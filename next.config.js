@@ -63,6 +63,10 @@ const nextConfig = {
     domains: ['localhost'],
   },
   experimental: {
+    serverComponentsExternalPackages: [
+      'puppeteer-core',
+      '@sparticuz/chromium-min',
+    ],
     // Keep parent form PDFs available to serverless functions that attach them.
     outputFileTracingIncludes: {
       '/api/public/parent-forms/[slug]': [
@@ -70,10 +74,14 @@ const nextConfig = {
         './email-docs/**/*',
         './assets/crm-parent-forms/**/*',
       ],
+      '/api/payroll/statements/[id]/generate': [
+        './public/brand/**/*',
+      ],
       '/*': [
         './public/parent-forms/**/*',
         './email-docs/**/*',
         './assets/crm-parent-forms/**/*',
+        './public/brand/**/*',
       ],
     },
   },

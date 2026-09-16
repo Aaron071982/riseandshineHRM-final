@@ -44,7 +44,7 @@ export default function RecentCyclesList({ cycles }: { cycles: CycleRow[] }) {
             {formatUsd(c.totalGrossPay)}
           </p>
           <div className="flex items-center gap-2">
-            <Link href={`/billing/cycles/${c.id}`} className="text-[#0D9488] text-sm font-medium">
+            <Link href={`/billing/cycles/${c.id}`} className="text-[#E7692C] text-sm font-medium">
               Open →
             </Link>
             <DeleteCycleButton

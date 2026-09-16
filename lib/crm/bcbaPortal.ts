@@ -1,10 +1,15 @@
 import type { CrmRole, Prisma } from '@prisma/client'
 import {
+  CrmAccessError,
   getUserCrmRoles,
   isFullAccess,
   isSuperAdmin,
   type CrmAccessSubject,
 } from '@/lib/crm/access'
+import {
+  FULL_CRM_DEPT_ROLES,
+  isPortalClinicalOnlyRoles,
+} from '@/lib/crm/portalRoles'
 import { NOT_DELETED } from '@/lib/crm/softDelete'
 
 /** Roles that can be selected as a client's Assigned BCBA. */
@@ -13,14 +18,7 @@ export const ASSIGNABLE_BCBA_ROLES: readonly CrmRole[] = [
   'CLINICAL_LEAD',
 ] as const
 
-/** Full-department CRM roles that keep the classic multi-tab client UI. */
-const FULL_CRM_DEPT_ROLES: readonly CrmRole[] = [
-  'INTAKE',
-  'AUTHORIZATION',
-  'STAFFING',
-  'CASE_COORDINATION',
-  'BILLING',
-] as const
+export { FULL_CRM_DEPT_ROLES, isPortalClinicalOnlyRoles }
 
 export function hasCrmRole(
   user: CrmAccessSubject,
@@ -53,24 +51,23 @@ export function hasBcbaPortalAccess(user: CrmAccessSubject): boolean {
 }
 
 /**
- * Overview + Assessment only — external BCBA and clinical lead without
- * other department CRM roles.
+ * Overview + Authorization + Assessment + Schedule (view-only) —
+ * external BCBA and clinical lead without other department CRM roles.
+ * Email allowlist alone does not expand these users into full CRM.
  */
 export function isClinicalSurfaceOnly(user: CrmAccessSubject): boolean {
-  if (isFullAccess(user) || isSuperAdmin(user)) return false
-  const roles = getUserCrmRoles(user)
-  const portal =
-    roles.includes('BCBA') || roles.includes('CLINICAL_LEAD')
-  if (!portal) return false
-  return !roles.some((r) =>
-    (FULL_CRM_DEPT_ROLES as readonly string[]).includes(r)
-  )
+  if (isSuperAdmin(user)) return false
+  return isPortalClinicalOnlyRoles(getUserCrmRoles(user))
 }
 
 /** Clinical lead sees every live client (assignment filter bypass). */
 export function seesAllClinicalClients(user: CrmAccessSubject): boolean {
-  if (isFullAccess(user) || isSuperAdmin(user)) return true
-  return isClinicalLead(user)
+  if (isSuperAdmin(user)) return true
+  if (isClinicalLead(user)) return true
+  if (isFullAccess(user) && !isPortalClinicalOnlyRoles(getUserCrmRoles(user))) {
+    return true
+  }
+  return false
 }
 
 /**
@@ -98,4 +95,20 @@ export function canViewClientAsAssignedBcba(
   if (seesAllClinicalClients(user)) return true
   if (!isExternalBcba(user) || !user.id) return false
   return assignedBcbaId === user.id
+}
+
+/**
+ * Portal clinical roles may view the schedule matrix but must not mutate it.
+ * Call at the top of every schedule write path (UI canEdit=false is not enough).
+ */
+export function assertPortalScheduleReadOnly(user: CrmAccessSubject): void {
+  if (!isClinicalSurfaceOnly(user)) return
+  throw new CrmAccessError(
+    'Schedule is view-only in the BCBA portal. Contact staffing to request changes.',
+    403
+  )
+}
+
+export function canMutateClientSchedule(user: CrmAccessSubject): boolean {
+  return !isClinicalSurfaceOnly(user)
 }

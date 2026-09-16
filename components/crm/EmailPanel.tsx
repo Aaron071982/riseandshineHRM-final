@@ -27,6 +27,8 @@ export type EmailSendContext = {
   canSend: boolean
   blockedReason: string | null
   graphEnabled: boolean
+  /** True when a delegated Graph access token is available (cookie or env). */
+  hasGraphToken?: boolean
   hasMailbox: boolean
   emailConsentOk?: boolean
 }
@@ -49,6 +51,13 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function skipReasonFromBody(body: string | null | undefined): string | null {
+  if (!body) return null
+  const match = body.match(/<!--\s*SKIP_REASON:\s*([\s\S]*?)\s*-->/)
+  const reason = match?.[1]?.trim()
+  return reason || null
 }
 
 function parseAttachmentsJson(raw: unknown): {
@@ -469,11 +478,43 @@ export function EmailPanel({
         </p>
       )}
 
+      <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs text-quiet">
+        Email delivery:{' '}
+        <span className={emailSend.graphEnabled ? 'text-[var(--green)]' : 'text-[var(--urgent)]'}>
+          Graph {emailSend.graphEnabled ? 'on' : 'off'}
+        </span>
+        {' · '}
+        <span className={emailSend.hasMailbox ? 'text-[var(--green)]' : 'text-[var(--urgent)]'}>
+          mailbox {emailSend.hasMailbox ? 'ok' : 'missing'}
+        </span>
+        {' · '}
+        <span
+          className={
+            emailSend.hasGraphToken ? 'text-[var(--green)]' : 'text-[var(--urgent)]'
+          }
+        >
+          Microsoft token {emailSend.hasGraphToken ? 'present' : 'missing — sign in with Microsoft'}
+        </span>
+      </div>
+
       {!emailSend.graphEnabled && (
         <p className="rounded-lg border border-line bg-[var(--sunrise-soft)] px-3 py-2 text-sm text-ink">
-          Outbound email is in preview mode. Sends are recorded as{' '}
-          <strong>SKIPPED</strong> until M365 admin consent enables Graph (
-          <code className="text-xs">GRAPH_EMAIL_ENABLED=true</code>).
+          Outbound Graph sending is kill-switched (
+          <code className="text-xs">GRAPH_EMAIL_ENABLED=false</code>). Remove that
+          env value or set it to <code className="text-xs">true</code>, then redeploy.
+        </p>
+      )}
+      {emailSend.graphEnabled && !emailSend.hasGraphToken && (
+        <p className="rounded-lg border border-line bg-[var(--sunrise-soft)] px-3 py-2 text-sm text-ink">
+          Graph is on, but this session has no Microsoft mailbox token. Sign out and
+          sign back in with your <code className="text-xs">@riseandshineaba.com</code>{' '}
+          Microsoft account so sends can leave your mailbox.
+        </p>
+      )}
+      {emailSend.graphEnabled && !emailSend.hasMailbox && (
+        <p className="rounded-lg border border-line bg-[var(--sunrise-soft)] px-3 py-2 text-sm text-ink">
+          Graph sending is on, but this account is not a Rise &amp; Shine mailbox.
+          Sign in with <code className="text-xs">@riseandshineaba.com</code> to send.
         </p>
       )}
 
@@ -960,7 +1001,12 @@ export function EmailPanel({
                   )}
                   {c.status === 'SKIPPED' && (
                     <p className="mt-0.5 text-sm text-quiet">
-                      Not delivered — Graph sending disabled or no mailbox token.
+                      {(() => {
+                        const reason = skipReasonFromBody(c.body)
+                        return reason
+                          ? `Not delivered — ${reason}`
+                          : 'Not delivered — Graph sending disabled or no mailbox token.'
+                      })()}
                     </p>
                   )}
                   <p className="mt-1 text-xs text-faint">

@@ -1,10 +1,15 @@
 import { cookies } from 'next/headers'
-import { runtimeEnvFlag } from '@/lib/env/runtimeFlag'
+import { runtimeEnvFlagExplicitlyFalse } from '@/lib/env/runtimeFlag'
 import { MICROSOFT_GRAPH_TOKEN_COOKIE } from '@/lib/auth/microsoft'
 
-/** Whether real Microsoft Graph sendMail is enabled (M365 admin consent). */
+/**
+ * Whether real Microsoft Graph sendMail is allowed.
+ *
+ * Defaults to ON (including when the env var is missing) so redeploys cannot
+ * silently SKIP parent emails. Kill-switch only: GRAPH_EMAIL_ENABLED=false|no|0|off|disabled.
+ */
 export function graphEmailEnabled(): boolean {
-  return runtimeEnvFlag('GRAPH_EMAIL_ENABLED')
+  return !runtimeEnvFlagExplicitlyFalse('GRAPH_EMAIL_ENABLED')
 }
 
 export type GraphFileAttachment = {
@@ -199,12 +204,13 @@ async function sendMailViaDraft(
 /**
  * Resolve the signed-in user's delegated Graph token.
  * OAuth flow will populate the cookie; dev may use MICROSOFT_GRAPH_DELEGATED_TOKEN.
+ * Ignore placeholder values like "yes" / "true" that are often mistaken for the enable flag.
  */
 export async function resolveDelegatedGraphToken(
   userId: string
 ): Promise<string | null> {
   const envToken = process.env.MICROSOFT_GRAPH_DELEGATED_TOKEN?.trim()
-  if (envToken) return envToken
+  if (envToken && !isPlaceholderToken(envToken)) return envToken
 
   const cookieStore = await cookies()
   const fromCookie = cookieStore.get(MICROSOFT_GRAPH_TOKEN_COOKIE)?.value?.trim()
@@ -212,6 +218,20 @@ export async function resolveDelegatedGraphToken(
 
   void userId
   return null
+}
+
+function isPlaceholderToken(token: string): boolean {
+  const v = token.trim().toLowerCase()
+  return (
+    v === 'yes' ||
+    v === 'true' ||
+    v === '1' ||
+    v === 'on' ||
+    v === 'enabled' ||
+    v === 'false' ||
+    v === 'no' ||
+    v.length < 20
+  )
 }
 
 export async function sendMailViaGraph(

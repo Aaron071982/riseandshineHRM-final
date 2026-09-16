@@ -12,6 +12,8 @@ export async function assertScheduleClientEdit(
   user: CrmUser,
   serviceClientId: string | null | undefined
 ): Promise<void> {
+  const { assertPortalScheduleReadOnly } = await import('@/lib/crm/bcbaPortal')
+  assertPortalScheduleReadOnly(user)
   if (!serviceClientId) {
     if (!isFullAccess(user)) throw new CrmAccessError('Forbidden', 403)
     return
@@ -35,6 +37,8 @@ export async function assertScheduleClientsEdit(
   user: CrmUser,
   serviceClientIds: (string | null | undefined)[]
 ): Promise<void> {
+  const { assertPortalScheduleReadOnly } = await import('@/lib/crm/bcbaPortal')
+  assertPortalScheduleReadOnly(user)
   if (serviceClientIds.some((id) => !id) && !isFullAccess(user)) {
     throw new CrmAccessError('Forbidden', 403)
   }

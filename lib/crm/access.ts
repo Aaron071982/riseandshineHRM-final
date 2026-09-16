@@ -24,6 +24,7 @@ import {
 } from '@/lib/crm/roleConstants'
 import { NOT_DELETED } from '@/lib/crm/softDelete'
 import { isActiveStaffingCrossListClient } from '@/lib/crm/staffingCoverage'
+import { isPortalClinicalOnlyRoles } from '@/lib/crm/portalRoles'
 
 export {
   CRM_DEPARTMENT_ROLES,
@@ -93,13 +94,17 @@ export function isSuperAdmin(user: CrmAccessSubject): boolean {
 
 /**
  * Full caseload access: SUPER_ADMIN / MANAGEMENT role, or Client Services
- * email allowlist break-glass.
+ * email allowlist break-glass — except portal-only BCBA / CLINICAL_LEAD, who
+ * must stay on assignment / clinical-lead caseload rules.
  */
 export function isFullAccess(user: CrmAccessSubject): boolean {
   if (user.fullAccess === true) return true
   const roles = getUserCrmRoles(user)
   if (roles.includes('SUPER_ADMIN') || roles.includes('MANAGEMENT')) return true
-  return isClientServicesFullAccessEmail(user.email)
+  if (!isClientServicesFullAccessEmail(user.email)) return false
+  // Email allowlist must not override portal BCBA / clinical-lead limits.
+  if (isPortalClinicalOnlyRoles(roles)) return false
+  return true
 }
 
 /** Create clients at INQUIRY — intake staff, management, super-admin, or break-glass allowlist. */

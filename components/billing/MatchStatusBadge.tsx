@@ -41,7 +41,7 @@ const cycleStyles: Record<BillingCycleStatus, string> = {
   DRAFT: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
   REVIEW: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200',
   FINALIZED: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-  PAID: 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300',
+  PAID: 'bg-[#E7692C]/15 text-[#2A2019] dark:bg-[#2A2019]/40 dark:text-[#E7692C]',
 }
 
 export function CycleStatusBadge({ status }: { status: BillingCycleStatus }) {

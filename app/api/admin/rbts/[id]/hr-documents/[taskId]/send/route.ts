@@ -31,27 +31,43 @@ export async function POST(
 
     const { id: rbtProfileId, taskId } = await params
     const body = await request.json().catch(() => ({}))
-    const employeeRateOfPay =
+    let employeeRateOfPay =
       typeof body.employeeRateOfPay === 'string' ? body.employeeRateOfPay.trim() : ''
-
-    const hourly = parseHourlyRate(employeeRateOfPay)
-    if (!hourly) {
-      return NextResponse.json({ error: 'Enter a valid hourly rate of pay' }, { status: 400 })
-    }
-
-    const overtimeRate = formatOvertimeRate(hourly)
 
     const [task, profile] = await Promise.all([
       findHrDocumentTaskForSend(taskId, rbtProfileId),
       prisma.rBTProfile.findUnique({
         where: { id: rbtProfileId },
-        select: { id: true, firstName: true, lastName: true, email: true },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          hourlyPayRate: true,
+        },
       }),
     ])
 
     if (!task || !profile) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
+
+    if (!employeeRateOfPay && profile.hourlyPayRate != null && profile.hourlyPayRate > 0) {
+      employeeRateOfPay = String(profile.hourlyPayRate)
+    }
+
+    const hourly = parseHourlyRate(employeeRateOfPay)
+    if (!hourly) {
+      return NextResponse.json(
+        {
+          error:
+            'Enter a valid hourly rate of pay (or set hourly pay on the RBT profile first)',
+        },
+        { status: 400 }
+      )
+    }
+
+    const overtimeRate = formatOvertimeRate(hourly)
 
     if (task.documentType !== LS54_SLUG) {
       return NextResponse.json({ error: 'This action is only supported for LS-54' }, { status: 400 })
@@ -67,7 +83,7 @@ export async function POST(
     const employeeName = `${profile.firstName} ${profile.lastName}`.trim()
     const generated = await generateLs54HrPdfForRbt(rbtProfileId, {
       employeeName,
-      employeeRateOfPay,
+      employeeRateOfPay: hourly.toFixed(2),
       overtimeRate,
     })
 
@@ -85,7 +101,7 @@ export async function POST(
     const storagePath = generated.storagePath
     const now = new Date()
     const formMeta = {
-      employeeRateOfPay: String(hourly),
+      employeeRateOfPay: hourly.toFixed(2),
       overtimeRate,
       employeeName,
       sentAt: now.toISOString(),

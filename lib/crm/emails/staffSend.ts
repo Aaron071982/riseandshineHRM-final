@@ -539,7 +539,7 @@ export async function sendStaffClientEmail(
         channel: 'EMAIL',
         direction: 'OUTBOUND',
         subject: rendered.subject,
-        body: rendered.html,
+        body: `${rendered.html}\n\n<!-- SKIP_REASON: ${reason.replace(/-->/g, '')} -->`,
         ccRecipients: ccStored,
         attachmentsJson: attachJson,
         sentByUserId: user.id,
@@ -580,8 +580,8 @@ export async function sendStaffClientEmail(
       .join('; ')
     return recordSkipped(
       detail
-        ? `GRAPH_EMAIL_ENABLED is not true — recorded without sending (${detail})`
-        : 'GRAPH_EMAIL_ENABLED is not true — recorded without sending'
+        ? `GRAPH_EMAIL_ENABLED kill-switch is on — recorded without sending (${detail})`
+        : 'GRAPH_EMAIL_ENABLED kill-switch is on — recorded without sending'
     )
   }
 

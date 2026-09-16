@@ -4,6 +4,8 @@ import {
   getPostLoginPath,
   normalizeLoginRole,
 } from '@/lib/auth/postLogin'
+import { getPostLoginPathForCrmUser } from '@/lib/crm/portalRouting'
+import { fetchUserCrmRoles } from '@/lib/crm/access'
 import {
   MICROSOFT_GRAPH_TOKEN_COOKIE,
   MICROSOFT_NONCE_COOKIE,
@@ -154,7 +156,20 @@ export async function GET(request: NextRequest) {
   })
 
   const loginRole = normalizeLoginRole(user.role)
-  const redirectTo = getPostLoginPath(loginRole, email) ?? '/admin/dashboard'
+  let crmRoles: Awaited<ReturnType<typeof fetchUserCrmRoles>> = []
+  try {
+    crmRoles = await fetchUserCrmRoles(user.id)
+  } catch (error) {
+    console.warn('[auth][microsoft] fetchUserCrmRoles failed', error)
+  }
+  const redirectTo =
+    getPostLoginPathForCrmUser({
+      role: loginRole,
+      email,
+      crmRoles,
+    }) ??
+    getPostLoginPath(loginRole, email) ??
+    '/admin/dashboard'
   const response = NextResponse.redirect(new URL(redirectTo, request.url), { status: 302 })
   const secure = process.env.NODE_ENV === 'production'
 

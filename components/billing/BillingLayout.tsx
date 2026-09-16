@@ -4,15 +4,34 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, DollarSign, LogOut, Menu, X, ArrowLeft } from 'lucide-react'
+import {
+  LayoutDashboard,
+  DollarSign,
+  LogOut,
+  Menu,
+  X,
+  ArrowLeft,
+  Receipt,
+} from 'lucide-react'
 import { useState } from 'react'
 import Image from 'next/image'
+import { PAYROLL_THEME as T } from '@/lib/payroll/theme'
 
 const nav = [
-  { href: '/billing/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/billing/rates', label: 'Pay Rates', icon: DollarSign },
-  { href: '/billing/payroll', label: 'Payroll', icon: DollarSign },
+  { href: '/billing', label: 'Payroll & Billing', match: (p: string) => p === '/billing' || p === '/billing/' },
+  { href: '/billing/rates', label: 'Pay Rates', match: (p: string) => p.startsWith('/billing/rates') },
+  {
+    href: '/billing/cycles/new',
+    label: 'New cycle',
+    match: (p: string) => p.startsWith('/billing/cycles'),
+  },
 ]
+
+const icons = {
+  '/billing': LayoutDashboard,
+  '/billing/rates': DollarSign,
+  '/billing/cycles/new': Receipt,
+} as const
 
 export default function BillingLayout({
   children,
@@ -35,10 +54,8 @@ export default function BillingLayout({
   const NavLinks = () => (
     <>
       {nav.map((item) => {
-        const Icon = item.icon
-        const active =
-          pathname === item.href ||
-          (item.href !== '/billing/dashboard' && pathname.startsWith(item.href))
+        const Icon = icons[item.href as keyof typeof icons]
+        const isActive = item.match(pathname)
         return (
           <Link
             key={item.href}
@@ -46,10 +63,11 @@ export default function BillingLayout({
             onClick={() => setMobileOpen(false)}
             className={cn(
               'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-              active
-                ? 'bg-[#0D9488] text-white'
-                : 'text-gray-700 dark:text-gray-200 hover:bg-teal-50 dark:hover:bg-teal-950/30'
+              isActive
+                ? 'text-white'
+                : 'text-[#2A2019]/75 hover:bg-[#2A2019]/06'
             )}
+            style={isActive ? { backgroundColor: T.espresso } : undefined}
           >
             <Icon className="w-4 h-4" />
             {item.label}
@@ -60,8 +78,14 @@ export default function BillingLayout({
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[var(--bg-primary)]">
-      <header className="bg-[#0D9488] text-white border-b border-teal-700">
+    <div className="min-h-screen" style={{ backgroundColor: T.surface }}>
+      <header
+        className="text-white border-b"
+        style={{
+          backgroundColor: T.espresso,
+          borderColor: 'rgba(255,255,255,0.08)',
+        }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
@@ -73,9 +97,11 @@ export default function BillingLayout({
                 className="object-contain bg-white rounded-full p-0.5 shrink-0"
               />
               <div className="min-w-0">
-                <h1 className="text-lg font-bold truncate">Billing & Payroll</h1>
-                <p className="text-teal-100 text-sm truncate">
-                  Upload Artemis reports and generate payroll
+                <h1 className="text-lg font-display font-bold truncate">
+                  Payroll &amp; Billing
+                </h1>
+                <p className="text-sm truncate opacity-70">
+                  1099 contractors · RBT reconciliation · Artemis cycles
                 </p>
               </div>
             </div>
@@ -84,7 +110,7 @@ export default function BillingLayout({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-white hover:bg-teal-700 hover:text-white"
+                  className="text-white hover:bg-white/10 hover:text-white"
                   asChild
                 >
                   <Link href="/admin/dashboard">
@@ -93,14 +119,14 @@ export default function BillingLayout({
                   </Link>
                 </Button>
               )}
-              <span className="text-sm text-teal-100 hidden lg:inline truncate max-w-[160px]">
+              <span className="text-sm opacity-70 hidden lg:inline truncate max-w-[160px]">
                 {userName}
               </span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={logout}
-                className="text-white hover:bg-teal-700 hover:text-white"
+                className="text-white hover:bg-white/10 hover:text-white"
               >
                 <LogOut className="w-4 h-4 mr-1" />
                 Logout
@@ -109,7 +135,7 @@ export default function BillingLayout({
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden text-white hover:bg-teal-700"
+              className="md:hidden text-white hover:bg-white/10"
               onClick={() => setMobileOpen(!mobileOpen)}
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -119,19 +145,26 @@ export default function BillingLayout({
       </header>
 
       <div className="flex flex-col md:flex-row max-w-7xl mx-auto">
-        <aside className="hidden md:block w-56 shrink-0 p-4 border-r border-gray-200 dark:border-[var(--border-subtle)]">
+        <aside
+          className="hidden md:block w-56 shrink-0 p-4 border-r"
+          style={{ borderColor: T.border }}
+        >
           <nav className="flex flex-col gap-1">
             <NavLinks />
           </nav>
         </aside>
 
         {mobileOpen && (
-          <div className="md:hidden border-b border-gray-200 dark:border-[var(--border-subtle)] bg-white dark:bg-[var(--bg-elevated)] p-3 space-y-1">
+          <div
+            className="md:hidden border-b bg-white p-3 space-y-1"
+            style={{ borderColor: T.border }}
+          >
             <NavLinks />
             {isAdmin && (
               <Link
                 href="/admin/dashboard"
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200"
+                className="flex items-center gap-2 px-3 py-2 text-sm"
+                style={{ color: T.espresso }}
                 onClick={() => setMobileOpen(false)}
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -141,7 +174,8 @@ export default function BillingLayout({
             <button
               type="button"
               onClick={logout}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 w-full"
+              className="flex items-center gap-2 px-3 py-2 text-sm w-full"
+              style={{ color: T.espresso }}
             >
               <LogOut className="w-4 h-4" />
               Logout

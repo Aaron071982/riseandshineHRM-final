@@ -69,12 +69,12 @@ export default function PayableStatusesControl({
   }
 
   return (
-    <div className="rounded-lg border border-teal-200 dark:border-teal-900/40 bg-teal-50/50 dark:bg-teal-950/20 p-4">
+    <div className="rounded-lg border border-[#2A2019]/15 dark:border-[#2A2019]/20 bg-[#FAF8F4] dark:bg-[#2A2019]/10 p-4">
       <div className="flex items-center justify-between gap-2 mb-3">
         <p className="font-semibold text-sm text-gray-900 dark:text-[var(--text-primary)]">
           Payable Statuses
         </p>
-        {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0D9488]" />}
+        {loading && <Loader2 className="w-4 h-4 animate-spin text-[#E7692C]" />}
       </div>
       <p className="text-xs text-gray-600 mb-3">
         Choose which session statuses count toward pay this cycle. Cancelled and Deleted are always

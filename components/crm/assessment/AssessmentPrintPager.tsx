@@ -7,6 +7,8 @@ type Props = {
   assessmentId: string
   clientName: string
   children: React.ReactNode
+  /** Back-link base when leaving print preview. */
+  basePath?: '/portal' | '/client-services'
 }
 
 /**
@@ -18,6 +20,7 @@ export function AssessmentPrintPager({
   assessmentId,
   clientName,
   children,
+  basePath = '/client-services',
 }: Props) {
   const sourceRef = useRef<HTMLDivElement>(null)
   const renderRef = useRef<HTMLDivElement>(null)
@@ -115,8 +118,9 @@ export function AssessmentPrintPager({
           {!failed && (
             <>
               {' '}
-              Enable <strong>Background graphics</strong> in the print dialog so
-              orange headers and charts print correctly.
+              In the print dialog set <strong>Margins: None</strong> and enable{' '}
+              <strong>Background graphics</strong> so pages and orange headers
+              print correctly.
             </>
           )}
         </p>
@@ -129,7 +133,7 @@ export function AssessmentPrintPager({
             className="secondary"
             onClick={() =>
               window.open(
-                `/client-services/clients/${clientId}/assessments/${assessmentId}`,
+                `${basePath}/clients/${clientId}/assessments/${assessmentId}`,
                 '_self'
               )
             }

@@ -506,6 +506,7 @@ model User {
   documentAccessLogs            DocumentAccessLog[]
   sensitiveAccessLogs           SensitiveAccessLog[]
   oauthAccessTokens             OAuthAccessToken[]
+  contractorProfile             ContractorProfile?
 
   @@map("users")
 }
@@ -798,6 +799,9 @@ model RBTProfile {
   quizCertificates            OnboardingQuizCertificate[]
   oigScreeningLogs            OigScreeningLog[]
   hourlyPayRate               Float?
+  payRates                    PayRate[]       @relation("PayRateRbtStaff")
+  unifiedPayStatements        PayStatement[]  @relation("PayStatementRbtStaff")
+
   artemisProviderName         String?
   /// Remembered "Last, First" from payroll register uploads (like artemisProviderName)
   payrollName                 String?
@@ -4198,5 +4202,132 @@ model OrgTrainingCompletion {
   @@index([userId])
   @@index([moduleId])
   @@map("org_training_completions")
+}
+
+// ─── Unified payroll domain (Prompt 3) ───────────────────────────────────────
+
+enum PayeeType {
+  BCBA
+  RBT
+}
+
+enum PayStatementStatus {
+  DRAFT
+  READY
+  SENT
+}
+
+enum LineSource {
+  MANUAL
+  RECONCILIATION
+}
+
+/// BCBA / clinical 1099 payee linked to a User.
+model ContractorProfile {
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  legalName      String
+  entityName     String?
+  classification String  @default("1099")
+  activeRateId   String? @unique
+
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeRate   PayRate?       @relation("ContractorActiveRate", fields: [activeRateId], references: [id], onDelete: SetNull)
+  rates        PayRate[]      @relation("ContractorRates")
+  statements   PayStatement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contractor_profiles")
+}
+
+model PayRate {
+  id            String    @id @default(cuid())
+  contractorId  String?
+  /// RBTProfile id when payeeType is RBT.
+  staffId       String?
+  ratePerHour   Decimal   @db.Decimal(10, 2)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+
+  contractor     ContractorProfile?  @relation("ContractorRates", fields: [contractorId], references: [id], onDelete: Cascade)
+  rbtProfile     RBTProfile?         @relation("PayRateRbtStaff", fields: [staffId], references: [id], onDelete: Cascade)
+  activeFor      ContractorProfile?  @relation("ContractorActiveRate")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([contractorId, effectiveFrom])
+  @@index([staffId, effectiveFrom])
+  @@map("pay_rates")
+}
+
+model PayPeriod {
+  id        String   @id @default(cuid())
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  payDate   DateTime @db.Date
+  label     String
+
+  statements PayStatement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([startDate, endDate])
+  @@map("pay_periods")
+}
+
+model PayStatement {
+  id           String             @id @default(cuid())
+  payPeriodId  String
+  payeeType    PayeeType
+  contractorId String?
+  /// RBTProfile id when payeeType is RBT.
+  staffId      String?
+  status       PayStatementStatus @default(DRAFT)
+  totalHours   Decimal            @db.Decimal(10, 2)
+  grossPay     Decimal            @db.Decimal(12, 2)
+  deductions   Decimal            @default(0) @db.Decimal(12, 2)
+  netPay       Decimal            @db.Decimal(12, 2)
+  /// false when an override makes grossPay ≠ Σ line item amounts.
+  reconciled   Boolean            @default(true)
+  pdfUrl       String?
+  sentAt       DateTime?
+
+  payPeriod  PayPeriod          @relation(fields: [payPeriodId], references: [id], onDelete: Cascade)
+  contractor ContractorProfile? @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  rbtProfile RBTProfile?        @relation("PayStatementRbtStaff", fields: [staffId], references: [id], onDelete: Cascade)
+  lineItems  PayLineItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([payPeriodId, payeeType, contractorId, staffId])
+  @@index([payeeType, status])
+  @@index([staffId])
+  @@index([contractorId])
+  @@map("pay_statements")
+}
+
+model PayLineItem {
+  id             String     @id @default(cuid())
+  payStatementId String
+  workDate       DateTime   @db.Date
+  /// h.mm clock strings, e.g. "4.30" (.30 = 30 minutes).
+  startClock     String
+  endClock       String
+  hours          Decimal    @db.Decimal(10, 2)
+  amount         Decimal    @db.Decimal(12, 2)
+  source         LineSource
+
+  payStatement PayStatement @relation(fields: [payStatementId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([payStatementId, workDate])
+  @@map("pay_line_items")
 }
 

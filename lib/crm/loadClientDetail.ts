@@ -11,7 +11,7 @@ import {
 import { stageIndex } from '@/lib/crm/stages'
 import { hoursBetween } from '@/lib/rbt-schedule/utils'
 import { allowedTemplatesForUser } from '@/lib/crm/emails/templatePolicy'
-import { graphEmailEnabled } from '@/lib/crm/emails/graphSend'
+import { graphEmailEnabled, resolveDelegatedGraphToken } from '@/lib/crm/emails/graphSend'
 import { hasRiseAndShineMailbox, mailboxBlockedReason } from '@/lib/crm/emails/mailbox'
 import { ensureClientRequirements } from '@/lib/crm/ensureRequirements'
 import { ensureCanonicalOwnerDept } from '@/lib/crm/ensureOwnerDept'
@@ -302,6 +302,7 @@ export async function loadClientCrmDetail(clientId: string) {
         ? 'Claim this client or be assigned as case coordinator to send email.'
         : mailboxReason ?? null,
       graphEnabled: graphEmailEnabled(),
+      hasGraphToken: !!(await resolveDelegatedGraphToken(user.id)),
       hasMailbox: hasRiseAndShineMailbox(user.email),
       emailConsentOk,
     },

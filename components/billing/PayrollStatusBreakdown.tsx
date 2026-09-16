@@ -240,7 +240,7 @@ export default function PayrollStatusBreakdown({
           <div className="flex gap-2 pb-1 ml-auto">
             <Link
               href={exportFilteredHref}
-              className="text-xs text-[#0D9488] hover:underline whitespace-nowrap"
+              className="text-xs text-[#E7692C] hover:underline whitespace-nowrap"
             >
               Export filtered
             </Link>
@@ -256,7 +256,7 @@ export default function PayrollStatusBreakdown({
 
       <div className="overflow-x-auto rounded-lg border dark:border-[var(--border-subtle)]">
         <table className="min-w-full text-sm">
-          <thead className="bg-[#0D9488] text-white">
+          <thead className="bg-[#E7692C] text-white">
             <tr>
               <th
                 className="px-3 py-2 text-left cursor-pointer text-xs font-semibold"
