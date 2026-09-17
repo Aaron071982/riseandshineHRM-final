@@ -1,10 +1,11 @@
 import {
   PDFBool,
+  PDFCheckBox,
   PDFDocument,
   PDFName,
+  PDFTextField,
   StandardFonts,
   type PDFForm,
-  type PDFTextField,
 } from 'pdf-lib'
 import {
   LS54_REQUIRED_TEXT_FIELDS,
@@ -27,16 +28,17 @@ function applyFieldValues(
       missing.push(fieldName)
       continue
     }
-    const fieldType = field.constructor.name
     try {
-      if (fieldType === 'PDFTextField') {
-        ;(field as PDFTextField).setText(String(value))
+      // Use instanceof — constructor.name breaks under Next.js production minify.
+      if (field instanceof PDFTextField) {
+        field.setText(String(value))
         applied.push(fieldName)
-      } else if (fieldType === 'PDFCheckBox') {
-        const box = form.getCheckBox(fieldName)
-        if (value === true || value === 'true' || value === '1') box.check()
-        else box.uncheck()
+      } else if (field instanceof PDFCheckBox) {
+        if (value === true || value === 'true' || value === '1') field.check()
+        else field.uncheck()
         applied.push(fieldName)
+      } else {
+        missing.push(fieldName)
       }
     } catch (err) {
       console.error(`[ls54-pdf] failed to set ${fieldName}`, err)
@@ -75,12 +77,11 @@ async function burnTextFieldsOntoPages(pdfDoc: PDFDocument, form: PDFForm): Prom
   if (!page) return
 
   for (const field of form.getFields()) {
-    if (field.constructor.name !== 'PDFTextField') continue
-    const textField = field as PDFTextField
-    const text = textField.getText()?.trim()
+    if (!(field instanceof PDFTextField)) continue
+    const text = field.getText()?.trim()
     if (!text) continue
 
-    for (const widget of textField.acroField.getWidgets()) {
+    for (const widget of field.acroField.getWidgets()) {
       const rect = widget.getRectangle()
       const fontSize = Math.min(10, Math.max(7, rect.height * 0.7))
       page.drawText(text, {
@@ -100,11 +101,10 @@ function markCheckedBoxesVisually(pdfDoc: PDFDocument, form: PDFForm): void {
   if (!page) return
 
   for (const field of form.getFields()) {
-    if (field.constructor.name !== 'PDFCheckBox') continue
+    if (!(field instanceof PDFCheckBox)) continue
     try {
-      const box = form.getCheckBox(field.getName())
-      if (!box.isChecked()) continue
-      for (const widget of box.acroField.getWidgets()) {
+      if (!field.isChecked()) continue
+      for (const widget of field.acroField.getWidgets()) {
         const rect = widget.getRectangle()
         const inset = 2
         page.drawLine({

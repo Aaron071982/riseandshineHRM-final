@@ -1,4 +1,11 @@
-import { PDFDocument, StandardFonts } from 'pdf-lib'
+import {
+  PDFCheckBox,
+  PDFDocument,
+  PDFDropdown,
+  PDFRadioGroup,
+  PDFTextField,
+  StandardFonts,
+} from 'pdf-lib'
 
 /**
  * Fills a PDF form with field values and returns a filled PDF as a Blob
@@ -20,7 +27,7 @@ export async function fillPdfWithValues(
     const fields = form.getFields()
 
     // Create a map of field names to field objects for easier lookup
-    const fieldMap = new Map<string, any>()
+    const fieldMap = new Map<string, (typeof fields)[number]>()
     fields.forEach((field) => {
       const name = field.getName()
       fieldMap.set(name, field)
@@ -38,34 +45,21 @@ export async function fillPdfWithValues(
           continue
         }
 
-        const fieldType = field.constructor.name
-
-        switch (fieldType) {
-          case 'PDFTextField':
-            // Text field
-            field.setText(String(value))
-            break
-
-          case 'PDFCheckBox':
-            // Checkbox - value should be boolean or truthy/falsy
-            if (value === true || value === 'true' || value === '1') {
-              field.check()
-            } else {
-              field.uncheck()
-            }
-            break
-
-          case 'PDFDropdown':
-          case 'PDFRadioGroup':
-            // Dropdown or radio button - select the value
-            try {
-              field.select(String(value))
-            } catch (selectError) {
-              // Value might not be a valid option, try to find similar
-            }
-            break
-
-          default:
+        // instanceof survives Next.js production minify; constructor.name does not.
+        if (field instanceof PDFTextField) {
+          field.setText(String(value))
+        } else if (field instanceof PDFCheckBox) {
+          if (value === true || value === 'true' || value === '1') {
+            field.check()
+          } else {
+            field.uncheck()
+          }
+        } else if (field instanceof PDFDropdown || field instanceof PDFRadioGroup) {
+          try {
+            field.select(String(value))
+          } catch {
+            // Value might not be a valid option
+          }
         }
       } catch (fieldError) {
         console.error(`Error filling field "${fieldName}":`, fieldError)
@@ -100,4 +94,3 @@ export async function fillPdfWithValues(
     throw new Error(`Failed to fill PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
-
