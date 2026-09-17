@@ -85,6 +85,14 @@
   width: 100%;
 }
 
+/* Flow root Paged.js fragments into pages — never inherit screen max-width */
+.assessment-print-doc {
+  margin: 0;
+  max-width: none;
+  padding: 0;
+  width: 100%;
+}
+
 .assessment-print-render {
   align-items: center;
   display: flex;
@@ -517,7 +525,11 @@
   /*
    * Paged.js already painted Letter sheets (margins + running headers baked
    * into .pagedjs_page). Zero the print page box so one sheet == one PDF page.
-   * Do not clip with overflow:hidden — that chops headers/footers.
+   *
+   * CRITICAL: constrain html/body/wrappers to Letter width. `width: auto` on
+   * the render tree lets the layout use the browser viewport (~1200px). Chrome
+   * then shrink-to-fits the whole document onto Letter → content paints at ~67%
+   * in the left column with a blank strip on the right.
    */
   @page {
     size: Letter;
@@ -533,20 +545,28 @@
     background: #fff !important;
     height: auto !important;
     margin: 0 !important;
+    max-width: 8.5in !important;
     min-height: 0 !important;
     padding: 0 !important;
+    width: 8.5in !important;
   }
 
   .min-h-screen {
     min-height: 0 !important;
+    max-width: 8.5in !important;
+    width: 8.5in !important;
   }
 
   .assessment-print-root {
     align-items: stretch !important;
     background: #fff !important;
     display: block !important;
+    margin: 0 !important;
+    max-width: 8.5in !important;
     min-height: 0 !important;
-    width: 100% !important;
+    padding: 0 !important;
+    transform: none !important;
+    width: 8.5in !important;
   }
 
   .no-print,
@@ -554,18 +574,23 @@
     display: none !important;
   }
 
-  .assessment-print-render {
+  .assessment-print-render,
+  .assessment-print-source,
+  .assessment-print-doc {
     display: block !important;
     margin: 0 !important;
+    max-width: none !important;
     padding: 0 !important;
-    width: auto !important;
+    width: 100% !important;
   }
 
   .pagedjs_pages {
+    align-items: stretch !important;
     display: block !important;
     gap: 0 !important;
     margin: 0 !important;
-    width: auto !important;
+    max-width: none !important;
+    width: 100% !important;
   }
 
   .pagedjs_page {
@@ -573,6 +598,7 @@
     break-after: page;
     height: 11in !important;
     margin: 0 !important;
+    max-width: 8.5in !important;
     overflow: visible !important;
     page-break-after: always;
     width: 8.5in !important;
@@ -583,11 +609,37 @@
     page-break-after: auto;
   }
 
+  .pagedjs_sheet,
+  .pagedjs_pagebox,
+  .pagedjs_area {
+    margin: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
   .pagedjs_sheet {
     height: 11in !important;
-    margin: 0 !important;
-    overflow: visible !important;
-    width: 8.5in !important;
+  }
+
+  /* Flowed body must fill the page content box — kill screen max-width / mx-auto */
+  .pagedjs_page_content,
+  .pagedjs_page_content > * {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  .assessment-cover,
+  .assessment-cover-toprule,
+  .assessment-cover-company,
+  .section-band,
+  .print-body,
+  .print-section,
+  .print-table {
+    max-width: none !important;
+    width: 100% !important;
   }
 
   .field-grid,

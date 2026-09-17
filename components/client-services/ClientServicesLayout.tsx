@@ -199,8 +199,10 @@ export default function ClientServicesLayout({
     )
   }
 
+  // Bare document — no sidebar, no max-width shell. Width must stay Letter
+  // for print or Chrome shrink-to-fits the viewport into a left column.
   if (onAssessmentPrint || onCaseCoordinationPrint) {
-    return <div className="min-h-screen bg-[var(--bg)]">{children}</div>
+    return <>{children}</>
   }
 
   return (

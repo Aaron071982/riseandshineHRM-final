@@ -71,7 +71,15 @@ export function AssessmentPrintPager({
         if (cancelled) return
 
         // Clone so React can keep ownership of `source` after setState.
+        // Drop the screen-only source wrapper (max-width / padding) so Paged.js
+        // measures at the full @page content width — not a narrow preview column.
         const clone = source.cloneNode(true) as HTMLElement
+        clone.classList.remove('assessment-print-source', 'is-paged')
+        clone.classList.add('assessment-print-doc')
+        clone.style.maxWidth = 'none'
+        clone.style.width = '100%'
+        clone.style.margin = '0'
+        clone.style.padding = '0'
         source.classList.add('is-paged')
         renderTo.innerHTML = ''
         const previewer = new Previewer()
