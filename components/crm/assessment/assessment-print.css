@@ -85,14 +85,6 @@
   width: 100%;
 }
 
-/* Flow root Paged.js fragments into pages — never inherit screen max-width */
-.assessment-print-doc {
-  margin: 0;
-  max-width: none;
-  padding: 0;
-  width: 100%;
-}
-
 .assessment-print-render {
   align-items: center;
   display: flex;
@@ -114,8 +106,8 @@
 }
 
 /* ——— Cover page ——— */
-/* Exact letter height fills page 1 (@page :first margin: 0) so the company
-   bar can pin to the bottom via flex. No break-after — print-body starts page 2. */
+/* Full letter-height cover so the company bar can pin to the page bottom.
+   No break-after — print-body starts page 2. */
 .assessment-cover {
   background: #fff;
   box-sizing: border-box;
@@ -140,9 +132,9 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  justify-content: center;
   min-height: 0;
-  padding: 28px 40px 20px;
+  /* Leave room for the absolutely pinned company bar */
+  padding: 36px 48px 110px;
   text-align: center;
 }
 
@@ -192,8 +184,8 @@
   gap: 8px 36px;
   grid-template-columns: 1fr 1fr;
   margin: 0 auto;
-  max-width: none;
-  padding: 22px 28px;
+  max-width: 720px;
+  padding: 22px 26px;
   text-align: left;
   width: 100%;
 }
@@ -223,15 +215,17 @@
   align-items: flex-end;
   background: var(--rs-ink);
   border-top: 3px solid var(--rs-orange);
+  bottom: 0;
   color: #f5efe8;
   display: flex;
-  flex: 0 0 auto;
   font-size: 9.5pt;
   gap: 16px;
   justify-content: space-between;
+  left: 0;
   line-height: 1.45;
-  margin-top: auto;
   padding: 18px 48px 22px;
+  position: absolute;
+  right: 0;
   width: 100%;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -402,13 +396,9 @@
 }
 
 /* ——— Paged Media (Paged.js polyfill) ——— */
-/*
- * Content fills most of the letter sheet. Top/bottom reserve a chrome band
- * for running header + footer; sides stay tight so tables/sections use the page.
- */
 @page {
   size: Letter;
-  margin: 0.65in 0.55in 0.6in 0.55in;
+  margin: 22mm 16mm 20mm 16mm;
 
   @top-left {
     color: #2a2019;
@@ -416,8 +406,6 @@
     font-family: var(--font-display), 'Bricolage Grotesque', Georgia, serif;
     font-size: 10pt;
     font-weight: 700;
-    vertical-align: bottom;
-    padding-bottom: 6px;
   }
 
   @top-right {
@@ -425,14 +413,10 @@
     content: 'Initial Assessment and Treatment Plan';
     font-family: var(--font-sans), Inter, system-ui, sans-serif;
     font-size: 8.5pt;
-    vertical-align: bottom;
-    padding-bottom: 6px;
   }
 
   @top-center {
     content: '';
-    vertical-align: bottom;
-    padding-bottom: 6px;
   }
 
   @bottom-left {
@@ -440,8 +424,6 @@
     content: string(clientident);
     font-family: var(--font-sans), Inter, system-ui, sans-serif;
     font-size: 8.5pt;
-    vertical-align: top;
-    padding-top: 6px;
   }
 
   @bottom-right {
@@ -449,8 +431,6 @@
     content: 'Page ' counter(page) ' of ' counter(pages);
     font-family: var(--font-sans), Inter, system-ui, sans-serif;
     font-size: 8.5pt;
-    vertical-align: top;
-    padding-top: 6px;
   }
 }
 
@@ -498,75 +478,23 @@
   margin-right: auto;
 }
 
-/* Full-width chrome rules so header/footer read as page bands, not floating text */
-.pagedjs_margin-top {
-  align-items: flex-end;
-}
-
-.pagedjs_margin-bottom {
-  align-items: flex-start;
-}
-
+/* Orange hairline under running header (pages 2+) */
 .pagedjs_margin-top-left,
 .pagedjs_margin-top-right,
 .pagedjs_margin-top-center {
-  border-bottom: 2px solid var(--rs-orange);
-  box-sizing: border-box;
-}
-
-.pagedjs_margin-bottom-left,
-.pagedjs_margin-bottom-right,
-.pagedjs_margin-bottom-center {
-  border-top: 1px solid #d8d0c8;
-  box-sizing: border-box;
+  border-bottom: 1px solid rgba(231, 105, 44, 0.55);
 }
 
 @media print {
-  /*
-   * Paged.js already painted Letter sheets (margins + running headers baked
-   * into .pagedjs_page). Zero the print page box so one sheet == one PDF page.
-   *
-   * CRITICAL: constrain html/body/wrappers to Letter width. `width: auto` on
-   * the render tree lets the layout use the browser viewport (~1200px). Chrome
-   * then shrink-to-fits the whole document onto Letter → content paints at ~67%
-   * in the left column with a blank strip on the right.
-   */
-  @page {
-    size: Letter;
-    margin: 0 !important;
-  }
-
-  @page :first {
-    margin: 0 !important;
-  }
-
   html,
   body {
     background: #fff !important;
-    height: auto !important;
     margin: 0 !important;
-    max-width: 8.5in !important;
-    min-height: 0 !important;
     padding: 0 !important;
-    width: 8.5in !important;
-  }
-
-  .min-h-screen {
-    min-height: 0 !important;
-    max-width: 8.5in !important;
-    width: 8.5in !important;
   }
 
   .assessment-print-root {
-    align-items: stretch !important;
     background: #fff !important;
-    display: block !important;
-    margin: 0 !important;
-    max-width: 8.5in !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-    transform: none !important;
-    width: 8.5in !important;
   }
 
   .no-print,
@@ -574,72 +502,26 @@
     display: none !important;
   }
 
-  .assessment-print-render,
-  .assessment-print-source,
-  .assessment-print-doc {
-    display: block !important;
+  .assessment-print-render {
     margin: 0 !important;
-    max-width: none !important;
     padding: 0 !important;
-    width: 100% !important;
   }
 
   .pagedjs_pages {
-    align-items: stretch !important;
-    display: block !important;
-    gap: 0 !important;
-    margin: 0 !important;
-    max-width: none !important;
-    width: 100% !important;
+    display: block;
+    gap: 0;
   }
 
   .pagedjs_page {
-    box-shadow: none !important;
-    break-after: page;
-    height: 11in !important;
-    margin: 0 !important;
-    max-width: 8.5in !important;
-    overflow: visible !important;
+    box-shadow: none;
+    margin: 0;
     page-break-after: always;
-    width: 8.5in !important;
+    break-after: page;
   }
 
   .pagedjs_page:last-child {
-    break-after: auto;
     page-break-after: auto;
-  }
-
-  .pagedjs_sheet,
-  .pagedjs_pagebox,
-  .pagedjs_area {
-    margin: 0 !important;
-    max-width: none !important;
-    overflow: visible !important;
-    width: 100% !important;
-  }
-
-  .pagedjs_sheet {
-    height: 11in !important;
-  }
-
-  /* Flowed body must fill the page content box — kill screen max-width / mx-auto */
-  .pagedjs_page_content,
-  .pagedjs_page_content > * {
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    max-width: none !important;
-    width: 100% !important;
-  }
-
-  .assessment-cover,
-  .assessment-cover-toprule,
-  .assessment-cover-company,
-  .section-band,
-  .print-body,
-  .print-section,
-  .print-table {
-    max-width: none !important;
-    width: 100% !important;
+    break-after: auto;
   }
 
   .field-grid,
