@@ -106,21 +106,16 @@
 }
 
 /* ——— Cover page ——— */
-/* Named page + break-after opens page 2 for .print-body. Height fills the
-   first page box (@page cover / :first margin: 0) so the company bar pins
-   via flex — do NOT also break-before on .print-body (that inserts a blank). */
+/* Exact letter height fills page 1 (@page :first margin: 0) so the company
+   bar can pin to the bottom via flex. No break-after — print-body starts page 2. */
 .assessment-cover {
   background: #fff;
   box-sizing: border-box;
-  break-after: page;
   display: flex;
   flex-direction: column;
-  /* Full letter — @page cover has margin: 0 during pagination. */
   height: 11in;
   max-height: 11in;
   overflow: hidden;
-  page: cover;
-  page-break-after: always;
   position: relative;
   width: 100%;
 }
@@ -137,8 +132,9 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  justify-content: center;
   min-height: 0;
-  padding: 36px 48px 24px;
+  padding: 28px 40px 20px;
   text-align: center;
 }
 
@@ -188,8 +184,8 @@
   gap: 8px 36px;
   grid-template-columns: 1fr 1fr;
   margin: 0 auto;
-  max-width: 720px;
-  padding: 22px 26px;
+  max-width: none;
+  padding: 22px 28px;
   text-align: left;
   width: 100%;
 }
@@ -246,9 +242,8 @@
 }
 
 .print-body {
-  /* Cover already break-after: page — no break-before here (avoids blank sheet). */
-  break-before: auto;
-  page-break-before: auto;
+  break-before: page;
+  page-break-before: always;
   padding: 0;
 }
 
@@ -400,13 +395,12 @@
 
 /* ——— Paged Media (Paged.js polyfill) ——— */
 /*
- * Generous margins so running header/footer sit in clear chrome bands —
- * not crushed against the page edge or body content. Top/bottom must stay
- * large enough for the hairline + text (~0.45in) plus breathing room.
+ * Content fills most of the letter sheet. Top/bottom reserve a chrome band
+ * for running header + footer; sides stay tight so tables/sections use the page.
  */
 @page {
   size: Letter;
-  margin: 0.85in 0.7in 0.8in 0.7in;
+  margin: 0.65in 0.55in 0.6in 0.55in;
 
   @top-left {
     color: #2a2019;
@@ -414,8 +408,8 @@
     font-family: var(--font-display), 'Bricolage Grotesque', Georgia, serif;
     font-size: 10pt;
     font-weight: 700;
-    padding-bottom: 8px;
     vertical-align: bottom;
+    padding-bottom: 6px;
   }
 
   @top-right {
@@ -423,14 +417,14 @@
     content: 'Initial Assessment and Treatment Plan';
     font-family: var(--font-sans), Inter, system-ui, sans-serif;
     font-size: 8.5pt;
-    padding-bottom: 8px;
     vertical-align: bottom;
+    padding-bottom: 6px;
   }
 
   @top-center {
     content: '';
-    padding-bottom: 8px;
     vertical-align: bottom;
+    padding-bottom: 6px;
   }
 
   @bottom-left {
@@ -438,8 +432,8 @@
     content: string(clientident);
     font-family: var(--font-sans), Inter, system-ui, sans-serif;
     font-size: 8.5pt;
-    padding-top: 8px;
     vertical-align: top;
+    padding-top: 6px;
   }
 
   @bottom-right {
@@ -447,32 +441,12 @@
     content: 'Page ' counter(page) ' of ' counter(pages);
     font-family: var(--font-sans), Inter, system-ui, sans-serif;
     font-size: 8.5pt;
-    padding-top: 8px;
     vertical-align: top;
+    padding-top: 6px;
   }
 }
 
 /* Cover: own logo + company band; suppress running chrome */
-@page cover {
-  margin: 0;
-
-  @top-left {
-    content: none;
-  }
-  @top-right {
-    content: none;
-  }
-  @top-center {
-    content: none;
-  }
-  @bottom-left {
-    content: none;
-  }
-  @bottom-right {
-    content: none;
-  }
-}
-
 @page :first {
   margin: 0;
 
@@ -516,10 +490,7 @@
   margin-right: auto;
 }
 
-/*
- * Running chrome: keep header/footer text off the page edge and draw a
- * clear rule between chrome and body (matches the old table-header look).
- */
+/* Full-width chrome rules so header/footer read as page bands, not floating text */
 .pagedjs_margin-top {
   align-items: flex-end;
 }
@@ -531,41 +502,25 @@
 .pagedjs_margin-top-left,
 .pagedjs_margin-top-right,
 .pagedjs_margin-top-center {
-  border-bottom: 2px solid rgba(231, 105, 44, 0.65);
+  border-bottom: 2px solid var(--rs-orange);
   box-sizing: border-box;
-  padding-bottom: 6px !important;
 }
 
 .pagedjs_margin-bottom-left,
 .pagedjs_margin-bottom-right,
 .pagedjs_margin-bottom-center {
-  border-top: 1px solid #e8dfd6;
+  border-top: 1px solid #d8d0c8;
   box-sizing: border-box;
-  padding-top: 6px !important;
-}
-
-/* Body content should not crowd the chrome bands */
-.pagedjs_page .pagedjs_area {
-  padding-top: 2px;
-  padding-bottom: 2px;
 }
 
 @media print {
   /*
    * Paged.js already painted Letter sheets (margins + running headers baked
-   * into .pagedjs_page). Re-applying @page margins here makes each sheet
-   * overflow → blank odd pages in Chrome “Save as PDF”. Zero the print
-   * page box so one .pagedjs_page == one PDF page.
-   *
-   * Do NOT set overflow:hidden / max-height:100% — that clips the baked-in
-   * header/footer against the sheet edge in Chrome’s PDF output.
+   * into .pagedjs_page). Zero the print page box so one sheet == one PDF page.
+   * Do not clip with overflow:hidden — that chops headers/footers.
    */
   @page {
     size: Letter;
-    margin: 0 !important;
-  }
-
-  @page cover {
     margin: 0 !important;
   }
 

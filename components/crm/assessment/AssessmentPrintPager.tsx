@@ -65,9 +65,6 @@ export function AssessmentPrintPager({
           await document.fonts.ready
         }
         await waitForImages(source)
-        // Let Next/CSS settle so @page margin boxes exist before Paged.js runs.
-        await new Promise<void>((r) => requestAnimationFrame(() => r()))
-        await new Promise<void>((r) => setTimeout(r, 50))
         if (cancelled) return
 
         const { Previewer } = await import('pagedjs')
@@ -78,21 +75,9 @@ export function AssessmentPrintPager({
         source.classList.add('is-paged')
         renderTo.innerHTML = ''
         const previewer = new Previewer()
-        // Omit stylesheets so Paged.js reads document.styleSheets (Next CSS),
-        // including assessment-print.css @page header/footer rules.
+        // Omit stylesheets so Paged.js reads document.styleSheets (Next CSS).
         const flow = await previewer.preview(clone, undefined, renderTo)
         if (cancelled) return
-
-        // Guard: if margin boxes failed to generate, chrome will look flush to
-        // the page edge — surface a hint so the user doesn't save a bad PDF.
-        const hasChrome =
-          renderTo.querySelector('.pagedjs_margin-top-left') ||
-          renderTo.querySelector('.pagedjs_margin-bottom-left')
-        if (!hasChrome) {
-          console.warn(
-            '[assessment-print] Paged.js margin boxes missing — headers/footers may not render'
-          )
-        }
 
         setStatus(
           typeof flow?.total === 'number'
@@ -134,9 +119,8 @@ export function AssessmentPrintPager({
             <>
               {' '}
               In the print dialog set <strong>Margins: None</strong> and enable{' '}
-              <strong>Background graphics</strong>. Headers and footers are
-              already built into each page — extra browser margins will crop
-              them.
+              <strong>Background graphics</strong> so headers, footers, and orange
+              section bars print correctly.
             </>
           )}
         </p>
