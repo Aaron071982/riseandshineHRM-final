@@ -399,9 +399,14 @@
 }
 
 /* ——— Paged Media (Paged.js polyfill) ——— */
+/*
+ * Generous margins so running header/footer sit in clear chrome bands —
+ * not crushed against the page edge or body content. Top/bottom must stay
+ * large enough for the hairline + text (~0.45in) plus breathing room.
+ */
 @page {
   size: Letter;
-  margin: 22mm 16mm 20mm 16mm;
+  margin: 0.85in 0.7in 0.8in 0.7in;
 
   @top-left {
     color: #2a2019;
@@ -409,6 +414,8 @@
     font-family: var(--font-display), 'Bricolage Grotesque', Georgia, serif;
     font-size: 10pt;
     font-weight: 700;
+    padding-bottom: 8px;
+    vertical-align: bottom;
   }
 
   @top-right {
@@ -416,10 +423,14 @@
     content: 'Initial Assessment and Treatment Plan';
     font-family: var(--font-sans), Inter, system-ui, sans-serif;
     font-size: 8.5pt;
+    padding-bottom: 8px;
+    vertical-align: bottom;
   }
 
   @top-center {
     content: '';
+    padding-bottom: 8px;
+    vertical-align: bottom;
   }
 
   @bottom-left {
@@ -427,6 +438,8 @@
     content: string(clientident);
     font-family: var(--font-sans), Inter, system-ui, sans-serif;
     font-size: 8.5pt;
+    padding-top: 8px;
+    vertical-align: top;
   }
 
   @bottom-right {
@@ -434,6 +447,8 @@
     content: 'Page ' counter(page) ' of ' counter(pages);
     font-family: var(--font-sans), Inter, system-ui, sans-serif;
     font-size: 8.5pt;
+    padding-top: 8px;
+    vertical-align: top;
   }
 }
 
@@ -501,11 +516,38 @@
   margin-right: auto;
 }
 
-/* Orange hairline under running header (pages 2+) */
+/*
+ * Running chrome: keep header/footer text off the page edge and draw a
+ * clear rule between chrome and body (matches the old table-header look).
+ */
+.pagedjs_margin-top {
+  align-items: flex-end;
+}
+
+.pagedjs_margin-bottom {
+  align-items: flex-start;
+}
+
 .pagedjs_margin-top-left,
 .pagedjs_margin-top-right,
 .pagedjs_margin-top-center {
-  border-bottom: 1px solid rgba(231, 105, 44, 0.55);
+  border-bottom: 2px solid rgba(231, 105, 44, 0.65);
+  box-sizing: border-box;
+  padding-bottom: 6px !important;
+}
+
+.pagedjs_margin-bottom-left,
+.pagedjs_margin-bottom-right,
+.pagedjs_margin-bottom-center {
+  border-top: 1px solid #e8dfd6;
+  box-sizing: border-box;
+  padding-top: 6px !important;
+}
+
+/* Body content should not crowd the chrome bands */
+.pagedjs_page .pagedjs_area {
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
 @media print {
@@ -514,6 +556,9 @@
    * into .pagedjs_page). Re-applying @page margins here makes each sheet
    * overflow → blank odd pages in Chrome “Save as PDF”. Zero the print
    * page box so one .pagedjs_page == one PDF page.
+   *
+   * Do NOT set overflow:hidden / max-height:100% — that clips the baked-in
+   * header/footer against the sheet edge in Chrome’s PDF output.
    */
   @page {
     size: Letter;
@@ -571,11 +616,11 @@
   .pagedjs_page {
     box-shadow: none !important;
     break-after: page;
+    height: 11in !important;
     margin: 0 !important;
-    max-height: 100% !important;
-    max-width: 100% !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     page-break-after: always;
+    width: 8.5in !important;
   }
 
   .pagedjs_page:last-child {
@@ -584,7 +629,10 @@
   }
 
   .pagedjs_sheet {
+    height: 11in !important;
     margin: 0 !important;
+    overflow: visible !important;
+    width: 8.5in !important;
   }
 
   .field-grid,

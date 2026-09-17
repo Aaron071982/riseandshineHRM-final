@@ -82,6 +82,16 @@ function isoDate(d: Date): string {
 export async function loadUnifiedDashboard(
   selectedPeriodId?: string | null
 ): Promise<UnifiedDashboardData> {
+  // First visit after unified payroll: copy Artemis cycles into PayPeriods.
+  try {
+    const { ensurePayPeriodsFromBillingCycles } = await import(
+      '@/lib/payroll/migrateFromBillingCycles'
+    )
+    await ensurePayPeriodsFromBillingCycles()
+  } catch (err) {
+    console.warn('[payroll] billing-cycle backfill skipped', err)
+  }
+
   const periodsRaw = await prisma.payPeriod.findMany({
     orderBy: { startDate: 'desc' },
     take: 40,
