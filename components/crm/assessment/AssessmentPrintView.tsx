@@ -127,11 +127,20 @@ export function AssessmentPrintView(props: Props) {
       basePath={props.basePath}
     >
       <section className="assessment-cover">
-        {/* Keep running string inside the first page box — a preceding sibling
+        {/* Keep running elements inside the first page box — a preceding sibling
             can make Paged.js emit a blank sheet before the cover. */}
         <span className="running-client" aria-hidden="true">
           {clientName} · DOB {dobForFooter}
         </span>
+        <div className="running-header-brand" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className="running-header-logo"
+            src="/brand/rise-and-shine-logo.png"
+            alt=""
+          />
+          <span className="running-header-name">Rise &amp; Shine</span>
+        </div>
         <div className="assessment-cover-toprule" aria-hidden="true" />
         <div className="assessment-cover-inner">
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -105,6 +105,33 @@
   width: 1px;
 }
 
+/* Logo + wordmark for running header (pages 2+) */
+.running-header-brand {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  position: running(headerBrand);
+}
+
+.running-header-logo {
+  /* Crop to the sun icon on the left of the wordmark asset */
+  display: block;
+  flex: 0 0 auto;
+  height: 22px;
+  object-fit: cover;
+  object-position: left center;
+  width: 22px;
+}
+
+.running-header-name {
+  color: #2a2019;
+  font-family: var(--font-display), 'Bricolage Grotesque', Georgia, serif;
+  font-size: 10pt;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 /* ——— Cover page ——— */
 /* Full letter-height cover so the company bar can pin to the page bottom.
    No break-after — print-body starts page 2. */
@@ -401,11 +428,8 @@
   margin: 22mm 16mm 20mm 16mm;
 
   @top-left {
-    color: #2a2019;
-    content: 'Rise & Shine';
-    font-family: var(--font-display), 'Bricolage Grotesque', Georgia, serif;
-    font-size: 10pt;
-    font-weight: 700;
+    content: element(headerBrand);
+    vertical-align: bottom;
   }
 
   @top-right {
