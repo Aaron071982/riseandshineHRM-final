@@ -6,3 +6,12 @@ export function rbtOnboardingPdfUrl(
   const base = `/api/rbt/onboarding/documents/${documentId}/pdf`
   return opts?.download ? `${base}?download=1` : base
 }
+
+/** Stream a BCBA onboarding PDF for portal / admin viewers. */
+export function bcbaOnboardingPdfUrl(
+  documentId: string,
+  opts?: { download?: boolean }
+): string {
+  const base = `/api/bcba/onboarding/documents/${documentId}/pdf`
+  return opts?.download ? `${base}?download=1` : base
+}

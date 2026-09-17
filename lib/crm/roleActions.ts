@@ -49,6 +49,7 @@ export async function listCrmUsersWithRoles(query?: string): Promise<
       id: string
       name: string | null
       email: string | null
+      hrmRole: string
       roles: CrmRole[]
       fullAccess: boolean
       superAdmin: boolean
@@ -64,27 +65,37 @@ export async function listCrmUsersWithRoles(query?: string): Promise<
     const q = query?.trim()
     const users = await prisma.user.findMany({
       where: {
-        role: 'ADMIN',
+        isActive: true,
+        OR: [
+          { role: { in: ['ADMIN', 'BCBA'] } },
+          { crmRoles: { some: { revokedAt: null } } },
+        ],
         ...(q
           ? {
-              OR: [
-                { name: { contains: q, mode: 'insensitive' } },
-                { email: { contains: q, mode: 'insensitive' } },
+              AND: [
+                {
+                  OR: [
+                    { name: { contains: q, mode: 'insensitive' } },
+                    { email: { contains: q, mode: 'insensitive' } },
+                  ],
+                },
               ],
             }
-          : { isActive: true }),
+          : {}),
       },
       select: {
         id: true,
         name: true,
         email: true,
+        role: true,
         crmRoles: {
           where: { revokedAt: null },
           select: { role: true },
         },
+        bcbaProfile: { select: { id: true, fullName: true } },
       },
       orderBy: [{ name: 'asc' }, { email: 'asc' }],
-      take: 100,
+      take: 200,
     })
 
     return {
@@ -94,8 +105,9 @@ export async function listCrmUsersWithRoles(query?: string): Promise<
         const subject = { id: u.id, email: u.email, crmRoles: roles }
         return {
           id: u.id,
-          name: u.name,
+          name: u.name || u.bcbaProfile?.fullName || null,
           email: u.email,
+          hrmRole: u.role,
           roles,
           fullAccess: isFullAccess(subject),
           superAdmin: isSuperAdmin(subject),
@@ -110,6 +122,8 @@ export async function listCrmUsersWithRoles(query?: string): Promise<
     return fail(err) as RoleActionResult<{ users: never[] }>
   }
 }
+
+const GRANTABLE_HRM_ROLES = new Set(['ADMIN', 'BCBA'])
 
 export async function grantCrmRole(
   targetUserId: string,
@@ -133,10 +147,10 @@ export async function grantCrmRole(
         error: 'User must exist first — ask them to log in, then grant the role',
       }
     }
-    if (target.role !== 'ADMIN') {
+    if (!GRANTABLE_HRM_ROLES.has(target.role)) {
       return {
         ok: false,
-        error: 'CRM roles can only be granted to HRM admin users',
+        error: 'CRM roles can only be granted to Admin or BCBA login accounts',
       }
     }
 

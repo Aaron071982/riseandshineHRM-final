@@ -22,9 +22,8 @@ export default async function ClientServicesAdminPage() {
           403 — Super-admin only
         </h1>
         <p className="mt-2 text-sm text-ink">
-          Admin Management requires a CRM SUPER_ADMIN role (or break-glass
-          super-admin email allowlist). Ask an existing super-admin to grant
-          access.
+          Roles &amp; privileges requires CRM SUPER_ADMIN (or a break-glass
+          super-admin email). Ask an existing super-admin to grant you access.
         </p>
       </div>
     )

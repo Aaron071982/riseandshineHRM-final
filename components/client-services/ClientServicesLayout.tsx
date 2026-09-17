@@ -76,7 +76,7 @@ export default function ClientServicesLayout({
         : []),
       { href: '/client-services/process', label: 'Process map', icon: Network },
       ...(showAdmin
-        ? ([{ href: '/client-services/admin', label: 'Admin', icon: Shield }] as ShellNavItem[])
+        ? ([{ href: '/client-services/admin', label: 'Roles & Admin', icon: Shield }] as ShellNavItem[])
         : []),
       { href: '/client-services/profile', label: 'Profile', icon: UserCircle },
     ],
@@ -151,7 +151,7 @@ export default function ClientServicesLayout({
         ? [
             ...hrmCrumb,
             { label: 'Client Services', href: '/client-services' },
-            { label: 'Admin Management' },
+            { label: 'Roles & privileges' },
           ]
         : onTherapistSearch
           ? [

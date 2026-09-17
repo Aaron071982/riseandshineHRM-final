@@ -10,24 +10,18 @@ import {
 } from '@/lib/crm/roleActions'
 import { getTrainingCompletionSummaries } from '@/lib/crm/training/actions'
 import { CRM_DEPARTMENT_ROLES } from '@/lib/crm/roleConstants'
+import {
+  CRM_ROLE_OPTIONS,
+  CRM_ROLE_PRIVILEGES,
+} from '@/lib/crm/rolePrivileges'
 import { ConfirmDestructiveDialog } from '@/components/crm/ConfirmDestructiveDialog'
 import { cn } from '@/lib/utils'
-
-const ROLE_OPTIONS: { value: CrmRole; label: string }[] = [
-  { value: 'SUPER_ADMIN', label: 'Super admin' },
-  { value: 'MANAGEMENT', label: 'Management' },
-  { value: 'INTAKE', label: 'Intake' },
-  { value: 'CLINICAL', label: 'Clinical' },
-  { value: 'AUTHORIZATION', label: 'Authorization' },
-  { value: 'STAFFING', label: 'Staffing' },
-  { value: 'CASE_COORDINATION', label: 'Case coordination' },
-  { value: 'BILLING', label: 'Billing' },
-]
 
 type UserRow = {
   id: string
   name: string | null
   email: string | null
+  hrmRole: string
   roles: CrmRole[]
   fullAccess: boolean
   superAdmin: boolean
@@ -42,13 +36,14 @@ export default function AdminManagementClient() {
   const [message, setMessage] = useState('')
   const [pending, startTransition] = useTransition()
   const [grantUserId, setGrantUserId] = useState('')
-  const [grantRole, setGrantRole] = useState<CrmRole>('INTAKE')
+  const [grantRole, setGrantRole] = useState<CrmRole>('BCBA')
   const [revokeTarget, setRevokeTarget] = useState<{
     userId: string
     role: CrmRole
     name: string
   } | null>(null)
   const [trainingPct, setTrainingPct] = useState<Record<string, number>>({})
+  const [showMatrix, setShowMatrix] = useState(true)
 
   const load = useCallback((query?: string) => {
     startTransition(async () => {
@@ -118,15 +113,20 @@ export default function AdminManagementClient() {
     })
   }
 
+  const bcbaUsers = users.filter(
+    (u) => u.hrmRole === 'BCBA' || u.roles.includes('BCBA') || u.roles.includes('CLINICAL_LEAD')
+  )
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-16">
       <div>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
-          Admin Management
+          Roles &amp; privileges
         </h1>
         <p className="mt-0.5 text-sm text-quiet">
-          Grant and revoke CRM roles for HRM admin users only. Super-admin only.
-          Therapist and other non-admin accounts are not listed.
+          Control what each person can see and do in Client Services — including
+          BCBAs. Super-admin only. Open this page anytime from the sidebar{' '}
+          <strong className="text-ink">Admin</strong> link.
         </p>
       </div>
 
@@ -141,10 +141,73 @@ export default function AdminManagementClient() {
         </p>
       )}
 
+      <section className="rounded-xl border border-line bg-surface overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+          <div>
+            <h2 className="font-display text-sm font-semibold text-ink">
+              Privilege matrix — what each role unlocks
+            </h2>
+            <p className="text-xs text-quiet">
+              Granting a role below applies these privileges immediately.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowMatrix((v) => !v)}
+            className="text-xs font-medium text-[var(--sunrise-dark)] hover:underline"
+          >
+            {showMatrix ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        {showMatrix ? (
+          <div className="divide-y divide-line-2">
+            {(['Leadership', 'Departments', 'Clinical portal'] as const).map(
+              (group) => (
+                <div key={group} className="px-4 py-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">
+                    {group}
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {CRM_ROLE_PRIVILEGES.filter((r) => r.group === group).map(
+                      (r) => (
+                        <div
+                          key={r.role}
+                          className="rounded-lg border border-line bg-line-2/30 p-3"
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p className="text-sm font-semibold text-ink">
+                              {r.label}
+                            </p>
+                            <span className="text-[10px] font-medium uppercase tracking-wide text-faint">
+                              {r.role.replace(/_/g, ' ')}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-quiet">{r.summary}</p>
+                          <ul className="mt-2 space-y-1 text-xs text-ink">
+                            {r.privileges.map((p) => (
+                              <li key={p} className="flex gap-1.5">
+                                <span className="text-[var(--sunrise)]">•</span>
+                                <span>{p}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        ) : null}
+      </section>
+
       <section className="rounded-xl border border-line bg-surface p-4">
         <h2 className="font-display text-sm font-semibold text-ink">Grant role</h2>
         <p className="mt-0.5 text-xs text-quiet">
-          Pick an HRM admin who has logged in at least once.
+          Works for HRM Admins and BCBA login accounts (created from Add BCBA in
+          HRM). Pick BCBA / Clinical lead for portal access, or a department role
+          for full CRM queues.
         </p>
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <label className="min-w-[14rem] flex-1">
@@ -161,20 +224,21 @@ export default function AdminManagementClient() {
                 <option key={u.id} value={u.id}>
                   {u.name || u.email || u.id}
                   {u.email ? ` · ${u.email}` : ''}
+                  {u.hrmRole === 'BCBA' ? ' · BCBA' : ''}
                 </option>
               ))}
             </select>
           </label>
-          <label className="w-48">
+          <label className="w-52">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-faint">
-              Role
+              Role / privilege
             </span>
             <select
               value={grantRole}
               onChange={(e) => setGrantRole(e.target.value as CrmRole)}
               className="h-9 w-full rounded-lg border border-line bg-surface px-2 text-sm"
             >
-              {ROLE_OPTIONS.map((r) => (
+              {CRM_ROLE_OPTIONS.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>
@@ -192,8 +256,68 @@ export default function AdminManagementClient() {
         </div>
       </section>
 
+      <section className="rounded-xl border border-[color-mix(in_srgb,var(--sunrise)_35%,var(--line))] bg-[color-mix(in_srgb,var(--sunrise)_6%,white)] p-4">
+        <h2 className="font-display text-sm font-semibold text-ink">
+          BCBA &amp; clinical portal accounts
+        </h2>
+        <p className="mt-0.5 text-xs text-quiet">
+          Assign <strong>BCBA</strong> (caseload) or <strong>Clinical lead</strong>{' '}
+          (all clients, clinical tabs). Add department / Management roles if they
+          should leave the limited portal and use full CRM.
+        </p>
+        {bcbaUsers.length === 0 ? (
+          <p className="mt-3 text-sm text-quiet">
+            No BCBA / clinical-lead accounts yet. Create one in HRM → Add Employee
+            → Add BCBA, then grant roles here.
+          </p>
+        ) : (
+          <ul className="mt-3 divide-y divide-line/60 rounded-lg border border-line bg-surface">
+            {bcbaUsers.map((u) => (
+              <li
+                key={u.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm"
+              >
+                <div>
+                  <Link
+                    href={`/client-services/profile/${u.id}`}
+                    className="font-medium text-[var(--sunrise-dark)] hover:underline"
+                  >
+                    {u.name || u.email || u.id}
+                  </Link>
+                  <div className="text-xs text-quiet">
+                    {u.email} · HRM {u.hrmRole}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {u.roles.length === 0 ? (
+                    <span className="text-xs text-faint">No CRM roles</span>
+                  ) : (
+                    u.roles.map((role) => (
+                      <button
+                        key={role}
+                        type="button"
+                        title="Click to revoke"
+                        onClick={() =>
+                          onRevoke(u.id, role, u.name || u.email || u.id)
+                        }
+                        className="rounded-md border border-line bg-line-2 px-2 py-0.5 text-[11px] font-medium hover:border-[var(--urgent)]"
+                      >
+                        {role.replace(/_/g, ' ')} ×
+                      </button>
+                    ))
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
+          <h2 className="mr-auto font-display text-sm font-semibold text-ink">
+            All CRM users
+          </h2>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -213,10 +337,11 @@ export default function AdminManagementClient() {
         </div>
 
         <div className="overflow-hidden rounded-xl border border-line bg-surface">
-          <table className="w-full min-w-[40rem] text-left text-sm">
+          <table className="w-full min-w-[44rem] text-left text-sm">
             <thead>
               <tr className="border-b border-line bg-line-2/40 text-[11px] uppercase tracking-wide text-faint">
                 <th className="px-3 py-2.5 font-medium">User</th>
+                <th className="px-3 py-2.5 font-medium">Account</th>
                 <th className="px-3 py-2.5 font-medium">Roles</th>
                 <th className="px-3 py-2.5 font-medium">Training</th>
                 <th className="px-3 py-2.5 font-medium">Access</th>
@@ -226,8 +351,8 @@ export default function AdminManagementClient() {
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center text-quiet">
-                    {pending ? 'Loading…' : 'No admin users found'}
+                  <td colSpan={6} className="px-3 py-8 text-center text-quiet">
+                    {pending ? 'Loading…' : 'No users found'}
                   </td>
                 </tr>
               ) : (
@@ -241,6 +366,9 @@ export default function AdminManagementClient() {
                         {u.name || '—'}
                       </Link>
                       <div className="text-xs text-quiet">{u.email || u.id}</div>
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-quiet">
+                      {u.hrmRole}
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex flex-wrap gap-1">
@@ -259,7 +387,9 @@ export default function AdminManagementClient() {
                               'rounded-md border px-2 py-0.5 text-[11px] font-medium',
                               role === 'SUPER_ADMIN'
                                 ? 'border-[var(--urgent)] bg-[var(--urgent-bg)] text-[var(--urgent)]'
-                                : 'border-line bg-line-2 text-ink hover:border-[var(--urgent)]'
+                                : role === 'BCBA' || role === 'CLINICAL_LEAD'
+                                  ? 'border-[color-mix(in_srgb,var(--sunrise)_40%,var(--line))] bg-[color-mix(in_srgb,var(--sunrise)_10%,white)] text-ink'
+                                  : 'border-line bg-line-2 text-ink hover:border-[var(--urgent)]'
                             )}
                           >
                             {role.replace(/_/g, ' ')} ×
@@ -317,7 +447,7 @@ export default function AdminManagementClient() {
         </div>
         <p className="text-[11px] text-faint">
           Department roles: {(CRM_DEPARTMENT_ROLES as readonly string[]).join(', ')}.
-          Click a role chip to revoke (soft). Last SUPER_ADMIN cannot be removed.
+          Click a role chip to revoke. Last SUPER_ADMIN cannot be removed.
         </p>
       </section>
       <ConfirmDestructiveDialog
@@ -328,7 +458,7 @@ export default function AdminManagementClient() {
         title="Revoke CRM role?"
         description={
           revokeTarget
-            ? `Revoke ${ROLE_OPTIONS.find((r) => r.value === revokeTarget.role)?.label ?? revokeTarget.role} from ${revokeTarget.name}.\n\nHistory is kept (revokedAt is set). An audit log is written.`
+            ? `Revoke ${CRM_ROLE_OPTIONS.find((r) => r.value === revokeTarget.role)?.label ?? revokeTarget.role} from ${revokeTarget.name}.\n\nHistory is kept (revokedAt is set). An audit log is written.`
             : ''
         }
         confirmLabel="Revoke role"

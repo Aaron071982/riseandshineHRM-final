@@ -8,13 +8,13 @@ export const CRM_SUPER_ADMIN_BOOTSTRAP_EMAILS = [
   'kazi@siyam.nyc',
   'kazi@riseandshineaba.com',
   'irsal@riseandshineaba.com',
-] as const
-
-/** Clinical lead — all-clients clinical portal (not payroll/admin). */
-export const CRM_CLINICAL_LEAD_BOOTSTRAP_EMAILS = [
+  // Full CRM (not limited clinical portal)
   'shazia@riseandshineaba.com',
   'shaziakhaliq37@gmail.com',
 ] as const
+
+/** Clinical lead — all-clients clinical portal only (no full CRM tabs). */
+export const CRM_CLINICAL_LEAD_BOOTSTRAP_EMAILS = [] as const
 
 export type BootstrapCrmRolesResult = {
   granted: { email: string; userId: string; role: CrmRole }[]

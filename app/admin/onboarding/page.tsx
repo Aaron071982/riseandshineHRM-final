@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { FileCheck, CheckCircle, Clock, TrendingUp } from 'lucide-react'
 import { getOnboardingProgress } from '@/lib/onboarding/progress'
+import { getBcbaOnboardingProgress } from '@/lib/onboarding/bcbaProgress'
 import { RBT_VISIBLE_STEPS } from '@/lib/onboarding/catalog'
 
 export const dynamic = 'force-dynamic'
@@ -22,6 +23,17 @@ export default async function OnboardingPage() {
       tierACompletedAt: true,
       tierBCompletedAt: true,
       fullyActivatedAt: true,
+    },
+    orderBy: { updatedAt: 'desc' },
+  })
+
+  const bcbas = await prisma.bCBAProfile.findMany({
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      onboardingCompletedAt: true,
+      updatedAt: true,
     },
     orderBy: { updatedAt: 'desc' },
   })
@@ -66,6 +78,33 @@ export default async function OnboardingPage() {
               : 'Not started',
         stalled,
         activated: !!rbt.fullyActivatedAt,
+      }
+    })
+  )
+
+  const bcbaRows = await Promise.all(
+    bcbas.map(async (b) => {
+      let progress
+      try {
+        progress = await getBcbaOnboardingProgress(b.id)
+      } catch {
+        progress = null
+      }
+      const pct =
+        progress && progress.totalSteps > 0
+          ? Math.round((progress.completedCount / progress.totalSteps) * 100)
+          : 0
+      return {
+        id: b.id,
+        name: b.fullName,
+        email: b.email,
+        pct,
+        status:
+          progress?.fullyComplete || b.onboardingCompletedAt
+            ? 'Complete'
+            : pct > 0
+              ? 'In progress'
+              : 'Not started',
       }
     })
   )
@@ -127,6 +166,56 @@ export default async function OnboardingPage() {
                         <Link href={`/admin/rbts/${r.id}`}>
                           <Button size="sm" variant="outline">
                             Documents
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>BCBA onboarding</CardTitle>
+          <Link href="/admin/onboarding-documents">
+            <Button size="sm" variant="outline">
+              Manage BCBA docs
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {bcbaRows.length === 0 ? (
+            <p className="text-gray-500 py-8 text-center">No BCBAs yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="py-2 pr-4">Name</th>
+                    <th className="py-2 pr-4">Progress</th>
+                    <th className="py-2 pr-4">Status</th>
+                    <th className="py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {bcbaRows.map((r) => (
+                    <tr key={r.id} className="border-b border-gray-100">
+                      <td className="py-3 pr-4">
+                        <div className="font-medium">{r.name}</div>
+                        <div className="text-xs text-gray-500">{r.email}</div>
+                      </td>
+                      <td className="py-3 pr-4">{r.pct}%</td>
+                      <td className="py-3 pr-4">
+                        <Badge variant="secondary">{r.status}</Badge>
+                      </td>
+                      <td className="py-3">
+                        <Link href={`/admin/employees/bcba/${r.id}`}>
+                          <Button size="sm" variant="outline">
+                            Profile
                           </Button>
                         </Link>
                       </td>

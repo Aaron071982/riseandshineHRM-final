@@ -14,6 +14,7 @@ export function PortalShell({
 }) {
   const pathname = usePathname()
   const onPay = pathname?.startsWith('/portal/pay')
+  const onOnboarding = pathname?.startsWith('/portal/onboarding')
   const onPrint = /\/assessments\/[^/]+\/print\/?$/.test(pathname ?? '')
 
   if (onPrint) {
@@ -43,12 +44,22 @@ export function PortalShell({
             <Link
               href="/portal"
               className={
-                !onPay
+                !onPay && !onOnboarding
                   ? 'rounded-lg bg-[color-mix(in_srgb,var(--sunrise)_14%,white)] px-3 py-1.5 font-medium text-[var(--espresso)]'
                   : 'rounded-lg px-3 py-1.5 text-quiet hover:bg-canvas hover:text-ink'
               }
             >
               Clients
+            </Link>
+            <Link
+              href="/portal/onboarding"
+              className={
+                onOnboarding
+                  ? 'rounded-lg bg-[color-mix(in_srgb,var(--sunrise)_14%,white)] px-3 py-1.5 font-medium text-[var(--espresso)]'
+                  : 'rounded-lg px-3 py-1.5 text-quiet hover:bg-canvas hover:text-ink'
+              }
+            >
+              Onboarding
             </Link>
             <Link
               href="/portal/pay"

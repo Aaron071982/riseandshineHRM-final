@@ -18,8 +18,34 @@ const CONFIG: Record<
 > = {
   bcba: {
     staffHoursLogType: 'BCBA',
-    findUnique: (id) => prisma.bCBAProfile.findUnique({ where: { id }, select: { id: true } }),
-    deleteProfile: (id) => prisma.bCBAProfile.delete({ where: { id } }),
+    findUnique: (id) =>
+      prisma.bCBAProfile.findUnique({ where: { id }, select: { id: true, userId: true } }),
+    deleteProfile: async (id) => {
+      const profile = await prisma.bCBAProfile.findUnique({
+        where: { id },
+        select: { userId: true },
+      })
+      await prisma.employee.deleteMany({
+        where: { employeeType: 'BCBA', referenceId: id },
+      })
+      await prisma.bCBAProfile.delete({ where: { id } })
+      if (profile?.userId) {
+        await prisma.userCrmRole.deleteMany({ where: { userId: profile.userId } })
+        await prisma.session.deleteMany({ where: { userId: profile.userId } })
+        const stillLinked = await prisma.bCBAProfile.findFirst({
+          where: { userId: profile.userId },
+          select: { id: true },
+        })
+        if (!stillLinked) {
+          await prisma.user.delete({ where: { id: profile.userId } }).catch(() =>
+            prisma.user.update({
+              where: { id: profile.userId! },
+              data: { isActive: false },
+            })
+          )
+        }
+      }
+    },
     notFoundMessage: 'BCBA profile not found',
     successMessage: 'BCBA deleted successfully',
   },

@@ -8,6 +8,8 @@ import { loadPdfJs } from '@/lib/onboarding/load-pdfjs'
 type Props = {
   documentId: string
   pdfUrl?: string | null
+  /** Override PDF fetch path (default: RBT onboarding). */
+  pdfFetchUrl?: string
   title: string
   onScrolledToBottom?: () => void
   className?: string
@@ -16,6 +18,7 @@ type Props = {
 export default function OnboardingPdfViewer({
   documentId,
   pdfUrl,
+  pdfFetchUrl,
   title,
   onScrolledToBottom,
   className = '',
@@ -46,7 +49,7 @@ export default function OnboardingPdfViewer({
       setError(null)
       setEmbedUrl(null)
       try {
-        const url = rbtOnboardingPdfUrl(documentId)
+        const url = pdfFetchUrl ?? rbtOnboardingPdfUrl(documentId)
         const res = await fetch(url, { credentials: 'include' })
         if (!res.ok) {
           setError('PDF not available')
@@ -102,7 +105,7 @@ export default function OnboardingPdfViewer({
         objectUrlRef.current = null
       }
     }
-  }, [documentId, pdfUrl, checkScroll])
+  }, [documentId, pdfUrl, pdfFetchUrl, checkScroll])
 
   useEffect(() => {
     const el = scrollRef.current

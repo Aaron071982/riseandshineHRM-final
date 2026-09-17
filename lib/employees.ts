@@ -56,14 +56,24 @@ export async function ensureEmployeeForSource(
 export async function ensureEmployeeForBcbaProfile(id: string) {
   const profile = await prisma.bCBAProfile.findUnique({
     where: { id },
-    select: { id: true, fullName: true },
+    select: { id: true, fullName: true, userId: true },
   })
   if (!profile) return null
-  return ensureEmployeeForSource({
-    id: profile.id,
-    type: 'BCBA',
-    displayName: profile.fullName,
-  })
+  const employee = await ensureEmployeeForSource(
+    {
+      id: profile.id,
+      type: 'BCBA',
+      displayName: profile.fullName,
+    },
+    profile.userId ?? undefined
+  )
+  if (employee && profile.userId && !employee.userId) {
+    return prisma.employee.update({
+      where: { id: employee.id },
+      data: { userId: profile.userId },
+    })
+  }
+  return employee
 }
 
 export async function ensureEmployeeForBillingProfile(id: string) {

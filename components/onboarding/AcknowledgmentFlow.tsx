@@ -41,6 +41,10 @@ interface AcknowledgmentFlowProps {
   document: OnboardingDocument
   completion: Completion | undefined
   onComplete: () => void
+  /** Default: `/api/onboarding/acknowledge` (RBT). */
+  acknowledgeUrl?: string
+  /** Optional PDF fetch override for non-RBT catalogs. */
+  pdfFetchUrl?: string
 }
 
 const DISPLAY_TZ = 'America/New_York'
@@ -54,7 +58,13 @@ function twoOrMoreWords(s: string): boolean {
   return s.trim().split(/\s+/).filter(Boolean).length >= 2
 }
 
-export default function AcknowledgmentFlow({ document, completion, onComplete }: AcknowledgmentFlowProps) {
+export default function AcknowledgmentFlow({
+  document,
+  completion,
+  onComplete,
+  acknowledgeUrl = '/api/onboarding/acknowledge',
+  pdfFetchUrl,
+}: AcknowledgmentFlowProps) {
   const { showToast } = useToast()
   const [readConfirmed, setReadConfirmed] = useState(false)
   const [agreeConfirmed, setAgreeConfirmed] = useState(false)
@@ -176,7 +186,7 @@ export default function AcknowledgmentFlow({ document, completion, onComplete }:
         signatureText: typedName.trim(),
         timestamp: signedAt.toISOString(),
       })
-      const response = await fetch('/api/onboarding/acknowledge', {
+      const response = await fetch(acknowledgeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -184,6 +194,7 @@ export default function AcknowledgmentFlow({ document, completion, onComplete }:
           typedName: typedName.trim(),
           readConfirmed,
           agreeConfirmed,
+          perDocConsent,
           signatureConsentGiven: perDocConsent,
           consentStatement: PER_DOCUMENT_SIGNATURE_CONSENT_STATEMENT,
           auditTrail: trailWithSignature,
@@ -253,6 +264,7 @@ export default function AcknowledgmentFlow({ document, completion, onComplete }:
       <OnboardingPdfViewer
         documentId={document.id}
         pdfUrl={document.pdfUrl}
+        pdfFetchUrl={pdfFetchUrl}
         title={document.title}
         onScrolledToBottom={handleScrolledToBottom}
       />

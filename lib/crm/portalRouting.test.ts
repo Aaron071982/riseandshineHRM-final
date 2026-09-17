@@ -16,10 +16,20 @@ describe('portalRouting', () => {
     expect(
       getPostLoginPathForCrmUser({
         role: 'ADMIN',
-        email: 'shazia@riseandshineaba.com',
+        email: 'clinical-lead@example.com',
         crmRoles: ['CLINICAL_LEAD'] as CrmRole[],
       })
     ).toBe(PORTAL_HOME_PATH)
+  })
+
+  it('sends Shazia (SUPER_ADMIN) to full Client Services CRM', () => {
+    expect(
+      getPostLoginPathForCrmUser({
+        role: 'ADMIN',
+        email: 'shazia@riseandshineaba.com',
+        crmRoles: ['SUPER_ADMIN', 'CLINICAL_LEAD'] as CrmRole[],
+      })
+    ).toBe(CLIENT_SERVICES_HOME_PATH)
   })
 
   it('keeps hybrid CRM staff on the Client Services home', () => {

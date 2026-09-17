@@ -31,6 +31,7 @@ export interface SessionUser {
   name?: string | null
   email?: string | null
   rbtProfileId?: string | null
+  bcbaProfileId?: string | null
 }
 
 export async function createSession(
@@ -80,20 +81,30 @@ function normalizeRole(role: string | null | undefined): SessionUserRole | null 
  * RBT routes require `rbtProfileId` — resolve it from `users.id` when missing.
  */
 export async function attachRbtProfileIdIfNeeded(user: SessionUser): Promise<SessionUser> {
-  if (user.rbtProfileId) return user
-  if (user.role !== 'RBT' && user.role !== 'CANDIDATE') return user
-  try {
-    const rp = await prisma.rBTProfile.findUnique({
-      where: { userId: user.id },
-      select: { id: true },
-    })
-    if (rp?.id) {
-      return { ...user, rbtProfileId: rp.id }
+  let next = user
+  if (!next.rbtProfileId && (next.role === 'RBT' || next.role === 'CANDIDATE')) {
+    try {
+      const rp = await prisma.rBTProfile.findUnique({
+        where: { userId: next.id },
+        select: { id: true },
+      })
+      if (rp?.id) next = { ...next, rbtProfileId: rp.id }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
-  return user
+  if (!next.bcbaProfileId && next.role === 'BCBA') {
+    try {
+      const bp = await prisma.bCBAProfile.findUnique({
+        where: { userId: next.id },
+        select: { id: true },
+      })
+      if (bp?.id) next = { ...next, bcbaProfileId: bp.id }
+    } catch {
+      // ignore
+    }
+  }
+  return next
 }
 
 /** Raw SQL fallback when Prisma fails (e.g. schema/connection issues). */
@@ -203,6 +214,7 @@ export async function validateSession(token: string): Promise<SessionUser | null
           user: {
             include: {
               rbtProfile: true,
+              bcbaProfile: true,
             },
           },
         },
@@ -237,7 +249,15 @@ export async function validateSession(token: string): Promise<SessionUser | null
       })
       .catch(() => {})
     type SessionWithUser = typeof session & {
-      user: { id: string; role: string; phoneNumber: string | null; name: string | null; email: string | null; rbtProfile?: { id: string } | null }
+      user: {
+        id: string
+        role: string
+        phoneNumber: string | null
+        name: string | null
+        email: string | null
+        rbtProfile?: { id: string } | null
+        bcbaProfile?: { id: string } | null
+      }
     }
     const sessionWithUser = session as SessionWithUser
     const { user } = sessionWithUser
@@ -252,6 +272,7 @@ export async function validateSession(token: string): Promise<SessionUser | null
       name: user.name,
       email: user.email,
       rbtProfileId: user.rbtProfile?.id ?? null,
+      bcbaProfileId: user.bcbaProfile?.id ?? null,
     })
   } catch (err: unknown) {
     return validateSessionRawSql(token)

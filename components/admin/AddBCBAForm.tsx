@@ -22,7 +22,7 @@ export default function AddBCBAForm() {
       url: '/api/admin/employees/bcba',
       body: {
         fullName: (formData.get('fullName') as string)?.trim(),
-        email: (formData.get('email') as string)?.trim() || undefined,
+        email: (formData.get('email') as string)?.trim(),
         phone: (formData.get('phone') as string)?.trim() || undefined,
         certificationNumber: (formData.get('certificationNumber') as string)?.trim() || undefined,
         certificationExpiresAt: certificationExpiresAt || undefined,
@@ -49,8 +49,17 @@ export default function AddBCBAForm() {
               <Input id="fullName" name="fullName" required className="dark:bg-[var(--bg-input)] dark:border-[var(--border-subtle)]" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" className="dark:bg-[var(--bg-input)] dark:border-[var(--border-subtle)]" />
+              <Label htmlFor="email">Email (login) *</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                required
+                className="dark:bg-[var(--bg-input)] dark:border-[var(--border-subtle)]"
+              />
+              <p className="text-xs text-muted-foreground">
+                Creates a portal login and CRM BCBA role so you can assign clients.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>

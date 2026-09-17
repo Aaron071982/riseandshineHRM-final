@@ -405,6 +405,7 @@ model User {
   updatedAt   DateTime @updatedAt
 
   rbtProfile                 RBTProfile?
+  bcbaProfile                BCBAProfile?
   profile                    UserProfile?
   sessions                   Session[]
   activities                 ActivityLog[]
@@ -1866,6 +1867,8 @@ model SensitiveAccessLog {
 
 model BCBAProfile {
   id                     String    @id @default(cuid())
+  /// Login user (UserRole BCBA + CrmRole BCBA). Required for portal login / client assign.
+  userId                 String?   @unique
   fullName               String
   email                  String?
   phone                  String?
@@ -1875,12 +1878,63 @@ model BCBAProfile {
   preferredRegions       String?   @db.Text
   notes                  String?   @db.Text
   status                 String? // e.g. Active, Inactive
+  onboardingCompletedAt  DateTime?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  serviceClients ServiceClient[] @relation("ServiceClientBcbaProfile")
+  user                   User?                       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  serviceClients         ServiceClient[]             @relation("ServiceClientBcbaProfile")
+  onboardingCompletions  BcbaOnboardingCompletion[]
 
   @@map("bcba_profiles")
+}
+
+/// Admin-managed BCBA onboarding templates (parallel to RBT OnboardingDocument catalog).
+model BcbaOnboardingDocument {
+  id           String   @id @default(cuid())
+  title        String
+  slug         String   @unique
+  /// ESIGN (acknowledge/sign) or UPLOAD (file upload).
+  flowType     String   @default("ESIGN")
+  pdfUrl       String?  @db.Text
+  pdfData      String?  @db.Text
+  displayOrder Int      @default(0)
+  isRequired   Boolean  @default(true)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  completions BcbaOnboardingCompletion[]
+
+  @@index([isActive, displayOrder])
+  @@map("bcba_onboarding_documents")
+}
+
+model BcbaOnboardingCompletion {
+  id                    String                     @id @default(cuid())
+  bcbaProfileId         String
+  documentId            String
+  status                OnboardingCompletionStatus @default(NOT_STARTED)
+  completedAt           DateTime?
+  acknowledgmentJson    Json?
+  signedPdfUrl          String?                    @db.Text
+  signedPdfData         String?                    @db.Text
+  signatureText         String?                    @db.Text
+  signatureTimestamp    DateTime?
+  signatureIpAddress    String?
+  signatureUserAgent    String?                    @db.Text
+  signatureConsentGiven Boolean                    @default(false)
+  signatureMethod       String?
+  auditTrailJson        Json?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+
+  bcbaProfile BCBAProfile            @relation(fields: [bcbaProfileId], references: [id], onDelete: Cascade)
+  document    BcbaOnboardingDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([bcbaProfileId, documentId])
+  @@index([bcbaProfileId])
+  @@map("bcba_onboarding_completions")
 }
 
 model BillingProfile {
