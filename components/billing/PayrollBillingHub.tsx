@@ -9,6 +9,8 @@ import {
   FileSpreadsheet,
   Loader2,
   Plus,
+  Send,
+  Trash2,
   Upload,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -27,16 +29,16 @@ import { cn } from '@/lib/utils'
 import { formatUsd, formatHours, defaultBiweeklyPeriod } from '@/lib/billing/format'
 import { PAYROLL_THEME as T } from '@/lib/payroll/theme'
 import {
-  addBcbaHoursLineAction,
-  createOrUpdateContractorAction,
-  ensureBcbaStatementAction,
+  generateAllPayStubsForPeriodAction,
   generatePayStubAction,
+  getPayStatementLinesAction,
   importRbtFromArtemisAction,
+  saveBcbaHoursSheetAction,
+  sendAllPayStubsForPeriodAction,
   sendPayStubAction,
-  setContractorRateAction,
-  setPayStatementStatusAction,
   upsertPayPeriodAction,
 } from '@/lib/payroll/actions'
+import { hoursBetween, amountForHours, round2 } from '@/lib/payroll/hoursHmm'
 import type {
   UnifiedDashboardData,
   UnifiedPayeeRow,
@@ -238,26 +240,56 @@ export default function PayrollBillingHub({ data }: { data: UnifiedDashboardData
     URL.revokeObjectURL(url)
   }
 
-  async function runPayroll() {
+  async function generateAllStubs() {
     if (!selectedPeriod) {
       showToast('Select or create a pay period first', 'warning')
       return
     }
-    const drafts = data.statements.filter((s) => s.status === 'DRAFT')
-    if (drafts.length === 0) {
-      showToast('No draft statements to mark Ready', 'info')
+    startTransition(async () => {
+      const res = await generateAllPayStubsForPeriodAction({
+        payPeriodId: selectedPeriod.id,
+        payeeType: segment,
+      })
+      if (!res.ok) {
+        showToast(res.error, 'error')
+        return
+      }
+      const errNote =
+        res.errors.length > 0
+          ? ` · ${res.errors.length} failed (${res.errors[0]?.name}: ${res.errors[0]?.error})`
+          : ''
+      showToast(
+        `Generated ${res.generated} stub(s)${res.skipped ? ` · ${res.skipped} skipped` : ''}${errNote}`,
+        res.errors.length ? 'warning' : 'success'
+      )
+      router.refresh()
+    })
+  }
+
+  async function sendAllToPortal() {
+    if (!selectedPeriod) {
+      showToast('Select or create a pay period first', 'warning')
       return
     }
     startTransition(async () => {
-      let ok = 0
-      for (const s of drafts) {
-        const res = await setPayStatementStatusAction({
-          payStatementId: s.statementId,
-          status: 'READY',
-        })
-        if (res.ok) ok++
+      const res = await sendAllPayStubsForPeriodAction({
+        payPeriodId: selectedPeriod.id,
+        payeeType: segment,
+      })
+      if (!res.ok) {
+        showToast(res.error, 'error')
+        return
       }
-      showToast(`Marked ${ok} statement(s) Ready`, 'success')
+      const errNote =
+        res.errors.length > 0
+          ? ` · ${res.errors.length} failed (${res.errors[0]?.name}: ${res.errors[0]?.error})`
+          : ''
+      showToast(
+        segment === 'BCBA'
+          ? `Sent ${res.sent} stub(s) to the portal${res.skipped ? ` · ${res.skipped} skipped` : ''}${errNote}`
+          : `Marked ${res.sent} stub(s) Sent${res.skipped ? ` · ${res.skipped} skipped` : ''}${errNote}`,
+        res.errors.length ? 'warning' : 'success'
+      )
       router.refresh()
     })
   }
@@ -312,10 +344,24 @@ export default function PayrollBillingHub({ data }: { data: UnifiedDashboardData
           </Button>
           <Button
             type="button"
+            variant="outline"
+            className="border-[rgba(42,32,25,0.18)]"
+            disabled={pending || !selectedPeriod}
+            onClick={generateAllStubs}
+          >
+            {pending ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="mr-1.5 h-4 w-4" />
+            )}
+            Generate stubs
+          </Button>
+          <Button
+            type="button"
             className="text-white shadow-sm"
             style={{ backgroundColor: T.orange }}
-            disabled={pending}
-            onClick={runPayroll}
+            disabled={pending || !selectedPeriod}
+            onClick={sendAllToPortal}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = T.orangeHover
             }}
@@ -325,8 +371,10 @@ export default function PayrollBillingHub({ data }: { data: UnifiedDashboardData
           >
             {pending ? (
               <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-            ) : null}
-            Run payroll
+            ) : (
+              <Send className="mr-1.5 h-4 w-4" />
+            )}
+            Send to portal
           </Button>
         </div>
       </div>
@@ -401,7 +449,7 @@ export default function PayrollBillingHub({ data }: { data: UnifiedDashboardData
             >
               {(
                 [
-                  ['BCBA', 'BCBA — manual entry'],
+                  ['BCBA', 'BCBA — hours sheet'],
                   ['RBT', 'RBT — reconciliation'],
                 ] as const
               ).map(([key, label]) => (
@@ -433,7 +481,7 @@ export default function PayrollBillingHub({ data }: { data: UnifiedDashboardData
                   disabled={!selectedPeriod}
                 >
                   <Plus className="mr-1.5 h-4 w-4" />
-                  Add BCBA hours
+                  Enter hours sheet
                 </Button>
               ) : (
                 <Button
@@ -483,7 +531,7 @@ export default function PayrollBillingHub({ data }: { data: UnifiedDashboardData
                     >
                       {selectedPeriod
                         ? segment === 'BCBA'
-                          ? 'No BCBA statements yet. Add hours to create one.'
+                          ? 'No BCBA statements yet. Open the hours sheet to enter days for this pay cycle.'
                           : 'No RBT statements yet. Import from the Artemis reconciliation sheet.'
                         : 'Create a pay period to get started.'}
                     </td>
@@ -618,14 +666,15 @@ export default function PayrollBillingHub({ data }: { data: UnifiedDashboardData
         </TabsContent>
       </Tabs>
 
-      <BcbaHoursDialog
+      <BcbaHoursSheetDialog
         open={bcbaOpen}
         onOpenChange={setBcbaOpen}
-        periodId={selectedPeriod?.id ?? null}
-        contractors={data.contractors}
+        period={selectedPeriod}
+        candidates={data.bcbaCandidates}
         editRow={editRow}
         onDone={() => {
           setBcbaOpen(false)
+          setEditRow(null)
           router.refresh()
         }}
       />
@@ -899,124 +948,191 @@ function PayStubsPanel({
   )
 }
 
-function BcbaHoursDialog({
+type SheetRow = {
+  key: string
+  workDate: string
+  startClock: string
+  endClock: string
+}
+
+function blankSheetRows(periodStart: string, count = 5): SheetRow[] {
+  return Array.from({ length: count }, (_, i) => ({
+    key: `new-${i}-${Math.random().toString(36).slice(2, 8)}`,
+    workDate: i === 0 ? periodStart : '',
+    startClock: '',
+    endClock: '',
+  }))
+}
+
+function BcbaHoursSheetDialog({
   open,
   onOpenChange,
-  periodId,
-  contractors,
+  period,
+  candidates,
   editRow,
   onDone,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
-  periodId: string | null
-  contractors: UnifiedDashboardData['contractors']
+  period: UnifiedDashboardData['periods'][number] | null
+  candidates: UnifiedDashboardData['bcbaCandidates']
   editRow: UnifiedPayeeRow | null
   onDone: () => void
 }) {
   const { showToast } = useToast()
   const [pending, startTransition] = useTransition()
-  const [contractorId, setContractorId] = useState('')
+  const [loadingLines, setLoadingLines] = useState(false)
+  const [userId, setUserId] = useState('')
   const [legalName, setLegalName] = useState('')
   const [entityName, setEntityName] = useState('')
-  const [userId, setUserId] = useState('')
   const [rate, setRate] = useState('')
-  const [workDate, setWorkDate] = useState('')
-  const [startClock, setStartClock] = useState('9.00')
-  const [endClock, setEndClock] = useState('12.00')
-  const [mode, setMode] = useState<'existing' | 'new'>('existing')
+  const [rows, setRows] = useState<SheetRow[]>([])
 
   useEffect(() => {
-    if (!open) return
-    if (editRow?.contractorId) {
-      setMode('existing')
-      setContractorId(editRow.contractorId)
-      setRate(editRow.ratePerHour != null ? String(editRow.ratePerHour) : '')
-    } else if (contractors[0]) {
-      setMode('existing')
-      setContractorId(contractors[0].id)
-      setRate(
-        contractors[0].ratePerHour != null
-          ? String(contractors[0].ratePerHour)
-          : ''
+    if (!open || !period) return
+
+    const periodStart = period.startDate
+    let cancelled = false
+
+    async function init() {
+      const match = editRow?.userId
+        ? candidates.find((c) => c.userId === editRow.userId)
+        : candidates[0]
+
+      const uid = editRow?.userId ?? match?.userId ?? ''
+      const cand = candidates.find((c) => c.userId === uid) ?? match
+
+      setUserId(uid)
+      setLegalName(
+        editRow?.payeeName ||
+          cand?.legalName ||
+          cand?.name ||
+          ''
       )
-    } else {
-      setMode('new')
-      setContractorId('')
+      setEntityName(editRow?.entityName || cand?.entityName || '')
+      setRate(
+        editRow?.ratePerHour != null
+          ? String(editRow.ratePerHour)
+          : cand?.ratePerHour != null
+            ? String(cand.ratePerHour)
+            : ''
+      )
+
+      if (editRow?.statementId) {
+        setLoadingLines(true)
+        const res = await getPayStatementLinesAction({
+          payStatementId: editRow.statementId,
+        })
+        if (cancelled) return
+        setLoadingLines(false)
+        if (res.ok && res.lines.length > 0) {
+          setRows(
+            res.lines.map((l) => ({
+              key: l.id,
+              workDate: l.workDate,
+              startClock: l.startClock,
+              endClock: l.endClock,
+            }))
+          )
+          return
+        }
+      }
+
+      if (!cancelled) {
+        setRows(blankSheetRows(periodStart))
+      }
     }
-  }, [open, editRow?.contractorId, contractors])
+
+    void init()
+    return () => {
+      cancelled = true
+    }
+  }, [open, period, editRow, candidates])
+
+  function selectCandidate(nextUserId: string) {
+    setUserId(nextUserId)
+    const c = candidates.find((x) => x.userId === nextUserId)
+    if (!c) return
+    setLegalName(c.legalName || c.name)
+    setEntityName(c.entityName || '')
+    if (c.ratePerHour != null) setRate(String(c.ratePerHour))
+  }
+
+  function updateRow(key: string, patch: Partial<SheetRow>) {
+    setRows((prev) =>
+      prev.map((r) => (r.key === key ? { ...r, ...patch } : r))
+    )
+  }
+
+  function addRow() {
+    setRows((prev) => [
+      ...prev,
+      {
+        key: `new-${Math.random().toString(36).slice(2, 9)}`,
+        workDate: period?.startDate ?? '',
+        startClock: '',
+        endClock: '',
+      },
+    ])
+  }
+
+  function removeRow(key: string) {
+    setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.key !== key)))
+  }
+
+  const rateNum = Number(rate) || 0
+  const preview = useMemo(() => {
+    let hours = 0
+    let gross = 0
+    for (const r of rows) {
+      if (!r.startClock.trim() || !r.endClock.trim()) continue
+      const h = hoursBetween(r.startClock, r.endClock)
+      hours = round2(hours + h)
+      gross = round2(gross + amountForHours(h, rateNum))
+    }
+    return { hours, gross }
+  }, [rows, rateNum])
 
   function submit() {
-    if (!periodId) {
+    if (!period) {
       showToast('Select a pay period first', 'error')
       return
     }
+    if (!userId) {
+      showToast('Select a BCBA', 'error')
+      return
+    }
+    if (!(rateNum > 0)) {
+      showToast('Enter a rate per hour', 'error')
+      return
+    }
+    const filled = rows.filter(
+      (r) => r.workDate && r.startClock.trim() && r.endClock.trim()
+    )
+    if (filled.length === 0) {
+      showToast('Add at least one day with start and end times', 'error')
+      return
+    }
+
     startTransition(async () => {
-      let cid = contractorId
-      const rateNum = Number(rate)
-
-      if (mode === 'new') {
-        if (!userId.trim() || !legalName.trim()) {
-          showToast('User ID and legal name are required', 'error')
-          return
-        }
-        const created = await createOrUpdateContractorAction({
-          userId: userId.trim(),
-          legalName: legalName.trim(),
-          entityName: entityName.trim() || null,
-        })
-        if (!created.ok) {
-          showToast(created.error, 'error')
-          return
-        }
-        cid = created.contractorId
-      }
-
-      if (!cid) {
-        showToast('Select a contractor', 'error')
-        return
-      }
-
-      if (rateNum > 0) {
-        const rateRes = await setContractorRateAction({
-          contractorId: cid,
-          ratePerHour: rateNum,
-        })
-        if (!rateRes.ok) {
-          showToast(rateRes.error, 'error')
-          return
-        }
-      }
-
-      const stmt = await ensureBcbaStatementAction({
-        payPeriodId: periodId,
-        contractorId: cid,
-        ratePerHour: rateNum > 0 ? rateNum : undefined,
+      const res = await saveBcbaHoursSheetAction({
+        payPeriodId: period.id,
+        userId,
+        legalName: legalName.trim() || 'BCBA',
+        entityName: entityName.trim() || null,
+        ratePerHour: rateNum,
+        lines: filled.map((r) => ({
+          workDate: r.workDate,
+          startClock: r.startClock,
+          endClock: r.endClock,
+        })),
       })
-      if (!stmt.ok) {
-        showToast(stmt.error, 'error')
+      if (!res.ok) {
+        showToast(res.error, 'error')
         return
       }
-
-      if (!workDate || !startClock || !endClock) {
-        showToast('Work date and clocks are required', 'error')
-        return
-      }
-
-      const line = await addBcbaHoursLineAction({
-        payStatementId: stmt.statementId,
-        workDate,
-        startClock,
-        endClock,
-        ratePerHour: rateNum > 0 ? rateNum : undefined,
-      })
-      if (!line.ok) {
-        showToast(line.error, 'error')
-        return
-      }
-
       showToast(
-        `Added ${line.hours.toFixed(2)} h · ${formatUsd(line.amount)}`,
+        `Saved ${res.lineCount} day(s) · ${formatHours(res.totalHours)} · ${formatUsd(res.grossPay)}`,
         'success'
       )
       onDone()
@@ -1025,130 +1141,201 @@ function BcbaHoursDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-[#FAF8F4]">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto bg-[#FAF8F4]">
         <DialogHeader>
           <DialogTitle className="font-display">
-            {editRow ? 'Add BCBA hours' : 'Add BCBA hours'}
+            {editRow ? 'Edit BCBA hours sheet' : 'BCBA hours sheet'}
           </DialogTitle>
+          {period ? (
+            <p className="text-sm" style={{ color: T.muted }}>
+              Pay cycle {period.label} ({period.startDate} → {period.endDate})
+            </p>
+          ) : null}
         </DialogHeader>
-        <div className="space-y-3 py-2">
-          {contractors.length > 0 && (
-            <div className="flex gap-2 text-xs">
-              <button
-                type="button"
-                className={cn(
-                  'px-2 py-1 rounded',
-                  mode === 'existing' && 'bg-white shadow-sm font-medium'
-                )}
-                onClick={() => setMode('existing')}
-              >
-                Existing contractor
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'px-2 py-1 rounded',
-                  mode === 'new' && 'bg-white shadow-sm font-medium'
-                )}
-                onClick={() => setMode('new')}
-              >
-                New contractor
-              </button>
-            </div>
-          )}
 
-          {mode === 'existing' && contractors.length > 0 ? (
-            <div className="space-y-1.5">
-              <Label>Contractor</Label>
-              <select
-                className="w-full h-10 rounded-md border bg-white px-3 text-sm"
-                value={contractorId}
-                onChange={(e) => {
-                  setContractorId(e.target.value)
-                  const c = contractors.find((x) => x.id === e.target.value)
-                  if (c?.ratePerHour != null) setRate(String(c.ratePerHour))
-                }}
-              >
-                {contractors.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.legalName}
-                    {c.entityName ? ` · ${c.entityName}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-1.5">
-                <Label>User ID</Label>
-                <Input
+        <div className="space-y-4 py-1">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>BCBA</Label>
+              {candidates.length > 0 ? (
+                <select
+                  className="w-full h-10 rounded-md border bg-white px-3 text-sm"
                   value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                  placeholder="users.id for this BCBA"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Legal name</Label>
-                <Input
-                  value={legalName}
-                  onChange={(e) => setLegalName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Entity (optional)</Label>
-                <Input
-                  value={entityName}
-                  onChange={(e) => setEntityName(e.target.value)}
-                  placeholder="My Lane Applied Behavior Analysis PLLC"
-                />
-              </div>
-            </>
-          )}
+                  disabled={Boolean(editRow)}
+                  onChange={(e) => selectCandidate(e.target.value)}
+                >
+                  <option value="">Select BCBA…</option>
+                  {candidates.map((c) => (
+                    <option key={c.userId} value={c.userId}>
+                      {c.name}
+                      {c.email ? ` · ${c.email}` : ''}
+                      {c.ratePerHour != null
+                        ? ` · ${formatUsd(c.ratePerHour)}/h`
+                        : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-sm text-amber-800">
+                  No BCBA portal users found. Add a BCBA under Admin → Employees
+                  first so they have a login.
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Legal name on stub</Label>
+              <Input
+                value={legalName}
+                onChange={(e) => setLegalName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Entity (optional)</Label>
+              <Input
+                value={entityName}
+                onChange={(e) => setEntityName(e.target.value)}
+                placeholder="My Lane Applied Behavior Analysis PLLC"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Rate / hour</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={rate}
+                onChange={(e) => setRate(e.target.value)}
+              />
+            </div>
+          </div>
 
-          <div className="space-y-1.5">
-            <Label>Rate / hour</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={rate}
-              onChange={(e) => setRate(e.target.value)}
-            />
+          <div
+            className="overflow-x-auto rounded-lg border bg-white"
+            style={{ borderColor: T.border }}
+          >
+            <table className="w-full text-sm">
+              <thead>
+                <tr
+                  className="text-left text-[11px] uppercase tracking-wide"
+                  style={{ backgroundColor: T.surface, color: T.muted }}
+                >
+                  <th className="px-3 py-2 font-medium">Work date</th>
+                  <th className="px-3 py-2 font-medium">Start (h.mm)</th>
+                  <th className="px-3 py-2 font-medium">End (h.mm)</th>
+                  <th className="px-3 py-2 font-medium text-right">Hours</th>
+                  <th className="px-3 py-2 font-medium text-right">Amount</th>
+                  <th className="px-3 py-2 w-10" />
+                </tr>
+              </thead>
+              <tbody>
+                {loadingLines ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-3 py-8 text-center"
+                      style={{ color: T.muted }}
+                    >
+                      <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
+                      Loading days…
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((r) => {
+                    const h =
+                      r.startClock.trim() && r.endClock.trim()
+                        ? hoursBetween(r.startClock, r.endClock)
+                        : 0
+                    const amt = amountForHours(h, rateNum)
+                    return (
+                      <tr
+                        key={r.key}
+                        className="border-t"
+                        style={{ borderColor: T.border }}
+                      >
+                        <td className="px-2 py-1.5">
+                          <Input
+                            type="date"
+                            className="h-9"
+                            value={r.workDate}
+                            min={period?.startDate}
+                            max={period?.endDate}
+                            onChange={(e) =>
+                              updateRow(r.key, { workDate: e.target.value })
+                            }
+                          />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <Input
+                            className="h-9"
+                            value={r.startClock}
+                            placeholder="9.00"
+                            onChange={(e) =>
+                              updateRow(r.key, { startClock: e.target.value })
+                            }
+                          />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <Input
+                            className="h-9"
+                            value={r.endClock}
+                            placeholder="12.00"
+                            onChange={(e) =>
+                              updateRow(r.key, { endClock: e.target.value })
+                            }
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 text-right tabular-nums">
+                          {h > 0 ? formatHours(h) : '—'}
+                        </td>
+                        <td className="px-3 py-1.5 text-right tabular-nums">
+                          {h > 0 && rateNum > 0 ? formatUsd(amt) : '—'}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <button
+                            type="button"
+                            className="p-1.5 rounded hover:bg-black/5"
+                            onClick={() => removeRow(r.key)}
+                            aria-label="Remove day"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 opacity-60" />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+              <tfoot>
+                <tr
+                  className="border-t text-sm font-medium"
+                  style={{ borderColor: T.border, backgroundColor: T.surface }}
+                >
+                  <td className="px-3 py-2" colSpan={3}>
+                    Period total
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {formatHours(preview.hours)}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <Money value={preview.gross} size="sm" />
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={addRow}>
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Add day
+            </Button>
             <p className="text-xs" style={{ color: T.muted }}>
-              Saved as the contractor&apos;s active rate for future periods
+              .30 = 30 minutes (not decimal). Example: 4.30 → 6.30 = 2.00 h
             </p>
           </div>
-
-          <div className="space-y-1.5">
-            <Label>Work date</Label>
-            <Input
-              type="date"
-              value={workDate}
-              onChange={(e) => setWorkDate(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Start (h.mm)</Label>
-              <Input
-                value={startClock}
-                onChange={(e) => setStartClock(e.target.value)}
-                placeholder="4.30"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>End (h.mm)</Label>
-              <Input
-                value={endClock}
-                onChange={(e) => setEndClock(e.target.value)}
-                placeholder="6.30"
-              />
-            </div>
-          </div>
-          <p className="text-xs" style={{ color: T.muted }}>
-            .30 = 30 minutes (not decimal). Example: 4.30 → 6.30 = 2.00 h
-          </p>
         </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
@@ -1156,11 +1343,11 @@ function BcbaHoursDialog({
           <Button
             className="text-white"
             style={{ backgroundColor: T.orange }}
-            disabled={pending}
+            disabled={pending || loadingLines || candidates.length === 0}
             onClick={submit}
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-            Save hours
+            Save hours sheet
           </Button>
         </DialogFooter>
       </DialogContent>

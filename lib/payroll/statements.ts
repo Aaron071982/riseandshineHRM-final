@@ -170,6 +170,13 @@ export async function addBcbaManualLineItem(input: {
 
   const updated = await applyTotals(statement.id)
 
+  if (statement.status === 'READY' || statement.pdfUrl) {
+    await prisma.payStatement.update({
+      where: { id: statement.id },
+      data: { status: 'DRAFT', pdfUrl: null },
+    })
+  }
+
   await auditPayrollChange({
     actorUserId: input.actorUserId,
     entityType: 'PayStatement',
@@ -191,6 +198,153 @@ export async function addBcbaManualLineItem(input: {
     amount,
     reconciled: updated.reconciled,
   }
+}
+
+export type BcbaSheetLineInput = {
+  workDate: Date
+  startClock: string
+  endClock: string
+}
+
+/**
+ * Replace all MANUAL lines on a BCBA statement (idempotent save of a period hours sheet).
+ * Clears pdfUrl / resets READY→DRAFT so stubs must be regenerated after edits.
+ */
+export async function replaceBcbaManualLines(input: {
+  payStatementId: string
+  lines: BcbaSheetLineInput[]
+  ratePerHour?: number
+  actorUserId: string
+}): Promise<{
+  lineCount: number
+  totalHours: number
+  grossPay: number
+  reconciled: boolean
+}> {
+  const statement = await prisma.payStatement.findUnique({
+    where: { id: input.payStatementId },
+  })
+  if (!statement || statement.payeeType !== 'BCBA' || !statement.contractorId) {
+    throw new Error('BCBA pay statement not found')
+  }
+  if (statement.status === 'SENT') {
+    throw new Error('Cannot edit a sent pay statement')
+  }
+
+  const rate =
+    input.ratePerHour ??
+    (await getActiveContractorRate(statement.contractorId))
+  if (rate == null || !(rate > 0)) {
+    throw new Error('No active rate for contractor')
+  }
+
+  const computed: {
+    workDate: Date
+    startClock: string
+    endClock: string
+    hours: number
+    amount: number
+  }[] = []
+
+  for (const line of input.lines) {
+    const startClock = line.startClock.trim()
+    const endClock = line.endClock.trim()
+    if (!startClock || !endClock) continue
+    const { hours, amount } = computeLine({
+      startClock,
+      endClock,
+      ratePerHour: rate,
+    })
+    if (hours <= 0) {
+      throw new Error(
+        `Invalid hours on ${line.workDate.toISOString().slice(0, 10)}: end must be after start (h.mm)`
+      )
+    }
+    computed.push({
+      workDate: line.workDate,
+      startClock,
+      endClock,
+      hours,
+      amount,
+    })
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.payLineItem.deleteMany({
+      where: { payStatementId: statement.id, source: 'MANUAL' },
+    })
+    if (computed.length > 0) {
+      await tx.payLineItem.createMany({
+        data: computed.map((c) => ({
+          payStatementId: statement.id,
+          workDate: c.workDate,
+          startClock: c.startClock,
+          endClock: c.endClock,
+          hours: dec(c.hours),
+          amount: dec(c.amount),
+          source: 'MANUAL' satisfies LineSource,
+        })),
+      })
+    }
+    await tx.payStatement.update({
+      where: { id: statement.id },
+      data: {
+        status: 'DRAFT',
+        pdfUrl: null,
+        sentAt: null,
+      },
+    })
+  })
+
+  const updated = await applyTotals(statement.id)
+  const totals = recomputeStatementTotals(
+    computed.map((c) => ({ hours: c.hours, amount: c.amount }))
+  )
+
+  await auditPayrollChange({
+    actorUserId: input.actorUserId,
+    entityType: 'PayStatement',
+    entityId: statement.id,
+    label: `PAY_STATEMENT_EDIT:replace_manual_lines:${computed.length}`,
+    after: {
+      lineCount: computed.length,
+      totalHours: totals.totalHours,
+      grossPay: totals.grossPay,
+    },
+  })
+
+  return {
+    lineCount: computed.length,
+    totalHours: Number(updated.totalHours),
+    grossPay: Number(updated.grossPay),
+    reconciled: updated.reconciled,
+  }
+}
+
+export async function listPayStatementLines(payStatementId: string): Promise<
+  {
+    id: string
+    workDate: string
+    startClock: string
+    endClock: string
+    hours: number
+    amount: number
+    source: LineSource
+  }[]
+> {
+  const items = await prisma.payLineItem.findMany({
+    where: { payStatementId },
+    orderBy: [{ workDate: 'asc' }, { startClock: 'asc' }],
+  })
+  return items.map((i) => ({
+    id: i.id,
+    workDate: i.workDate.toISOString().slice(0, 10),
+    startClock: i.startClock,
+    endClock: i.endClock,
+    hours: Number(i.hours),
+    amount: Number(i.amount),
+    source: i.source,
+  }))
 }
 
 export async function removePayLineItem(input: {

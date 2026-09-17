@@ -65,6 +65,16 @@ export type UnifiedDashboardData = {
     entityName: string | null
     ratePerHour: number | null
   }[]
+  /** Portal BCBA users available for the hours sheet picker. */
+  bcbaCandidates: {
+    userId: string
+    name: string
+    email: string | null
+    contractorId: string | null
+    legalName: string | null
+    entityName: string | null
+    ratePerHour: number | null
+  }[]
   billing: {
     cycles: BillingCycleRow[]
     missingRatesCount: number
@@ -110,6 +120,8 @@ export async function loadUnifiedDashboard(
   const [
     statementsRaw,
     contractorsRaw,
+    bcbaUsers,
+    bcbaProfilesWithUser,
     cycles,
     missingRatesCount,
     totalCycles,
@@ -144,6 +156,20 @@ export async function loadUnifiedDashboard(
       },
       orderBy: { legalName: 'asc' },
     }),
+    prisma.user.findMany({
+      where: { role: 'BCBA', isActive: true },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.bCBAProfile.findMany({
+      where: { userId: { not: null } },
+      select: {
+        fullName: true,
+        email: true,
+        userId: true,
+        user: { select: { id: true, name: true, email: true, isActive: true } },
+      },
+    }),
     prisma.billingCycle.findMany({
       orderBy: { createdAt: 'desc' },
       take: 10,
@@ -176,6 +202,82 @@ export async function loadUnifiedDashboard(
       select: { label: true, totalGrossPay: true, periodEnd: true },
     }),
   ])
+
+  const contractorByUserId = new Map(
+    contractorsRaw.map((c) => [
+      c.userId,
+      {
+        id: c.id,
+        legalName: c.legalName,
+        entityName: c.entityName,
+        ratePerHour: c.activeRate ? Number(c.activeRate.ratePerHour) : null,
+      },
+    ])
+  )
+
+  const bcbaCandidateMap = new Map<
+    string,
+    UnifiedDashboardData['bcbaCandidates'][number]
+  >()
+
+  for (const u of bcbaUsers) {
+    const c = contractorByUserId.get(u.id)
+    bcbaCandidateMap.set(u.id, {
+      userId: u.id,
+      name: u.name?.trim() || u.email || 'BCBA',
+      email: u.email,
+      contractorId: c?.id ?? null,
+      legalName: c?.legalName ?? u.name ?? null,
+      entityName: c?.entityName ?? null,
+      ratePerHour: c?.ratePerHour ?? null,
+    })
+  }
+
+  for (const p of bcbaProfilesWithUser) {
+    if (!p.userId || !p.user || p.user.isActive === false) continue
+    const existing = bcbaCandidateMap.get(p.userId)
+    const c = contractorByUserId.get(p.userId)
+    const name =
+      p.fullName?.trim() ||
+      p.user.name?.trim() ||
+      p.email ||
+      p.user.email ||
+      'BCBA'
+    if (existing) {
+      if (!existing.legalName && (c?.legalName || p.fullName)) {
+        existing.legalName = c?.legalName ?? p.fullName
+      }
+      if (!existing.name || existing.name === 'BCBA') existing.name = name
+      continue
+    }
+    bcbaCandidateMap.set(p.userId, {
+      userId: p.userId,
+      name,
+      email: p.user.email ?? p.email,
+      contractorId: c?.id ?? null,
+      legalName: c?.legalName ?? p.fullName,
+      entityName: c?.entityName ?? null,
+      ratePerHour: c?.ratePerHour ?? null,
+    })
+  }
+
+  // Include existing contractors even if role is not BCBA (legacy payees).
+  for (const c of contractorsRaw) {
+    if (bcbaCandidateMap.has(c.userId)) continue
+    bcbaCandidateMap.set(c.userId, {
+      userId: c.userId,
+      name: c.legalName,
+      email: c.user.email,
+      contractorId: c.id,
+      legalName: c.legalName,
+      entityName: c.entityName,
+      ratePerHour: c.activeRate ? Number(c.activeRate.ratePerHour) : null,
+    })
+  }
+
+  const bcbaCandidates = [...bcbaCandidateMap.values()].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  )
 
   const statements: UnifiedPayeeRow[] = statementsRaw.map((s) => {
     if (s.payeeType === 'BCBA' && s.contractor) {
@@ -310,6 +412,7 @@ export async function loadUnifiedDashboard(
       entityName: c.entityName,
       ratePerHour: c.activeRate ? Number(c.activeRate.ratePerHour) : null,
     })),
+    bcbaCandidates,
     billing: {
       cycles: cycleRows,
       missingRatesCount,

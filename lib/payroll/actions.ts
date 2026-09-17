@@ -13,11 +13,14 @@ import {
 import {
   addBcbaManualLineItem,
   ensureBcbaPayStatement,
+  listPayStatementLines,
   removePayLineItem,
+  replaceBcbaManualLines,
   setPayStatementGrossOverride,
   setPayStatementStatus,
   upsertPayPeriod,
 } from '@/lib/payroll/statements'
+import { prisma } from '@/lib/prisma'
 import { importRbtStatementsFromArtemisWorkbook } from '@/lib/payroll/rbtImport'
 import {
   generatePayStubPdf,
@@ -54,8 +57,19 @@ export async function createOrUpdateContractorAction(input: {
 }): Promise<ActionResult<{ contractorId: string }>> {
   try {
     const actor = await assertCanWritePayroll()
+    const user = await prisma.user.findUnique({
+      where: { id: input.userId.trim() },
+      select: { id: true },
+    })
+    if (!user) {
+      return {
+        ok: false,
+        error: 'User not found — pick a BCBA from the hours sheet list',
+      }
+    }
     const c = await upsertContractorProfile({
       ...input,
+      userId: user.id,
       actorUserId: actor.id,
     })
     revalidatePath('/billing')
@@ -182,6 +196,261 @@ export async function addBcbaHoursLineAction(input: {
       hours: number
       amount: number
       reconciled: boolean
+    }>
+  }
+}
+
+/** Save a full BCBA hours sheet for one contractor in a pay period. */
+export async function saveBcbaHoursSheetAction(input: {
+  payPeriodId: string
+  userId: string
+  legalName: string
+  entityName?: string | null
+  ratePerHour: number
+  lines: { workDate: string; startClock: string; endClock: string }[]
+}): Promise<
+  ActionResult<{
+    statementId: string
+    contractorId: string
+    lineCount: number
+    totalHours: number
+    grossPay: number
+  }>
+> {
+  try {
+    const actor = await assertCanWritePayroll()
+    const user = await prisma.user.findUnique({
+      where: { id: input.userId.trim() },
+      select: { id: true, name: true, email: true },
+    })
+    if (!user) {
+      return { ok: false, error: 'Select a BCBA with a portal login (user not found)' }
+    }
+
+    const contractor = await upsertContractorProfile({
+      userId: user.id,
+      legalName: input.legalName.trim() || user.name || user.email || 'BCBA',
+      entityName: input.entityName?.trim() || null,
+      actorUserId: actor.id,
+    })
+
+    if (!(input.ratePerHour > 0)) {
+      return { ok: false, error: 'Set a rate per hour before saving hours' }
+    }
+
+    await setContractorPayRate({
+      contractorId: contractor.id,
+      ratePerHour: input.ratePerHour,
+      actorUserId: actor.id,
+    })
+
+    const stmt = await ensureBcbaPayStatement({
+      payPeriodId: input.payPeriodId,
+      contractorId: contractor.id,
+      ratePerHour: input.ratePerHour,
+      actorUserId: actor.id,
+    })
+
+    const filled = input.lines.filter(
+      (l) => l.workDate && l.startClock.trim() && l.endClock.trim()
+    )
+    if (filled.length === 0) {
+      return { ok: false, error: 'Add at least one day with start and end times' }
+    }
+
+    const replaced = await replaceBcbaManualLines({
+      payStatementId: stmt.id,
+      lines: filled.map((l) => ({
+        workDate: parseDateInput(l.workDate),
+        startClock: l.startClock,
+        endClock: l.endClock,
+      })),
+      ratePerHour: input.ratePerHour,
+      actorUserId: actor.id,
+    })
+
+    revalidatePath('/billing')
+    return {
+      ok: true,
+      statementId: stmt.id,
+      contractorId: contractor.id,
+      lineCount: replaced.lineCount,
+      totalHours: replaced.totalHours,
+      grossPay: replaced.grossPay,
+    }
+  } catch (err) {
+    return fail(err) as ActionResult<{
+      statementId: string
+      contractorId: string
+      lineCount: number
+      totalHours: number
+      grossPay: number
+    }>
+  }
+}
+
+export async function getPayStatementLinesAction(input: {
+  payStatementId: string
+}): Promise<
+  ActionResult<{
+    lines: Awaited<ReturnType<typeof listPayStatementLines>>
+  }>
+> {
+  try {
+    await assertCanWritePayroll()
+    const lines = await listPayStatementLines(input.payStatementId)
+    return { ok: true, lines }
+  } catch (err) {
+    return fail(err) as ActionResult<{
+      lines: Awaited<ReturnType<typeof listPayStatementLines>>
+    }>
+  }
+}
+
+/** Generate stub PDFs for every statement in a period that has hours (optional payee filter). */
+export async function generateAllPayStubsForPeriodAction(input: {
+  payPeriodId: string
+  payeeType?: 'BCBA' | 'RBT'
+}): Promise<
+  ActionResult<{
+    generated: number
+    skipped: number
+    errors: { statementId: string; name: string; error: string }[]
+  }>
+> {
+  try {
+    const actor = await assertCanWritePayroll()
+    const statements = await prisma.payStatement.findMany({
+      where: {
+        payPeriodId: input.payPeriodId,
+        ...(input.payeeType ? { payeeType: input.payeeType } : {}),
+      },
+      include: {
+        contractor: { select: { legalName: true } },
+        rbtProfile: { select: { firstName: true, lastName: true } },
+        _count: { select: { lineItems: true } },
+      },
+    })
+
+    let generated = 0
+    let skipped = 0
+    const errors: { statementId: string; name: string; error: string }[] = []
+
+    for (const s of statements) {
+      const name =
+        s.payeeType === 'BCBA'
+          ? s.contractor?.legalName ?? 'BCBA'
+          : s.rbtProfile
+            ? `${s.rbtProfile.firstName} ${s.rbtProfile.lastName}`
+            : 'RBT'
+      if (s.status === 'SENT') {
+        skipped++
+        continue
+      }
+      if (s._count.lineItems === 0) {
+        skipped++
+        continue
+      }
+      try {
+        await generatePayStubPdf({
+          payStatementId: s.id,
+          actorUserId: actor.id,
+        })
+        generated++
+      } catch (err) {
+        errors.push({
+          statementId: s.id,
+          name,
+          error: err instanceof Error ? err.message : 'Failed',
+        })
+      }
+    }
+
+    revalidatePath('/billing')
+    revalidatePath('/portal/pay')
+    return { ok: true, generated, skipped, errors }
+  } catch (err) {
+    return fail(err) as ActionResult<{
+      generated: number
+      skipped: number
+      errors: { statementId: string; name: string; error: string }[]
+    }>
+  }
+}
+
+/** Publish stubs to the portal (BCBA) / mark Sent. Generates PDF first when missing. */
+export async function sendAllPayStubsForPeriodAction(input: {
+  payPeriodId: string
+  payeeType?: 'BCBA' | 'RBT'
+}): Promise<
+  ActionResult<{
+    sent: number
+    skipped: number
+    errors: { statementId: string; name: string; error: string }[]
+  }>
+> {
+  try {
+    const actor = await assertCanWritePayroll()
+    const statements = await prisma.payStatement.findMany({
+      where: {
+        payPeriodId: input.payPeriodId,
+        ...(input.payeeType ? { payeeType: input.payeeType } : {}),
+      },
+      include: {
+        contractor: { select: { legalName: true } },
+        rbtProfile: { select: { firstName: true, lastName: true } },
+        _count: { select: { lineItems: true } },
+      },
+    })
+
+    let sent = 0
+    let skipped = 0
+    const errors: { statementId: string; name: string; error: string }[] = []
+
+    for (const s of statements) {
+      const name =
+        s.payeeType === 'BCBA'
+          ? s.contractor?.legalName ?? 'BCBA'
+          : s.rbtProfile
+            ? `${s.rbtProfile.firstName} ${s.rbtProfile.lastName}`
+            : 'RBT'
+      if (s.status === 'SENT') {
+        skipped++
+        continue
+      }
+      if (s._count.lineItems === 0) {
+        skipped++
+        continue
+      }
+      try {
+        if (!s.pdfUrl || s.status === 'DRAFT') {
+          await generatePayStubPdf({
+            payStatementId: s.id,
+            actorUserId: actor.id,
+          })
+        }
+        await sendPayStatement({
+          payStatementId: s.id,
+          actorUserId: actor.id,
+        })
+        sent++
+      } catch (err) {
+        errors.push({
+          statementId: s.id,
+          name,
+          error: err instanceof Error ? err.message : 'Failed',
+        })
+      }
+    }
+
+    revalidatePath('/billing')
+    revalidatePath('/portal/pay')
+    return { ok: true, sent, skipped, errors }
+  } catch (err) {
+    return fail(err) as ActionResult<{
+      sent: number
+      skipped: number
+      errors: { statementId: string; name: string; error: string }[]
     }>
   }
 }
