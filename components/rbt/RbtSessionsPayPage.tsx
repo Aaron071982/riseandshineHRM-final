@@ -4,7 +4,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Loader2, ChevronDown, ChevronRight, Download, DollarSign, Clock, TrendingUp } from 'lucide-react'
+import {
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  DollarSign,
+  Clock,
+  TrendingUp,
+} from 'lucide-react'
 import { usd, fmtUtcDate } from '@/lib/payroll/format'
 
 type PaySummary = {
@@ -14,36 +22,30 @@ type PaySummary = {
   statementCount: number
 }
 
-type PayStub = {
+type PortalDeduction = {
+  label: string
+  amount: number
+}
+
+type PortalStub = {
   id: string
-  rbtProfileId: string | null
+  source: 'unified' | 'legacy'
   payrollName: string
   totalHours: number
   grossPay: number
-  adjustedGross: number | null
-  empTaxTotal: number
-  empTaxFIT: number
-  empTaxSS: number
-  empTaxMed: number
-  empTaxNYIT: number
+  totalDeductions: number
   netPay: number
-  payrollRun: {
-    id: string
+  deductions: PortalDeduction[]
+  pdfAvailable: boolean
+  payPeriod: {
     label: string
     payDate: string
     periodStart: string
     periodEnd: string
-    status: string
   }
 }
 
-function StubBreakdown({ stub }: { stub: PayStub }) {
-  const deductions = [
-    { label: 'Federal Income Tax', amount: stub.empTaxFIT },
-    { label: 'Social Security', amount: stub.empTaxSS },
-    { label: 'Medicare', amount: stub.empTaxMed },
-    { label: 'NY Income Tax', amount: stub.empTaxNYIT },
-  ]
+function StubBreakdown({ stub }: { stub: PortalStub }) {
   return (
     <div className="mt-4 space-y-3 text-sm">
       <div className="flex justify-between">
@@ -51,61 +53,72 @@ function StubBreakdown({ stub }: { stub: PayStub }) {
         <span className="font-medium">{stub.totalHours.toFixed(2)}</span>
       </div>
       <div className="flex justify-between">
-        <span className="text-gray-600">Gross Pay</span>
+        <span className="text-gray-600">Gross pay</span>
         <span className="font-medium">{usd(stub.grossPay)}</span>
       </div>
       <div className="border-t pt-3">
-        <p className="font-medium text-gray-800 mb-2">Deductions</p>
+        <p className="mb-2 font-medium text-gray-800">Deductions</p>
         <div className="space-y-1.5">
-          {deductions.map((d) => (
-            <div key={d.label} className="flex justify-between text-gray-600">
-              <span>{d.label}</span>
-              <span>−{usd(d.amount)}</span>
-            </div>
-          ))}
-          <div className="flex justify-between font-medium text-gray-800 pt-1 border-t">
-            <span>Total Deductions</span>
-            <span>−{usd(stub.empTaxTotal)}</span>
+          {stub.deductions.length === 0 ? (
+            <p className="text-gray-500">No itemized deductions on this stub.</p>
+          ) : (
+            stub.deductions.map((d) => (
+              <div key={d.label} className="flex justify-between text-gray-600">
+                <span>{d.label}</span>
+                <span>−{usd(d.amount)}</span>
+              </div>
+            ))
+          )}
+          <div className="flex justify-between border-t pt-1 font-medium text-gray-800">
+            <span>Total deductions</span>
+            <span>−{usd(stub.totalDeductions)}</span>
           </div>
         </div>
       </div>
-      <div className="flex justify-between items-baseline bg-[#0E4D52]/5 rounded-lg px-3 py-3 mt-2">
-        <span className="font-semibold text-[#0E4D52]">Net Pay</span>
+      <div className="mt-2 flex items-baseline justify-between rounded-lg bg-[#0E4D52]/5 px-3 py-3">
+        <span className="font-semibold text-[#0E4D52]">Net pay</span>
         <span className="text-2xl font-bold text-[#0E4D52]">{usd(stub.netPay)}</span>
       </div>
     </div>
   )
 }
 
-function downloadStubHtml(stub: PayStub) {
+function downloadStub(stub: PortalStub) {
+  if (stub.source === 'unified' && stub.pdfAvailable) {
+    window.location.href = `/api/payroll/statements/${stub.id}/download`
+    return
+  }
+  const rows = stub.deductions
+    .map(
+      (d) =>
+        `<div class="row"><span>${d.label}</span><span>-${usd(d.amount)}</span></div>`
+    )
+    .join('')
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Pay Stub</title>
 <style>body{font-family:system-ui,sans-serif;max-width:560px;margin:40px auto;color:#111}
 .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee}
 .net{font-size:1.5rem;font-weight:700;margin-top:16px}</style></head><body>
-<h1>Pay Stub</h1>
-<p><strong>Period:</strong> ${fmtUtcDate(stub.payrollRun.periodStart)} – ${fmtUtcDate(stub.payrollRun.periodEnd)}</p>
-<p><strong>Pay date:</strong> ${fmtUtcDate(stub.payrollRun.payDate)}</p>
+<h1>Employee earnings statement</h1>
+<p><strong>Period:</strong> ${fmtUtcDate(stub.payPeriod.periodStart)} – ${fmtUtcDate(stub.payPeriod.periodEnd)}</p>
+<p><strong>Pay date:</strong> ${fmtUtcDate(stub.payPeriod.payDate)}</p>
 <div class="row"><span>Hours</span><span>${stub.totalHours.toFixed(2)}</span></div>
-<div class="row"><span>Gross Pay</span><span>${usd(stub.grossPay)}</span></div>
-<div class="row"><span>Federal Income Tax</span><span>-${usd(stub.empTaxFIT)}</span></div>
-<div class="row"><span>Social Security</span><span>-${usd(stub.empTaxSS)}</span></div>
-<div class="row"><span>Medicare</span><span>-${usd(stub.empTaxMed)}</span></div>
-<div class="row"><span>NY Income Tax</span><span>-${usd(stub.empTaxNYIT)}</span></div>
-<div class="row"><span>Total Deductions</span><span>-${usd(stub.empTaxTotal)}</span></div>
-<p class="net">Net Pay: ${usd(stub.netPay)}</p>
+<div class="row"><span>Gross pay</span><span>${usd(stub.grossPay)}</span></div>
+${rows}
+<div class="row"><span>Total deductions</span><span>-${usd(stub.totalDeductions)}</span></div>
+<p class="net">Net pay: ${usd(stub.netPay)}</p>
 </body></html>`
   const blob = new Blob([html], { type: 'text/html' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `pay-stub-${fmtUtcDate(stub.payrollRun.payDate).replace(/\s/g, '-')}.html`
+  a.download = `pay-stub-${fmtUtcDate(stub.payPeriod.payDate).replace(/\s/g, '-')}.html`
   a.click()
   URL.revokeObjectURL(url)
 }
 
 export default function RbtSessionsPayPage() {
   const [summary, setSummary] = useState<PaySummary | null>(null)
-  const [stubs, setStubs] = useState<PayStub[]>([])
+  const [stubs, setStubs] = useState<PortalStub[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -124,8 +137,8 @@ export default function RbtSessionsPayPage() {
         setError(sumData.error || listData.error || 'Failed to load pay data')
         return
       }
-      setSummary(sumData)
-      const list = (listData.stubs ?? []) as PayStub[]
+      setSummary(sumData as PaySummary)
+      const list = (listData.stubs ?? []) as PortalStub[]
       setStubs(list)
       if (list.length > 0) setExpandedId(list[0].id)
     } catch {
@@ -161,13 +174,17 @@ export default function RbtSessionsPayPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Pay</h1>
-        <p className="text-sm text-gray-500 mt-1">Your published pay stubs from payroll.</p>
+        <p className="mt-1 text-sm text-gray-500">
+          Your W-2 earnings statements from payroll — gross, deductions, and net.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-gray-600">This Month Net Pay</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">
+              This month net pay
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
@@ -175,8 +192,10 @@ export default function RbtSessionsPayPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Net Earned</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Total net earned
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
@@ -184,12 +203,16 @@ export default function RbtSessionsPayPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Hours</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Total hours
+            </CardTitle>
             <Clock className="h-4 w-4 text-gray-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(summary?.totalPayableHours ?? 0).toFixed(1)}h</div>
+            <div className="text-2xl font-bold">
+              {(summary?.totalPayableHours ?? 0).toFixed(1)}h
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -200,14 +223,15 @@ export default function RbtSessionsPayPage() {
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <CardTitle className="text-lg">Latest pay stub</CardTitle>
-                <p className="text-sm text-gray-500 mt-1">
-                  {fmtUtcDate(latest.payrollRun.periodStart)} – {fmtUtcDate(latest.payrollRun.periodEnd)}
-                  {' · '}Pay date {fmtUtcDate(latest.payrollRun.payDate)}
+                <p className="mt-1 text-sm text-gray-500">
+                  {fmtUtcDate(latest.payPeriod.periodStart)} –{' '}
+                  {fmtUtcDate(latest.payPeriod.periodEnd)}
+                  {' · '}Pay date {fmtUtcDate(latest.payPeriod.payDate)}
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => downloadStubHtml(latest)}>
-                <Download className="w-4 h-4 mr-1" />
-                Download
+              <Button variant="outline" size="sm" onClick={() => downloadStub(latest)}>
+                <Download className="mr-1 h-4 w-4" />
+                {latest.pdfAvailable ? 'Download PDF' : 'Download'}
               </Button>
             </div>
           </CardHeader>
@@ -218,7 +242,7 @@ export default function RbtSessionsPayPage() {
       ) : (
         <Card>
           <CardContent className="py-12 text-center text-gray-500">
-            No published pay stubs yet. Your pay will appear here after payroll is published.
+            No published pay stubs yet. They appear here after payroll sends them.
           </CardContent>
         </Card>
       )}
@@ -232,28 +256,38 @@ export default function RbtSessionsPayPage() {
               <Card key={stub.id}>
                 <button
                   type="button"
-                  className="w-full text-left px-6 py-4 flex items-center justify-between gap-3"
+                  className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left"
                   onClick={() => setExpandedId(open ? null : stub.id)}
                 >
                   <div>
                     <div className="font-medium">
-                      {fmtUtcDate(stub.payrollRun.periodStart)} – {fmtUtcDate(stub.payrollRun.periodEnd)}
+                      {fmtUtcDate(stub.payPeriod.periodStart)} –{' '}
+                      {fmtUtcDate(stub.payPeriod.periodEnd)}
                     </div>
                     <div className="text-sm text-gray-500">
-                      Pay date {fmtUtcDate(stub.payrollRun.payDate)} · {stub.totalHours.toFixed(1)}h
+                      Pay date {fmtUtcDate(stub.payPeriod.payDate)} ·{' '}
+                      {stub.totalHours.toFixed(1)}h
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge variant="secondary">{usd(stub.netPay)}</Badge>
-                    {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    {open ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
                   </div>
                 </button>
                 {open && (
-                  <CardContent className="pt-0 border-t">
+                  <CardContent className="border-t pt-0">
                     <div className="flex justify-end pt-3">
-                      <Button variant="outline" size="sm" onClick={() => downloadStubHtml(stub)}>
-                        <Download className="w-4 h-4 mr-1" />
-                        Download
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadStub(stub)}
+                      >
+                        <Download className="mr-1 h-4 w-4" />
+                        {stub.pdfAvailable ? 'Download PDF' : 'Download'}
                       </Button>
                     </div>
                     <StubBreakdown stub={stub} />

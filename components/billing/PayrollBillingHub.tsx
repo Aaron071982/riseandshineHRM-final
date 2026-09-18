@@ -185,7 +185,7 @@ export default function PayrollBillingHub({ data }: { data: UnifiedDashboardData
       showToast(
         row.payeeType === 'BCBA'
           ? 'Sent — now visible in the BCBA portal'
-          : 'Marked Sent (admin download only for RBT)',
+          : 'Sent — now visible in the RBT portal Pay page',
         'success'
       )
       router.refresh()

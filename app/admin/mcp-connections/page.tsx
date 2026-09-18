@@ -1,8 +1,16 @@
 import Link from 'next/link'
-import { loadDocumentReadAllowlistUsers, loadMcpConnections } from '@/lib/mcp/admin/data'
 import {
+  loadBulkImportGrantUsers,
+  loadDocumentReadAllowlistUsers,
+  loadMcpConnections,
+  loadPendingBulkImportApprovals,
+} from '@/lib/mcp/admin/data'
+import {
+  approveScheduleBulkImportBatch,
   revokeAllMcpTokens,
   revokeMcpToken,
+  setCanBulkImportSchedule,
+  setCanBulkImportScheduleByEmail,
   setCanReadClientDocuments,
   setMcpSuperAdmin,
 } from '@/lib/mcp/admin/actions'
@@ -21,6 +29,8 @@ function parseScopes(scope: string): string[] {
 export default async function McpConnectionsPage() {
   const { clients, tokens } = await loadMcpConnections()
   const allowlistUsers = await loadDocumentReadAllowlistUsers()
+  const bulkImportUsers = await loadBulkImportGrantUsers()
+  const pendingBulkImports = await loadPendingBulkImportApprovals()
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-12">
@@ -223,6 +233,108 @@ export default async function McpConnectionsPage() {
             )
           })}
         </ul>
+      </section>
+
+      <section className="rounded-lg border border-amber-200 dark:border-amber-900">
+        <h2 className="border-b px-4 py-3 font-medium">
+          Schedule bulk import (schedule:bulk_import)
+        </h2>
+        <p className="px-4 pt-3 text-xs text-muted-foreground">
+          One-time grant. Default off. MCP tools preview_schedule_import / commit_schedule_import /
+          rollback_schedule_import require OAuth identity + this flag on every call. Revoke after the import.
+        </p>
+        <form
+          action={async (formData) => {
+            'use server'
+            const email = String(formData.get('email') ?? '')
+            await setCanBulkImportScheduleByEmail(email, true)
+          }}
+          className="flex flex-wrap items-end gap-2 border-b px-4 py-3"
+        >
+          <label className="text-sm">
+            <span className="mb-1 block text-xs text-muted-foreground">Grant by email</span>
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="staff@riseandshineaba.com"
+              className="rounded-md border px-2 py-1.5 text-sm"
+            />
+          </label>
+          <button type="submit" className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
+            Grant
+          </button>
+        </form>
+        <ul className="divide-y">
+          {bulkImportUsers.map((u) => (
+            <li
+              key={`bulk-${u.id}`}
+              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm"
+            >
+              <div>
+                <p className="font-medium">{u.name || u.email}</p>
+                <p className="text-xs text-muted-foreground">{u.email}</p>
+                <p className="text-xs">
+                  {u.canBulkImportSchedule ? (
+                    <span className="text-amber-700 dark:text-amber-300">Grant active</span>
+                  ) : (
+                    <span className="text-muted-foreground">No grant</span>
+                  )}
+                </p>
+              </div>
+              <form
+                action={async () => {
+                  'use server'
+                  await setCanBulkImportSchedule(u.id, !u.canBulkImportSchedule)
+                }}
+              >
+                <button type="submit" className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
+                  {u.canBulkImportSchedule ? 'Revoke' : 'Grant'}
+                </button>
+              </form>
+            </li>
+          ))}
+        </ul>
+        {pendingBulkImports.length > 0 ? (
+          <div className="border-t">
+            <h3 className="px-4 py-2 text-sm font-medium">
+              Pending admin approval ({pendingBulkImports.length})
+            </h3>
+            <ul className="divide-y">
+              {pendingBulkImports.map((b) => (
+                <li
+                  key={b.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm"
+                >
+                  <div>
+                    <p className="font-medium">
+                      {b.okCount} ok / {b.conflictCount} conflict / {b.errorCount} error ·{' '}
+                      {b.entryCount} rows
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {b.actor.name || b.actor.email} · {b.status} · expires{' '}
+                      {b.expiresAt.toLocaleString()}
+                    </p>
+                    <p className="font-mono text-xs text-muted-foreground">{b.id}</p>
+                  </div>
+                  <form
+                    action={async () => {
+                      'use server'
+                      await approveScheduleBulkImportBatch(b.id)
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      className="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
+                    >
+                      Approve commit
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-lg border">

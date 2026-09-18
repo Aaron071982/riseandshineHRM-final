@@ -2,6 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { cn } from '@/lib/utils'
+
+const NAV = [
+  { href: '/portal', label: 'Clients', match: (p: string) => p === '/portal' || p.startsWith('/portal/clients') },
+  { href: '/portal/assessments', label: 'Assessments', match: (p: string) => p.startsWith('/portal/assessments') },
+  { href: '/portal/pay', label: 'Pay stubs', match: (p: string) => p.startsWith('/portal/pay') },
+  { href: '/portal/onboarding', label: 'Onboarding', match: (p: string) => p.startsWith('/portal/onboarding') },
+] as const
 
 export function PortalShell({
   userName,
@@ -12,10 +20,8 @@ export function PortalShell({
   credentialsLine?: string | null
   children: React.ReactNode
 }) {
-  const pathname = usePathname()
-  const onPay = pathname?.startsWith('/portal/pay')
-  const onOnboarding = pathname?.startsWith('/portal/onboarding')
-  const onPrint = /\/assessments\/[^/]+\/print\/?$/.test(pathname ?? '')
+  const pathname = usePathname() ?? ''
+  const onPrint = /\/assessments\/[^/]+\/print\/?$/.test(pathname)
 
   if (onPrint) {
     return <>{children}</>
@@ -23,8 +29,8 @@ export function PortalShell({
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-ink">
-      <header className="border-b border-line bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <header className="sticky top-0 z-40 border-b border-line bg-surface/95 backdrop-blur">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -32,7 +38,7 @@ export function PortalShell({
               alt="Rise & Shine"
               className="h-9 w-auto"
             />
-            <div>
+            <div className="hidden sm:block">
               <p className="font-display text-sm font-semibold text-[var(--espresso)]">
                 Rise &amp; Shine
               </p>
@@ -40,37 +46,24 @@ export function PortalShell({
             </div>
           </div>
 
-          <nav className="flex items-center gap-1 text-sm">
-            <Link
-              href="/portal"
-              className={
-                !onPay && !onOnboarding
-                  ? 'rounded-lg bg-[color-mix(in_srgb,var(--sunrise)_14%,white)] px-3 py-1.5 font-medium text-[var(--espresso)]'
-                  : 'rounded-lg px-3 py-1.5 text-quiet hover:bg-canvas hover:text-ink'
-              }
-            >
-              Clients
-            </Link>
-            <Link
-              href="/portal/onboarding"
-              className={
-                onOnboarding
-                  ? 'rounded-lg bg-[color-mix(in_srgb,var(--sunrise)_14%,white)] px-3 py-1.5 font-medium text-[var(--espresso)]'
-                  : 'rounded-lg px-3 py-1.5 text-quiet hover:bg-canvas hover:text-ink'
-              }
-            >
-              Onboarding
-            </Link>
-            <Link
-              href="/portal/pay"
-              className={
-                onPay
-                  ? 'rounded-lg bg-[color-mix(in_srgb,var(--sunrise)_14%,white)] px-3 py-1.5 font-medium text-[var(--espresso)]'
-                  : 'rounded-lg px-3 py-1.5 text-quiet hover:bg-canvas hover:text-ink'
-              }
-            >
-              Pay stubs
-            </Link>
+          <nav className="flex flex-wrap items-center gap-1 text-sm">
+            {NAV.map((item) => {
+              const active = item.match(pathname)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'rounded-lg px-3 py-1.5 transition-colors',
+                    active
+                      ? 'bg-[color-mix(in_srgb,var(--sunrise)_14%,white)] font-medium text-[var(--espresso)]'
+                      : 'text-quiet hover:bg-canvas hover:text-ink'
+                  )}
+                >
+                  {item.label}
+                </Link>
+              )
+            })}
           </nav>
 
           <div className="text-right text-sm">
@@ -81,7 +74,7 @@ export function PortalShell({
           </div>
         </div>
       </header>
-      <main>{children}</main>
+      <main className="w-full">{children}</main>
     </div>
   )
 }

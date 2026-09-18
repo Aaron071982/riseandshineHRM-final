@@ -10,8 +10,8 @@ export type PayStubAccess =
 /**
  * App-layer ownership for pay stub PII.
  * - Billing managers / super-admins: any statement
- * - Contractor payee: only their own statement (via ContractorProfile.userId)
- * RBT stubs have no portal user — admin-only.
+ * - BCBA contractor: own SENT BCBA statements (portal)
+ * - RBT employee: own SENT RBT statements (RBT portal Pay page)
  */
 export async function assertCanAccessPayStatement(input: {
   user: SessionUser | null
@@ -33,6 +33,7 @@ export async function assertCanAccessPayStatement(input: {
       staffId: true,
       pdfUrl: true,
       contractor: { select: { userId: true } },
+      rbtProfile: { select: { userId: true } },
     },
   })
 
@@ -44,11 +45,12 @@ export async function assertCanAccessPayStatement(input: {
     return { ok: true, role: 'admin' }
   }
 
-  if (statement.payeeType !== 'BCBA' || !statement.contractor?.userId) {
-    return { ok: false, status: 403, error: 'Forbidden' }
-  }
+  const ownerUserId =
+    statement.payeeType === 'BCBA'
+      ? statement.contractor?.userId
+      : statement.rbtProfile?.userId
 
-  if (statement.contractor.userId !== input.user.id) {
+  if (!ownerUserId || ownerUserId !== input.user.id) {
     return { ok: false, status: 403, error: 'Forbidden' }
   }
 

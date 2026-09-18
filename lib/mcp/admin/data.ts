@@ -73,10 +73,53 @@ export async function loadDocumentReadAllowlistUsers() {
       email: true,
       canReadClientDocuments: true,
       isMcpSuperAdmin: true,
+      canBulkImportSchedule: true,
       crmRoles: {
         where: { revokedAt: null },
         select: { role: true },
       },
+    },
+  })
+}
+
+/** Admins + anyone who already holds the one-time schedule bulk-import grant. */
+export async function loadBulkImportGrantUsers() {
+  return prisma.user.findMany({
+    where: {
+      isActive: true,
+      OR: [{ role: 'ADMIN' }, { canBulkImportSchedule: true }],
+    },
+    orderBy: { email: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      canBulkImportSchedule: true,
+    },
+  })
+}
+
+export async function loadPendingBulkImportApprovals() {
+  return prisma.scheduleBulkImportBatch.findMany({
+    where: {
+      status: { in: ['AWAITING_ADMIN', 'PREVIEW'] },
+      requiresAdminApproval: true,
+      adminApprovedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+    select: {
+      id: true,
+      previewToken: true,
+      status: true,
+      entryCount: true,
+      okCount: true,
+      conflictCount: true,
+      errorCount: true,
+      createdAt: true,
+      expiresAt: true,
+      actor: { select: { id: true, name: true, email: true } },
     },
   })
 }

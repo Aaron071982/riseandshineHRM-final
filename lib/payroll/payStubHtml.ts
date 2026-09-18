@@ -9,6 +9,18 @@ export type PayStubLine = {
   amount: number
 }
 
+export type PayStubDeductionRow = {
+  label: string
+  amount: number
+  employeePaid: boolean
+}
+
+export type PayStubYtd = {
+  gross: number
+  deductions: number
+  net: number
+}
+
 export type PayStubPayload = {
   payeeType: 'BCBA' | 'RBT'
   legalName: string
@@ -18,8 +30,12 @@ export type PayStubPayload = {
   periodEnd: Date | string
   ratePerHour: number | null
   lineItems: PayStubLine[]
+  /** Legacy single total — used when deductionRows is empty (BCBA). */
   deductions: number
+  /** Itemized employee/employer rows for W-2 BT stubs. */
+  deductionRows?: PayStubDeductionRow[]
   reconciled: boolean
+  ytd?: PayStubYtd | null
   /** Absolute or data URL for logo embed in headless Chrome. */
   logoSrc: string
 }
@@ -62,16 +78,26 @@ function escapeHtml(s: string): string {
  */
 export function buildPayStubHtml(payload: PayStubPayload): string {
   const isContractor = payload.payeeType === 'BCBA'
+  const employeeRows = (payload.deductionRows ?? []).filter((d) => d.employeePaid)
+  const deductionsFromRows = round2(
+    employeeRows.reduce((sum, d) => sum + Number(d.amount), 0)
+  )
+  const deductions =
+    employeeRows.length > 0
+      ? deductionsFromRows
+      : round2(payload.deductions ?? 0)
+
   const totals = recomputeStatementTotals(
     payload.lineItems.map((li) => ({ hours: li.hours, amount: li.amount })),
-    { deductions: payload.deductions }
+    { deductions }
   )
   // Always drive printed totals from line items (source of truth).
   const grossPay = totals.lineAmountSum
-  const deductions = round2(payload.deductions ?? 0)
   const netPay = round2(grossPay - deductions)
   const showReconcileWarn =
-    !payload.reconciled || Math.abs(grossPay - totals.lineAmountSum) >= 0.005
+    !payload.reconciled ||
+    Math.abs(grossPay - totals.lineAmountSum) >= 0.005 ||
+    Math.abs(netPay - round2(grossPay - deductions)) >= 0.005
 
   const rows = payload.lineItems
     .map((li, i) => {
@@ -96,14 +122,40 @@ export function buildPayStubHtml(payload: PayStubPayload): string {
 
   const subBand = isContractor
     ? `<div class="sub-band">Contractor payment — 1099 (no taxes withheld)</div>`
-    : `<div class="sub-band employee">Employee payment</div>`
+    : `<div class="sub-band employee">Employee earnings statement</div>`
 
   const footnotes = isContractor
     ? `<li>This is a 1099 contractor payment. No federal, state, or FICA taxes were withheld.</li>
        <li>Amount = hours × pay rate. Hours are computed from session start/end clocks (h.mm; <code>.30</code> = 30 minutes).</li>
        <li>Keep this statement for your records. A Form 1099-NEC will be issued if required.</li>`
-    : `<li>This is an employee wage statement. Deductions shown are as recorded for this period.</li>
-       <li>Amount = hours × pay rate. Hours are computed from session start/end clocks (h.mm; <code>.30</code> = 30 minutes).</li>`
+    : `<li>Taxes withheld per your Form W-4 and applicable federal, New York State, and New York City rates. This is an employee earnings statement.</li>
+       <li>Amount = hours × pay rate. Hours are computed from session start/end clocks (h.mm; <code>.30</code> = 30 minutes).</li>
+       <li>Deduction amounts are as recorded for this pay period — they are not recalculated on this statement.</li>`
+
+  const deductionBlock =
+    !isContractor && employeeRows.length > 0
+      ? employeeRows
+          .map(
+            (d) => `<div class="row">
+        <span>${escapeHtml(d.label)}</span>
+        <span>−${escapeHtml(formatUsd(d.amount))}</span>
+      </div>`
+          )
+          .join('\n')
+      : `<div class="row">
+        <span>${isContractor ? 'Deductions / taxes' : 'Total deductions'}</span>
+        <span>${deductions > 0 ? `−${escapeHtml(formatUsd(deductions))}` : escapeHtml(formatUsd(0))}</span>
+      </div>`
+
+  const ytdBlock =
+    !isContractor && payload.ytd
+      ? `<div class="ytd">
+      <div class="label">Year to date</div>
+      <div class="ytd-row"><span>Gross</span><span>${escapeHtml(formatUsd(payload.ytd.gross))}</span></div>
+      <div class="ytd-row"><span>Deductions</span><span>−${escapeHtml(formatUsd(payload.ytd.deductions))}</span></div>
+      <div class="ytd-row"><span>Net</span><span>${escapeHtml(formatUsd(payload.ytd.net))}</span></div>
+    </div>`
+      : ''
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -233,7 +285,7 @@ export function buildPayStubHtml(payload: PayStubPayload): string {
   }
   .totals {
     margin-top: 18px;
-    width: 280px;
+    width: 300px;
     margin-left: auto;
     font-size: 12px;
   }
@@ -244,6 +296,16 @@ export function buildPayStubHtml(payload: PayStubPayload): string {
     border-bottom: 1px solid #EEE8E0;
   }
   .totals .row.gross .amt { color: #2E6B57; font-weight: 700; }
+  .totals .row.deduction-head {
+    margin-top: 8px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6B5E54;
+    font-weight: 700;
+    border-bottom: none;
+    padding-bottom: 2px;
+  }
   .totals .net {
     margin-top: 8px;
     background: #1B4F8A;
@@ -258,6 +320,26 @@ export function buildPayStubHtml(payload: PayStubPayload): string {
   .totals .net .amt {
     font-size: 18px;
     font-variant-numeric: tabular-nums;
+  }
+  .ytd {
+    margin-top: 14px;
+    padding: 10px 12px;
+    background: #FAF8F4;
+    border: 1px solid #E5E0D8;
+    font-size: 11px;
+  }
+  .ytd .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6B5E54;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .ytd-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
   }
   .money { color: #2E6B57; font-variant-numeric: tabular-nums; }
   .footnotes {
@@ -287,7 +369,7 @@ export function buildPayStubHtml(payload: PayStubPayload): string {
     ${subBand}
     ${
       showReconcileWarn
-        ? `<div class="warn-band">⚠ Totals don't match line items — review before relying on this statement.</div>`
+        ? `<div class="warn-band">⚠ Totals don't match line items / deductions — review before relying on this statement.</div>`
         : ''
     }
 
@@ -338,14 +420,17 @@ export function buildPayStubHtml(payload: PayStubPayload): string {
         <span>Gross pay</span>
         <span class="amt">${escapeHtml(formatUsd(grossPay))}</span>
       </div>
-      <div class="row">
-        <span>Deductions / taxes</span>
-        <span>${escapeHtml(formatUsd(deductions))}</span>
-      </div>
+      ${
+        !isContractor && employeeRows.length > 0
+          ? `<div class="row deduction-head"><span>Deductions</span><span></span></div>`
+          : ''
+      }
+      ${deductionBlock}
       <div class="net">
         <span>NET PAY</span>
         <span class="amt">${escapeHtml(formatUsd(netPay))}</span>
       </div>
+      ${ytdBlock}
     </div>
 
     <div class="footnotes">

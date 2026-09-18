@@ -41,7 +41,7 @@ describe('payStubHtml', () => {
     expect(html).toContain('$0.00')
   })
 
-  it('uses employee framing for RBT (no 1099 band)', () => {
+  it('uses employee framing for RBT (no 1099 band) with itemized deductions', () => {
     const html = buildPayStubHtml({
       payeeType: 'RBT',
       legalName: 'Jordan Miles',
@@ -53,6 +53,13 @@ describe('payStubHtml', () => {
       deductions: 0,
       reconciled: true,
       logoSrc: 'data:image/png;base64,xx',
+      deductionRows: [
+        { label: 'Federal income tax', amount: 42.5, employeePaid: true },
+        { label: 'Social Security', amount: 18.2, employeePaid: true },
+        { label: 'Medicare', amount: 4.26, employeePaid: true },
+        { label: 'NY State tax', amount: 12.0, employeePaid: true },
+      ],
+      ytd: { gross: 840, deductions: 77, net: 763 },
       lineItems: [
         {
           workDate: new Date('2026-03-04'),
@@ -63,7 +70,13 @@ describe('payStubHtml', () => {
         },
       ],
     })
-    expect(html).toContain('Employee payment')
+    expect(html).toContain('Employee earnings statement')
     expect(html).not.toContain('1099')
+    expect(html).toContain('Federal income tax')
+    expect(html).toContain('Social Security')
+    expect(html).toContain('Year to date')
+    expect(html).toContain('Form W-4')
+    // net = 84 - (42.5+18.2+4.26+12) = 7.04
+    expect(html).toContain('$7.04')
   })
 })

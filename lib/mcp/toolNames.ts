@@ -26,6 +26,9 @@ export const MCP_TOOL_NAMES = [
   'get_staff_pay',
   'get_staff_worked_sessions',
   'get_payroll_summary',
+  'preview_schedule_import',
+  'commit_schedule_import',
+  'rollback_schedule_import',
 ] as const
 
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number]

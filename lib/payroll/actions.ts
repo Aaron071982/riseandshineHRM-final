@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import {
   assertCanWritePayroll,
+  auditPayrollChange,
   PayrollAccessError,
 } from '@/lib/payroll/access'
 import {
@@ -26,6 +27,8 @@ import {
   generatePayStubPdf,
   sendPayStatement,
 } from '@/lib/payroll/generatePayStub'
+import { replacePayDeductions } from '@/lib/payroll/deductions'
+import type { DeductionCode } from '@prisma/client'
 import type { PayStatementStatus } from '@prisma/client'
 
 type ActionResult<T extends object = object> =
@@ -505,6 +508,40 @@ export async function setPayStatementStatusAction(input: {
   }
 }
 
+
+export async function setPayDeductionsAction(input: {
+  payStatementId: string
+  deductions: {
+    code: DeductionCode
+    label: string
+    amount: number
+    employeePaid?: boolean
+  }[]
+}): Promise<ActionResult<{ deductions: number; netPay: number; reconciled: boolean }>> {
+  try {
+    const actor = await assertCanWritePayroll()
+    const res = await replacePayDeductions({
+      payStatementId: input.payStatementId,
+      deductions: input.deductions,
+    })
+    await auditPayrollChange({
+      actorUserId: actor.id,
+      entityType: 'PayStatement',
+      entityId: input.payStatementId,
+      label: 'PAY_STATEMENT_EDIT:set_deductions',
+      after: res,
+    })
+    revalidatePath('/billing')
+    return { ok: true, ...res }
+  } catch (err) {
+    return fail(err) as ActionResult<{
+      deductions: number
+      netPay: number
+      reconciled: boolean
+    }>
+  }
+}
+
 export async function generatePayStubAction(input: {
   payStatementId: string
 }): Promise<ActionResult<{ pdfUrl: string; status: 'READY' }>> {
@@ -516,6 +553,7 @@ export async function generatePayStubAction(input: {
     })
     revalidatePath('/billing')
     revalidatePath('/portal/pay')
+    revalidatePath('/rbt/sessions')
     return { ok: true, ...res }
   } catch (err) {
     return fail(err) as ActionResult<{ pdfUrl: string; status: 'READY' }>
@@ -533,6 +571,7 @@ export async function sendPayStubAction(input: {
     })
     revalidatePath('/billing')
     revalidatePath('/portal/pay')
+    revalidatePath('/rbt/sessions')
     return {
       ok: true,
       status: res.status,

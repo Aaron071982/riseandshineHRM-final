@@ -8,16 +8,92 @@ import {
   uploadPayStubPdf,
 } from '@/lib/payroll/payStubStorage'
 import { getActiveContractorRate } from '@/lib/payroll/contractors'
+import {
+  deductionsFromLegacyPayrollEntry,
+  replacePayDeductions,
+} from '@/lib/payroll/deductions'
+import { round2 } from '@/lib/payroll/hoursHmm'
+import { revalidatePath } from 'next/cache'
+
+async function loadYtdForPayee(input: {
+  payeeType: 'BCBA' | 'RBT'
+  contractorId: string | null
+  staffId: string | null
+  payDate: Date
+  excludeStatementId: string
+}): Promise<{ gross: number; deductions: number; net: number } | null> {
+  const year = input.payDate.getUTCFullYear()
+  const yearStart = new Date(Date.UTC(year, 0, 1))
+  const yearEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59))
+
+  const prior = await prisma.payStatement.findMany({
+    where: {
+      id: { not: input.excludeStatementId },
+      payeeType: input.payeeType,
+      status: { in: ['READY', 'SENT'] },
+      ...(input.payeeType === 'BCBA'
+        ? { contractorId: input.contractorId ?? undefined }
+        : { staffId: input.staffId ?? undefined }),
+      payPeriod: {
+        payDate: { gte: yearStart, lte: yearEnd },
+      },
+    },
+    select: { grossPay: true, deductions: true, netPay: true },
+  })
+  if (prior.length === 0) return null
+  return {
+    gross: round2(prior.reduce((s, p) => s + Number(p.grossPay), 0)),
+    deductions: round2(prior.reduce((s, p) => s + Number(p.deductions), 0)),
+    net: round2(prior.reduce((s, p) => s + Number(p.netPay), 0)),
+  }
+}
+
+/** If RBT statement has no itemized deductions, copy amounts from a matching legacy published entry. */
+async function ensureRbtDeductionsFromLegacy(statementId: string, staffId: string) {
+  const existing = await prisma.payDeduction.count({
+    where: { payStatementId: statementId },
+  })
+  if (existing > 0) return
+
+  const statement = await prisma.payStatement.findUnique({
+    where: { id: statementId },
+    include: { payPeriod: true },
+  })
+  if (!statement) return
+
+  const legacy = await prisma.payrollRunEntry.findFirst({
+    where: {
+      rbtProfileId: staffId,
+      payrollRun: {
+        status: 'PUBLISHED',
+        periodStart: statement.payPeriod.startDate,
+        periodEnd: statement.payPeriod.endDate,
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+  if (!legacy) return
+
+  const rows = deductionsFromLegacyPayrollEntry({
+    empTaxFIT: legacy.empTaxFIT,
+    empTaxSS: legacy.empTaxSS,
+    empTaxMed: legacy.empTaxMed,
+    empTaxNYIT: legacy.empTaxNYIT,
+  })
+  if (rows.length === 0) return
+  await replacePayDeductions({ payStatementId: statementId, deductions: rows })
+}
 
 export async function generatePayStubPdf(input: {
   payStatementId: string
   actorUserId: string
 }): Promise<{ pdfUrl: string; status: 'READY' }> {
-  const statement = await prisma.payStatement.findUnique({
+  let statement = await prisma.payStatement.findUnique({
     where: { id: input.payStatementId },
     include: {
       payPeriod: true,
       lineItems: { orderBy: [{ workDate: 'asc' }, { startClock: 'asc' }] },
+      deductionsItems: { orderBy: { createdAt: 'asc' } },
       contractor: { include: { activeRate: true } },
       rbtProfile: {
         select: {
@@ -35,6 +111,32 @@ export async function generatePayStubPdf(input: {
   }
   if (statement.lineItems.length === 0) {
     throw new Error('Add line items before generating a stub')
+  }
+
+  if (
+    statement.payeeType === 'RBT' &&
+    statement.staffId &&
+    statement.deductionsItems.length === 0
+  ) {
+    await ensureRbtDeductionsFromLegacy(statement.id, statement.staffId)
+    statement = await prisma.payStatement.findUnique({
+      where: { id: input.payStatementId },
+      include: {
+        payPeriod: true,
+        lineItems: { orderBy: [{ workDate: 'asc' }, { startClock: 'asc' }] },
+        deductionsItems: { orderBy: { createdAt: 'asc' } },
+        contractor: { include: { activeRate: true } },
+        rbtProfile: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            hourlyPayRate: true,
+          },
+        },
+      },
+    })
+    if (!statement) throw new Error('Pay statement not found')
   }
 
   let legalName: string
@@ -58,6 +160,52 @@ export async function generatePayStubPdf(input: {
     payeeKey = statement.staffId ?? statement.rbtProfile.id
   }
 
+  const deductionRows = statement.deductionsItems.map((d) => ({
+    label: d.label,
+    amount: Number(d.amount),
+    employeePaid: d.employeePaid,
+  }))
+  const employeeDeductionSum = round2(
+    deductionRows
+      .filter((d) => d.employeePaid)
+      .reduce((s, d) => s + d.amount, 0)
+  )
+
+  const ytdBase = await loadYtdForPayee({
+    payeeType: statement.payeeType,
+    contractorId: statement.contractorId,
+    staffId: statement.staffId,
+    payDate: statement.payPeriod.payDate,
+    excludeStatementId: statement.id,
+  })
+  const ytd = ytdBase
+    ? {
+        gross: round2(ytdBase.gross + Number(statement.grossPay)),
+        deductions: round2(
+          ytdBase.deductions +
+            (deductionRows.length > 0
+              ? employeeDeductionSum
+              : Number(statement.deductions))
+        ),
+        net: round2(
+          ytdBase.net +
+            Number(statement.grossPay) -
+            (deductionRows.length > 0
+              ? employeeDeductionSum
+              : Number(statement.deductions))
+        ),
+      }
+    : statement.payeeType === 'RBT'
+      ? {
+          gross: Number(statement.grossPay),
+          deductions:
+            deductionRows.length > 0
+              ? employeeDeductionSum
+              : Number(statement.deductions),
+          net: Number(statement.netPay),
+        }
+      : null
+
   const pdfBytes = await renderPayStubPdf({
     payeeType: statement.payeeType,
     legalName,
@@ -66,8 +214,13 @@ export async function generatePayStubPdf(input: {
     periodStart: statement.payPeriod.startDate,
     periodEnd: statement.payPeriod.endDate,
     ratePerHour,
-    deductions: Number(statement.deductions),
+    deductions:
+      deductionRows.length > 0
+        ? employeeDeductionSum
+        : Number(statement.deductions),
+    deductionRows,
     reconciled: statement.reconciled,
+    ytd,
     lineItems: statement.lineItems.map((li) => ({
       workDate: li.workDate,
       startClock: li.startClock,
@@ -132,6 +285,9 @@ export async function sendPayStatement(input: {
     before: { status: statement.status },
     after: { status: 'SENT', sentAt: sentAt.toISOString() },
   })
+
+  revalidatePath('/portal/pay')
+  revalidatePath('/rbt/sessions')
 
   return { status: 'SENT', sentAt }
 }

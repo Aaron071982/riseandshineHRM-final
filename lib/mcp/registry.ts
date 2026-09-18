@@ -44,6 +44,11 @@ import {
   getStaffPay,
   getStaffWorkedSessions,
 } from '@/lib/mcp/tools/payroll'
+import {
+  commitScheduleImportTool,
+  previewScheduleImportTool,
+  rollbackScheduleImportTool,
+} from '@/lib/mcp/tools/scheduleBulkImport'
 import { logDocumentAccess } from '@/lib/mcp/documentAccess'
 import { logSensitiveAccess } from '@/lib/mcp/sensitiveAccess'
 import type { ToolResult } from '@/lib/mcp/types'
@@ -179,6 +184,18 @@ async function executeTool(
         from: typeof args.from === 'string' ? args.from : undefined,
         to: typeof args.to === 'string' ? args.to : undefined,
         match_by: typeof args.match_by === 'string' ? args.match_by : undefined,
+      })
+    case 'preview_schedule_import':
+      return previewScheduleImportTool({ entries: args.entries })
+    case 'commit_schedule_import':
+      return commitScheduleImportTool({
+        previewToken:
+          typeof args.previewToken === 'string' ? args.previewToken : undefined,
+        confirm: args.confirm === true,
+      })
+    case 'rollback_schedule_import':
+      return rollbackScheduleImportTool({
+        batchId: typeof args.batchId === 'string' ? args.batchId : undefined,
       })
     default:
       throw new Error(`Unknown tool: ${name}`)

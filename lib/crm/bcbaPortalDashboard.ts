@@ -16,6 +16,7 @@ export type BcbaPortalDashboard = {
     clientName: string
     clientCode: string
     reason: string
+    assessmentId?: string | null
   }[]
   clients: {
     id: string
@@ -25,9 +26,20 @@ export type BcbaPortalDashboard = {
     dateOfBirth: Date | null
     stage: string
     assessmentStatus: string | null
+    assessmentId: string | null
     nextReassessmentDate: Date | null
     authEndDate: Date | null
     updatedAt: Date
+  }[]
+  assessments: {
+    id: string
+    clientId: string
+    clientName: string
+    clientCode: string
+    status: string
+    source: string
+    updatedAt: Date
+    signedAt: Date | null
   }[]
 }
 
@@ -72,8 +84,14 @@ export async function loadBcbaPortalDashboard(
       treatmentAssessments: {
         where: { deletedAt: null },
         orderBy: { updatedAt: 'desc' },
-        take: 1,
-        select: { id: true, status: true, updatedAt: true, signedAt: true },
+        take: 8,
+        select: {
+          id: true,
+          status: true,
+          source: true,
+          updatedAt: true,
+          signedAt: true,
+        },
       },
     },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
@@ -87,6 +105,7 @@ export async function loadBcbaPortalDashboard(
   let authExpiring30 = 0
   let reassessmentsDue = 0
   const actionQueue: BcbaPortalDashboard['actionQueue'] = []
+  const assessments: BcbaPortalDashboard['assessments'] = []
 
   const rows: BcbaPortalDashboard['clients'] = clients.map((c) => {
     const latest = c.treatmentAssessments[0] ?? null
@@ -98,6 +117,19 @@ export async function loadBcbaPortalDashboard(
       else if (status === 'COMPLETED') assessmentMix.completed += 1
     }
 
+    for (const a of c.treatmentAssessments) {
+      assessments.push({
+        id: a.id,
+        clientId: c.id,
+        clientName: `${c.firstName} ${c.lastName}`.trim(),
+        clientCode: c.clientCode,
+        status: a.status,
+        source: a.source,
+        updatedAt: a.updatedAt,
+        signedAt: a.signedAt,
+      })
+    }
+
     const authEnd = c.authorizations[0]?.expirationDate ?? null
     if (authEnd && authEnd >= now && authEnd <= in30) {
       authExpiring30 += 1
@@ -107,6 +139,7 @@ export async function loadBcbaPortalDashboard(
         clientName: `${c.firstName} ${c.lastName}`.trim(),
         clientCode: c.clientCode,
         reason: 'Authorization ends within 30 days',
+        assessmentId: latest?.id ?? null,
       })
     }
 
@@ -122,6 +155,7 @@ export async function loadBcbaPortalDashboard(
             clientName: `${c.firstName} ${c.lastName}`.trim(),
             clientCode: c.clientCode,
             reason: 'Reassessment window open',
+            assessmentId: latest.id,
           })
         }
       }
@@ -132,6 +166,7 @@ export async function loadBcbaPortalDashboard(
         clientName: `${c.firstName} ${c.lastName}`.trim(),
         clientCode: c.clientCode,
         reason: latest ? 'Assessment in progress' : 'Assessment not started yet',
+        assessmentId: latest?.id ?? null,
       })
     }
 
@@ -143,11 +178,14 @@ export async function loadBcbaPortalDashboard(
       dateOfBirth: c.dateOfBirth,
       stage: c.stage,
       assessmentStatus: status,
+      assessmentId: latest?.id ?? null,
       nextReassessmentDate,
       authEndDate: authEnd,
       updatedAt: c.updatedAt,
     }
   })
+
+  assessments.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
 
   const fullName = user.name?.trim() || null
   const lead = user.crmRoles?.includes('CLINICAL_LEAD')
@@ -168,5 +206,6 @@ export async function loadBcbaPortalDashboard(
     reassessmentsDue,
     actionQueue: actionQueue.slice(0, 25),
     clients: rows,
+    assessments: assessments.slice(0, 80),
   }
 }

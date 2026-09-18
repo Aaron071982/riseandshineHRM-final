@@ -33,16 +33,17 @@ export default async function PortalPayPage() {
     : []
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="w-full px-4 py-8 sm:px-6 lg:px-8">
+      <div className="w-full max-w-none">
       <p className="text-sm font-medium uppercase tracking-[0.12em] text-[var(--sunrise)]">
         Pay stubs
       </p>
       <h1 className="mt-2 font-display text-3xl font-semibold text-[var(--espresso)]">
         Your pay stubs
       </h1>
-      <p className="mt-3 text-[var(--muted-ink)]">
-        1099 contractor statements published to you by payroll. Only your own
-        sent statements appear here.
+      <p className="mt-3 max-w-2xl text-[var(--muted-ink)]">
+        Pay statements published to you by payroll. Only your own sent
+        statements appear here.
       </p>
 
       {stubs.length === 0 ? (
@@ -97,6 +98,7 @@ export default async function PortalPayPage() {
           </table>
         </div>
       )}
+      </div>
     </div>
   )
 }

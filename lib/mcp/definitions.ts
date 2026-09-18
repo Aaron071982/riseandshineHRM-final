@@ -287,4 +287,67 @@ export const MCP_TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    name: 'preview_schedule_import',
+    description:
+      'One-time grant only (schedule:bulk_import). Validate a batch of schedule entries without writing. Returns per-row ok|conflict|error, summary, and a previewToken for commit. Max 200 rows. Resolves client code/id and therapist id/email/name; ambiguous identifiers become error rows (never guessed).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entries: {
+          type: 'array',
+          description:
+            'Schedule rows: { client, therapist, service?, dayOrDate, start, end, location? }',
+          items: {
+            type: 'object',
+            properties: {
+              client: { type: 'string', description: 'Client id or clientCode' },
+              therapist: {
+                type: 'string',
+                description: 'RBT profile id, email, or name',
+              },
+              service: { type: 'string', description: 'CPT code (default 97153)' },
+              dayOrDate: {
+                type: ['string', 'number'],
+                description: '0–6, weekday name, or YYYY-MM-DD',
+              },
+              start: { type: 'string', description: 'HH:MM 24h' },
+              end: { type: 'string', description: 'HH:MM 24h' },
+              location: { type: 'string' },
+            },
+            required: ['client', 'therapist', 'dayOrDate', 'start', 'end'],
+          },
+        },
+      },
+      required: ['entries'],
+    },
+  },
+  {
+    name: 'commit_schedule_import',
+    description:
+      'One-time grant only. Write only the ok rows from a prior preview. Requires unmodified previewToken and confirm:true. Idempotent natural key (client+day+start+therapist). May await admin approval on first commit for all-client loads. Stamp shared batchId for rollback.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        previewToken: { type: 'string' },
+        confirm: {
+          type: 'boolean',
+          description: 'Must be true to commit',
+        },
+      },
+      required: ['previewToken', 'confirm'],
+    },
+  },
+  {
+    name: 'rollback_schedule_import',
+    description:
+      'One-time grant only. Soft-delete every assignment written under batchId (SCHEDULE_BULK_IMPORT_ROLLBACK). Fully reversible.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        batchId: { type: 'string' },
+      },
+      required: ['batchId'],
+    },
+  },
 ] as const

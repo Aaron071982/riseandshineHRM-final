@@ -77,6 +77,10 @@ export const MCP_TOOL_ACCESS: Record<McpToolName | string, McpToolAccessRule> = 
     requiresWrite: false,
     requiresSuperAdmin: true,
   },
+
+  preview_schedule_import: { requiresPhi: true, requiresWrite: true },
+  commit_schedule_import: { requiresPhi: true, requiresWrite: true },
+  rollback_schedule_import: { requiresPhi: true, requiresWrite: true },
 }
 
 export function parseOAuthScopes(scope: string | null | undefined): Set<string> {
