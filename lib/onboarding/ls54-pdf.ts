@@ -1,8 +1,6 @@
 import {
-  PDFBool,
   PDFCheckBox,
   PDFDocument,
-  PDFName,
   PDFTextField,
   StandardFonts,
   type PDFForm,
@@ -70,6 +68,9 @@ function assertRequiredFieldsFilled(form: PDFForm): void {
  * Burn text into the page at each text-field widget so Preview/Chrome show
  * values even when this government AcroForm refuses to flatten.
  * LS-54 is a single-page form — always draw on page 0.
+ *
+ * After drawing, callers must remove (or empty) the text fields — otherwise
+ * viewers show both the burned page ink and the AcroForm appearance (doubled).
  */
 async function burnTextFieldsOntoPages(pdfDoc: PDFDocument, form: PDFForm): Promise<void> {
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
@@ -92,6 +93,26 @@ async function burnTextFieldsOntoPages(pdfDoc: PDFDocument, form: PDFForm): Prom
         maxWidth: Math.max(8, rect.width - 4),
         lineHeight: fontSize + 1,
       })
+    }
+  }
+}
+
+/** Drop text fields after burn-in so AcroForm appearances cannot double the ink. */
+function removeTextFieldsAfterBurn(form: PDFForm): void {
+  for (const field of [...form.getFields()]) {
+    if (!(field instanceof PDFTextField)) continue
+    try {
+      form.removeField(field)
+    } catch (err) {
+      try {
+        field.setText('')
+      } catch {
+        console.warn(
+          '[ls54-pdf] could not remove text field after burn',
+          field.getName(),
+          err
+        )
+      }
     }
   }
 }
@@ -145,23 +166,11 @@ export async function fillLs54Pdf(
 
   assertRequiredFieldsFilled(form)
 
-  try {
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
-    form.updateFieldAppearances(font)
-  } catch (err) {
-    console.warn('[ls54-pdf] updateFieldAppearances failed', err)
-  }
-
-  try {
-    form.acroForm.dict.set(PDFName.of('NeedAppearances'), PDFBool.True)
-  } catch {
-    /* optional */
-  }
-
-  // This template's flatten() throws (broken page refs). Burn values onto the
-  // page so Preview / Chrome / mobile PDF viewers always show employer + pay.
+  // Do not call updateFieldAppearances / NeedAppearances — that embeds a second
+  // copy of each value in the widget appearance stream. Burn page ink only.
   await burnTextFieldsOntoPages(pdfDoc, form)
   markCheckedBoxesVisually(pdfDoc, form)
+  removeTextFieldsAfterBurn(form)
 
   try {
     form.flatten()
