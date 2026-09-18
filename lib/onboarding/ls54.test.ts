@@ -33,7 +33,7 @@ describe('LS-54 wage notice', () => {
     expect(parseHourlyRate('$22.50/hr')).toBe(22.5)
   })
 
-  it('burns employer and pay into the PDF so viewers show values once', async () => {
+  it('fills employer and pay so viewers show each value once', async () => {
     const templatePath = join(process.cwd(), 'onboarding-documents/LS54.pdf')
     const pdfBytes = new Uint8Array(readFileSync(templatePath))
     const filled = await fillLs54Pdf(pdfBytes, {
@@ -42,21 +42,18 @@ describe('LS-54 wage notice', () => {
       overtimeRate: '33.00',
     })
 
-    // Values are burned into page content; text fields are removed afterward
-    // so AcroForm appearances cannot double the ink.
     expect(filled.length).toBeGreaterThan(20_000)
 
-    const { PDFTextField } = await import('pdf-lib')
     const doc = await PDFDocument.load(filled)
-    const leftoverTextFields = doc
-      .getForm()
-      .getFields()
-      .filter((f) => f instanceof PDFTextField)
-    expect(leftoverTextFields).toHaveLength(0)
-
-    const asText = Buffer.from(filled).toString('latin1')
-    expect(asText).toContain('Kazi Siyam')
-    expect(asText).toContain('Jordan Example')
-    expect(asText).toContain('22.00')
+    const form = doc.getForm()
+    expect(form.getTextField('Employment_RegularRates_PerRate1').getText()).toBe(
+      '22.00'
+    )
+    expect(
+      form.getTextField('Apprenticeship_ApplicantNotification_EmployerName').getText()
+    ).toBe('Kazi Siyam')
+    expect(form.getTextField('Business_EmployeeName').getText()).toBe(
+      'Jordan Example'
+    )
   })
 })

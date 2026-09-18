@@ -1,6 +1,8 @@
 import {
+  PDFBool,
   PDFCheckBox,
   PDFDocument,
+  PDFName,
   PDFTextField,
   StandardFonts,
   type PDFForm,
@@ -65,90 +67,12 @@ function assertRequiredFieldsFilled(form: PDFForm): void {
 }
 
 /**
- * Burn text into the page at each text-field widget so Preview/Chrome show
- * values even when this government AcroForm refuses to flatten.
- * LS-54 is a single-page form — always draw on page 0.
+ * Fill LS-54 template and return PDF bytes with visible values.
  *
- * After drawing, callers must remove (or empty) the text fields — otherwise
- * viewers show both the burned page ink and the AcroForm appearance (doubled).
+ * This government AcroForm's flatten() throws (broken page refs). We rely on
+ * updateFieldAppearances + NeedAppearances so each value renders once. Do NOT
+ * also burn text onto the page — that doubles every filled field in Preview/Chrome.
  */
-async function burnTextFieldsOntoPages(pdfDoc: PDFDocument, form: PDFForm): Promise<void> {
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  const page = pdfDoc.getPages()[0]
-  if (!page) return
-
-  for (const field of form.getFields()) {
-    if (!(field instanceof PDFTextField)) continue
-    const text = field.getText()?.trim()
-    if (!text) continue
-
-    for (const widget of field.acroField.getWidgets()) {
-      const rect = widget.getRectangle()
-      const fontSize = Math.min(10, Math.max(7, rect.height * 0.7))
-      page.drawText(text, {
-        x: rect.x + 2,
-        y: rect.y + Math.max(2, (rect.height - fontSize) / 2),
-        size: fontSize,
-        font,
-        maxWidth: Math.max(8, rect.width - 4),
-        lineHeight: fontSize + 1,
-      })
-    }
-  }
-}
-
-/** Drop text fields after burn-in so AcroForm appearances cannot double the ink. */
-function removeTextFieldsAfterBurn(form: PDFForm): void {
-  for (const field of [...form.getFields()]) {
-    if (!(field instanceof PDFTextField)) continue
-    try {
-      form.removeField(field)
-    } catch (err) {
-      try {
-        field.setText('')
-      } catch {
-        console.warn(
-          '[ls54-pdf] could not remove text field after burn',
-          field.getName(),
-          err
-        )
-      }
-    }
-  }
-}
-
-function markCheckedBoxesVisually(pdfDoc: PDFDocument, form: PDFForm): void {
-  const page = pdfDoc.getPages()[0]
-  if (!page) return
-
-  for (const field of form.getFields()) {
-    if (!(field instanceof PDFCheckBox)) continue
-    try {
-      if (!field.isChecked()) continue
-      for (const widget of field.acroField.getWidgets()) {
-        const rect = widget.getRectangle()
-        const inset = 2
-        page.drawLine({
-          start: { x: rect.x + inset, y: rect.y + inset },
-          end: {
-            x: rect.x + rect.width - inset,
-            y: rect.y + rect.height - inset,
-          },
-          thickness: 1.25,
-        })
-        page.drawLine({
-          start: { x: rect.x + inset, y: rect.y + rect.height - inset },
-          end: { x: rect.x + rect.width - inset, y: rect.y + inset },
-          thickness: 1.25,
-        })
-      }
-    } catch {
-      /* skip */
-    }
-  }
-}
-
-/** Fill LS-54 template and return PDF bytes with visible values (burned in). */
 export async function fillLs54Pdf(
   pdfBytes: Uint8Array,
   input: Ls54FillInput
@@ -166,11 +90,18 @@ export async function fillLs54Pdf(
 
   assertRequiredFieldsFilled(form)
 
-  // Do not call updateFieldAppearances / NeedAppearances — that embeds a second
-  // copy of each value in the widget appearance stream. Burn page ink only.
-  await burnTextFieldsOntoPages(pdfDoc, form)
-  markCheckedBoxesVisually(pdfDoc, form)
-  removeTextFieldsAfterBurn(form)
+  try {
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    form.updateFieldAppearances(font)
+  } catch (err) {
+    console.warn('[ls54-pdf] updateFieldAppearances failed', err)
+  }
+
+  try {
+    form.acroForm.dict.set(PDFName.of('NeedAppearances'), PDFBool.True)
+  } catch {
+    /* optional */
+  }
 
   try {
     form.flatten()
@@ -178,6 +109,6 @@ export async function fillLs54Pdf(
     console.warn('[ls54-pdf] flatten skipped (expected for LS-54):', (err as Error).message)
   }
 
-  const saved = await pdfDoc.save()
+  const saved = await pdfDoc.save({ updateFieldAppearances: false })
   return Buffer.from(saved)
 }
