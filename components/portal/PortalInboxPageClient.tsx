@@ -8,10 +8,10 @@ import { cn } from '@/lib/utils'
 
 const FILTERS: { id: PortalNotificationType | null; label: string }[] = [
   { id: null, label: 'All' },
-  { id: 'CLIENT_ASSIGNED', label: 'Assigned' },
-  { id: 'THERAPIST_ASSIGNED', label: 'Therapist' },
-  { id: 'IN_COORDINATION', label: 'Coordination' },
+  { id: 'CLIENT_ASSIGNED', label: 'Intake' },
+  { id: 'IN_COORDINATION', label: 'Authorization' },
   { id: 'READY_FOR_ASSESSMENT', label: 'Ready' },
+  { id: 'THERAPIST_ASSIGNED', label: 'Therapist search' },
 ]
 
 export function PortalInboxPageClient({

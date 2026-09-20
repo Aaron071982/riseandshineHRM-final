@@ -53,27 +53,27 @@ export function PortalShell({
   return (
     <div className="portal-shell min-h-screen bg-[var(--portal-paper)] text-ink">
       <header className="sticky top-0 z-40 bg-[var(--espresso)] text-[#F3EADD]">
-        <div className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
           <Link href="/portal" className="flex items-center gap-3 no-underline">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/rise-and-shine-mark.png"
               alt=""
-              width={34}
-              height={44}
-              className="h-[34px] w-auto"
+              width={40}
+              height={52}
+              className="h-10 w-auto"
             />
             <div className="leading-tight">
-              <p className="font-display text-base font-semibold tracking-tight text-[#F3EADD]">
+              <p className="font-display text-lg font-semibold tracking-tight text-[#F3EADD] sm:text-xl">
                 Rise &amp; Shine
               </p>
-              <p className="text-[11px] font-medium text-[#F3EADD]/80">
+              <p className="text-xs font-medium text-[#F3EADD]/80">
                 Clinical Portal
               </p>
             </div>
           </Link>
 
-          <nav className="flex flex-wrap items-center gap-1 text-sm">
+          <nav className="flex flex-wrap items-center gap-1 text-sm sm:text-[15px]">
             {NAV.map((item) => {
               const active = item.match(pathname)
               const showBadge = item.href === '/portal/inbox' && inboxUnread > 0
@@ -82,7 +82,7 @@ export function PortalShell({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'relative rounded-lg px-3 py-1.5 transition-colors',
+                    'relative rounded-lg px-3.5 py-2 transition-colors',
                     active
                       ? 'bg-[color-mix(in_srgb,var(--portal-orange)_28%,transparent)] font-medium text-white'
                       : 'text-[#F3EADD]/80 hover:bg-white/10 hover:text-white'

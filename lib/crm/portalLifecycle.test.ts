@@ -1,33 +1,44 @@
 import { describe, expect, it } from 'vitest'
 import {
   derivePortalLifecycle,
-  isPortalCoordinationStage,
+  isPortalAuthorizationDone,
+  isPortalIntakeDone,
   isPortalReadyForAssessment,
 } from '@/lib/crm/portalLifecycle'
 
 describe('portalLifecycle', () => {
-  it('marks assigned when BCBA id present', () => {
+  it('starts on Intake while CRM is still in intake', () => {
+    const snap = derivePortalLifecycle({ stage: 'INQUIRY' })
+    expect(snap.currentId).toBe('INTAKE')
+    expect(snap.stages[0]?.done).toBe(false)
+    expect(isPortalIntakeDone('INQUIRY')).toBe(false)
+  })
+
+  it('moves to Ready for assessment on ASSESSMENT', () => {
+    const snap = derivePortalLifecycle({ stage: 'ASSESSMENT' })
+    expect(isPortalIntakeDone('ASSESSMENT')).toBe(true)
+    expect(isPortalAuthorizationDone('ASSESSMENT')).toBe(true)
+    expect(isPortalReadyForAssessment('ASSESSMENT')).toBe(true)
+    expect(snap.currentId).toBe('READY_FOR_ASSESSMENT')
+    expect(snap.stages[2]?.done).toBe(false)
+  })
+
+  it('shows Therapist search after staffing or therapist assigned', () => {
     const snap = derivePortalLifecycle({
-      assignedBcbaId: 'u1',
-      stage: 'INQUIRY',
+      stage: 'RBT_SEARCH',
+      assessmentStatus: 'SIGNED',
       hasTherapistAssigned: false,
     })
-    expect(snap.stages[0]?.done).toBe(true)
-    expect(snap.currentId).toBe('THERAPIST_ASSIGNED')
+    expect(snap.currentId).toBe('THERAPIST_SEARCH')
+    expect(snap.stages[2]?.done).toBe(true)
   })
 
-  it('detects coordination and ready stages from CRM stage', () => {
-    expect(isPortalCoordinationStage('SCHEDULE_COORDINATION')).toBe(true)
-    expect(isPortalReadyForAssessment('ASSESSMENT')).toBe(true)
-    expect(isPortalReadyForAssessment('INQUIRY')).toBe(false)
-  })
-
-  it('fills therapist when care team present', () => {
+  it('marks therapist search done when a therapist is on the care team', () => {
     const snap = derivePortalLifecycle({
-      assignedBcbaId: 'u1',
-      stage: 'RBT_ASSIGNED',
+      stage: 'APPROVED',
+      assessmentStatus: 'SIGNED',
       hasTherapistAssigned: true,
     })
-    expect(snap.stages[1]?.done).toBe(true)
+    expect(snap.stages[3]?.done).toBe(true)
   })
 })

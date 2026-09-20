@@ -13,14 +13,12 @@ export function PortalStageStrip({
   size?: 'sm' | 'md'
 }) {
   const dot = size === 'sm' ? 'h-2 w-2' : 'h-2.5 w-2.5'
-  const gap = size === 'sm' ? 'gap-0' : 'gap-0'
 
   return (
-    <div className={cn('min-w-[9.5rem]', className)}>
-      <div className={cn('flex items-center', gap)} aria-hidden>
+    <div className={cn('mx-auto flex w-full max-w-[11rem] flex-col items-center', className)}>
+      <div className="flex w-full items-center justify-center" aria-hidden>
         {lifecycle.stages.map((stage, i) => {
           const isCurrent = i === lifecycle.currentIndex
-          const filled = stage.done || isCurrent
           return (
             <div key={stage.id} className="flex flex-1 items-center last:flex-none">
               <span
@@ -49,7 +47,7 @@ export function PortalStageStrip({
       </div>
       <p
         className={cn(
-          'mt-1 truncate font-medium text-[var(--espresso)]',
+          'mt-1 w-full text-center font-medium text-[var(--espresso)]',
           size === 'sm' ? 'text-[10px]' : 'text-xs'
         )}
       >

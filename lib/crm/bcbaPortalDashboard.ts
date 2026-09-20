@@ -149,11 +149,14 @@ export async function loadBcbaPortalDashboard(
     }
 
     const lifecycle = derivePortalLifecycle({
-      assignedBcbaId: c.assignedBcbaId,
       stage: c.stage,
+      assessmentStatus: status,
       hasTherapistAssigned: c.btAssignments.length > 0,
     })
-    if (lifecycle.currentId === 'READY_FOR_ASSESSMENT' || lifecycle.stages[3]?.done) {
+    if (
+      lifecycle.currentId === 'READY_FOR_ASSESSMENT' ||
+      (lifecycle.stages[2] && !lifecycle.stages[2].done && lifecycle.stages[1]?.done)
+    ) {
       if (!latest || status === 'DRAFT' || status === 'IN_PROGRESS') {
         readyToAssess += 1
       }

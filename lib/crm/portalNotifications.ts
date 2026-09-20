@@ -26,10 +26,10 @@ export type PortalInboxItem = {
 }
 
 const STAGE_TO_TYPE: Record<PortalLifecycleStageId, PortalNotificationType> = {
-  ASSIGNED: 'CLIENT_ASSIGNED',
-  THERAPIST_ASSIGNED: 'THERAPIST_ASSIGNED',
-  IN_COORDINATION: 'IN_COORDINATION',
+  INTAKE: 'CLIENT_ASSIGNED',
+  AUTHORIZATION: 'IN_COORDINATION',
   READY_FOR_ASSESSMENT: 'READY_FOR_ASSESSMENT',
+  THERAPIST_SEARCH: 'THERAPIST_ASSIGNED',
 }
 
 function titlesFor(
@@ -44,19 +44,10 @@ function titlesFor(
         detail: `${clientName} was assigned to you`,
         clientName,
       }
-    case 'THERAPIST_ASSIGNED':
-      return {
-        title: 'Therapist assigned',
-        detail: therapistName
-          ? `${therapistName} assigned to ${clientName}`
-          : `A therapist was assigned to ${clientName}`,
-        clientName,
-        therapistName: therapistName ?? null,
-      }
     case 'IN_COORDINATION':
       return {
-        title: 'Case coordination',
-        detail: `${clientName} entered case coordination`,
+        title: 'Authorization update',
+        detail: `${clientName} moved into authorization`,
         clientName,
       }
     case 'READY_FOR_ASSESSMENT':
@@ -64,6 +55,15 @@ function titlesFor(
         title: 'Ready to assess',
         detail: `${clientName} is ready to assess`,
         clientName,
+      }
+    case 'THERAPIST_ASSIGNED':
+      return {
+        title: 'Therapist search',
+        detail: therapistName
+          ? `${therapistName} assigned to ${clientName}`
+          : `${clientName} entered therapist search`,
+        clientName,
+        therapistName: therapistName ?? null,
       }
     default:
       return { title: 'Update', detail: clientName, clientName }
@@ -168,12 +168,10 @@ export async function emitStageLifecycleNotifications(input: {
 
   const clientName = `${client.firstName} ${client.lastName}`.trim()
   const before = derivePortalLifecycle({
-    assignedBcbaId: client.assignedBcbaId,
     stage: input.fromStage,
     hasTherapistAssigned: client.btAssignments.length > 0,
   })
   const after = derivePortalLifecycle({
-    assignedBcbaId: client.assignedBcbaId,
     stage: input.toStage,
     hasTherapistAssigned: client.btAssignments.length > 0,
   })
@@ -182,7 +180,8 @@ export async function emitStageLifecycleNotifications(input: {
     if (!stage.done) continue
     const wasDone = before.stages.find((s) => s.id === stage.id)?.done
     if (wasDone) continue
-    if (stage.id === 'ASSIGNED' || stage.id === 'THERAPIST_ASSIGNED') continue
+    // Assignment / therapist-care-team emits are handled by dedicated hooks.
+    if (stage.id === 'INTAKE' || stage.id === 'THERAPIST_SEARCH') continue
     await emitPortalNotification({
       recipientUserId: client.assignedBcbaId,
       clientId: input.clientId,

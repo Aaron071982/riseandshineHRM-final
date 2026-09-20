@@ -1,11 +1,16 @@
 import type { ClientStage } from '@prisma/client'
 import { LINEAR_STAGE_ORDER, STAGE_GROUP } from '@/lib/crm/stages'
 
+/**
+ * BCBA-facing lifecycle (visibility strip). Order matches how BCBAs experience
+ * the case: wait through intake → wait through authorization → do assessment →
+ * therapist search follows.
+ */
 export type PortalLifecycleStageId =
-  | 'ASSIGNED'
-  | 'THERAPIST_ASSIGNED'
-  | 'IN_COORDINATION'
+  | 'INTAKE'
+  | 'AUTHORIZATION'
   | 'READY_FOR_ASSESSMENT'
+  | 'THERAPIST_SEARCH'
 
 export type PortalLifecycleStageDef = {
   id: PortalLifecycleStageId
@@ -14,21 +19,26 @@ export type PortalLifecycleStageDef = {
 }
 
 export const PORTAL_LIFECYCLE_STAGES: readonly PortalLifecycleStageDef[] = [
-  { id: 'ASSIGNED', label: 'Assigned', shortLabel: 'Assigned' },
-  { id: 'THERAPIST_ASSIGNED', label: 'Therapist assigned', shortLabel: 'Therapist' },
-  { id: 'IN_COORDINATION', label: 'In case coordination', shortLabel: 'In coordination' },
+  { id: 'INTAKE', label: 'Intake', shortLabel: 'Intake' },
+  { id: 'AUTHORIZATION', label: 'Authorization', shortLabel: 'Authorization' },
   {
     id: 'READY_FOR_ASSESSMENT',
     label: 'Ready for assessment',
     shortLabel: 'Ready for assessment',
   },
+  {
+    id: 'THERAPIST_SEARCH',
+    label: 'Therapist search',
+    shortLabel: 'Therapist search',
+  },
 ] as const
 
 export type PortalLifecycleInput = {
-  assignedBcbaId: string | null
   stage: ClientStage | string
+  /** Latest treatment assessment status, if any. */
+  assessmentStatus?: string | null
   /** Active care-team BT rows (status ACTIVE, not deleted). */
-  hasTherapistAssigned: boolean
+  hasTherapistAssigned?: boolean
 }
 
 export type PortalLifecycleSnapshot = {
@@ -48,37 +58,89 @@ function linearIdx(stage: ClientStage | string): number {
   return LINEAR_STAGE_ORDER.indexOf(stage as ClientStage)
 }
 
-/** Case-coordination CRM stages (plus ACTIVE = past coordination). */
-export function isPortalCoordinationStage(stage: ClientStage | string): boolean {
+/** Past intake group (INQUIRY → BENEFITS). */
+export function isPortalIntakeDone(stage: ClientStage | string): boolean {
   const s = stage as ClientStage
-  if (STAGE_GROUP[s] === 'COORDINATION') return true
-  if (s === 'ACTIVE') return true
+  if (STAGE_GROUP[s] === 'INTAKE') return false
   const idx = linearIdx(s)
-  const coordIdx = linearIdx('SCHEDULE_COORDINATION')
-  return idx >= 0 && coordIdx >= 0 && idx >= coordIdx
+  return idx >= 0
 }
 
 /**
- * Ready-for-assessment: client has reached the ASSESSMENT stage (or later
- * clinical/auth). Source of truth = CRM `ClientStage`.
+ * Authorization phase cleared: reached AUTHORIZATION/APPROVED, or assessment
+ * has already started (BCBA enters at assessment after intake wait).
  */
+export function isPortalAuthorizationDone(stage: ClientStage | string): boolean {
+  const s = stage as ClientStage
+  const idx = linearIdx(s)
+  const authIdx = linearIdx('AUTHORIZATION')
+  const assessIdx = linearIdx('ASSESSMENT')
+  if (idx < 0) return false
+  if (authIdx >= 0 && idx >= authIdx) return true
+  if (assessIdx >= 0 && idx >= assessIdx) return true
+  return false
+}
+
+/** Client has reached the ASSESSMENT stage (BCBA’s first active phase). */
 export function isPortalReadyForAssessment(stage: ClientStage | string): boolean {
   const s = stage as ClientStage
-  if (s === 'ASSESSMENT') return true
-  if (STAGE_GROUP[s] === 'CLINICAL_AUTH') return true
+  if (s === 'ASSESSMENT' || s === 'TREATMENT_PLAN') return true
   const idx = linearIdx(s)
   const assessIdx = linearIdx('ASSESSMENT')
   return idx >= 0 && assessIdx >= 0 && idx >= assessIdx
 }
 
+/** Assessment phase finished — moved past ASSESSMENT or assessment signed/completed. */
+export function isPortalAssessmentPhaseDone(
+  stage: ClientStage | string,
+  assessmentStatus?: string | null
+): boolean {
+  const s = stage as ClientStage
+  if (assessmentStatus === 'COMPLETED' || assessmentStatus === 'SIGNED') return true
+  const idx = linearIdx(s)
+  const assessIdx = linearIdx('ASSESSMENT')
+  // Past assessment in the linear pipeline (authorization onward, or staffing).
+  if (idx >= 0 && assessIdx >= 0 && idx > assessIdx && s !== 'TREATMENT_PLAN') {
+    return true
+  }
+  return false
+}
+
+/** Staffing / therapist search underway or complete. */
+export function isPortalTherapistSearchReached(
+  stage: ClientStage | string,
+  hasTherapistAssigned?: boolean
+): boolean {
+  if (hasTherapistAssigned) return true
+  const s = stage as ClientStage
+  const g = STAGE_GROUP[s]
+  if (g === 'STAFFING' || g === 'COORDINATION' || g === 'ACTIVE') return true
+  const idx = linearIdx(s)
+  const staffIdx = linearIdx('READY_FOR_STAFFING')
+  return idx >= 0 && staffIdx >= 0 && idx >= staffIdx
+}
+
 export function derivePortalLifecycle(
   input: PortalLifecycleInput
 ): PortalLifecycleSnapshot {
+  const intakeDone = isPortalIntakeDone(input.stage)
+  const authDone = isPortalAuthorizationDone(input.stage)
+  const readyReached = isPortalReadyForAssessment(input.stage)
+  const assessmentDone = isPortalAssessmentPhaseDone(
+    input.stage,
+    input.assessmentStatus
+  )
+  const therapistReached = isPortalTherapistSearchReached(
+    input.stage,
+    input.hasTherapistAssigned
+  )
+
+  // Done = phase completed (moved past). For ready, "done" means assessment finished.
   const doneFlags: boolean[] = [
-    !!input.assignedBcbaId,
-    input.hasTherapistAssigned,
-    isPortalCoordinationStage(input.stage),
-    isPortalReadyForAssessment(input.stage),
+    intakeDone,
+    authDone,
+    assessmentDone,
+    therapistReached && assessmentDone,
   ]
 
   const stages = PORTAL_LIFECYCLE_STAGES.map((def, i) => ({
@@ -88,6 +150,7 @@ export function derivePortalLifecycle(
     done: doneFlags[i]!,
   }))
 
+  // Current = first incomplete; if on ASSESSMENT, force ready even if auth just cleared.
   let currentIndex = 0
   for (let i = 0; i < doneFlags.length; i++) {
     if (!doneFlags[i]) {
@@ -95,6 +158,15 @@ export function derivePortalLifecycle(
       break
     }
     currentIndex = i
+  }
+
+  // Prefer highlighting Ready while the BCBA is actively on ASSESSMENT.
+  if (
+    readyReached &&
+    !assessmentDone &&
+    (input.stage === 'ASSESSMENT' || input.stage === 'TREATMENT_PLAN')
+  ) {
+    currentIndex = 2
   }
 
   const current = stages[currentIndex]!

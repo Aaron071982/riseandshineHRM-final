@@ -53,13 +53,13 @@ export function PortalClientDetail({
   const lifecycle = useMemo(
     () =>
       derivePortalLifecycle({
-        assignedBcbaId: client.assignedBcbaId ?? null,
         stage: client.stage,
+        assessmentStatus: treatmentAssessment?.assessments?.[0]?.status ?? null,
         hasTherapistAssigned: client.btAssignments.some(
           (a) => a.status === 'ACTIVE'
         ),
       }),
-    [client]
+    [client, treatmentAssessment]
   )
 
   return (
@@ -86,8 +86,8 @@ export function PortalClientDetail({
             </p>
           </div>
         </div>
-        <div className="hidden rounded-[14px] border border-[var(--portal-line)] bg-white px-4 py-3 shadow-[var(--portal-shadow)] sm:block">
-          <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--muted-ink)]">
+        <div className="hidden min-w-[12rem] rounded-[14px] border border-[var(--portal-line)] bg-white px-4 py-3 shadow-[var(--portal-shadow)] sm:block">
+          <p className="mb-2 text-center text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--muted-ink)]">
             Lifecycle
           </p>
           <PortalStageStrip lifecycle={lifecycle} />
@@ -116,7 +116,7 @@ export function PortalClientDetail({
         {tab === 'overview' && (
           <div className="space-y-4">
             <div className="rounded-[16px] border border-[var(--portal-line)] bg-white p-4 shadow-[var(--portal-shadow)] sm:hidden">
-              <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--muted-ink)]">
+              <p className="mb-2 text-center text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--muted-ink)]">
                 Lifecycle
               </p>
               <PortalStageStrip lifecycle={lifecycle} />

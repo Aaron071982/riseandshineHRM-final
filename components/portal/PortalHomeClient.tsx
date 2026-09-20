@@ -176,11 +176,13 @@ export function PortalHomeClient({
                           : 'DOB —'}
                       </p>
                     </div>
-                    <PortalStageStrip
-                      lifecycle={c.lifecycle}
-                      size="sm"
-                      className="hidden sm:block"
-                    />
+                    <div className="flex min-w-[10.5rem] flex-1 justify-center px-2">
+                      <PortalStageStrip
+                        lifecycle={c.lifecycle}
+                        size="sm"
+                        className="hidden sm:flex sm:flex-col"
+                      />
+                    </div>
                     <PortalAssessmentPill status={c.assessmentStatus} />
                     <div className="flex gap-2">
                       <Link
