@@ -350,7 +350,7 @@ export async function generateAllPayStubsForPeriodAction(input: {
         skipped++
         continue
       }
-      if (s._count.lineItems === 0) {
+      if (s._count.lineItems === 0 || !(Number(s.grossPay) > 0)) {
         skipped++
         continue
       }
@@ -421,7 +421,7 @@ export async function sendAllPayStubsForPeriodAction(input: {
         skipped++
         continue
       }
-      if (s._count.lineItems === 0) {
+      if (s._count.lineItems === 0 || !(Number(s.grossPay) > 0)) {
         skipped++
         continue
       }

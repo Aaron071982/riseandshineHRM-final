@@ -3,35 +3,58 @@
 import Link from 'next/link'
 import { formatCalendarDate } from '@/lib/billing/calendarDate'
 import type { BcbaPortalDashboard } from '@/lib/crm/bcbaPortalDashboard'
+import { PortalInboxCard } from '@/components/portal/PortalInboxCard'
+import { PortalStageStrip } from '@/components/portal/PortalStageStrip'
+import {
+  PortalAssessmentPill,
+  PortalAvatar,
+  PortalStatTile,
+} from '@/components/portal/PortalUi'
 import { cn } from '@/lib/utils'
 
-const ASSESSMENT_PILL: Record<string, string> = {
-  DRAFT: 'bg-[color-mix(in_srgb,var(--line)_80%,white)] text-[var(--muted-ink)]',
-  IN_PROGRESS: 'bg-[color-mix(in_srgb,var(--sunrise)_18%,white)] text-[var(--espresso)]',
-  COMPLETED: 'bg-[color-mix(in_srgb,var(--stage-clinical)_18%,white)] text-[var(--espresso)]',
-  SIGNED: 'bg-[color-mix(in_srgb,var(--espresso)_12%,white)] text-[var(--espresso)]',
+function timeOfDayGreeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
 }
 
-function assessmentLabel(status: string | null) {
-  if (!status) return 'Not started'
-  return status.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase())
-}
-
-function Stat({
-  label,
-  value,
-}: {
-  label: string
-  value: number | string
-}) {
+function CompletionRing({ pct }: { pct: number }) {
+  const r = 36
+  const c = 2 * Math.PI * r
+  const offset = c - (pct / 100) * c
   return (
-    <div className="rounded-xl border border-line bg-surface px-4 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-quiet">
-        {label}
-      </p>
-      <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-[var(--espresso)]">
-        {value}
-      </p>
+    <div className="relative h-24 w-24 shrink-0">
+      <svg viewBox="0 0 88 88" className="h-full w-full -rotate-90">
+        <circle
+          cx="44"
+          cy="44"
+          r={r}
+          fill="none"
+          stroke="rgba(42,32,25,0.1)"
+          strokeWidth="8"
+        />
+        <circle
+          cx="44"
+          cy="44"
+          r={r}
+          fill="none"
+          stroke="var(--portal-orange)"
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          className="motion-safe:transition-[stroke-dashoffset] motion-safe:duration-700"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-display text-xl font-semibold text-[var(--espresso)]">
+          {pct}%
+        </span>
+        <span className="text-[10px] uppercase tracking-wide text-[var(--muted-ink)]">
+          Done
+        </span>
+      </div>
     </div>
   )
 }
@@ -43,243 +66,187 @@ export function PortalHomeClient({
   data: BcbaPortalDashboard
   isLead: boolean
 }) {
-  const needsWork = data.assessments.filter(
+  const continueAssessment = data.assessments.find(
     (a) => a.status === 'DRAFT' || a.status === 'IN_PROGRESS'
-  )
-  const finished = data.assessments.filter(
-    (a) => a.status === 'COMPLETED' || a.status === 'SIGNED'
   )
 
   return (
     <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-4 border-b border-line pb-6 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-1">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--sunrise)]">
-            {isLead ? 'Clinical lead portal' : 'BCBA portal'}
+      <section className="portal-hero flex flex-col gap-6 rounded-[20px] border border-[var(--portal-line)] p-6 shadow-[var(--portal-shadow)] lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 space-y-3">
+          <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--portal-orange-deep)]">
+            {isLead ? 'Clinical lead' : 'BCBA'} · {timeOfDayGreeting()}
           </p>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-[var(--espresso)] sm:text-4xl">
-            Welcome{data.greetingName ? `, ${data.greetingName}` : ''}
+            {timeOfDayGreeting()}
+            {data.greetingName ? `, ${data.greetingName}` : ''}
           </h1>
-          {data.credentialsLine ? (
-            <p className="text-[var(--muted-ink)]">{data.credentialsLine}</p>
-          ) : null}
+          <p className="max-w-xl text-sm text-[var(--muted-ink)]">
+            {data.clientCount} client{data.clientCount === 1 ? '' : 's'} on your
+            caseload
+            {data.inbox.unreadCount > 0
+              ? ` · ${data.inbox.unreadCount} new inbox update${
+                  data.inbox.unreadCount === 1 ? '' : 's'
+                }`
+              : ''}
+            {data.readyToAssess > 0
+              ? ` · ${data.readyToAssess} ready to assess`
+              : ''}
+            .
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {continueAssessment ? (
+              <Link
+                href={`/portal/clients/${continueAssessment.clientId}/assessments/${continueAssessment.id}`}
+                className="inline-flex rounded-lg bg-[var(--portal-orange)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[var(--portal-orange-deep)]"
+              >
+                Continue assessment
+              </Link>
+            ) : (
+              <Link
+                href="/portal/assessments"
+                className="inline-flex rounded-lg bg-[var(--portal-orange)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[var(--portal-orange-deep)]"
+              >
+                Open assessments
+              </Link>
+            )}
+            <Link
+              href="/portal/inbox"
+              className="inline-flex rounded-lg border border-[var(--portal-line)] bg-white/80 px-4 py-2 text-sm font-medium text-[var(--espresso)] hover:bg-white"
+            >
+              Open inbox
+              {data.inbox.unreadCount > 0 ? ` (${data.inbox.unreadCount})` : ''}
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/portal/assessments"
-            className="inline-flex rounded-lg border border-line bg-surface px-4 py-2 text-sm font-medium text-[var(--espresso)] hover:bg-canvas"
-          >
-            All assessments
-          </Link>
-          <Link
-            href="/portal/pay"
-            className="inline-flex rounded-lg bg-[var(--sunrise)] px-4 py-2 text-sm font-medium text-white hover:opacity-95"
-          >
-            Pay stubs
-          </Link>
-        </div>
-      </header>
+        <CompletionRing pct={data.caseloadCompletionPct} />
+      </section>
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-        <Stat label="Clients" value={data.clientCount} />
-        <Stat label="In progress" value={data.assessmentMix.inProgress} />
-        <Stat label="Draft" value={data.assessmentMix.draft} />
-        <Stat label="Completed" value={data.assessmentMix.completed} />
-        <Stat label="Signed" value={data.assessmentMix.signed} />
-        <Stat label="Auth ending ≤30d" value={data.authExpiring30} />
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <PortalStatTile label="Clients" value={data.clientCount} />
+        <PortalStatTile label="Ready to assess" value={data.readyToAssess} />
+        <PortalStatTile label="In progress" value={data.assessmentMix.inProgress} />
+        <PortalStatTile label="Completed" value={data.assessmentMix.completed} />
+        <PortalStatTile label="Signed" value={data.assessmentMix.signed} />
+        <PortalStatTile label="Auth ≤30d" value={data.authExpiring30} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.55fr_0.9fr]">
-        <div className="rounded-2xl border border-line bg-surface">
-          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line px-5 py-4">
+        <div className="rounded-[16px] border border-[var(--portal-line)] bg-white shadow-[var(--portal-shadow)]">
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--portal-line)] px-5 py-4">
             <div>
               <h2 className="font-display text-xl font-semibold text-[var(--espresso)]">
                 Caseload
               </h2>
-              <p className="mt-1 text-sm text-quiet">
-                Open a client for overview, authorization, assessment, and schedule.
+              <p className="mt-1 text-sm text-[var(--muted-ink)]">
+                Lifecycle stage, assessment status, and quick open.
               </p>
             </div>
-            <p className="text-sm text-quiet">
+            <p className="text-sm text-[var(--muted-ink)]">
               {data.clientCount} client{data.clientCount === 1 ? '' : 's'}
             </p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead className="bg-canvas/80 text-quiet">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Client</th>
-                  <th className="px-3 py-3 font-medium">Code</th>
-                  <th className="px-3 py-3 font-medium">DOB</th>
-                  <th className="px-3 py-3 font-medium">Assessment</th>
-                  <th className="px-3 py-3 font-medium">Next reassessment</th>
-                  <th className="px-3 py-3 font-medium">Auth end</th>
-                  <th className="px-3 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.clients.map((c) => (
-                  <tr
+          <ul className="divide-y divide-[var(--portal-line)]">
+            {data.clients.length === 0 ? (
+              <li className="px-5 py-10 text-center text-sm text-[var(--muted-ink)]">
+                No clients assigned yet.
+              </li>
+            ) : (
+              data.clients.map((c) => {
+                const name = `${c.firstName} ${c.lastName}`.trim()
+                return (
+                  <li
                     key={c.id}
-                    className="border-t border-line/70 hover:bg-canvas/50"
+                    className="flex flex-wrap items-center gap-4 px-5 py-3.5 transition-colors hover:bg-[var(--portal-paper)]"
                   >
-                    <td className="px-5 py-3">
+                    <PortalAvatar name={name} />
+                    <div className="min-w-[10rem] flex-1">
                       <Link
                         href={`/portal/clients/${c.id}`}
-                        className="font-medium text-[var(--espresso)] hover:text-[var(--sunrise)]"
+                        className="font-medium text-[var(--espresso)] hover:text-[var(--portal-orange)]"
                       >
-                        {c.firstName} {c.lastName}
+                        {name}
                       </Link>
-                    </td>
-                    <td className="px-3 py-3 tabular-nums text-quiet">
-                      {c.clientCode}
-                    </td>
-                    <td className="px-3 py-3 text-quiet">
-                      {c.dateOfBirth ? formatCalendarDate(c.dateOfBirth) : '—'}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span
-                        className={cn(
-                          'inline-flex rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-                          ASSESSMENT_PILL[c.assessmentStatus ?? ''] ??
-                            'bg-canvas text-quiet'
-                        )}
+                      <p className="text-xs text-[var(--muted-ink)]">
+                        <span className="tabular-nums">{c.clientCode}</span>
+                        <span className="mx-1.5">·</span>
+                        {c.dateOfBirth
+                          ? formatCalendarDate(c.dateOfBirth)
+                          : 'DOB —'}
+                      </p>
+                    </div>
+                    <PortalStageStrip
+                      lifecycle={c.lifecycle}
+                      size="sm"
+                      className="hidden sm:block"
+                    />
+                    <PortalAssessmentPill status={c.assessmentStatus} />
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/portal/clients/${c.id}`}
+                        className="rounded-lg bg-[var(--espresso)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95"
                       >
-                        {assessmentLabel(c.assessmentStatus)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-quiet">
-                      {c.nextReassessmentDate
-                        ? formatCalendarDate(c.nextReassessmentDate)
-                        : '—'}
-                    </td>
-                    <td className="px-3 py-3 text-quiet">
-                      {c.authEndDate ? formatCalendarDate(c.authEndDate) : '—'}
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <div className="inline-flex flex-wrap justify-end gap-2">
+                        Open
+                      </Link>
+                      {c.assessmentId ? (
                         <Link
-                          href={`/portal/clients/${c.id}?tab=assessment`}
-                          className="text-xs font-medium text-[var(--espresso)] underline-offset-2 hover:underline"
+                          href={`/portal/clients/${c.id}/assessments/${c.assessmentId}`}
+                          className="rounded-lg border border-[var(--portal-line)] px-3 py-1.5 text-xs font-medium text-[var(--espresso)] hover:bg-[var(--portal-paper)]"
                         >
-                          Open
+                          Preview
                         </Link>
-                        {c.assessmentId ? (
-                          <>
-                            <span className="text-line">·</span>
-                            <Link
-                              href={`/portal/clients/${c.id}/assessments/${c.assessmentId}`}
-                              className="text-xs font-medium text-[var(--espresso)] underline-offset-2 hover:underline"
-                            >
-                              Edit
-                            </Link>
-                            <span className="text-line">·</span>
-                            <Link
-                              href={`/portal/clients/${c.id}/assessments/${c.assessmentId}/print`}
-                              className="text-xs font-medium text-[var(--sunrise)] underline-offset-2 hover:underline"
-                              target="_blank"
-                            >
-                              Preview
-                            </Link>
-                          </>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {data.clients.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-5 py-12 text-center text-[var(--muted-ink)]"
-                    >
-                      No clients assigned yet. They&apos;ll appear here once assigned.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                      ) : null}
+                    </div>
+                  </li>
+                )
+              })
+            )}
+          </ul>
         </div>
 
-        <aside className="space-y-4">
-          <div className="rounded-2xl border border-line bg-surface p-5">
-            <h2 className="font-display text-lg font-semibold text-[var(--espresso)]">
-              Needs attention
-            </h2>
-            <ul className="mt-4 space-y-2">
-              {data.actionQueue.length === 0 && (
-                <li className="text-sm text-quiet">
-                  You&apos;re caught up — nothing waiting right now.
-                </li>
-              )}
-              {data.actionQueue.map((item) => (
-                <li key={item.id}>
-                  <Link
-                    href={
-                      item.assessmentId
-                        ? `/portal/clients/${item.clientId}/assessments/${item.assessmentId}`
-                        : `/portal/clients/${item.clientId}?tab=assessment`
-                    }
-                    className="block rounded-xl border border-line px-3 py-2.5 text-sm hover:bg-canvas"
-                  >
-                    <span className="font-medium text-ink">
-                      {item.clientName}{' '}
-                      <span className="text-quiet">({item.clientCode})</span>
-                    </span>
-                    <span className="mt-0.5 block text-quiet">{item.reason}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+        <aside className="space-y-6">
+          <PortalInboxCard
+            items={data.inbox.items}
+            unreadCount={data.inbox.unreadCount}
+          />
 
-          <div className="rounded-2xl border border-line bg-surface p-5">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-display text-lg font-semibold text-[var(--espresso)]">
-                Assessments
-              </h2>
-              <Link
-                href="/portal/assessments"
-                className="text-xs font-medium text-[var(--sunrise)] hover:underline"
-              >
-                View all
-              </Link>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2 text-center text-sm">
-              <div className="rounded-lg bg-canvas px-3 py-3">
-                <p className="font-display text-xl font-semibold text-[var(--espresso)]">
-                  {needsWork.length}
-                </p>
-                <p className="text-xs text-quiet">To do</p>
-              </div>
-              <div className="rounded-lg bg-canvas px-3 py-3">
-                <p className="font-display text-xl font-semibold text-[var(--espresso)]">
-                  {finished.length}
-                </p>
-                <p className="text-xs text-quiet">Done</p>
-              </div>
-            </div>
-          </div>
-
-          <Link
-            href="/portal/pay"
-            className="block rounded-2xl border border-line bg-surface p-5 transition hover:border-[color-mix(in_srgb,var(--sunrise)_45%,var(--line))]"
-          >
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--sunrise)]">
-              Pay stubs
-            </p>
-            <h2 className="mt-2 font-display text-xl font-semibold text-[var(--espresso)]">
-              Your pay stubs
+          <div className="rounded-[16px] bg-[var(--espresso)] p-5 text-[#F3EADD] shadow-[var(--portal-shadow)]">
+            <h2 className="font-display text-lg font-semibold">
+              Assessment progress
             </h2>
-            <p className="mt-2 text-sm text-quiet">
-              Statements appear here after payroll sends them to your portal.
+            <p className="mt-1 text-sm text-[#F3EADD]/75">
+              Signed and completed vs. caseload size.
             </p>
-            <span className="mt-4 inline-flex text-sm font-medium text-[var(--sunrise)]">
-              Open pay stubs →
-            </span>
-          </Link>
+            <div className="mt-4 flex items-center gap-4">
+              <CompletionRing pct={data.caseloadCompletionPct} />
+              <ul className="space-y-1.5 text-sm">
+                <li>
+                  <span className="text-[#F3EADD]/70">In progress</span>{' '}
+                  <strong className="font-display">
+                    {data.assessmentMix.inProgress}
+                  </strong>
+                </li>
+                <li>
+                  <span className="text-[#F3EADD]/70">Completed</span>{' '}
+                  <strong className="font-display">
+                    {data.assessmentMix.completed}
+                  </strong>
+                </li>
+                <li>
+                  <span className="text-[#F3EADD]/70">Signed</span>{' '}
+                  <strong className="font-display">
+                    {data.assessmentMix.signed}
+                  </strong>
+                </li>
+              </ul>
+            </div>
+            {data.actionQueue[0] ? (
+              <p className={cn('mt-4 border-t border-white/10 pt-3 text-xs text-[#F3EADD]/80')}>
+                Next up: {data.actionQueue[0].clientName} — {data.actionQueue[0].reason}
+              </p>
+            ) : null}
+          </div>
         </aside>
       </section>
     </div>

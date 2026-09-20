@@ -1,3 +1,8 @@
+/**
+ * Render side-by-side sample stubs for Prompt 5b (BCBA 1099 vs BT W-2).
+ *
+ *   npx tsx scripts/render-sample-stubs-html.ts
+ */
 import fs from 'fs'
 import { buildPayStubHtml } from '../lib/payroll/payStubHtml'
 import { loadPayStubLogoDataUrl } from '../lib/payroll/renderPayStubPdf'
@@ -69,11 +74,41 @@ const rbt = buildPayStubHtml({
     { label: 'Medicare', amount: 6.62, employeePaid: true },
     { label: 'NY State tax', amount: 15.4, employeePaid: true },
     { label: 'NYC local tax', amount: 8.1, employeePaid: true },
+    { label: 'NY SDI', amount: 1.2, employeePaid: true },
+    { label: 'NY Paid Family Leave', amount: 2.45, employeePaid: true },
   ],
-  ytd: { gross: 1960, deductions: 428, net: 1532 },
+  ytd: {
+    gross: 1960,
+    deductions: 428.57,
+    net: 1531.43,
+    byLabel: [
+      { label: 'Federal income tax', amount: 210 },
+      { label: 'Social Security', amount: 121.52 },
+      { label: 'Medicare', amount: 28.42 },
+      { label: 'NY State tax', amount: 48.2 },
+      { label: 'NYC local tax', amount: 20.43 },
+    ],
+  },
   lineItems: sharedLines,
 })
 
 fs.writeFileSync(`${outDir}/bcba-1099-stub.html`, bcba)
 fs.writeFileSync(`${outDir}/rbt-w2-stub.html`, rbt)
+
+const index = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><title>Prompt 5b — stub variants</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:24px;background:#f4f1ea;color:#2A2019}
+  h1{font-size:20px} .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  iframe{width:100%;height:920px;border:1px solid #ccc;background:#fff}
+  p{max-width:720px;line-height:1.45;color:#555}
+</style></head><body>
+<h1>Prompt 5b — BCBA 1099 vs BT W-2</h1>
+<p>Left: contractor stub (orange 1099 band, no itemized taxes). Right: employee stub (neutral band, itemized deductions, YTD). Amounts are stored rows — no tax math in the renderer.</p>
+<div class="grid">
+  <div><h2>BCBA · 1099</h2><iframe src="./bcba-1099-stub.html"></iframe></div>
+  <div><h2>BT / RBT · W-2</h2><iframe src="./rbt-w2-stub.html"></iframe></div>
+</div>
+</body></html>`
+fs.writeFileSync(`${outDir}/index.html`, index)
 console.log('wrote', outDir)

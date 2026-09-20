@@ -19,6 +19,8 @@ export type PayStubYtd = {
   gross: number
   deductions: number
   net: number
+  /** Optional per-code employee-paid YTD (W-2 stubs). */
+  byLabel?: Array<{ label: string; amount: number }>
 }
 
 export type PayStubPayload = {
@@ -152,6 +154,13 @@ export function buildPayStubHtml(payload: PayStubPayload): string {
       ? `<div class="ytd">
       <div class="label">Year to date</div>
       <div class="ytd-row"><span>Gross</span><span>${escapeHtml(formatUsd(payload.ytd.gross))}</span></div>
+      ${(payload.ytd.byLabel ?? [])
+        .filter((r) => r.amount > 0)
+        .map(
+          (r) =>
+            `<div class="ytd-row"><span>${escapeHtml(r.label)}</span><span>−${escapeHtml(formatUsd(r.amount))}</span></div>`
+        )
+        .join('\n')}
       <div class="ytd-row"><span>Deductions</span><span>−${escapeHtml(formatUsd(payload.ytd.deductions))}</span></div>
       <div class="ytd-row"><span>Net</span><span>${escapeHtml(formatUsd(payload.ytd.net))}</span></div>
     </div>`

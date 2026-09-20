@@ -4,6 +4,7 @@ import {
   ESIGN_CONSENT_SLUG,
   FORTY_HOUR_RBT_CERTIFICATE_SLUG,
   ONBOARDING_CATALOG,
+  ORIENTATION_BOOKING_SLUG,
   RBT_VISIBLE_STEPS,
   TIER_A_LAST_STEP,
   TIER_B_FIRST_STEP,
@@ -83,7 +84,7 @@ function isDocComplete(
   if (doc.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG) {
     return profile.fortyHourCourseCompleted === true || completion?.status === 'COMPLETED'
   }
-  if (doc.flowType === 'BOOKING' && doc.slug === 'artemis-training') {
+  if (doc.flowType === 'BOOKING' && doc.slug === ORIENTATION_BOOKING_SLUG) {
     return profile.artemisTrainingCompleted === true || completion?.status === 'COMPLETED'
   }
   return completion?.status === 'COMPLETED'
@@ -162,7 +163,10 @@ export function isTierAComplete(done: Set<number>): boolean {
 }
 
 export function isTierBComplete(done: Set<number>): boolean {
+  // Orientation Calendly booking is post-onboarding — does not block activation.
   for (let n = TIER_B_FIRST_STEP; n <= TIER_B_LAST_STEP; n++) {
+    const entry = ONBOARDING_CATALOG.find((e) => e.stepNumber === n)
+    if (entry?.slug === ORIENTATION_BOOKING_SLUG) continue
     if (!done.has(n)) return false
   }
   return true
@@ -240,7 +244,9 @@ export async function getOnboardingProgress(rbtProfileId: string): Promise<Onboa
   })
 
   const tierADocs = rbtDocs.filter((d) => d.tier === 'TIER_A')
-  const tierBDocs = rbtDocs.filter((d) => d.tier === 'TIER_B')
+  const tierBDocs = rbtDocs.filter(
+    (d) => d.tier === 'TIER_B' && d.slug !== ORIENTATION_BOOKING_SLUG
+  )
 
   return {
     steps,

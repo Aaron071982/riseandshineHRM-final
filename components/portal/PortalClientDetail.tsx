@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { OverviewPanel } from '@/components/crm/NotesPanel'
@@ -9,6 +9,8 @@ import { TreatmentAssessmentPanel } from '@/components/crm/assessment/TreatmentA
 import { SchedulePanel } from '@/components/crm/SchedulePanel'
 import type { ClientCrmDetailData } from '@/lib/crm/loadClientDetail'
 import { STAGE_LABELS } from '@/lib/crm/stages'
+import { derivePortalLifecycle } from '@/lib/crm/portalLifecycle'
+import { PortalStageStrip } from '@/components/portal/PortalStageStrip'
 import { cn } from '@/lib/utils'
 
 type TabId = 'overview' | 'authorization' | 'assessment' | 'schedule'
@@ -48,31 +50,51 @@ export function PortalClientDetail({
   const stageLabel =
     STAGE_LABELS[client.stage as keyof typeof STAGE_LABELS] ?? client.stage
 
+  const lifecycle = useMemo(
+    () =>
+      derivePortalLifecycle({
+        assignedBcbaId: client.assignedBcbaId ?? null,
+        stage: client.stage,
+        hasTherapistAssigned: client.btAssignments.some(
+          (a) => a.status === 'ACTIVE'
+        ),
+      }),
+    [client]
+  )
+
   return (
     <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 pb-16 sm:px-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/portal"
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm text-quiet hover:bg-line-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Your clients
-        </Link>
-        <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--espresso)]">
-            {client.firstName} {client.lastName}
-          </h1>
-          <p className="text-sm text-quiet">
-            <span className="tabular-nums">{client.clientCode}</span>
-            <span className="mx-2 text-line">·</span>
-            <span className="inline-flex rounded-full bg-[color-mix(in_srgb,var(--sunrise)_14%,white)] px-2 py-0.5 text-xs font-medium text-[var(--espresso)]">
-              {stageLabel}
-            </span>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/portal"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--portal-line)] bg-white px-3 text-sm text-[var(--muted-ink)] hover:bg-[var(--portal-paper)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Your clients
+          </Link>
+          <div>
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-[var(--espresso)] sm:text-3xl">
+              {client.firstName} {client.lastName}
+            </h1>
+            <p className="text-sm text-[var(--muted-ink)]">
+              <span className="tabular-nums">{client.clientCode}</span>
+              <span className="mx-2 text-[var(--portal-line)]">·</span>
+              <span className="inline-flex rounded-full bg-[color-mix(in_srgb,var(--portal-orange)_14%,white)] px-2 py-0.5 text-xs font-medium text-[var(--espresso)]">
+                {stageLabel}
+              </span>
+            </p>
+          </div>
+        </div>
+        <div className="hidden rounded-[14px] border border-[var(--portal-line)] bg-white px-4 py-3 shadow-[var(--portal-shadow)] sm:block">
+          <p className="mb-1 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--muted-ink)]">
+            Lifecycle
           </p>
+          <PortalStageStrip lifecycle={lifecycle} />
         </div>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto border-b border-line pb-px">
+      <div className="flex gap-1 overflow-x-auto border-b border-[var(--portal-line)] pb-px">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -81,8 +103,8 @@ export function PortalClientDetail({
             className={cn(
               'shrink-0 rounded-t-lg px-3 py-2 text-sm font-medium transition-colors',
               tab === t.id
-                ? 'border border-b-surface border-line -mb-px bg-surface text-[var(--sunrise)]'
-                : 'text-quiet hover:text-ink'
+                ? 'border border-b-white border-[var(--portal-line)] -mb-px bg-white text-[var(--portal-orange)]'
+                : 'text-[var(--muted-ink)] hover:text-ink'
             )}
           >
             {t.label}
@@ -92,11 +114,19 @@ export function PortalClientDetail({
 
       <div className="pt-1">
         {tab === 'overview' && (
-          <OverviewPanel
-            client={client}
-            canEdit={false}
-            canAssignPortalBcba={false}
-          />
+          <div className="space-y-4">
+            <div className="rounded-[16px] border border-[var(--portal-line)] bg-white p-4 shadow-[var(--portal-shadow)] sm:hidden">
+              <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--muted-ink)]">
+                Lifecycle
+              </p>
+              <PortalStageStrip lifecycle={lifecycle} />
+            </div>
+            <OverviewPanel
+              client={client}
+              canEdit={false}
+              canAssignPortalBcba={false}
+            />
+          </div>
         )}
 
         {tab === 'authorization' && (
@@ -122,7 +152,7 @@ export function PortalClientDetail({
         )}
 
         {tab === 'assessment' && !treatmentAssessment?.canView && (
-          <p className="rounded-xl border border-line bg-surface px-4 py-6 text-sm text-quiet">
+          <p className="rounded-xl border border-[var(--portal-line)] bg-white px-4 py-6 text-sm text-[var(--muted-ink)]">
             Assessment access is not available for this account. Contact an
             administrator if you need it enabled.
           </p>
@@ -130,7 +160,7 @@ export function PortalClientDetail({
 
         {tab === 'schedule' && (
           <div className="space-y-3">
-            <p className="rounded-xl border border-line bg-canvas px-4 py-3 text-sm text-quiet">
+            <p className="rounded-xl border border-[var(--portal-line)] bg-[var(--portal-paper)] px-4 py-3 text-sm text-[var(--muted-ink)]">
               Schedule is view-only here. To request changes, reach out to
               staffing or your clinical lead.
             </p>

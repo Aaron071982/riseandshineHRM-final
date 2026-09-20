@@ -29,6 +29,17 @@ export const DEFAULT_PAYABLE_STATUSES: ArtemisSessionStatusKey[] = [
   ARTEMIS_STATUS.READY_TO_BILL,
 ]
 
+/**
+ * Unified RBT payroll sheet / stub import — pay only worked/billable statuses.
+ * Scheduled-only hours never generate pay lines or stubs.
+ */
+export const RBT_PAYROLL_PAYABLE_STATUSES: ArtemisSessionStatusKey[] = [
+  ARTEMIS_STATUS.COMPLETED,
+  ARTEMIS_STATUS.READY_TO_BILL,
+  ARTEMIS_STATUS.IN_PROGRESS,
+  ARTEMIS_STATUS.INCOMPLETE,
+]
+
 export const ALWAYS_EXCLUDED_STATUSES = new Set<ArtemisSessionStatusKey>([
   ARTEMIS_STATUS.CANCELLED,
   ARTEMIS_STATUS.DELETED,
@@ -77,6 +88,15 @@ export function isAlwaysExcludedStatus(
   status: ArtemisSessionStatusKey | null | undefined
 ): boolean {
   return status != null && ALWAYS_EXCLUDED_STATUSES.has(status)
+}
+
+/** True when a session should create RBT pay lines / stubs (never scheduled-only). */
+export function isRbtPayrollPayableSession(
+  sessionStatus: string | null | undefined
+): boolean {
+  const key = normalizeArtemisStatus(sessionStatus)
+  if (!key || isAlwaysExcludedStatus(key)) return false
+  return (RBT_PAYROLL_PAYABLE_STATUSES as readonly string[]).includes(key)
 }
 
 export function parsePayableStatusesJson(value: unknown): ArtemisSessionStatusKey[] {

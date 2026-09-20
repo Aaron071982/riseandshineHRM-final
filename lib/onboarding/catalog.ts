@@ -19,6 +19,11 @@ export const FORTY_HOUR_RBT_COURSE_LABEL = 'Start the 40-hour RBT course (requir
 
 export const FORTY_HOUR_RBT_CERTIFICATE_SLUG = 'forty-hour-rbt-certificate'
 
+/** Post-onboarding orientation booking (replaces in-house Artemis training sessions). */
+export const ORIENTATION_BOOKING_SLUG = 'artemis-training'
+export const ONBOARDING_ORIENTATION_CALENDLY_URL =
+  'https://calendly.com/musa-riseandshineaba/60min'
+
 export type CatalogEntry = {
   stepNumber: number
   title: string
@@ -64,7 +69,7 @@ export const ONBOARDING_CATALOG: CatalogEntry[] = [
   { stepNumber: 27, title: 'Mandated Reporter Training Certificate', slug: 'mandated-reporter-certificate', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
   { stepNumber: 28, title: 'CPR/First Aid Certificate', slug: 'cpr-first-aid-certificate', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
   { stepNumber: 29, title: '40-Hour RBT Training Certificate', slug: FORTY_HOUR_RBT_CERTIFICATE_SLUG, type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
-  { stepNumber: 30, title: 'Artemis Training Booking & Completion', slug: 'artemis-training', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'BOOKING', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
+  { stepNumber: 30, title: 'Schedule Orientation (60 min)', slug: ORIENTATION_BOOKING_SLUG, type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'BOOKING', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
   { stepNumber: 31, title: 'Background Check Cleared (Admin)', slug: 'background-check-cleared', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'ADMIN_ONLY', tier: 'ACTIVATION', unlockGroup: null, folder: 'ACKNOWLEDGMENT_FORMS', file: null, isRequired: true },
   { stepNumber: 32, title: 'Supervision Contract Countersigned (Admin)', slug: 'supervision-countersigned', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'ADMIN_ONLY', tier: 'ACTIVATION', unlockGroup: null, folder: 'ACKNOWLEDGMENT_FORMS', file: null, isRequired: true },
 ]

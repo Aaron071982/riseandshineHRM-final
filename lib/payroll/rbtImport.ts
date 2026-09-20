@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { parseArtemisWorkbook } from '@/lib/billing/artemisParser'
 import { matchProviderToRbt } from '@/lib/billing/matcher'
 import { loadRbtMatchCandidates, suggestPayRatesForRbts } from '@/lib/billing/payRate'
+import { isRbtPayrollPayableSession } from '@/lib/billing/sessionStatus'
 import { auditPayrollChange } from '@/lib/payroll/access'
 import {
   amountForHours,
@@ -103,6 +104,51 @@ export async function importRbtStatementsFromArtemisWorkbook(input: {
       continue
     }
 
+    // Only pay complete / ready_to_bill / in_progress / incomplete — never scheduled-only.
+    const payableSessions = group.sessions.filter(
+      (s) => s.actualMinutes > 0 && isRbtPayrollPayableSession(s.sessionStatus)
+    )
+    if (payableSessions.length === 0) {
+      // Clear any prior reconciliation lines so a re-import of scheduled-only
+      // hours does not leave a stale stub.
+      const existing = await prisma.payStatement.findFirst({
+        where: {
+          payPeriodId: input.payPeriodId,
+          payeeType: 'RBT',
+          staffId,
+        },
+        include: { _count: { select: { lineItems: true } } },
+      })
+      if (existing && existing.status !== 'SENT') {
+        await prisma.payLineItem.deleteMany({
+          where: { payStatementId: existing.id, source: 'RECONCILIATION' },
+        })
+        const remaining = await prisma.payLineItem.findMany({
+          where: { payStatementId: existing.id },
+          select: { hours: true, amount: true },
+        })
+        const totals = recomputeStatementTotals(
+          remaining.map((i) => ({ hours: Number(i.hours), amount: Number(i.amount) }))
+        )
+        await prisma.payStatement.update({
+          where: { id: existing.id },
+          data: {
+            totalHours: dec(totals.totalHours),
+            grossPay: dec(totals.grossPay),
+            deductions: dec(0),
+            netPay: dec(totals.netPay),
+            reconciled: totals.reconciled,
+            status: existing.status === 'READY' ? 'DRAFT' : existing.status,
+            pdfUrl: null,
+          },
+        })
+      }
+      unmatchedProviders.push(
+        `${group.providerName} (no payable hours — scheduled-only excluded)`
+      )
+      continue
+    }
+
     let statement = await prisma.payStatement.findFirst({
       where: {
         payPeriodId: input.payPeriodId,
@@ -141,23 +187,21 @@ export async function importRbtStatementsFromArtemisWorkbook(input: {
 
     statementIds.push(statement.id)
 
-    const lineData = group.sessions
-      .filter((s) => s.actualMinutes > 0)
-      .map((session) => {
-        const clocks = clocksFromSession(session)
-        const hours =
-          clocks.hours > 0 ? clocks.hours : round2(session.actualMinutes / 60)
-        const amount = amountForHours(hours, rate)
-        return {
-          payStatementId: statement!.id,
-          workDate: session.dos,
-          startClock: clocks.startClock,
-          endClock: clocks.endClock,
-          hours: dec(hours),
-          amount: dec(amount),
-          source: 'RECONCILIATION' as const,
-        }
-      })
+    const lineData = payableSessions.map((session) => {
+      const clocks = clocksFromSession(session)
+      const hours =
+        clocks.hours > 0 ? clocks.hours : round2(session.actualMinutes / 60)
+      const amount = amountForHours(hours, rate)
+      return {
+        payStatementId: statement!.id,
+        workDate: session.dos,
+        startClock: clocks.startClock,
+        endClock: clocks.endClock,
+        hours: dec(hours),
+        amount: dec(amount),
+        source: 'RECONCILIATION' as const,
+      }
+    })
 
     if (lineData.length > 0) {
       await prisma.payLineItem.createMany({ data: lineData })

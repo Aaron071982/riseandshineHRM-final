@@ -59,7 +59,15 @@ describe('payStubHtml', () => {
         { label: 'Medicare', amount: 4.26, employeePaid: true },
         { label: 'NY State tax', amount: 12.0, employeePaid: true },
       ],
-      ytd: { gross: 840, deductions: 77, net: 763 },
+      ytd: {
+        gross: 840,
+        deductions: 77,
+        net: 763,
+        byLabel: [
+          { label: 'Federal income tax', amount: 42.5 },
+          { label: 'Social Security', amount: 18.2 },
+        ],
+      },
       lineItems: [
         {
           workDate: new Date('2026-03-04'),

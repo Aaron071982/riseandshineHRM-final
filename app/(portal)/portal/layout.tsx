@@ -12,6 +12,7 @@ import {
 } from '@/lib/crm/bcbaPortal'
 import ElevateGate from '@/components/client-services/ElevateGate'
 import { PortalShell } from '@/components/portal/PortalShell'
+import { listPortalInbox } from '@/lib/crm/portalNotifications'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,7 +31,7 @@ export default async function PortalLayout({
   }
 
   const crmRoles = await fetchUserCrmRoles(user.id)
-  const subject = { id: user.id, email: user.email, crmRoles }
+  const subject = { id: user.id, email: user.email, crmRoles, name: user.name }
 
   if (!hasBcbaPortalAccess(subject)) {
     redirect('/client-services')
@@ -50,9 +51,23 @@ export default async function PortalLayout({
     ? `${user.name.trim()}${isLead ? ', Clinical Lead' : ', BCBA'}`
     : user.email
 
+  let inboxUnread = 0
+  if (elevated) {
+    try {
+      const inbox = await listPortalInbox(subject, { limit: 1 })
+      inboxUnread = inbox.unreadCount
+    } catch {
+      inboxUnread = 0
+    }
+  }
+
   if (!elevated) {
     return (
-      <PortalShell userName={userName} credentialsLine={credentialsLine}>
+      <PortalShell
+        userName={userName}
+        credentialsLine={credentialsLine}
+        inboxUnread={0}
+      >
         <div className="mx-auto max-w-lg px-4 py-16">
           <ElevateGate userEmail={user.email ?? ''} />
         </div>
@@ -61,7 +76,11 @@ export default async function PortalLayout({
   }
 
   return (
-    <PortalShell userName={userName} credentialsLine={credentialsLine}>
+    <PortalShell
+      userName={userName}
+      credentialsLine={credentialsLine}
+      inboxUnread={inboxUnread}
+    >
       {children}
     </PortalShell>
   )

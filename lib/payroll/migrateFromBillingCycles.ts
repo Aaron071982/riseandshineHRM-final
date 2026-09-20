@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { formatCycleLabel } from '@/lib/billing/format'
+import { isRbtPayrollPayableSession } from '@/lib/billing/sessionStatus'
 import {
   amountForHours,
   dateToHmmClock,
@@ -134,6 +135,20 @@ export async function migrateBillingCyclesToPayPeriods(): Promise<MigrateBilling
         continue
       }
 
+      const payableSessions = entry.sessions.filter(
+        (s) =>
+          Number(s.actualMinutes) > 0 &&
+          isRbtPayrollPayableSession(s.sessionStatus)
+      )
+      const useAggregateFallback =
+        payableSessions.length === 0 &&
+        entry.sessions.length === 0 &&
+        entry.totalHours > 0
+      if (payableSessions.length === 0 && !useAggregateFallback) {
+        skippedEntries++
+        continue
+      }
+
       let statement = await prisma.payStatement.findFirst({
         where: {
           payPeriodId: period.id,
@@ -176,9 +191,8 @@ export async function migrateBillingCyclesToPayPeriods(): Promise<MigrateBilling
         where: { payStatementId: statement.id, source: 'RECONCILIATION' },
       })
 
-      const sessions = entry.sessions
-      if (sessions.length > 0) {
-        for (const session of sessions) {
+      if (payableSessions.length > 0) {
+        for (const session of payableSessions) {
           const { startClock, endClock, hours } = clocksFromSession(session)
           if (!(hours > 0)) continue
           const amount = amountForHours(hours, rate)
@@ -195,7 +209,7 @@ export async function migrateBillingCyclesToPayPeriods(): Promise<MigrateBilling
           })
           lineItemsCreated++
         }
-      } else if (entry.totalHours > 0) {
+      } else if (useAggregateFallback) {
         // Aggregate fallback when session rows are missing.
         const hours = round2(entry.totalHours)
         const amount =

@@ -21,7 +21,12 @@ async function loadYtdForPayee(input: {
   staffId: string | null
   payDate: Date
   excludeStatementId: string
-}): Promise<{ gross: number; deductions: number; net: number } | null> {
+}): Promise<{
+  gross: number
+  deductions: number
+  net: number
+  byLabel: Array<{ label: string; amount: number }>
+} | null> {
   const year = input.payDate.getUTCFullYear()
   const yearStart = new Date(Date.UTC(year, 0, 1))
   const yearEnd = new Date(Date.UTC(year, 11, 31, 23, 59, 59))
@@ -38,13 +43,31 @@ async function loadYtdForPayee(input: {
         payDate: { gte: yearStart, lte: yearEnd },
       },
     },
-    select: { grossPay: true, deductions: true, netPay: true },
+    select: {
+      grossPay: true,
+      deductions: true,
+      netPay: true,
+      deductionsItems: {
+        where: { employeePaid: true },
+        select: { label: true, amount: true },
+      },
+    },
   })
   if (prior.length === 0) return null
+
+  const byLabelMap = new Map<string, number>()
+  for (const p of prior) {
+    for (const d of p.deductionsItems) {
+      const label = d.label.trim() || 'Other deduction'
+      byLabelMap.set(label, round2((byLabelMap.get(label) ?? 0) + Number(d.amount)))
+    }
+  }
+
   return {
     gross: round2(prior.reduce((s, p) => s + Number(p.grossPay), 0)),
     deductions: round2(prior.reduce((s, p) => s + Number(p.deductions), 0)),
     net: round2(prior.reduce((s, p) => s + Number(p.netPay), 0)),
+    byLabel: [...byLabelMap.entries()].map(([label, amount]) => ({ label, amount })),
   }
 }
 
@@ -111,6 +134,14 @@ export async function generatePayStubPdf(input: {
   }
   if (statement.lineItems.length === 0) {
     throw new Error('Add line items before generating a stub')
+  }
+  const payableGross = round2(
+    statement.lineItems.reduce((s, li) => s + Number(li.amount), 0)
+  )
+  if (!(payableGross > 0)) {
+    throw new Error(
+      'No payable hours on this statement (scheduled-only sessions are not paid)'
+    )
   }
 
   if (
@@ -194,6 +225,15 @@ export async function generatePayStubPdf(input: {
               ? employeeDeductionSum
               : Number(statement.deductions))
         ),
+        byLabel: (() => {
+          const map = new Map(
+            ytdBase.byLabel.map((r) => [r.label, r.amount] as const)
+          )
+          for (const d of deductionRows.filter((r) => r.employeePaid)) {
+            map.set(d.label, round2((map.get(d.label) ?? 0) + d.amount))
+          }
+          return [...map.entries()].map(([label, amount]) => ({ label, amount }))
+        })(),
       }
     : statement.payeeType === 'RBT'
       ? {
@@ -203,6 +243,9 @@ export async function generatePayStubPdf(input: {
               ? employeeDeductionSum
               : Number(statement.deductions),
           net: Number(statement.netPay),
+          byLabel: deductionRows
+            .filter((d) => d.employeePaid)
+            .map((d) => ({ label: d.label, amount: d.amount })),
         }
       : null
 

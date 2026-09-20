@@ -33,7 +33,7 @@
     --sunrise: #ffb066;
     --sunrise-soft: #fff4e8;
     --sunrise-dark: #ce551b;
-    --espresso: #2f2318;
+    --espresso: #2A2019;
 
     --side: #2a2019;
     --side-2: #1d1610;
@@ -80,6 +80,17 @@
     --phi-pill-fg: #f5c2c4;
     --phi-pill-border: rgba(220, 59, 64, 0.35);
     --phi-pill-bg: rgba(220, 59, 64, 0.12);
+
+    /* BCBA clinical portal */
+    --portal-paper: #faf7f2;
+    --portal-orange: #e7692c;
+    --portal-orange-deep: #cf5a22;
+    --portal-line: #ece4d8;
+    --portal-shadow: 0 8px 24px rgba(42, 32, 25, 0.06);
+    --portal-hero-a: #fff4e6;
+    --portal-hero-b: #fde9d6;
+    --portal-hero-c: #fbdcc2;
+    --portal-money: #2e7d5b;
   }
 
   /* Dark mode palette – spec variables + Tailwind semantic overrides */
@@ -184,6 +195,28 @@
     font-variant-numeric: tabular-nums lining-nums;
     background: var(--bg);
     color: var(--ink);
+  }
+
+  .portal-shell {
+    font-variant-numeric: tabular-nums lining-nums;
+    background: var(--portal-paper);
+    color: var(--ink);
+  }
+
+  .portal-hero {
+    background: linear-gradient(
+      135deg,
+      var(--portal-hero-a) 0%,
+      var(--portal-hero-b) 55%,
+      var(--portal-hero-c) 100%
+    );
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .portal-shell * {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 
   .crm-card {

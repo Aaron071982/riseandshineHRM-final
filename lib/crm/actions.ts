@@ -383,6 +383,19 @@ export async function advanceStage(
       console.error('[crm] stage notification after advance failed', notifyErr)
     }
 
+    try {
+      const { emitStageLifecycleNotifications } = await import(
+        '@/lib/crm/portalNotifications'
+      )
+      await emitStageLifecycleNotifications({
+        clientId,
+        fromStage: client.stage,
+        toStage,
+      })
+    } catch (portalErr) {
+      console.error('[portal] stage lifecycle notify after advance failed', portalErr)
+    }
+
     const taskNotification = automationResult.createdTaskNotification
     if (taskNotification && taskNotification.assigneeUserId) {
       const { queueAssignmentNotification } = await import(
@@ -558,6 +571,19 @@ export async function setStage(
       await maybeSendStageNotification(clientId, toStage, { actorUserId: user.id })
     } catch (notifyErr) {
       console.error('[crm] stage notification after setStage failed', notifyErr)
+    }
+
+    try {
+      const { emitStageLifecycleNotifications } = await import(
+        '@/lib/crm/portalNotifications'
+      )
+      await emitStageLifecycleNotifications({
+        clientId,
+        fromStage: client.stage,
+        toStage,
+      })
+    } catch (portalErr) {
+      console.error('[portal] stage lifecycle notify after setStage failed', portalErr)
     }
 
     const taskNotification = automationResult.createdTaskNotification
@@ -2333,6 +2359,17 @@ export async function assignRbt(
       serviceClientId: clientId,
       action: 'RBT_ASSIGN',
     })
+    try {
+      const { emitTherapistAssignedNotification } = await import(
+        '@/lib/crm/portalNotifications'
+      )
+      await emitTherapistAssignedNotification({
+        clientId,
+        therapistName: btName,
+      })
+    } catch (notifyErr) {
+      console.error('[portal] THERAPIST_ASSIGNED notify failed', notifyErr)
+    }
     revalidateClient(clientId)
     return { ok: true, id: row.id }
   } catch (err) {

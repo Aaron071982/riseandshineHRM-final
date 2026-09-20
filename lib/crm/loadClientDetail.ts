@@ -244,21 +244,38 @@ export async function loadClientCrmDetail(clientId: string) {
     ? await loadCaseCoordinationPanelData(clientId)
     : null
 
-  const [latestIntakeRow, allIntakeCodes] = await Promise.all([
-    prisma.clientIntakeSubmission.findFirst({
-      where: { serviceClientId: clientId },
-      orderBy: { submittedAt: 'desc' },
-      select: { packetId: true },
-    }),
-    prisma.clientIntakeSubmission.findMany({
-      where: { serviceClientId: clientId },
-      select: { formCode: true },
-      distinct: ['formCode'],
-    }),
-  ])
+  let latestIntakeRow: { packetId: string } | null = null
+  let allIntakeCodes: { formCode: string }[] = []
+  try {
+    ;[latestIntakeRow, allIntakeCodes] = await Promise.all([
+      prisma.clientIntakeSubmission.findFirst({
+        where: { serviceClientId: clientId },
+        orderBy: { submittedAt: 'desc' },
+        select: { packetId: true },
+      }),
+      prisma.clientIntakeSubmission.findMany({
+        where: { serviceClientId: clientId },
+        select: { formCode: true },
+        distinct: ['formCode'],
+      }),
+    ])
+  } catch (err) {
+    const { isPrismaMissingSchemaError } = await import('@/lib/prisma')
+    if (!isPrismaMissingSchemaError(err)) throw err
+  }
 
-  const intakePacketForms = latestIntakeRow
-    ? await prisma.clientIntakeSubmission.findMany({
+  let intakePacketForms: {
+    id: string
+    packetId: string
+    formCode: string
+    formTitle: string
+    submittedAt: Date
+    signedByName: string
+    signedByRelationship: string
+  }[] = []
+  if (latestIntakeRow) {
+    try {
+      intakePacketForms = await prisma.clientIntakeSubmission.findMany({
         where: {
           serviceClientId: clientId,
           packetId: latestIntakeRow.packetId,
@@ -274,7 +291,11 @@ export async function loadClientCrmDetail(clientId: string) {
           signedByRelationship: true,
         },
       })
-    : []
+    } catch (err) {
+      const { isPrismaMissingSchemaError } = await import('@/lib/prisma')
+      if (!isPrismaMissingSchemaError(err)) throw err
+    }
+  }
 
   const { getRequiredFormCodes, getFormDef } = await import(
     '@/lib/kiosk-intake/schema'

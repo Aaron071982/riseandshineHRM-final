@@ -15,11 +15,12 @@
 // do not auto-enforce in a phase change.
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com https://cdn.jsdelivr.net",
-  "style-src 'self' 'unsafe-inline' https://api.mapbox.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com https://cdn.jsdelivr.net https://assets.calendly.com",
+  "style-src 'self' 'unsafe-inline' https://api.mapbox.com https://assets.calendly.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://api.mapbox.com https://*.supabase.co https://api.resend.com https://cdn.jsdelivr.net",
+  "connect-src 'self' https://api.mapbox.com https://*.supabase.co https://api.resend.com https://cdn.jsdelivr.net https://calendly.com https://*.calendly.com",
+  "frame-src https://calendly.com https://*.calendly.com",
   "worker-src 'self' blob: https://cdn.jsdelivr.net",
   "frame-ancestors 'none'",
   "base-uri 'self'",

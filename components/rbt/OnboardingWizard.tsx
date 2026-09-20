@@ -21,10 +21,12 @@ import HRInitiatedDocFlow from '@/components/onboarding/HRInitiatedDocFlow'
 import DocumentUploadFlow from '@/components/onboarding/DocumentUploadFlow'
 import SexualHarassmentQuizFlow from '@/components/onboarding/SexualHarassmentQuizFlow'
 import FortyHourTrainingPanel from '@/components/rbt/FortyHourTrainingPanel'
+import OrientationBookingPanel from '@/components/onboarding/OrientationBookingPanel'
 import {
   RBT_VISIBLE_STEPS,
   TOTAL_ONBOARDING_STEPS,
   FORTY_HOUR_RBT_CERTIFICATE_SLUG,
+  ORIENTATION_BOOKING_SLUG,
   sortRbtOnboardingSteps,
 } from '@/lib/onboarding/catalog'
 
@@ -231,14 +233,30 @@ export default function OnboardingWizard({
   }
 
   if (progress.fullyActivated) {
+    const bookingStep = progress.steps.find((s) => s.slug === ORIENTATION_BOOKING_SLUG)
     return (
-      <div className="max-w-2xl mx-auto space-y-6 text-center py-12">
-        <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto" />
-        <h1 className="text-2xl font-bold">Onboarding complete</h1>
-        <p className="text-gray-600">All requirements are satisfied. Welcome to the team!</p>
-        <Button asChild>
-          <Link href="/rbt/dashboard">Go to Dashboard</Link>
-        </Button>
+      <div className="mx-auto max-w-3xl space-y-8 py-10">
+        <div className="space-y-4 text-center">
+          <CheckCircle2 className="mx-auto h-16 w-16 text-green-600" />
+          <h1 className="text-2xl font-bold">Onboarding complete</h1>
+          <p className="text-gray-600">
+            All requirements are satisfied. Welcome to the team!
+          </p>
+          <Button asChild>
+            <Link href="/rbt/dashboard">Go to Dashboard</Link>
+          </Button>
+        </div>
+
+        {bookingStep ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 text-left shadow-sm">
+            <OrientationBookingPanel
+              documentId={bookingStep.documentId}
+              alreadyBooked={bookingStep.isComplete}
+              variant="complete"
+              onBooked={() => void refresh()}
+            />
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -361,7 +379,7 @@ export default function OnboardingWizard({
             />
           ) : current.isLocked ? (
             <p className="text-gray-600">Complete earlier steps to unlock this task.</p>
-          ) : current.isComplete ? (
+          ) : current.isComplete && current.flowType !== 'BOOKING' ? (
             <p className="text-green-700">This step is complete.</p>
           ) : (
             <StepFlow
@@ -503,12 +521,11 @@ function StepFlow({
 
   if (current.flowType === 'BOOKING') {
     return (
-      <div className="space-y-4 text-sm text-gray-600">
-        <p>
-          Artemis training is coordinated by your supervisor. This step will be marked complete once
-          training is verified in our system.
-        </p>
-      </div>
+      <OrientationBookingPanel
+        documentId={current.documentId}
+        alreadyBooked={current.isComplete}
+        onBooked={onComplete}
+      />
     )
   }
 

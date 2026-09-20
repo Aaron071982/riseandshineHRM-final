@@ -133,8 +133,31 @@ export async function assignPortalBcba(
       action: `PORTAL_BCBA_ASSIGN:${before.assignedBcbaId ?? 'none'}→${assignedBcbaId ?? 'none'}`,
     })
 
+    if (assignedBcbaId) {
+      try {
+        const client = await prisma.serviceClient.findFirst({
+          where: { id: clientId },
+          select: { firstName: true, lastName: true },
+        })
+        const { emitClientAssignedNotification } = await import(
+          '@/lib/crm/portalNotifications'
+        )
+        await emitClientAssignedNotification({
+          clientId,
+          assignedBcbaId,
+          previousAssignedBcbaId: before.assignedBcbaId,
+          clientName: client
+            ? `${client.firstName} ${client.lastName}`.trim()
+            : 'Client',
+        })
+      } catch (notifyErr) {
+        console.error('[portal] CLIENT_ASSIGNED notify failed', notifyErr)
+      }
+    }
+
     revalidatePath(`/client-services/clients/${clientId}`)
     revalidatePath('/client-services')
+    revalidatePath('/portal')
     return { ok: true }
   } catch (err) {
     return fail(err)

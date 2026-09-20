@@ -2,14 +2,27 @@ import type { CrmUser } from '@/lib/crm/access'
 import { getVisibleClientsWhere } from '@/lib/crm/access'
 import { prisma } from '@/lib/prisma'
 import { NOT_DELETED } from '@/lib/crm/softDelete'
+import { derivePortalLifecycle } from '@/lib/crm/portalLifecycle'
+import type { PortalLifecycleSnapshot } from '@/lib/crm/portalLifecycle'
+import {
+  listPortalInbox,
+  type PortalInboxItem,
+} from '@/lib/crm/portalNotifications'
 
 export type BcbaPortalDashboard = {
   greetingName: string
   credentialsLine: string | null
   clientCount: number
-  assessmentMix: { draft: number; inProgress: number; signed: number; completed: number }
+  assessmentMix: {
+    draft: number
+    inProgress: number
+    signed: number
+    completed: number
+  }
+  readyToAssess: number
   authExpiring30: number
   reassessmentsDue: number
+  caseloadCompletionPct: number
   actionQueue: {
     id: string
     clientId: string
@@ -30,6 +43,7 @@ export type BcbaPortalDashboard = {
     nextReassessmentDate: Date | null
     authEndDate: Date | null
     updatedAt: Date
+    lifecycle: PortalLifecycleSnapshot
   }[]
   assessments: {
     id: string
@@ -41,6 +55,10 @@ export type BcbaPortalDashboard = {
     updatedAt: Date
     signedAt: Date | null
   }[]
+  inbox: {
+    items: PortalInboxItem[]
+    unreadCount: number
+  }
 }
 
 function addMonths(d: Date, months: number): Date {
@@ -74,6 +92,7 @@ export async function loadBcbaPortalDashboard(
       lastName: true,
       dateOfBirth: true,
       stage: true,
+      assignedBcbaId: true,
       updatedAt: true,
       authorizations: {
         where: { deletedAt: null },
@@ -93,6 +112,11 @@ export async function loadBcbaPortalDashboard(
           signedAt: true,
         },
       },
+      btAssignments: {
+        where: { status: 'ACTIVE', deletedAt: null },
+        select: { id: true },
+        take: 3,
+      },
     },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     take: 200,
@@ -104,6 +128,8 @@ export async function loadBcbaPortalDashboard(
   const in90 = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
   let authExpiring30 = 0
   let reassessmentsDue = 0
+  let readyToAssess = 0
+  let finishedAssessments = 0
   const actionQueue: BcbaPortalDashboard['actionQueue'] = []
   const assessments: BcbaPortalDashboard['assessments'] = []
 
@@ -113,8 +139,24 @@ export async function loadBcbaPortalDashboard(
     if (latest) {
       if (status === 'DRAFT') assessmentMix.draft += 1
       else if (status === 'IN_PROGRESS') assessmentMix.inProgress += 1
-      else if (status === 'SIGNED') assessmentMix.signed += 1
-      else if (status === 'COMPLETED') assessmentMix.completed += 1
+      else if (status === 'SIGNED') {
+        assessmentMix.signed += 1
+        finishedAssessments += 1
+      } else if (status === 'COMPLETED') {
+        assessmentMix.completed += 1
+        finishedAssessments += 1
+      }
+    }
+
+    const lifecycle = derivePortalLifecycle({
+      assignedBcbaId: c.assignedBcbaId,
+      stage: c.stage,
+      hasTherapistAssigned: c.btAssignments.length > 0,
+    })
+    if (lifecycle.currentId === 'READY_FOR_ASSESSMENT' || lifecycle.stages[3]?.done) {
+      if (!latest || status === 'DRAFT' || status === 'IN_PROGRESS') {
+        readyToAssess += 1
+      }
     }
 
     for (const a of c.treatmentAssessments) {
@@ -182,6 +224,7 @@ export async function loadBcbaPortalDashboard(
       nextReassessmentDate,
       authEndDate: authEnd,
       updatedAt: c.updatedAt,
+      lifecycle,
     }
   })
 
@@ -195,17 +238,34 @@ export async function loadBcbaPortalDashboard(
       ? `${user.email}`
       : null
 
+  const clientCount = await prisma.serviceClient.count({
+    where: { ...where, ...NOT_DELETED },
+  })
+
+  let inbox: BcbaPortalDashboard['inbox'] = { items: [], unreadCount: 0 }
+  try {
+    inbox = await listPortalInbox(user, { limit: 8 })
+  } catch (err) {
+    console.error('[portal] inbox load failed', err)
+  }
+
+  const caseloadCompletionPct =
+    clientCount === 0
+      ? 0
+      : Math.round((finishedAssessments / Math.max(clientCount, 1)) * 100)
+
   return {
     greetingName: fullName?.split(' ')[0] || user.email || 'there',
     credentialsLine,
-    clientCount: await prisma.serviceClient.count({
-      where: { ...where, ...NOT_DELETED },
-    }),
+    clientCount,
     assessmentMix,
+    readyToAssess,
     authExpiring30,
     reassessmentsDue,
+    caseloadCompletionPct: Math.min(100, caseloadCompletionPct),
     actionQueue: actionQueue.slice(0, 25),
     clients: rows,
     assessments: assessments.slice(0, 80),
+    inbox,
   }
 }

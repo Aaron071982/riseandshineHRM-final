@@ -82,12 +82,9 @@ export async function replacePayDeductions(input: {
   )
   const grossPay = lineAmountSum
   const netPay = round2(grossPay - deductionsTotal)
-  const storedNet = Number(statement.netPay)
-  const storedGross = Number(statement.grossPay)
-  // Reconciled when stored gross matches lines AND net ties to gross − employee deductions.
   const reconciled =
-    Math.abs(storedGross - lineAmountSum) < 0.005 &&
-    Math.abs(netPay - (grossPay - deductionsTotal)) < 0.005
+    Math.abs(grossPay - lineAmountSum) < 0.005 &&
+    Math.abs(netPay - round2(grossPay - deductionsTotal)) < 0.005
 
   await prisma.$transaction(async (tx) => {
     await tx.payDeduction.deleteMany({
@@ -110,24 +107,17 @@ export async function replacePayDeductions(input: {
         deductions: dec(deductionsTotal),
         netPay: dec(netPay),
         grossPay: dec(grossPay),
-        reconciled:
-          Math.abs(grossPay - lineAmountSum) < 0.005 &&
-          Math.abs(netPay - round2(grossPay - deductionsTotal)) < 0.005,
+        reconciled,
         status: statement.status === 'READY' ? 'DRAFT' : statement.status,
         pdfUrl: statement.status === 'READY' ? null : statement.pdfUrl,
       },
     })
   })
 
-  void storedNet
-  void reconciled
-
   return {
     deductions: deductionsTotal,
     netPay,
-    reconciled:
-      Math.abs(grossPay - lineAmountSum) < 0.005 &&
-      Math.abs(netPay - round2(grossPay - deductionsTotal)) < 0.005,
+    reconciled,
   }
 }
 

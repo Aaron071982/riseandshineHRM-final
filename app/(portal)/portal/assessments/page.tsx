@@ -4,20 +4,12 @@ import { getClientServicesPageUser } from '@/lib/crm/access'
 import { isClinicalSurfaceOnly } from '@/lib/crm/bcbaPortal'
 import { loadBcbaPortalDashboard } from '@/lib/crm/bcbaPortalDashboard'
 import { formatCalendarDate } from '@/lib/billing/calendarDate'
-import { cn } from '@/lib/utils'
+import {
+  PortalAssessmentPill,
+  PortalAvatar,
+} from '@/components/portal/PortalUi'
 
 export const dynamic = 'force-dynamic'
-
-const PILL: Record<string, string> = {
-  DRAFT: 'bg-[color-mix(in_srgb,var(--line)_80%,white)] text-[var(--muted-ink)]',
-  IN_PROGRESS: 'bg-[color-mix(in_srgb,var(--sunrise)_18%,white)] text-[var(--espresso)]',
-  COMPLETED: 'bg-[color-mix(in_srgb,var(--stage-clinical)_18%,white)] text-[var(--espresso)]',
-  SIGNED: 'bg-[color-mix(in_srgb,var(--espresso)_12%,white)] text-[var(--espresso)]',
-}
-
-function label(status: string) {
-  return status.replaceAll('_', ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase())
-}
 
 export default async function PortalAssessmentsPage() {
   const user = await getClientServicesPageUser()
@@ -34,16 +26,15 @@ export default async function PortalAssessmentsPage() {
 
   return (
     <div className="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="space-y-1 border-b border-line pb-6">
-        <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--sunrise)]">
+      <header className="space-y-1 pb-2">
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--portal-orange-deep)]">
           Assessments
         </p>
-        <h1 className="font-display text-3xl font-semibold text-[var(--espresso)]">
+        <h1 className="font-display text-3xl font-semibold text-[var(--espresso)] sm:text-4xl">
           Your assessment library
         </h1>
         <p className="max-w-2xl text-[var(--muted-ink)]">
           Work in progress and completed assessments across your caseload.
-          Preview or download any form you&apos;ve authored.
         </p>
       </header>
 
@@ -63,26 +54,34 @@ export default async function PortalAssessmentsPage() {
       </section>
 
       {data.clients.some((c) => !c.assessmentId) ? (
-        <section className="rounded-2xl border border-line bg-surface p-5">
+        <section className="rounded-[16px] border border-[var(--portal-line)] bg-white p-5 shadow-[var(--portal-shadow)]">
           <h2 className="font-display text-lg font-semibold text-[var(--espresso)]">
             Clients without an assessment
           </h2>
           <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {data.clients
               .filter((c) => !c.assessmentId)
-              .map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={`/portal/clients/${c.id}?tab=assessment`}
-                    className="block rounded-xl border border-line px-3 py-2.5 text-sm hover:bg-canvas"
-                  >
-                    <span className="font-medium text-[var(--espresso)]">
-                      {c.firstName} {c.lastName}
-                    </span>
-                    <span className="mt-0.5 block text-quiet">{c.clientCode}</span>
-                  </Link>
-                </li>
-              ))}
+              .map((c) => {
+                const name = `${c.firstName} ${c.lastName}`.trim()
+                return (
+                  <li key={c.id}>
+                    <Link
+                      href={`/portal/clients/${c.id}?tab=assessment`}
+                      className="flex items-center gap-3 rounded-[14px] border border-[var(--portal-line)] px-3 py-2.5 text-sm transition-colors hover:bg-[var(--portal-paper)]"
+                    >
+                      <PortalAvatar name={name} className="h-8 w-8 text-[10px]" />
+                      <span>
+                        <span className="block font-medium text-[var(--espresso)]">
+                          {name}
+                        </span>
+                        <span className="text-xs text-[var(--muted-ink)]">
+                          {c.clientCode}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                )
+              })}
           </ul>
         </section>
       ) : null}
@@ -110,91 +109,67 @@ function AssessmentTable({
   empty: string
 }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface">
-      <div className="border-b border-line px-5 py-4">
+    <div className="rounded-[16px] border border-[var(--portal-line)] bg-white shadow-[var(--portal-shadow)]">
+      <div className="border-b border-[var(--portal-line)] px-5 py-4">
         <h2 className="font-display text-xl font-semibold text-[var(--espresso)]">
           {title}
         </h2>
-        <p className="mt-1 text-sm text-quiet">{subtitle}</p>
+        <p className="mt-1 text-sm text-[var(--muted-ink)]">{subtitle}</p>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-canvas/80 text-quiet">
-            <tr>
-              <th className="px-5 py-3 font-medium">Client</th>
-              <th className="px-3 py-3 font-medium">Status</th>
-              <th className="px-3 py-3 font-medium">Updated</th>
-              <th className="px-3 py-3 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((a) => (
-              <tr key={a.id} className="border-t border-line/70">
-                <td className="px-5 py-3">
+      <ul className="divide-y divide-[var(--portal-line)]">
+        {rows.length === 0 ? (
+          <li className="px-5 py-10 text-center text-sm text-[var(--muted-ink)]">
+            {empty}
+          </li>
+        ) : (
+          rows.map((a) => (
+            <li
+              key={a.id}
+              className="flex flex-wrap items-center gap-3 px-5 py-3.5"
+            >
+              <PortalAvatar name={a.clientName} />
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/portal/clients/${a.clientId}?tab=assessment`}
+                  className="font-medium text-[var(--espresso)] hover:text-[var(--portal-orange)]"
+                >
+                  {a.clientName}
+                </Link>
+                <p className="text-xs text-[var(--muted-ink)]">
+                  {a.clientCode} · {formatCalendarDate(a.updatedAt)}
+                </p>
+              </div>
+              <PortalAssessmentPill status={a.status} />
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/portal/clients/${a.clientId}/assessments/${a.id}`}
+                  className="rounded-lg bg-[var(--espresso)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-95"
+                >
+                  {a.status === 'SIGNED' || a.status === 'COMPLETED'
+                    ? 'View'
+                    : 'Continue'}
+                </Link>
+                {a.source === 'UPLOAD' ? (
+                  <a
+                    href={`/api/client-services/clients/${a.clientId}/assessments/${a.id}/download`}
+                    className="rounded-lg border border-[var(--portal-line)] px-3 py-1.5 text-xs font-medium text-[var(--portal-orange)] hover:bg-[var(--portal-paper)]"
+                  >
+                    Download
+                  </a>
+                ) : (
                   <Link
-                    href={`/portal/clients/${a.clientId}?tab=assessment`}
-                    className="font-medium text-[var(--espresso)] hover:text-[var(--sunrise)]"
+                    href={`/portal/clients/${a.clientId}/assessments/${a.id}/print`}
+                    className="rounded-lg border border-[var(--portal-line)] px-3 py-1.5 text-xs font-medium text-[var(--portal-orange)] hover:bg-[var(--portal-paper)]"
+                    target="_blank"
                   >
-                    {a.clientName}
+                    Preview / PDF
                   </Link>
-                  <span className="mt-0.5 block text-xs text-quiet">
-                    {a.clientCode}
-                  </span>
-                </td>
-                <td className="px-3 py-3">
-                  <span
-                    className={cn(
-                      'inline-flex rounded-md px-2 py-0.5 text-xs font-medium capitalize',
-                      PILL[a.status] ?? 'bg-canvas text-quiet'
-                    )}
-                  >
-                    {label(a.status)}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-quiet">
-                  {formatCalendarDate(a.updatedAt)}
-                </td>
-                <td className="px-3 py-3 text-right">
-                  <div className="inline-flex flex-wrap justify-end gap-2">
-                    <Link
-                      href={`/portal/clients/${a.clientId}/assessments/${a.id}`}
-                      className="text-xs font-medium underline-offset-2 hover:underline"
-                    >
-                      {a.status === 'SIGNED' || a.status === 'COMPLETED'
-                        ? 'View'
-                        : 'Continue'}
-                    </Link>
-                    <span className="text-line">·</span>
-                    {a.source === 'UPLOAD' ? (
-                      <a
-                        href={`/api/client-services/clients/${a.clientId}/assessments/${a.id}/download`}
-                        className="text-xs font-medium text-[var(--sunrise)] underline-offset-2 hover:underline"
-                      >
-                        Download
-                      </a>
-                    ) : (
-                      <Link
-                        href={`/portal/clients/${a.clientId}/assessments/${a.id}/print`}
-                        className="text-xs font-medium text-[var(--sunrise)] underline-offset-2 hover:underline"
-                        target="_blank"
-                      >
-                        Preview / PDF
-                      </Link>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-5 py-10 text-center text-quiet">
-                  {empty}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                )}
+              </div>
+            </li>
+          ))
+        )}
+      </ul>
     </div>
   )
 }
