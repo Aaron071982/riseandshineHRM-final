@@ -97,6 +97,26 @@ function StatusPill({ status }: { status: string }) {
   )
 }
 
+function ClassificationPill({
+  classification,
+}: {
+  classification: '1099' | 'W2'
+}) {
+  const isW2 = classification === 'W2'
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+        isW2
+          ? 'bg-[#2E6B57]/12 text-[#2E6B57]'
+          : 'bg-[#E7692C]/12 text-[#E7692C]'
+      )}
+    >
+      {isW2 ? 'W-2' : '1099'}
+    </span>
+  )
+}
+
 function Initials({ name }: { name: string }) {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   const letters = ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?'
@@ -303,7 +323,7 @@ export default function PayrollBillingHub({ data }: { data: UnifiedDashboardData
             Payroll &amp; Billing
           </h1>
           <p className="mt-1 text-sm" style={{ color: T.muted }}>
-            Unified contractor (1099) and RBT reconciliation for the selected period
+            Unified BCBA (1099 or W-2) and RBT payroll for the selected period
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -546,7 +566,14 @@ export default function PayrollBillingHub({ data }: { data: UnifiedDashboardData
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
                         <Initials name={row.payeeName} />
-                        <span className="font-medium">{row.payeeName}</span>
+                        <div className="min-w-0">
+                          <span className="font-medium">{row.payeeName}</span>
+                          <div className="mt-0.5">
+                            <ClassificationPill
+                              classification={row.classification}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3" style={{ color: T.muted }}>
@@ -985,6 +1012,7 @@ function BcbaHoursSheetDialog({
   const [userId, setUserId] = useState('')
   const [legalName, setLegalName] = useState('')
   const [entityName, setEntityName] = useState('')
+  const [classification, setClassification] = useState<'1099' | 'W2'>('1099')
   const [rate, setRate] = useState('')
   const [rows, setRows] = useState<SheetRow[]>([])
 
@@ -1010,6 +1038,9 @@ function BcbaHoursSheetDialog({
           ''
       )
       setEntityName(editRow?.entityName || cand?.entityName || '')
+      setClassification(
+        editRow?.classification || cand?.classification || '1099'
+      )
       setRate(
         editRow?.ratePerHour != null
           ? String(editRow.ratePerHour)
@@ -1055,6 +1086,7 @@ function BcbaHoursSheetDialog({
     if (!c) return
     setLegalName(c.legalName || c.name)
     setEntityName(c.entityName || '')
+    setClassification(c.classification || '1099')
     if (c.ratePerHour != null) setRate(String(c.ratePerHour))
   }
 
@@ -1120,6 +1152,7 @@ function BcbaHoursSheetDialog({
         userId,
         legalName: legalName.trim() || 'BCBA',
         entityName: entityName.trim() || null,
+        classification,
         ratePerHour: rateNum,
         lines: filled.map((r) => ({
           workDate: r.workDate,
@@ -1196,6 +1229,50 @@ function BcbaHoursSheetDialog({
                 onChange={(e) => setEntityName(e.target.value)}
                 placeholder="My Lane Applied Behavior Analysis PLLC"
               />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Tax classification</Label>
+              <div
+                className="inline-flex rounded-lg border bg-white p-0.5"
+                role="tablist"
+                aria-label="Tax classification"
+              >
+                {(
+                  [
+                    {
+                      id: '1099' as const,
+                      label: '1099',
+                      hint: 'Contractor — no taxes withheld',
+                    },
+                    {
+                      id: 'W2' as const,
+                      label: 'W-2',
+                      hint: 'Employee — taxes estimated on stub',
+                    },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={classification === opt.id}
+                    onClick={() => setClassification(opt.id)}
+                    className={cn(
+                      'rounded-md px-4 py-2 text-sm font-medium transition-colors',
+                      classification === opt.id
+                        ? 'bg-[#2A2019] text-white'
+                        : 'text-[#2A2019]/70 hover:bg-[#2A2019]/06'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs" style={{ color: T.muted }}>
+                {classification === 'W2'
+                  ? 'W-2 stubs withhold estimated federal, FICA, and NY State taxes when generated (or use register amounts when available).'
+                  : '1099 stubs pay gross with no employee tax withholdings.'}
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label>Rate / hour</Label>

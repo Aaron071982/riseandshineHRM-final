@@ -1,5 +1,9 @@
 import { recomputeStatementTotals, round2 } from '@/lib/payroll/hoursHmm'
 import { formatUsd } from '@/lib/billing/format'
+import {
+  normalizePayeeClassification,
+  type PayeeClassification,
+} from '@/lib/payroll/classification'
 
 export type PayStubLine = {
   workDate: Date | string
@@ -25,6 +29,8 @@ export type PayStubYtd = {
 
 export type PayStubPayload = {
   payeeType: 'BCBA' | 'RBT'
+  /** Defaults: BCBA → 1099, RBT → W2 when omitted. */
+  classification?: PayeeClassification | string | null
   legalName: string
   entityName: string | null
   payDate: Date | string
@@ -32,9 +38,9 @@ export type PayStubPayload = {
   periodEnd: Date | string
   ratePerHour: number | null
   lineItems: PayStubLine[]
-  /** Legacy single total — used when deductionRows is empty (BCBA). */
+  /** Legacy single total — used when deductionRows is empty (BCBA 1099). */
   deductions: number
-  /** Itemized employee/employer rows for W-2 BT stubs. */
+  /** Itemized employee/employer rows for W-2 stubs. */
   deductionRows?: PayStubDeductionRow[]
   reconciled: boolean
   ytd?: PayStubYtd | null
@@ -74,12 +80,20 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
+function resolveClassification(payload: PayStubPayload): PayeeClassification {
+  if (payload.classification != null && String(payload.classification).trim()) {
+    return normalizePayeeClassification(payload.classification)
+  }
+  return payload.payeeType === 'RBT' ? 'W2' : '1099'
+}
+
 /**
  * Letter-sized HTML pay statement matching the BCBA stub layout
  * (logo + company header, blue PAY STATEMENT band, optional 1099 orange sub-band).
  */
 export function buildPayStubHtml(payload: PayStubPayload): string {
-  const isContractor = payload.payeeType === 'BCBA'
+  const classification = resolveClassification(payload)
+  const isContractor = classification === '1099'
   const employeeRows = (payload.deductionRows ?? []).filter((d) => d.employeePaid)
   const deductionsFromRows = round2(
     employeeRows.reduce((sum, d) => sum + Number(d.amount), 0)
@@ -124,15 +138,15 @@ export function buildPayStubHtml(payload: PayStubPayload): string {
 
   const subBand = isContractor
     ? `<div class="sub-band">Contractor payment — 1099 (no taxes withheld)</div>`
-    : `<div class="sub-band employee">Employee earnings statement</div>`
+    : `<div class="sub-band employee">Employee earnings statement — W-2</div>`
 
   const footnotes = isContractor
     ? `<li>This is a 1099 contractor payment. No federal, state, or FICA taxes were withheld.</li>
        <li>Amount = hours × pay rate. Hours are computed from session start/end clocks (h.mm; <code>.30</code> = 30 minutes).</li>
        <li>Keep this statement for your records. A Form 1099-NEC will be issued if required.</li>`
-    : `<li>Taxes withheld per your Form W-4 and applicable federal, New York State, and New York City rates. This is an employee earnings statement.</li>
+    : `<li>Taxes withheld for this W-2 employee earnings statement (federal, FICA, and New York State). Amounts marked &ldquo;(est.)&rdquo; are calculated estimates when a payroll register was not available.</li>
        <li>Amount = hours × pay rate. Hours are computed from session start/end clocks (h.mm; <code>.30</code> = 30 minutes).</li>
-       <li>Deduction amounts are as recorded for this pay period — they are not recalculated on this statement.</li>`
+       <li>Final withholdings on your paycheck / Form W-2 may differ based on your Form W-4 and applicable rates.</li>`
 
   const deductionBlock =
     !isContractor && employeeRows.length > 0

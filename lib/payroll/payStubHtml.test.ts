@@ -14,6 +14,7 @@ describe('payStubHtml', () => {
   it('includes 1099 band for BCBA and reconciliation warning', () => {
     const html = buildPayStubHtml({
       payeeType: 'BCBA',
+      classification: '1099',
       legalName: 'Shazia Khan',
       entityName: 'My Lane ABA PLLC',
       payDate: new Date('2026-03-20'),
@@ -41,9 +42,43 @@ describe('payStubHtml', () => {
     expect(html).toContain('$0.00')
   })
 
+  it('uses employee framing for W-2 BCBA with itemized taxes', () => {
+    const html = buildPayStubHtml({
+      payeeType: 'BCBA',
+      classification: 'W2',
+      legalName: 'Shazia Khan',
+      entityName: null,
+      payDate: new Date('2026-03-20'),
+      periodStart: new Date('2026-03-02'),
+      periodEnd: new Date('2026-03-15'),
+      ratePerHour: 105,
+      deductions: 0,
+      reconciled: true,
+      logoSrc: 'data:image/png;base64,xx',
+      deductionRows: [
+        { label: 'Federal income tax (est.)', amount: 12, employeePaid: true },
+        { label: 'Social Security (est.)', amount: 62, employeePaid: true },
+      ],
+      lineItems: [
+        {
+          workDate: new Date('2026-03-03'),
+          startClock: '4.30',
+          endClock: '6.30',
+          hours: 2,
+          amount: 1000,
+        },
+      ],
+    })
+    expect(html).toContain('Employee earnings statement — W-2')
+    expect(html).not.toContain('Contractor payment — 1099')
+    expect(html).toContain('Federal income tax (est.)')
+    expect(html).toContain('$926.00')
+  })
+
   it('uses employee framing for RBT (no 1099 band) with itemized deductions', () => {
     const html = buildPayStubHtml({
       payeeType: 'RBT',
+      classification: 'W2',
       legalName: 'Jordan Miles',
       entityName: null,
       payDate: new Date('2026-03-20'),
@@ -78,7 +113,7 @@ describe('payStubHtml', () => {
         },
       ],
     })
-    expect(html).toContain('Employee earnings statement')
+    expect(html).toContain('Employee earnings statement — W-2')
     expect(html).not.toContain('1099')
     expect(html).toContain('Federal income tax')
     expect(html).toContain('Social Security')

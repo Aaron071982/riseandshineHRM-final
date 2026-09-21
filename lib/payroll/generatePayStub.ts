@@ -9,9 +9,14 @@ import {
 } from '@/lib/payroll/payStubStorage'
 import { getActiveContractorRate } from '@/lib/payroll/contractors'
 import {
+  normalizePayeeClassification,
+  type PayeeClassification,
+} from '@/lib/payroll/classification'
+import {
   deductionsFromLegacyPayrollEntry,
   replacePayDeductions,
 } from '@/lib/payroll/deductions'
+import { estimateW2EmployeeDeductions } from '@/lib/payroll/estimateW2Taxes'
 import { round2 } from '@/lib/payroll/hoursHmm'
 import { revalidatePath } from 'next/cache'
 
@@ -72,7 +77,10 @@ async function loadYtdForPayee(input: {
 }
 
 /** If RBT statement has no itemized deductions, copy amounts from a matching legacy published entry. */
-async function ensureRbtDeductionsFromLegacy(statementId: string, staffId: string) {
+async function ensureRbtDeductionsFromLegacy(
+  statementId: string,
+  staffId: string
+) {
   const existing = await prisma.payDeduction.count({
     where: { payStatementId: statementId },
   })
@@ -105,6 +113,49 @@ async function ensureRbtDeductionsFromLegacy(statementId: string, staffId: strin
   })
   if (rows.length === 0) return
   await replacePayDeductions({ payStatementId: statementId, deductions: rows })
+}
+
+/**
+ * Ensure W-2 statements have tax rows before PDF:
+ * - RBT: always W-2 (legacy register first, then estimate)
+ * - BCBA W-2: estimate when empty
+ * - BCBA 1099: clear any leftover tax rows
+ */
+async function ensureClassificationDeductions(input: {
+  statementId: string
+  payeeType: 'BCBA' | 'RBT'
+  classification: PayeeClassification
+  staffId: string | null
+  grossPay: number
+}): Promise<void> {
+  if (input.classification === '1099') {
+    const count = await prisma.payDeduction.count({
+      where: { payStatementId: input.statementId },
+    })
+    if (count > 0) {
+      await replacePayDeductions({
+        payStatementId: input.statementId,
+        deductions: [],
+      })
+    }
+    return
+  }
+
+  if (input.payeeType === 'RBT' && input.staffId) {
+    await ensureRbtDeductionsFromLegacy(input.statementId, input.staffId)
+  }
+
+  const existing = await prisma.payDeduction.count({
+    where: { payStatementId: input.statementId },
+  })
+  if (existing > 0) return
+
+  const estimated = estimateW2EmployeeDeductions(input.grossPay)
+  if (estimated.length === 0) return
+  await replacePayDeductions({
+    payStatementId: input.statementId,
+    deductions: estimated,
+  })
 }
 
 export async function generatePayStubPdf(input: {
@@ -144,31 +195,37 @@ export async function generatePayStubPdf(input: {
     )
   }
 
-  if (
-    statement.payeeType === 'RBT' &&
-    statement.staffId &&
-    statement.deductionsItems.length === 0
-  ) {
-    await ensureRbtDeductionsFromLegacy(statement.id, statement.staffId)
-    statement = await prisma.payStatement.findUnique({
-      where: { id: input.payStatementId },
-      include: {
-        payPeriod: true,
-        lineItems: { orderBy: [{ workDate: 'asc' }, { startClock: 'asc' }] },
-        deductionsItems: { orderBy: { createdAt: 'asc' } },
-        contractor: { include: { activeRate: true } },
-        rbtProfile: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            hourlyPayRate: true,
-          },
+  const classification: PayeeClassification =
+    statement.payeeType === 'RBT'
+      ? 'W2'
+      : normalizePayeeClassification(statement.contractor?.classification)
+
+  await ensureClassificationDeductions({
+    statementId: statement.id,
+    payeeType: statement.payeeType,
+    classification,
+    staffId: statement.staffId,
+    grossPay: payableGross,
+  })
+
+  statement = await prisma.payStatement.findUnique({
+    where: { id: input.payStatementId },
+    include: {
+      payPeriod: true,
+      lineItems: { orderBy: [{ workDate: 'asc' }, { startClock: 'asc' }] },
+      deductionsItems: { orderBy: { createdAt: 'asc' } },
+      contractor: { include: { activeRate: true } },
+      rbtProfile: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          hourlyPayRate: true,
         },
       },
-    })
-    if (!statement) throw new Error('Pay statement not found')
-  }
+    },
+  })
+  if (!statement) throw new Error('Pay statement not found')
 
   let legalName: string
   let entityName: string | null
@@ -209,34 +266,38 @@ export async function generatePayStubPdf(input: {
     payDate: statement.payPeriod.payDate,
     excludeStatementId: statement.id,
   })
-  const ytd = ytdBase
-    ? {
-        gross: round2(ytdBase.gross + Number(statement.grossPay)),
-        deductions: round2(
-          ytdBase.deductions +
-            (deductionRows.length > 0
-              ? employeeDeductionSum
-              : Number(statement.deductions))
-        ),
-        net: round2(
-          ytdBase.net +
-            Number(statement.grossPay) -
-            (deductionRows.length > 0
-              ? employeeDeductionSum
-              : Number(statement.deductions))
-        ),
-        byLabel: (() => {
-          const map = new Map(
-            ytdBase.byLabel.map((r) => [r.label, r.amount] as const)
-          )
-          for (const d of deductionRows.filter((r) => r.employeePaid)) {
-            map.set(d.label, round2((map.get(d.label) ?? 0) + d.amount))
-          }
-          return [...map.entries()].map(([label, amount]) => ({ label, amount }))
-        })(),
-      }
-    : statement.payeeType === 'RBT'
+  const showYtd = classification === 'W2'
+  const ytd = showYtd
+    ? ytdBase
       ? {
+          gross: round2(ytdBase.gross + Number(statement.grossPay)),
+          deductions: round2(
+            ytdBase.deductions +
+              (deductionRows.length > 0
+                ? employeeDeductionSum
+                : Number(statement.deductions))
+          ),
+          net: round2(
+            ytdBase.net +
+              Number(statement.grossPay) -
+              (deductionRows.length > 0
+                ? employeeDeductionSum
+                : Number(statement.deductions))
+          ),
+          byLabel: (() => {
+            const map = new Map(
+              ytdBase.byLabel.map((r) => [r.label, r.amount] as const)
+            )
+            for (const d of deductionRows.filter((r) => r.employeePaid)) {
+              map.set(d.label, round2((map.get(d.label) ?? 0) + d.amount))
+            }
+            return [...map.entries()].map(([label, amount]) => ({
+              label,
+              amount,
+            }))
+          })(),
+        }
+      : {
           gross: Number(statement.grossPay),
           deductions:
             deductionRows.length > 0
@@ -247,10 +308,11 @@ export async function generatePayStubPdf(input: {
             .filter((d) => d.employeePaid)
             .map((d) => ({ label: d.label, amount: d.amount })),
         }
-      : null
+    : null
 
   const pdfBytes = await renderPayStubPdf({
     payeeType: statement.payeeType,
+    classification,
     legalName,
     entityName,
     payDate: statement.payPeriod.payDate,
@@ -292,8 +354,8 @@ export async function generatePayStubPdf(input: {
     actorUserId: input.actorUserId,
     entityType: 'PayStatement',
     entityId: statement.id,
-    label: `PAY_STATEMENT_EDIT:generate_stub:${statement.payeeType}`,
-    after: { pdfUrl: storagePath, status: 'READY' },
+    label: `PAY_STATEMENT_EDIT:generate_stub:${statement.payeeType}:${classification}`,
+    after: { pdfUrl: storagePath, status: 'READY', classification },
   })
 
   return { pdfUrl: storagePath, status: 'READY' }

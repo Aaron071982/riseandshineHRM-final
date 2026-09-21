@@ -1,6 +1,10 @@
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { auditPayrollChange } from '@/lib/payroll/access'
+import {
+  normalizePayeeClassification,
+  type PayeeClassification,
+} from '@/lib/payroll/classification'
 
 function dec(n: number): Prisma.Decimal {
   return new Prisma.Decimal(n.toFixed(2))
@@ -10,8 +14,16 @@ export async function upsertContractorProfile(input: {
   userId: string
   legalName: string
   entityName?: string | null
+  classification?: PayeeClassification | string | null
   actorUserId: string
-}): Promise<{ id: string; userId: string; legalName: string; entityName: string | null }> {
+}): Promise<{
+  id: string
+  userId: string
+  legalName: string
+  entityName: string | null
+  classification: string
+}> {
+  const classification = normalizePayeeClassification(input.classification)
   const existing = await prisma.contractorProfile.findUnique({
     where: { userId: input.userId },
   })
@@ -21,11 +33,17 @@ export async function upsertContractorProfile(input: {
       data: {
         legalName: input.legalName.trim(),
         entityName: input.entityName?.trim() || null,
+        ...(input.classification != null ? { classification } : {}),
       },
     })
+    const classChanged =
+      input.classification != null &&
+      normalizePayeeClassification(existing.classification) !==
+        normalizePayeeClassification(updated.classification)
     if (
       existing.legalName !== updated.legalName ||
-      (existing.entityName ?? null) !== (updated.entityName ?? null)
+      (existing.entityName ?? null) !== (updated.entityName ?? null) ||
+      classChanged
     ) {
       await auditPayrollChange({
         actorUserId: input.actorUserId,
@@ -35,10 +53,12 @@ export async function upsertContractorProfile(input: {
         before: {
           legalName: existing.legalName,
           entityName: existing.entityName,
+          classification: existing.classification,
         },
         after: {
           legalName: updated.legalName,
           entityName: updated.entityName,
+          classification: updated.classification,
         },
       })
     }
@@ -50,7 +70,7 @@ export async function upsertContractorProfile(input: {
       userId: input.userId,
       legalName: input.legalName.trim(),
       entityName: input.entityName?.trim() || null,
-      classification: '1099',
+      classification,
     },
   })
   await auditPayrollChange({
@@ -58,7 +78,11 @@ export async function upsertContractorProfile(input: {
     entityType: 'ContractorProfile',
     entityId: created.id,
     label: `PAYROLL_CONTRACTOR_CREATE:${created.legalName}`,
-    after: { userId: created.userId, legalName: created.legalName },
+    after: {
+      userId: created.userId,
+      legalName: created.legalName,
+      classification: created.classification,
+    },
   })
   return created
 }

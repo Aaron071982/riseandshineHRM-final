@@ -209,6 +209,8 @@ export async function saveBcbaHoursSheetAction(input: {
   userId: string
   legalName: string
   entityName?: string | null
+  /** 1099 contractor vs W-2 employee (taxes withheld on stub). */
+  classification?: '1099' | 'W2'
   ratePerHour: number
   lines: { workDate: string; startClock: string; endClock: string }[]
 }): Promise<
@@ -234,6 +236,7 @@ export async function saveBcbaHoursSheetAction(input: {
       userId: user.id,
       legalName: input.legalName.trim() || user.name || user.email || 'BCBA',
       entityName: input.entityName?.trim() || null,
+      classification: input.classification ?? '1099',
       actorUserId: actor.id,
     })
 

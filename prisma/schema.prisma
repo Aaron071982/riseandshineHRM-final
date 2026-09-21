@@ -4369,12 +4369,13 @@ enum DeductionCode {
   OTHER
 }
 
-/// BCBA / clinical 1099 payee linked to a User.
+/// BCBA / clinical payee linked to a User (1099 contractor or W-2 employee).
 model ContractorProfile {
   id             String  @id @default(cuid())
   userId         String  @unique
   legalName      String
   entityName     String?
+  /// `1099` (default) or `W2` — drives stub tax withholdings.
   classification String  @default("1099")
   activeRateId   String? @unique
 

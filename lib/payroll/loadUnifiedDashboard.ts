@@ -6,6 +6,7 @@ import {
   estimatePlutusBilled,
   estimatePlutusFromHours,
 } from '@/lib/payroll/plutusEstimate'
+import { normalizePayeeClassification } from '@/lib/payroll/classification'
 import type { PayStatementStatus, PayeeType } from '@prisma/client'
 
 export type PayPeriodOption = {
@@ -21,6 +22,8 @@ export type UnifiedPayeeRow = {
   payeeType: PayeeType
   payeeName: string
   entityName: string | null
+  /** BCBA contractor classification; RBTs are always W2. */
+  classification: '1099' | 'W2'
   ratePerHour: number | null
   totalHours: number
   grossPay: number
@@ -63,6 +66,7 @@ export type UnifiedDashboardData = {
     userId: string
     legalName: string
     entityName: string | null
+    classification: '1099' | 'W2'
     ratePerHour: number | null
   }[]
   /** Portal BCBA users available for the hours sheet picker. */
@@ -73,6 +77,7 @@ export type UnifiedDashboardData = {
     contractorId: string | null
     legalName: string | null
     entityName: string | null
+    classification: '1099' | 'W2'
     ratePerHour: number | null
   }[]
   billing: {
@@ -210,6 +215,7 @@ export async function loadUnifiedDashboard(
         id: c.id,
         legalName: c.legalName,
         entityName: c.entityName,
+        classification: normalizePayeeClassification(c.classification),
         ratePerHour: c.activeRate ? Number(c.activeRate.ratePerHour) : null,
       },
     ])
@@ -229,6 +235,7 @@ export async function loadUnifiedDashboard(
       contractorId: c?.id ?? null,
       legalName: c?.legalName ?? u.name ?? null,
       entityName: c?.entityName ?? null,
+      classification: c?.classification ?? '1099',
       ratePerHour: c?.ratePerHour ?? null,
     })
   }
@@ -257,6 +264,7 @@ export async function loadUnifiedDashboard(
       contractorId: c?.id ?? null,
       legalName: c?.legalName ?? p.fullName,
       entityName: c?.entityName ?? null,
+      classification: c?.classification ?? '1099',
       ratePerHour: c?.ratePerHour ?? null,
     })
   }
@@ -271,6 +279,7 @@ export async function loadUnifiedDashboard(
       contractorId: c.id,
       legalName: c.legalName,
       entityName: c.entityName,
+      classification: normalizePayeeClassification(c.classification),
       ratePerHour: c.activeRate ? Number(c.activeRate.ratePerHour) : null,
     })
   }
@@ -286,6 +295,7 @@ export async function loadUnifiedDashboard(
         payeeType: 'BCBA',
         payeeName: s.contractor.legalName,
         entityName: s.contractor.entityName,
+        classification: normalizePayeeClassification(s.contractor.classification),
         ratePerHour: s.contractor.activeRate
           ? Number(s.contractor.activeRate.ratePerHour)
           : null,
@@ -306,6 +316,7 @@ export async function loadUnifiedDashboard(
       payeeType: 'RBT',
       payeeName: rbt ? `${rbt.firstName} ${rbt.lastName}` : 'Unknown RBT',
       entityName: null,
+      classification: 'W2',
       ratePerHour: rbt?.hourlyPayRate ?? null,
       totalHours: Number(s.totalHours),
       grossPay: Number(s.grossPay),
@@ -410,6 +421,7 @@ export async function loadUnifiedDashboard(
       userId: c.userId,
       legalName: c.legalName,
       entityName: c.entityName,
+      classification: normalizePayeeClassification(c.classification),
       ratePerHour: c.activeRate ? Number(c.activeRate.ratePerHour) : null,
     })),
     bcbaCandidates,
