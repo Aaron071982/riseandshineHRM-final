@@ -61,7 +61,7 @@ function linearIdx(stage: ClientStage | string): number {
 /** Past intake group (INQUIRY → BENEFITS). */
 export function isPortalIntakeDone(stage: ClientStage | string): boolean {
   const s = stage as ClientStage
-  if (STAGE_GROUP[s] === 'INTAKE') return false
+  if (s === 'WAITLIST' || STAGE_GROUP[s] === 'INTAKE') return false
   const idx = linearIdx(s)
   return idx >= 0
 }

@@ -19,6 +19,7 @@ export const CRM_ROLE_CHIP: Record<CrmRole, string> = {
 }
 
 export const STAGE_CHIP: Record<string, string> = {
+  WAITLIST: 'bg-[var(--stage-waitlist-bg)] text-[var(--stage-waitlist)]',
   INQUIRY: 'bg-[var(--line-2)] text-[var(--muted-ink)]',
   INTAKE: 'bg-[var(--sunrise-soft)] text-[var(--sunrise-dark)]',
   CLINICAL: 'bg-[var(--stage-clinical-bg)] text-[var(--stage-clinical)]',

@@ -19,6 +19,8 @@ export function caseloadQueueWhere(
   const exp60 = authExpiryBefore(60, now)
 
   switch (queue) {
+    case 'waitlist':
+      return { ...live, stage: 'WAITLIST' }
     case 'pipeline':
       return { ...live, stage: { in: [...PRE_ACTIVE_STAGES] } }
     case 'staffing':
@@ -153,7 +155,10 @@ export function caseloadQueueWhere(
 
 export function isClientStage(value: string): value is ClientStage {
   return (
-    PRE_ACTIVE_STAGES.includes(value as ClientStage) || value === 'ACTIVE'
+    value === 'WAITLIST' ||
+    PRE_ACTIVE_STAGES.includes(value as ClientStage) ||
+    value === 'ACTIVE' ||
+    value === 'TREATMENT_PLAN'
   )
 }
 

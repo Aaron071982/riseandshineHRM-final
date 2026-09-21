@@ -288,11 +288,11 @@ export async function previewStaffClientEmail(
   }
 ) {
   await assertCanSendStaffEmail(user, clientId)
-  assertTemplateAllowedForUser(user, input.template)
   const locale = normalizeEmailLocale(input.locale)
 
   const client = await loadStaffEmailMergeContext(clientId)
   if (!client) throw new Error('Client not found')
+  assertTemplateAllowedForUser(user, input.template, client.stage)
 
   assertRbtAssignmentForClient(client, input.rbtAssignmentId)
 
@@ -417,7 +417,6 @@ export async function sendStaffClientEmail(
   }
 ): Promise<StaffEmailSendResult> {
   await assertCanSendStaffEmail(user, clientId)
-  assertTemplateAllowedForUser(user, input.template)
   const locale = normalizeEmailLocale(input.locale)
 
   const mailboxReason = mailboxBlockedReason(user.email)
@@ -427,6 +426,7 @@ export async function sendStaffClientEmail(
 
   const client = await loadStaffEmailMergeContext(clientId)
   if (!client) throw new Error('Client not found')
+  assertTemplateAllowedForUser(user, input.template, client.stage)
 
   assertRbtAssignmentForClient(client, input.rbtAssignmentId)
 

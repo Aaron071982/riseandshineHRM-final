@@ -3,6 +3,7 @@ import { LINEAR_STAGE_ORDER } from '@/lib/crm/stages'
 
 /** Expected max days in each stage before the case is considered stalled. */
 export const STAGE_MAX_DAYS: Record<ClientStage, number> = {
+  WAITLIST: 9999,
   INQUIRY: 1,
   INTAKE: 3,
   CONSENT: 5,
@@ -65,7 +66,7 @@ const RBT_TARGET_STALL_STAGES: ReadonlySet<ClientStage> = new Set([
 
 /** True when days in stage exceed max, or RBT target date is past while still staffing. */
 export function isStalled(client: StageAgingClient, now = new Date()): boolean {
-  if (client.stage === 'ACTIVE') return false
+  if (client.stage === 'ACTIVE' || client.stage === 'WAITLIST') return false
   if (daysInStage(client) > STAGE_MAX_DAYS[client.stage]) return true
   if (
     client.rbtTargetDate &&

@@ -2849,6 +2849,8 @@ enum ServiceClientDocumentType {
 }
 
 enum ClientStage {
+  /// Parked — cannot serve yet; outside the linear intake→active pipeline.
+  WAITLIST
   INQUIRY
   INTAKE
   CONSENT
@@ -2995,6 +2997,8 @@ enum CommTemplate {
   /// Retired from compose UI; kept so prod `db push` does not drop the PG enum value.
   CC_INTRODUCTION
   CASE_COORDINATION_FORM
+  /// Parent notice when the family is placed on the waitlist (only template for WAITLIST stage).
+  WAITLIST_NOTICE
   MANUAL
 }
 

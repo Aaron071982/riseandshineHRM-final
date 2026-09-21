@@ -50,7 +50,9 @@ export async function GET(request: NextRequest) {
     const qw = caseloadQueueWhere(queue)
     if (qw) Object.assign(where, qw)
   }
-  if (group === 'pipeline') {
+  if (group === 'waitlist') {
+    Object.assign(where, caseloadQueueWhere('waitlist') ?? {})
+  } else if (group === 'pipeline') {
     Object.assign(where, caseloadQueueWhere('pipeline') ?? {})
   } else if (group === 'staffing') {
     Object.assign(where, caseloadQueueWhere('staffing') ?? {})

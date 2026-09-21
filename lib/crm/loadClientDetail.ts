@@ -10,7 +10,7 @@ import {
 } from '@/lib/crm/access'
 import { stageIndex } from '@/lib/crm/stages'
 import { hoursBetween } from '@/lib/rbt-schedule/utils'
-import { allowedTemplatesForUser } from '@/lib/crm/emails/templatePolicy'
+import { allowedTemplatesForClient } from '@/lib/crm/emails/templatePolicy'
 import { graphEmailEnabled, resolveDelegatedGraphToken } from '@/lib/crm/emails/graphSend'
 import { hasRiseAndShineMailbox, mailboxBlockedReason } from '@/lib/crm/emails/mailbox'
 import { ensureClientRequirements } from '@/lib/crm/ensureRequirements'
@@ -317,7 +317,7 @@ export async function loadClientCrmDetail(clientId: string) {
     canOverrideStage: user.fullAccess,
     stageNumber: stageIndex(client.stage) + 1,
     emailSend: {
-      allowedTemplates: allowedTemplatesForUser(user),
+      allowedTemplates: allowedTemplatesForClient(user, client.stage),
       canSend: canSendEmail,
       blockedReason: !claimed
         ? 'Claim this client or be assigned as case coordinator to send email.'

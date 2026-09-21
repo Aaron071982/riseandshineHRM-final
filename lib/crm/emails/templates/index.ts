@@ -11,6 +11,7 @@ import { renderRbtAssigned } from './rbtAssigned'
 import { renderReadyForStaffing } from './readyForStaffing'
 import { renderScheduleConfirmed } from './scheduleConfirmed'
 import { renderWelcome } from './welcome'
+import { renderWaitlistNotice } from './waitlistNotice'
 import { LEGACY_RENDERERS } from './legacy'
 import { RENDERERS_ES } from './es'
 import {
@@ -43,6 +44,7 @@ const RENDERERS: Partial<
   MEET_AND_GREET: renderMeetAndGreet,
   CASE_COORDINATION: renderCaseCoordination,
   BCBA_ASSIGNED: renderBcbaAssigned,
+  WAITLIST_NOTICE: renderWaitlistNotice,
   ...LEGACY_RENDERERS,
 }
 

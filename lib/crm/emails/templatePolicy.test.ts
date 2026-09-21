@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CrmRole } from '@prisma/client'
 import {
+  allowedTemplatesForClient,
   allowedTemplatesForUser,
   assertTemplateAllowedForUser,
   isTemplateAllowedForUser,
@@ -18,11 +19,12 @@ const clinical = { id: 'u4', email: 'd@riseandshineaba.com', crmRoles: ['CLINICA
 const full = { id: 'u5', email: 'admin@example.com', fullAccess: true, crmRoles: [] as CrmRole[] }
 
 describe('lib/crm/emails/templatePolicy', () => {
-  it('INTAKE sees welcome, consent, and docs', () => {
+  it('INTAKE sees welcome, consent, docs, and waitlist notice', () => {
     expect(templatesForRoles(['INTAKE'])).toEqual([
       'WELCOME',
       'CONSENT_REQUEST',
       'DOCS_NEEDED',
+      'WAITLIST_NOTICE',
     ])
     expect(isTemplateAllowedForUser(intake, 'WELCOME')).toBe(true)
     expect(isTemplateAllowedForUser(intake, 'RBT_ASSIGNED')).toBe(false)
@@ -58,9 +60,24 @@ describe('lib/crm/emails/templatePolicy', () => {
     expect(isTemplateAllowedForUser(full, 'MANUAL')).toBe(true)
   })
 
+  it('waitlist clients only get WAITLIST_NOTICE', () => {
+    expect(allowedTemplatesForClient(full, 'WAITLIST')).toEqual(['WAITLIST_NOTICE'])
+    expect(allowedTemplatesForClient(intake, 'WAITLIST')).toEqual(['WAITLIST_NOTICE'])
+    expect(isTemplateAllowedForUser(full, 'WELCOME', 'WAITLIST')).toBe(false)
+    expect(isTemplateAllowedForUser(full, 'WAITLIST_NOTICE', 'WAITLIST')).toBe(true)
+  })
+
+  it('non-waitlist clients do not see WAITLIST_NOTICE in the compose list', () => {
+    expect(allowedTemplatesForClient(full, 'INQUIRY')).not.toContain('WAITLIST_NOTICE')
+    expect(allowedTemplatesForClient(intake, 'INQUIRY')).not.toContain('WAITLIST_NOTICE')
+  })
+
   it('assertTemplateAllowedForUser throws for disallowed template', () => {
     expect(() => assertTemplateAllowedForUser(intake, 'RBT_ASSIGNED')).toThrow(
       /not permitted/
+    )
+    expect(() => assertTemplateAllowedForUser(full, 'WELCOME', 'WAITLIST')).toThrow(
+      /Waitlist clients/
     )
   })
 })

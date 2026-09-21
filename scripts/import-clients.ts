@@ -112,7 +112,7 @@ function mapStatus(raw: string): {
   }
   if (s === 'waitlist') {
     return {
-      stage: 'INQUIRY',
+      stage: 'WAITLIST',
       pipelineStatus: 'LIVE',
       legacyStatus: 'NEW',
     }

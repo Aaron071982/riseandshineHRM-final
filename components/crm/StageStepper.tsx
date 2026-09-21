@@ -1,6 +1,7 @@
 import {
   LINEAR_STAGE_ORDER,
   OWNER_DEPT_LABELS,
+  SETTABLE_STAGE_ORDER,
   STAGE_DEFAULT_OWNER_DEPT,
   STAGE_DESCRIPTIONS,
   STAGE_GROUP,
@@ -34,10 +35,14 @@ export function StageStepper({
   fullAccess: boolean
   onSetStage: (to: ClientStage) => void
 }) {
+  const onWaitlist = stage === 'WAITLIST'
   const displayStage =
     stage === 'TREATMENT_PLAN' ? ('ASSESSMENT' as ClientStage) : stage
-  const currentIdx = LINEAR_STAGE_ORDER.indexOf(displayStage)
+  const currentIdx = onWaitlist ? -1 : LINEAR_STAGE_ORDER.indexOf(displayStage)
   const group = STAGE_GROUP[stage]
+  const canAdvance =
+    canEdit &&
+    (onWaitlist || (currentIdx >= 0 && currentIdx < LINEAR_STAGE_ORDER.length - 1))
 
   return (
     <section className="rounded-xl border border-line bg-surface p-4 md:p-5">
@@ -61,10 +66,10 @@ export function StageStepper({
               Jump to
               <select
                 className="h-9 rounded-lg border border-line bg-surface px-2 text-sm text-ink focus:outline-none focus:ring-4 focus:ring-[var(--brand-ring)]"
-                value={stage}
+                value={stage === 'TREATMENT_PLAN' ? 'ASSESSMENT' : stage}
                 onChange={(e) => onSetStage(e.target.value as ClientStage)}
               >
-                {LINEAR_STAGE_ORDER.map((s) => (
+                {SETTABLE_STAGE_ORDER.map((s) => (
                   <option key={s} value={s}>
                     {STAGE_LABELS[s]}
                   </option>
@@ -72,58 +77,69 @@ export function StageStepper({
               </select>
             </label>
           )}
-          {canEdit && currentIdx < LINEAR_STAGE_ORDER.length - 1 && (
+          {canAdvance && (
             <button
               type="button"
               disabled={advancing}
               onClick={onAdvance}
               className="inline-flex h-9 items-center rounded-lg bg-brand px-3.5 text-sm font-medium text-white hover:bg-brand-2 disabled:opacity-50"
             >
-              {advancing ? 'Advancing…' : 'Advance stage'}
+              {advancing
+                ? 'Advancing…'
+                : onWaitlist
+                  ? 'Move to Inquiry'
+                  : 'Advance stage'}
             </button>
           )}
         </div>
       </div>
 
-      <ol className="flex gap-1 overflow-x-auto pb-1">
-        {LINEAR_STAGE_ORDER.map((s, i) => {
-          const done = i < currentIdx
-          const current = i === currentIdx
-          const dept = STAGE_DEFAULT_OWNER_DEPT[s]
-          return (
-            <li
-              key={s}
-              className={cn(
-                'min-w-[4.5rem] flex-1 rounded-lg border px-1.5 py-2 text-center',
-                current &&
-                  'border-brand bg-[color-mix(in_srgb,var(--brand)_8%,white)] ring-4 ring-[var(--brand-ring)]',
-                done && 'border-line bg-line-2',
-                !done && !current && 'border-line bg-surface opacity-60'
-              )}
-              title={`${STAGE_LABELS[s]} · ${OWNER_DEPT_LABELS[dept]}\n${STAGE_DESCRIPTIONS[s]}`}
-            >
-              <div
+      {onWaitlist ? (
+        <div className="rounded-lg border border-[color-mix(in_srgb,var(--stage-waitlist)_30%,transparent)] bg-[var(--stage-waitlist-bg)] px-4 py-3 text-sm text-[var(--stage-waitlist)]">
+          This family is on the waitlist and is not in the active pipeline. Send the waitlist
+          notice email, then move them to Inquiry when you can serve them.
+        </div>
+      ) : (
+        <ol className="flex gap-1 overflow-x-auto pb-1">
+          {LINEAR_STAGE_ORDER.map((s, i) => {
+            const done = i < currentIdx
+            const current = i === currentIdx
+            const dept = STAGE_DEFAULT_OWNER_DEPT[s]
+            return (
+              <li
+                key={s}
                 className={cn(
-                  'mx-auto mb-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums',
-                  current && 'bg-brand text-white',
-                  done && 'bg-[var(--green)] text-white',
-                  !done && !current && 'bg-line text-quiet'
+                  'min-w-[4.5rem] flex-1 rounded-lg border px-1.5 py-2 text-center',
+                  current &&
+                    'border-brand bg-[color-mix(in_srgb,var(--brand)_8%,white)] ring-4 ring-[var(--brand-ring)]',
+                  done && 'border-line bg-line-2',
+                  !done && !current && 'border-line bg-surface opacity-60'
                 )}
+                title={`${STAGE_LABELS[s]} · ${OWNER_DEPT_LABELS[dept]}\n${STAGE_DESCRIPTIONS[s]}`}
               >
-                {done ? '✓' : i + 1}
-              </div>
-              <div
-                className={cn(
-                  'truncate text-[10px] font-medium leading-tight',
-                  current ? 'text-ink' : 'text-quiet'
-                )}
-              >
-                {STAGE_LABELS[s]}
-              </div>
-            </li>
-          )
-        })}
-      </ol>
+                <div
+                  className={cn(
+                    'mx-auto mb-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums',
+                    current && 'bg-brand text-white',
+                    done && 'bg-[var(--green)] text-white',
+                    !done && !current && 'bg-line text-quiet'
+                  )}
+                >
+                  {done ? '✓' : i + 1}
+                </div>
+                <div
+                  className={cn(
+                    'truncate text-[10px] font-medium leading-tight',
+                    current ? 'text-ink' : 'text-quiet'
+                  )}
+                >
+                  {STAGE_LABELS[s]}
+                </div>
+              </li>
+            )
+          })}
+        </ol>
+      )}
     </section>
   )
 }

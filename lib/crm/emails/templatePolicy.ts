@@ -1,4 +1,4 @@
-import type { CommTemplate, CrmRole } from '@prisma/client'
+import type { ClientStage, CommTemplate, CrmRole } from '@prisma/client'
 import { CrmAccessError, isFullAccess, getUserCrmRoles, type CrmAccessSubject } from '@/lib/crm/access'
 
 /** Human-composed staff email templates (excludes journey-only INQUIRY_ACK / SERVICES_STARTED). */
@@ -16,11 +16,15 @@ export const STAFF_EMAIL_TEMPLATES: CommTemplate[] = [
   'CASE_COORDINATION',
   'BCBA_ASSIGNED',
   'CASE_COORDINATION_FORM',
+  'WAITLIST_NOTICE',
   'MANUAL',
 ]
 
+/** Sole template available while a client is on WAITLIST. */
+export const WAITLIST_ONLY_TEMPLATES: CommTemplate[] = ['WAITLIST_NOTICE']
+
 const ROLE_TEMPLATES: Partial<Record<CrmRole, CommTemplate[]>> = {
-  INTAKE: ['WELCOME', 'CONSENT_REQUEST', 'DOCS_NEEDED'],
+  INTAKE: ['WELCOME', 'CONSENT_REQUEST', 'DOCS_NEEDED', 'WAITLIST_NOTICE'],
   BILLING: ['BENEFITS_UPDATE', 'AUTH_APPROVED'],
   AUTHORIZATION: ['BENEFITS_UPDATE', 'AUTH_APPROVED'],
   CLINICAL: ['ASSESSMENT_SCHEDULED', 'BCBA_ASSIGNED'],
@@ -31,6 +35,7 @@ const ROLE_TEMPLATES: Partial<Record<CrmRole, CommTemplate[]>> = {
     'BCBA_ASSIGNED',
     'SCHEDULE_CONFIRMED',
     'RBT_ASSIGNED',
+    'WAITLIST_NOTICE',
   ],
 }
 
@@ -47,20 +52,42 @@ export function allowedTemplatesForUser(user: CrmAccessSubject): CommTemplate[] 
   return templatesForRoles(getUserCrmRoles(user))
 }
 
+/**
+ * Templates offered on a specific client. Waitlist clients only get the
+ * waitlist notice — no intake/welcome/manual compose options.
+ */
+export function allowedTemplatesForClient(
+  user: CrmAccessSubject,
+  stage: ClientStage | null | undefined
+): CommTemplate[] {
+  if (stage === 'WAITLIST') return [...WAITLIST_ONLY_TEMPLATES]
+  return allowedTemplatesForUser(user).filter((t) => t !== 'WAITLIST_NOTICE')
+}
+
 export function isTemplateAllowedForUser(
   user: CrmAccessSubject,
-  template: CommTemplate
+  template: CommTemplate,
+  stage?: ClientStage | null
 ): boolean {
+  if (stage === 'WAITLIST') {
+    return WAITLIST_ONLY_TEMPLATES.includes(template)
+  }
+  if (template === 'WAITLIST_NOTICE') {
+    return allowedTemplatesForUser(user).includes(template)
+  }
   return allowedTemplatesForUser(user).includes(template)
 }
 
 export function assertTemplateAllowedForUser(
   user: CrmAccessSubject,
-  template: CommTemplate
+  template: CommTemplate,
+  stage?: ClientStage | null
 ): void {
-  if (!isTemplateAllowedForUser(user, template)) {
+  if (!isTemplateAllowedForUser(user, template, stage)) {
     throw new CrmAccessError(
-      `Your role is not permitted to send the ${template} template`,
+      stage === 'WAITLIST'
+        ? 'Waitlist clients may only receive the waitlist notice email'
+        : `Your role is not permitted to send the ${template} template`,
       403
     )
   }

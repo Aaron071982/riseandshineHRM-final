@@ -24,6 +24,7 @@ export async function loadStaffEmailMergeContext(clientId: string) {
       firstName: true,
       lastName: true,
       dateOfBirth: true,
+      stage: true,
       parentName: true,
       parentEmail: true,
       parentPhone: true,

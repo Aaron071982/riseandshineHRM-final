@@ -16,6 +16,7 @@ export function staffTemplateLabel(template: CommTemplate): string {
     CASE_COORDINATION: 'Case coordination (team)',
     BCBA_ASSIGNED: 'BCBA case assignment',
     CASE_COORDINATION_FORM: 'Case coordination form (legacy)',
+    WAITLIST_NOTICE: 'Waitlist notice',
     MANUAL: 'Manual / freeform',
     INQUIRY_ACK: 'Inquiry acknowledgment',
     SERVICES_STARTED: 'Services started',

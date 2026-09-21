@@ -36,6 +36,8 @@ export type CaseloadRow = {
 }
 
 const STAGE_TONE: Record<string, string> = {
+  WAITLIST:
+    'bg-[var(--stage-waitlist-bg)] text-[var(--stage-waitlist)] ring-1 ring-[color-mix(in_srgb,var(--stage-waitlist)_35%,transparent)]',
   INTAKE:
     'bg-[var(--stage-intake-bg)] text-[var(--stage-intake)] ring-1 ring-[color-mix(in_srgb,var(--stage-intake)_35%,transparent)]',
   CLINICAL_AUTH:
@@ -50,6 +52,7 @@ const STAGE_TONE: Record<string, string> = {
 
 const GROUPS = [
   { id: 'all', label: 'All' },
+  { id: 'waitlist', label: 'Waitlist' },
   { id: 'pipeline', label: 'Pipeline' },
   { id: 'staffing', label: 'Staffing' },
   { id: 'active', label: 'Active' },
@@ -67,6 +70,7 @@ const DEPT_QUEUES = [
 const COLLAPSE_STORAGE_KEY = 'caseload-collapsed-stages'
 
 function stageSortIndex(stage: ClientStage): number {
+  if (stage === 'WAITLIST') return -1
   if (stage === 'TREATMENT_PLAN') {
     return LINEAR_STAGE_ORDER.indexOf('ASSESSMENT') + 0.5
   }

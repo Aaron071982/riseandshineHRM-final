@@ -13,6 +13,7 @@ import type {
 
 /** Hex colors aligned with CRM stage-group accents in globals.css */
 export const CLIENT_STAGE_GROUP_HEX: Record<StageGroupId, string> = {
+  WAITLIST: '#6b7280',
   INTAKE: '#2a6ae0',
   CLINICAL_AUTH: '#7c3aed',
   STAFFING: '#e85a1c',

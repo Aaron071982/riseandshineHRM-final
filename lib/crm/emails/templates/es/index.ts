@@ -3,6 +3,7 @@ import type { StaffEmailContent, StaffMergeFields } from '../types'
 import { renderCaseCoordinationEs } from './caseCoordination'
 import { renderMeetAndGreetEs } from './meetAndGreet'
 import { renderBcbaAssigned } from '../bcbaAssigned'
+import { renderWaitlistNoticeEs } from './waitlistNotice'
 import {
   LEGACY_RENDERERS_ES,
   renderAssessmentScheduledEs,
@@ -32,5 +33,6 @@ export const RENDERERS_ES: Partial<
   CASE_COORDINATION: renderCaseCoordinationEs,
   /** Internal BCBA notice — English copy is the source of truth. */
   BCBA_ASSIGNED: renderBcbaAssigned,
+  WAITLIST_NOTICE: renderWaitlistNoticeEs,
   ...LEGACY_RENDERERS_ES,
 }

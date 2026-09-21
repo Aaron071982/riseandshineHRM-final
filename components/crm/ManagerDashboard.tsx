@@ -17,6 +17,7 @@ function caseloadHref(params: Record<string, string>) {
 }
 
 const GROUP_BAR: Record<string, string> = {
+  WAITLIST: 'bg-[var(--stage-waitlist)]',
   INTAKE: 'bg-[var(--stage-intake)]',
   CLINICAL_AUTH: 'bg-[var(--stage-clinical)]',
   STAFFING: 'bg-[var(--stage-staffing)]',

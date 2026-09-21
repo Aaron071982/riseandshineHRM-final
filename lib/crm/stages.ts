@@ -6,10 +6,12 @@ import type {
 } from '@prisma/client'
 
 /**
- * Full enum order (16 values). TREATMENT_PLAN remains in the enum for
- * history / legacy rows but is a parallel clinical track — not linear.
+ * Full enum order (17 values). WAITLIST sits before Inquiry but is a
+ * side lane (not in the linear funnel). TREATMENT_PLAN remains in the enum
+ * for history / legacy rows but is a parallel clinical track — not linear.
  */
 export const CLIENT_STAGE_ORDER: readonly ClientStage[] = [
+  'WAITLIST',
   'INQUIRY',
   'INTAKE',
   'CONSENT',
@@ -30,7 +32,7 @@ export const CLIENT_STAGE_ORDER: readonly ClientStage[] = [
 
 /**
  * Linear pipeline for advance / funnel / stepper.
- * Skips TREATMENT_PLAN (parallel milestone).
+ * Skips WAITLIST (side lane) and TREATMENT_PLAN (parallel milestone).
  */
 export const LINEAR_STAGE_ORDER: readonly ClientStage[] = [
   'INQUIRY',
@@ -50,7 +52,17 @@ export const LINEAR_STAGE_ORDER: readonly ClientStage[] = [
   'ACTIVE',
 ] as const
 
+/**
+ * Stages available in the full-access "Jump to" control.
+ * Waitlist is first so families can be parked outside the pipeline.
+ */
+export const SETTABLE_STAGE_ORDER: readonly ClientStage[] = [
+  'WAITLIST',
+  ...LINEAR_STAGE_ORDER,
+] as const
+
 export type StageGroupId =
+  | 'WAITLIST'
   | 'INTAKE'
   | 'CLINICAL_AUTH'
   | 'STAFFING'
@@ -58,6 +70,7 @@ export type StageGroupId =
   | 'ACTIVE'
 
 export const STAGE_GROUP_LABELS: Record<StageGroupId, string> = {
+  WAITLIST: 'Waitlist',
   INTAKE: 'Intake',
   CLINICAL_AUTH: 'Clinical / Auth',
   STAFFING: 'Staffing',
@@ -66,6 +79,7 @@ export const STAGE_GROUP_LABELS: Record<StageGroupId, string> = {
 }
 
 export const STAGE_GROUP: Record<ClientStage, StageGroupId> = {
+  WAITLIST: 'WAITLIST',
   INQUIRY: 'INTAKE',
   INTAKE: 'INTAKE',
   CONSENT: 'INTAKE',
@@ -86,6 +100,7 @@ export const STAGE_GROUP: Record<ClientStage, StageGroupId> = {
 
 /** Stages belonging to each display group (linear only; TP is parallel). */
 export const STAGE_GROUP_STAGES: Record<StageGroupId, readonly ClientStage[]> = {
+  WAITLIST: ['WAITLIST'],
   INTAKE: ['INQUIRY', 'INTAKE', 'CONSENT', 'DOCUMENTS', 'BENEFITS'],
   CLINICAL_AUTH: ['ASSESSMENT', 'AUTHORIZATION', 'APPROVED'],
   STAFFING: ['READY_FOR_STAFFING', 'RBT_SEARCH', 'RBT_ASSIGNED'],
@@ -95,6 +110,7 @@ export const STAGE_GROUP_STAGES: Record<StageGroupId, readonly ClientStage[]> = 
 
 /** Default owning department per stage. */
 export const STAGE_DEFAULT_OWNER_DEPT: Record<ClientStage, ClientOwnerDept> = {
+  WAITLIST: 'INTAKE',
   INQUIRY: 'INTAKE',
   INTAKE: 'INTAKE',
   CONSENT: 'INTAKE',
@@ -128,6 +144,7 @@ export function canonicalOwnerDeptForStage(
  * TREATMENT_PLAN stage keys are legacy; the parallel milestone uses treatmentPlanStatus.
  */
 export const STAGE_GATE_REQUIREMENT_KEYS: Record<ClientStage, readonly string[]> = {
+  WAITLIST: [],
   INQUIRY: ['parent_contacted', 'inquiry_ack_sent'],
   INTAKE: ['intake_packet_complete', 'demographics_complete'],
   CONSENT: ['consent_form', 'hipaa_ack'],
@@ -163,6 +180,7 @@ export { STANDARD_DOCUMENT_REQUIREMENT_KEYS } from '@/lib/crm/documents'
 
 /** Display labels for pipeline stages. */
 export const STAGE_LABELS: Record<ClientStage, string> = {
+  WAITLIST: 'Waitlist',
   INQUIRY: 'Inquiry',
   INTAKE: 'Intake',
   CONSENT: 'Consent',
@@ -183,6 +201,8 @@ export const STAGE_LABELS: Record<ClientStage, string> = {
 
 /** Plain-language stage descriptions for funnel / stepper (new-hire friendly). */
 export const STAGE_DESCRIPTIONS: Record<ClientStage, string> = {
+  WAITLIST:
+    'Family is parked outside the active pipeline — we cannot offer services right now. Send the waitlist notice email, then move them to Inquiry when capacity opens.',
   INQUIRY:
     'A new family has reached out. Intake owns first contact and acknowledgment; advance once the parent has been reached and the inquiry ack is logged.',
   INTAKE:
@@ -361,6 +381,7 @@ export function canAdvance(
 }
 
 export function stageIndex(stage: ClientStage): number {
+  if (stage === 'WAITLIST') return -1
   const linear = LINEAR_STAGE_ORDER.indexOf(stage)
   if (linear >= 0) return linear
   // Legacy TREATMENT_PLAN rows: treat as between Assessment and Authorization
@@ -371,6 +392,7 @@ export function stageIndex(stage: ClientStage): number {
 }
 
 export function nextStage(stage: ClientStage): ClientStage | null {
+  if (stage === 'WAITLIST') return 'INQUIRY'
   let from = stage
   if (from === 'TREATMENT_PLAN') from = 'ASSESSMENT'
   const i = LINEAR_STAGE_ORDER.indexOf(from)

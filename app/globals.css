@@ -62,6 +62,8 @@
     --blue-bg: #e3edfb;
 
     /* Stage-group accents (~20% more saturated for funnel / caseload) */
+    --stage-waitlist: #6b7280;
+    --stage-waitlist-bg: #eef0f3;
     --stage-intake: #2a6ae0;
     --stage-intake-bg: #dce9fc;
     --stage-clinical: #7c3aed;
