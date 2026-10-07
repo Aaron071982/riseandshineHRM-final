@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowRightLeft, ExternalLink, Loader2, Plus, X } from 'lucide-react'
+import { ArrowRightLeft, ExternalLink, Loader2, MapPin, Pause, Play, Plus, X } from 'lucide-react'
+import { useScheduleMutations } from '../scheduleMutations'
 import type { ScheduleSlot } from '@/lib/schedule/types'
 import { DAYS, DAY_FULL, fmtH, type Day } from '@/lib/schedule/utils'
 import {
@@ -32,6 +33,49 @@ type SlotHandlers = {
 }
 
 const rowKey = (s: ScheduleSlot) => `${s.id}:${s.day}:${s.startMin}:${s.endMin}`
+
+function AddressLine({ address, label }: { address: string | null | undefined; label?: string }) {
+  return (
+    <p className="flex items-start gap-1.5 text-[12px] text-[var(--muted-ink)]">
+      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span>
+        {label && <span className="font-medium text-[var(--espresso)]">{label}: </span>}
+        {address ? (
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-[var(--brand)] hover:underline"
+          >
+            {address}
+          </a>
+        ) : (
+          'No address on file'
+        )}
+      </span>
+    </p>
+  )
+}
+
+function ScenarioPauseButton({ clientId, onToggle }: { clientId: string; onToggle: () => Promise<void> }) {
+  const { isClientPaused } = useScheduleMutations()
+  const [busy, setBusy] = useState(false)
+  const paused = isClientPaused?.(clientId) ?? false
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true)
+        void onToggle().finally(() => setBusy(false))
+      }}
+      className="flex h-8 w-fit items-center gap-1 rounded-lg border border-[var(--line)] px-3 text-[12.5px] font-medium text-[var(--espresso)] hover:bg-[var(--line-2)] disabled:opacity-50"
+    >
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+      {paused ? 'Resume in this scenario' : 'Pause in this scenario'}
+    </button>
+  )
+}
 
 function SlotList({
   slots,
@@ -163,6 +207,7 @@ export default function ConstellationPanel({
   onTargetSaved: (row: TherapistCapacityRow) => void
   onRequestMove: (opts: { clientId: string; fromTherapistId: string; toTherapistId: string }) => void
 }) {
+  const mutations = useScheduleMutations()
   const clientName = (id: string) => model.clients.get(id)?.client.name ?? 'Client'
   const therapistName = (id: string) => model.therapists.get(id)?.therapist.name ?? 'Therapist'
 
@@ -176,6 +221,7 @@ export default function ConstellationPanel({
     const slots = tm.pairKeys.flatMap((k) => model.pairs.get(k)?.slots ?? [])
     body = (
       <>
+        <AddressLine address={tm.therapist.address} />
         <section className="space-y-2">
           <CapacityMeter hours={tm.hours} target={tm.target.hours} size="lg" />
           <p className="text-[12px] font-medium" style={{ color: BAND_META[tm.band].color }}>
@@ -219,6 +265,11 @@ export default function ConstellationPanel({
     if (!pair) return null
     heading = `${therapistName(pair.therapistId)} ↔ ${clientName(pair.clientId)}`
     body = (
+      <>
+      <section className="space-y-1">
+        <AddressLine label={therapistName(pair.therapistId)} address={model.therapists.get(pair.therapistId)?.therapist.address} />
+        <AddressLine label={clientName(pair.clientId)} address={model.clients.get(pair.clientId)?.client.address} />
+      </section>
       <PairSection
         pair={pair}
         model={model}
@@ -228,6 +279,7 @@ export default function ConstellationPanel({
         handlers={handlers}
         titleFor={() => clientName(pair.clientId)}
       />
+      </>
     )
   } else {
     const cm = model.clients.get(selection.id)
@@ -236,8 +288,10 @@ export default function ConstellationPanel({
     body = (
       <>
         <section className="space-y-1 text-[12px] text-[var(--muted-ink)]">
+          <AddressLine address={cm.client.address} />
           <p>
             {cm.client.code ?? 'No code'} · {cm.client.borough ?? 'Borough unset'}
+            {cm.client.insurance && ` · ${cm.client.insurance}`}
           </p>
           <p>
             <span className="font-semibold tabular-nums text-[var(--espresso)]">{fmtH(cm.hours)} hrs/wk</span>
@@ -252,6 +306,16 @@ export default function ConstellationPanel({
         >
           <Plus className="h-3.5 w-3.5" /> Add session
         </button>
+        {mutations.sandbox && mutations.pauseClient && mutations.resumeClient && (
+          <ScenarioPauseButton
+            clientId={cm.client.id}
+            onToggle={() =>
+              mutations.isClientPaused?.(cm.client.id)
+                ? mutations.resumeClient!(cm.client.id)
+                : mutations.pauseClient!(cm.client)
+            }
+          />
+        )}
         {cm.therapistIds.map((tid) => {
           const pair = model.pairs.get(pairKey(tid, cm.client.id))
           if (!pair) return null

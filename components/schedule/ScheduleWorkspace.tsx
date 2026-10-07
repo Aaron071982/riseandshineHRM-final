@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useCallback, useEffect } from 'react'
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type {
@@ -21,6 +21,32 @@ import ClientHoursPanel from './ClientHoursPanel'
 import SessionEditor from './SessionEditor'
 import ManageDialog from './ManageDialog'
 import ConstellationView from './constellation/ConstellationView'
+import ScenarioBar from './ScenarioBar'
+import {
+  ScheduleMutationsContext,
+  liveScheduleMutations,
+  type ScheduleMutations,
+} from './scheduleMutations'
+import {
+  SCENARIO_SLOT_PREFIX,
+  applyScenario,
+  pausedClientMatcher,
+  scenarioCreateSlot,
+  scenarioDeleteSlot,
+  scenarioPauseClient,
+  scenarioResumeClient,
+  scenarioUpdateSlot,
+  summarizeSchedule,
+  type ScenarioChanges,
+  type ScenarioSlotEdit,
+} from '@/lib/schedule/scenario'
+import {
+  createScheduleScenario,
+  deleteScheduleScenario,
+  listScheduleScenarios,
+  updateScheduleScenario,
+  type ScheduleScenarioDto,
+} from '@/lib/schedule/scenarioActions'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Trash2, Upload } from 'lucide-react'
 
@@ -28,6 +54,26 @@ type EditorState =
   | { mode: 'closed' }
   | { mode: 'create'; defaults?: Partial<ScheduleSlot> }
   | { mode: 'edit'; slot: ScheduleSlot }
+
+const ACTIVE_SCENARIO_KEY = 'schedule-active-scenario'
+
+const EDIT_KEYS = [
+  'therapistId',
+  'clientId',
+  'day',
+  'startMin',
+  'endMin',
+  'status',
+  'note',
+  'placeOfService',
+  'procedureCode',
+] as const
+
+function pickSlotEdit(patch: Record<string, unknown>): ScenarioSlotEdit {
+  const edit: Record<string, unknown> = {}
+  for (const k of EDIT_KEYS) if (patch[k] !== undefined) edit[k] = patch[k]
+  return edit as ScenarioSlotEdit
+}
 
 type InitialData = ScheduleWorkspaceData & {
   periodStart?: string | null
@@ -40,10 +86,12 @@ export default function ScheduleWorkspace({
   initial,
   periods = [],
   initialBorough = '',
+  canUseScenarios = false,
 }: {
   initial: InitialData
   periods?: SchedulePeriod[]
   initialBorough?: string
+  canUseScenarios?: boolean
 }) {
   const { showToast } = useToast()
   const router = useRouter()
@@ -64,10 +112,172 @@ export default function ScheduleWorkspace({
   const [editor, setEditor] = useState<EditorState>({ mode: 'closed' })
   const [manageOpen, setManageOpen] = useState(false)
   const [deletingPeriod, setDeletingPeriod] = useState(false)
+  const [scenarios, setScenarios] = useState<ScheduleScenarioDto[]>([])
+  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!canUseScenarios) return
+    listScheduleScenarios()
+      .then((rows) => {
+        setScenarios(rows)
+        try {
+          const saved = localStorage.getItem(ACTIVE_SCENARIO_KEY)
+          if (saved && rows.some((r) => r.id === saved)) setActiveScenarioId(saved)
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => showToast('Could not load scenarios', 'error'))
+  }, [canUseScenarios]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectScenario = useCallback((id: string | null) => {
+    setActiveScenarioId(id)
+    try {
+      if (id) localStorage.setItem(ACTIVE_SCENARIO_KEY, id)
+      else localStorage.removeItem(ACTIVE_SCENARIO_KEY)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const activeScenario = scenarios.find((s) => s.id === activeScenarioId) ?? null
+
+  const scenarioSlots = useMemo(
+    () => (activeScenario ? applyScenario(slots, clients, activeScenario.changes) : slots),
+    [activeScenario, slots, clients]
+  )
+
+  const scenarioClients = useMemo(() => {
+    if (!activeScenario) return clients
+    const withSlots = new Set(scenarioSlots.filter((s) => s.status !== 'CANCELLED').map((s) => s.clientId))
+    return clients.map((c) => (c.active === withSlots.has(c.id) ? c : { ...c, active: withSlots.has(c.id) }))
+  }, [activeScenario, scenarioSlots, clients])
+
+  const mainSummary = useMemo(() => summarizeSchedule(slots, clients), [slots, clients])
+  const activeSummary = useMemo(
+    () => (activeScenario ? summarizeSchedule(scenarioSlots, clients) : null),
+    [activeScenario, scenarioSlots, clients]
+  )
+
+  const latest = useRef<{ slots: ScheduleSlot[]; changes: ScenarioChanges | null }>({ slots, changes: null })
+  latest.current.slots = slots
+  latest.current.changes = activeScenario?.changes ?? null
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve())
+
+  const commitScenario = useCallback((id: string, next: ScenarioChanges) => {
+    latest.current.changes = next
+    setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, changes: next } : s)))
+    const save = saveQueue.current.then(() => updateScheduleScenario(id, { changes: next }))
+    saveQueue.current = save.catch(() => undefined)
+    return save.then(() => undefined)
+  }, [])
+
+  const mutations: ScheduleMutations = useMemo(() => {
+    if (!activeScenarioId) return liveScheduleMutations
+    const id = activeScenarioId
+    const changesNow = () => latest.current.changes ?? { pausedClients: [], removedSlotIds: [], slotEdits: {}, addedSlots: [] }
+    const currentSlot = (slotId: string) => {
+      const c = changesNow()
+      if (slotId.startsWith(SCENARIO_SLOT_PREFIX)) return c.addedSlots.find((s) => s.id === slotId)
+      const base = latest.current.slots.find((s) => s.id === slotId)
+      return base ? { ...base, ...c.slotEdits[slotId] } : undefined
+    }
+    const update = (c: ScenarioChanges, slotId: string, patch: Record<string, unknown>) => {
+      const cur = currentSlot(slotId)
+      if (!cur) throw new Error('Session not found')
+      return scenarioUpdateSlot(c, cur, pickSlotEdit(patch))
+    }
+    return {
+      sandbox: true,
+      createSlot: async (input) => {
+        const edit = pickSlotEdit(input)
+        const { changes, slot } = scenarioCreateSlot(
+          changesNow(),
+          {
+            therapistId: String(edit.therapistId ?? ''),
+            clientId: String(edit.clientId ?? ''),
+            day: edit.day ?? 'MON',
+            startMin: edit.startMin ?? 840,
+            endMin: edit.endMin ?? 1080,
+            status: edit.status ?? 'CONFIRMED',
+            procedureCode: edit.procedureCode ?? '97153',
+            placeOfService: edit.placeOfService ?? '12-Home',
+            note: edit.note ?? null,
+          },
+          crypto.randomUUID()
+        )
+        await commitScenario(id, changes)
+        return slot
+      },
+      updateSlot: async (slotId, patch) => {
+        const { changes, slot } = update(changesNow(), slotId, patch)
+        await commitScenario(id, changes)
+        return slot
+      },
+      deleteSlot: async (slotId) => {
+        await commitScenario(id, scenarioDeleteSlot(changesNow(), slotId))
+      },
+      bulkUpdateSlots: async (ids, patch) => {
+        let c = changesNow()
+        for (const slotId of ids) c = update(c, slotId, patch).changes
+        await commitScenario(id, c)
+      },
+      bulkDeleteSlots: async (ids) => {
+        await commitScenario(id, ids.reduce(scenarioDeleteSlot, changesNow()))
+      },
+      pauseClient: async (client) => {
+        await commitScenario(id, scenarioPauseClient(changesNow(), { id: client.id, name: client.name }))
+      },
+      resumeClient: async (clientId) => {
+        await commitScenario(id, scenarioResumeClient(changesNow(), clientId))
+      },
+      isClientPaused: (clientId) => pausedClientMatcher(changesNow(), clients)(clientId),
+    }
+  }, [activeScenarioId, commitScenario, clients])
+
+  const runScenarioAction = async (fn: () => Promise<void>, ok?: string) => {
+    try {
+      await fn()
+      if (ok) showToast(ok, 'success')
+    } catch (e) {
+      showToast(e instanceof Error && e.message === 'FORBIDDEN' ? 'Not allowed' : 'Could not save scenario', 'error')
+    }
+  }
+
+  const createScenario = (copyFromId?: string) => {
+    const base = copyFromId ? scenarios.find((s) => s.id === copyFromId)?.name : null
+    const name = prompt('Scenario name', base ? `${base} (copy)` : 'New scenario')?.trim()
+    if (!name) return
+    void runScenarioAction(async () => {
+      const row = await createScheduleScenario({ name, copyFromId })
+      setScenarios((prev) => [...prev, row])
+      selectScenario(row.id)
+    }, `Created “${name}”`)
+  }
+
+  const renameScenario = (id: string) => {
+    const cur = scenarios.find((s) => s.id === id)
+    const name = prompt('Rename scenario', cur?.name ?? '')?.trim()
+    if (!name || name === cur?.name) return
+    void runScenarioAction(async () => {
+      const row = await updateScheduleScenario(id, { name })
+      setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, name: row.name } : s)))
+    })
+  }
+
+  const deleteScenario = (id: string) => {
+    const cur = scenarios.find((s) => s.id === id)
+    if (!confirm(`Delete scenario “${cur?.name}”? The live schedule is not affected.`)) return
+    void runScenarioAction(async () => {
+      await deleteScheduleScenario(id)
+      setScenarios((prev) => prev.filter((s) => s.id !== id))
+      selectScenario(null)
+    }, 'Scenario deleted')
+  }
 
   const visibleSlots = useMemo(
-    () => (showCancelled ? slots : slots.filter((s) => s.status !== 'CANCELLED')),
-    [slots, showCancelled]
+    () => (showCancelled ? scenarioSlots : scenarioSlots.filter((s) => s.status !== 'CANCELLED')),
+    [scenarioSlots, showCancelled]
   )
 
   const conflicts = useMemo(() => findConflicts(visibleSlots), [visibleSlots])
@@ -79,10 +289,10 @@ export default function ScheduleWorkspace({
       slotCount: active.length,
       totalHours: fmtH(totalHours),
       therapistCount: therapists.filter((t) => t.active).length,
-      clientCount: clients.filter((c) => c.active).length,
+      clientCount: scenarioClients.filter((c) => c.active).length,
       conflictCount: conflicts.size,
     }
-  }, [visibleSlots, therapists, clients, conflicts])
+  }, [visibleSlots, therapists, scenarioClients, conflicts])
 
   const refreshFromServer = useCallback(async () => {
     try {
@@ -193,6 +403,10 @@ export default function ScheduleWorkspace({
 
   const onSlotSaved = useCallback(
     (slot: ScheduleSlot, isNew: boolean) => {
+      if (activeScenarioId) {
+        showToast(isNew ? 'Session added to scenario' : 'Scenario updated', 'success')
+        return
+      }
       setSlots((prev) => {
         const idx = prev.findIndex((s) => s.id === slot.id)
         if (idx >= 0) {
@@ -205,16 +419,20 @@ export default function ScheduleWorkspace({
       showToast(isNew ? 'Session added' : 'Session updated', 'success')
       void refreshFromServer()
     },
-    [showToast, refreshFromServer]
+    [showToast, refreshFromServer, activeScenarioId]
   )
 
   const onSlotDeleted = useCallback(
     (id: string) => {
+      if (activeScenarioId) {
+        showToast('Session removed from scenario', 'success')
+        return
+      }
       setSlots((prev) => prev.filter((s) => s.id !== id))
       showToast('Session deleted', 'success')
       void refreshFromServer()
     },
-    [showToast, refreshFromServer]
+    [showToast, refreshFromServer, activeScenarioId]
   )
 
   const fallBackToRoster = useCallback(() => setView('roster'), [])
@@ -237,6 +455,7 @@ export default function ScheduleWorkspace({
   }, [visibleSlots, search, therapists, clients])
 
   return (
+    <ScheduleMutationsContext.Provider value={mutations}>
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -286,7 +505,7 @@ export default function ScheduleWorkspace({
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
-          {periodStart && periodEnd && (
+          {periodStart && periodEnd && !activeScenario && (
             <Button
               size="sm"
               variant="outline"
@@ -342,6 +561,25 @@ export default function ScheduleWorkspace({
         </div>
       </div>
 
+      {canUseScenarios && (
+        <ScenarioBar
+          scenarios={scenarios}
+          activeId={activeScenario?.id ?? null}
+          onSelect={selectScenario}
+          onCreate={() => createScenario()}
+          onDuplicate={(id) => createScenario(id)}
+          onRename={renameScenario}
+          onDelete={deleteScenario}
+          mainSummary={mainSummary}
+          activeSummary={activeSummary}
+          activeChanges={activeScenario?.changes ?? null}
+          clients={clients}
+          onPauseClient={(c) => void runScenarioAction(() => mutations.pauseClient!(c), `Paused ${c.name} in this scenario`)}
+          onResumeClient={(id) => void runScenarioAction(() => mutations.resumeClient!(id))}
+          boroughFilter={borough}
+        />
+      )}
+
       <ScheduleToolbar
         stats={stats}
         view={view}
@@ -355,7 +593,11 @@ export default function ScheduleWorkspace({
         showAllRows={showAllRows}
         onShowAllRowsChange={setShowAllRows}
         onAddSession={() => openCreate()}
-        onManage={() => setManageOpen(true)}
+        onManage={() =>
+          activeScenario
+            ? showToast('Switch to Main schedule to manage therapists and clients', 'error')
+            : setManageOpen(true)
+        }
         onExport={() => {
           void (async () => {
             try {
@@ -395,7 +637,7 @@ export default function ScheduleWorkspace({
       {view === 'roster' && (
         <RosterView
           therapists={therapists}
-          clients={clients}
+          clients={scenarioClients}
           slots={filteredSlots}
           rowDim={rowDim}
           showAllRows={showAllRows}
@@ -413,7 +655,7 @@ export default function ScheduleWorkspace({
       {view === 'table' && (
         <TableView
           therapists={therapists}
-          clients={clients}
+          clients={scenarioClients}
           slots={filteredSlots}
           conflicts={conflicts}
           onEdit={openEdit}
@@ -423,13 +665,14 @@ export default function ScheduleWorkspace({
       )}
 
       {view === 'hours' && (
-        <ClientHoursPanel clients={clients} slots={visibleSlots} onRefresh={refreshFromServer} />
+        <ClientHoursPanel clients={scenarioClients} slots={visibleSlots} onRefresh={refreshFromServer} />
       )}
 
       {view === 'constellation' && (
         <ConstellationView
+          key={activeScenario?.id ?? 'main'}
           therapists={therapists}
-          clients={clients}
+          clients={scenarioClients}
           slots={visibleSlots}
           conflicts={conflicts}
           search={search}
@@ -470,5 +713,6 @@ export default function ScheduleWorkspace({
         onRefresh={refreshFromServer}
       />
     </div>
+    </ScheduleMutationsContext.Provider>
   )
 }

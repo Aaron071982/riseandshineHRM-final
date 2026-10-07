@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Loader2, MoreHorizontal, Trash2 } from 'lucide-react'
 import type { ScheduleSlot } from '@/lib/schedule/types'
 import { DAYS, DAY_LABEL, findConflicts, fmtH, inputToMin, minToInput, type Day } from '@/lib/schedule/utils'
-import { deleteSlot, updateSlot } from '@/lib/schedule/actions'
+import { useScheduleMutations } from '../scheduleMutations'
 import { useToast } from '@/components/ui/toast'
 import { cn } from '@/lib/utils'
 
@@ -26,6 +26,7 @@ export default function SessionInlineRow({
   onOpenEditor: (slot: ScheduleSlot) => void
 }) {
   const { showToast } = useToast()
+  const { updateSlot, deleteSlot } = useScheduleMutations()
   const [day, setDay] = useState<Day>(slot.day as Day)
   const [start, setStart] = useState(minToInput(slot.startMin))
   const [end, setEnd] = useState(minToInput(slot.endMin))
@@ -48,8 +49,7 @@ export default function SessionInlineRow({
     if (!valid || !dirty) return
     setBusy('save')
     try {
-      const updated = await updateSlot(slot.id, { day, startMin, endMin })
-      onSaved(updated as ScheduleSlot)
+      onSaved(await updateSlot(slot.id, { day, startMin, endMin }))
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Save failed', 'error')
     } finally {

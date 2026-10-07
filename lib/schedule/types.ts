@@ -9,6 +9,8 @@ export type ScheduleTherapist = {
   borough: string | null
   colorKey: number | null
   active: boolean
+  /** Home address from the RBT profile, single line. */
+  address?: string | null
 }
 
 export type ScheduleClient = {
@@ -21,6 +23,8 @@ export type ScheduleClient = {
   authorizedHoursPerWeek: number | null
   active: boolean
   stage: ClientStage | null
+  /** Service address from the client record, single line. */
+  address?: string | null
 }
 
 export type ScheduleSlot = {

@@ -78,6 +78,7 @@ export default async function CrmSchedulePage({
         initial={data}
         periods={periods}
         initialBorough={searchParams?.borough || ''}
+        canUseScenarios={isFullAccess(user)}
       />
     </div>
   )

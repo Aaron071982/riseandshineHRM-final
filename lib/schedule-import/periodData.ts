@@ -19,6 +19,47 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
+/** "123 Main St, Apt 4, Brooklyn, NY 11201" */
+function formatAddress(a: {
+  line1?: string | null
+  line2?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+}): string | null {
+  const stateZip = [a.state, a.zip].map((p) => p?.trim()).filter(Boolean).join(' ')
+  const line = [a.line1, a.line2, a.city, stateZip].map((p) => p?.trim()).filter(Boolean).join(', ')
+  return line || null
+}
+
+const THERAPIST_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+  addressLine1: true,
+  addressLine2: true,
+  locationCity: true,
+  locationState: true,
+  zipCode: true,
+} as const
+
+function therapistAddress(r: {
+  addressLine1: string | null
+  addressLine2: string | null
+  locationCity: string | null
+  locationState: string | null
+  zipCode: string | null
+}): string | null {
+  return formatAddress({
+    line1: r.addressLine1,
+    line2: r.addressLine2,
+    city: r.locationCity,
+    state: r.locationState,
+    zip: r.zipCode,
+  })
+}
+
 export async function listSchedulePeriods(): Promise<SchedulePeriod[]> {
   const batches = await prisma.scheduleImportBatch.findMany({
     orderBy: [{ periodStart: 'desc' }, { createdAt: 'desc' }],
@@ -124,6 +165,11 @@ export async function loadPeriodWorkspaceData(opts: {
       authHours: true,
       clientCode: true,
       stage: true,
+      insuranceProvider: true,
+      addressLine: true,
+      city: true,
+      state: true,
+      zip: true,
     },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   })
@@ -145,9 +191,7 @@ export async function loadPeriodWorkspaceData(opts: {
   const assignments = await prisma.rbtScheduleAssignment.findMany({
     where: assignmentWhere,
     include: {
-      rbtProfile: {
-        select: { id: true, firstName: true, lastName: true, email: true },
-      },
+      rbtProfile: { select: THERAPIST_SELECT },
       serviceClient: {
         select: { id: true, pipelineStatus: true, deletedAt: true },
       },
@@ -183,11 +227,12 @@ export async function loadPeriodWorkspaceData(opts: {
       code: c.clientCode,
       name,
       borough: c.borough,
-      insurance: null,
+      insurance: c.insuranceProvider,
       bcba: null,
       authorizedHoursPerWeek: c.authHours,
       active: false,
       stage: c.stage,
+      address: formatAddress({ line1: c.addressLine, city: c.city, state: c.state, zip: c.zip }),
     })
   }
 
@@ -202,6 +247,7 @@ export async function loadPeriodWorkspaceData(opts: {
         borough: null,
         colorKey: null,
         active: true,
+        address: therapistAddress(a.rbtProfile),
       })
     }
 
@@ -251,7 +297,7 @@ export async function loadPeriodWorkspaceData(opts: {
 
   const hiredWithoutSlots = await prisma.rBTProfile.findMany({
     where: { ...SCHEDULABLE_RBT_WHERE, id: { notIn: [...therapistMap.keys()] } },
-    select: { id: true, firstName: true, lastName: true, email: true },
+    select: THERAPIST_SELECT,
     take: 200,
   })
   for (const r of hiredWithoutSlots) {
@@ -263,6 +309,7 @@ export async function loadPeriodWorkspaceData(opts: {
       borough: null,
       colorKey: null,
       active: true,
+      address: therapistAddress(r),
     })
   }
 

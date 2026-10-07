@@ -15,7 +15,7 @@ import { hoursOf, fmtH, minToInput, inputToMin, DAY_LABEL, type Day } from '@/li
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { bulkUpdateSlots, bulkDeleteSlots } from '@/lib/schedule/actions'
+import { useScheduleMutations } from './scheduleMutations'
 
 const STATUS_COLORS: Record<string, string> = {
   CONFIRMED: 'bg-green-100 text-green-800',
@@ -42,6 +42,7 @@ export default function TableView({
   onAdd: () => void
 }) {
   const { showToast } = useToast()
+  const { bulkUpdateSlots, bulkDeleteSlots } = useScheduleMutations()
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())

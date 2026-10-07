@@ -2602,6 +2602,24 @@ model ScheduleAllowedUser {
   @@map("schedule_allowed_user")
 }
 
+/// Sandbox "what-if" schedule: an overlay of changes on the live schedule. Never writes assignments.
+model ScheduleScenario {
+  id              String    @id @default(cuid())
+  name            String
+  notes           String?   @db.Text
+  /// ScenarioChanges (lib/schedule/scenario.ts)
+  changes         Json      @default("{}")
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+  deletedByUserId String?
+
+  @@index([deletedAt])
+  @@map("schedule_scenarios")
+}
+
 model ScheduleTherapist {
   id        String                @id @default(cuid())
   name      String

@@ -11,7 +11,7 @@ import {
   utilizationBand,
   type ConstellationModel,
 } from '@/lib/schedule/constellation'
-import { updateSlot } from '@/lib/schedule/actions'
+import { useScheduleMutations } from '../scheduleMutations'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
@@ -58,6 +58,7 @@ export default function ReassignDialog({
   onCancel: () => void
   onDone: (result: { moved: number; failed: string[] }) => void
 }) {
+  const { updateSlot } = useScheduleMutations()
   const [fromId, setFromId] = useState(request.fromCandidates[0] ?? '')
   const pair = model.pairs.get(pairKey(fromId, request.clientId))
   const [checked, setChecked] = useState<Set<string>>(() => new Set(pair?.slots.map((s) => s.id) ?? []))

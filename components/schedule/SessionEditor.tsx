@@ -12,7 +12,7 @@ import {
   findConflicts,
   type Day,
 } from '@/lib/schedule/utils'
-import { createSlot, updateSlot, deleteSlot } from '@/lib/schedule/actions'
+import { useScheduleMutations } from './scheduleMutations'
 import { useToast } from '@/components/ui/toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +58,7 @@ export default function SessionEditor({
   onDeleted: (id: string) => void
 }) {
   const { showToast } = useToast()
+  const { createSlot, updateSlot, deleteSlot } = useScheduleMutations()
   const [therapistId, setTherapistId] = useState(
     slot?.therapistId ?? defaults?.therapistId ?? therapists[0]?.id ?? ''
   )
@@ -110,11 +111,9 @@ export default function SessionEditor({
         periodEnd: periodEnd || null,
       }
       if (mode === 'edit' && slot) {
-        const updated = await updateSlot(slot.id, payload)
-        onSaved(updated as ScheduleSlot, false)
+        onSaved(await updateSlot(slot.id, payload), false)
       } else {
-        const created = await createSlot(payload)
-        onSaved(created as ScheduleSlot, true)
+        onSaved(await createSlot(payload), true)
       }
       onClose()
     } catch (e) {
