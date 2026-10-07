@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { Calendar, CheckCircle2, Circle, ClipboardList, DollarSign } from 'lucide-react'
-import { FORTY_HOUR_RBT_CERTIFICATE_SLUG } from '@/lib/onboarding/catalog'
+import { FORTY_HOUR_RBT_CERTIFICATE_SLUG, RBT_I9_PORTAL_PATH } from '@/lib/onboarding/catalog'
 
 function getTimeBasedGreeting(): string {
   const h = new Date().getHours()
@@ -52,6 +52,8 @@ interface RBTDashboardHomeProps {
   fortyHourIncomplete?: boolean
   /** Required company (org) training still outstanding */
   orgTrainingOutstanding?: { id: string; title: string }[]
+  /** No Form I-9 on file (no Section 1 recorded and no I-9 document). */
+  i9Missing?: boolean
 }
 
 export default function RBTDashboardHome({
@@ -67,6 +69,7 @@ export default function RBTDashboardHome({
   pendingUploadTitles = [],
   fortyHourIncomplete = false,
   orgTrainingOutstanding = [],
+  i9Missing = false,
 }: RBTDashboardHomeProps) {
   const greeting = getTimeBasedGreeting()
   const showOnboarding = onboardingPercent < 100
@@ -84,6 +87,21 @@ export default function RBTDashboardHome({
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-[var(--text-primary)]">
         {greeting}, {firstName}!
       </h1>
+
+      {i9Missing && (
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 dark:border-amber-600 dark:bg-amber-950/30">
+          <p className="font-semibold text-amber-950 dark:text-amber-100">
+            Action needed: Form I-9 employment verification
+          </p>
+          <p className="mt-1 text-sm text-amber-900 dark:text-amber-200">
+            Form I-9 is required by federal law for every employee, and we don&apos;t have yours on file.
+            Upload it securely through the portal — please don&apos;t email your documents.
+          </p>
+          <Button asChild size="sm" className="mt-3 bg-[#e36f1e] hover:bg-[#c95e18] text-white">
+            <Link href={RBT_I9_PORTAL_PATH}>Complete your I-9</Link>
+          </Button>
+        </div>
+      )}
 
       {fortyHourIncomplete && (
         <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 dark:border-amber-600 dark:bg-amber-950/30">

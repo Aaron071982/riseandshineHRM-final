@@ -27,8 +27,13 @@ import {
   TOTAL_ONBOARDING_STEPS,
   FORTY_HOUR_RBT_CERTIFICATE_SLUG,
   ORIENTATION_BOOKING_SLUG,
+  isOptionalOnboardingSlug,
   sortRbtOnboardingSteps,
+  I9_SLUG,
+  I9_SECTION2_DEADLINE_BUSINESS_DAYS,
+  RBT_I9_PORTAL_PATH,
 } from '@/lib/onboarding/catalog'
+import { I9AcceptableDocumentsList, I9FormInstructions } from '@/components/rbt/I9Instructions'
 
 type StepRow = {
   documentId: string
@@ -70,6 +75,7 @@ type ProgressPayload = {
   tierAComplete: boolean
   tierBComplete: boolean
   fullyActivated: boolean
+  i9Submitted: boolean
   steps: StepRow[]
 }
 
@@ -99,6 +105,7 @@ export default function OnboardingWizard({
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [showOptionalSteps, setShowOptionalSteps] = useState(false)
   const confettiFired = useRef(false)
   const restoredStep = useRef(false)
 
@@ -135,6 +142,7 @@ export default function OnboardingWizard({
       tierAComplete: data.tierAComplete,
       tierBComplete: data.tierBComplete,
       fullyActivated: data.fullyActivated,
+      i9Submitted: Boolean(data.profile?.i9Section1CompletedAt),
       steps,
     })
   }, [docById, hrDocumentTasks])
@@ -232,8 +240,14 @@ export default function OnboardingWizard({
     )
   }
 
-  if (progress.fullyActivated) {
+  if (progress.fullyActivated && !showOptionalSteps) {
     const bookingStep = progress.steps.find((s) => s.slug === ORIENTATION_BOOKING_SLUG)
+    const optionalOpen = progress.steps.filter(
+      (s) =>
+        isOptionalOnboardingSlug(s.slug) && s.slug !== ORIENTATION_BOOKING_SLUG && !s.isComplete
+    )
+    const i9Step = progress.steps.find((s) => s.slug === I9_SLUG)
+    const i9Needed = !!i9Step && !i9Step.isComplete && !progress.i9Submitted
     return (
       <div className="mx-auto max-w-3xl space-y-8 py-10">
         <div className="space-y-4 text-center">
@@ -247,6 +261,19 @@ export default function OnboardingWizard({
           </Button>
         </div>
 
+        {i9Needed ? (
+          <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 sm:p-6 text-left shadow-sm">
+            <h2 className="font-semibold text-amber-950">Required: Form I-9</h2>
+            <p className="mt-1 text-sm text-amber-900">
+              Federal law requires a completed Form I-9 for every employee, and we don&apos;t have yours on
+              file yet. Please upload it through the portal.
+            </p>
+            <Button asChild size="sm" className="mt-3 bg-[#e36f1e] hover:bg-[#c95e18]">
+              <Link href={RBT_I9_PORTAL_PATH}>Complete your I-9</Link>
+            </Button>
+          </div>
+        ) : null}
+
         {bookingStep ? (
           <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 text-left shadow-sm">
             <OrientationBookingPanel
@@ -255,6 +282,33 @@ export default function OnboardingWizard({
               variant="complete"
               onBooked={() => void refresh()}
             />
+          </div>
+        ) : null}
+
+        {optionalOpen.length > 0 ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 text-left shadow-sm space-y-3">
+            <div>
+              <h2 className="font-semibold text-gray-900">Optional uploads</h2>
+              <p className="text-sm text-gray-600">
+                Not required to finish onboarding — upload these whenever you have them.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {optionalOpen.map((s) => (
+                <Button
+                  key={s.documentId}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const idx = progress.steps.findIndex((p) => p.documentId === s.documentId)
+                    if (idx >= 0) setCurrentIndex(idx)
+                    setShowOptionalSteps(true)
+                  }}
+                >
+                  {s.title}
+                </Button>
+              ))}
+            </div>
           </div>
         ) : null}
       </div>
@@ -287,6 +341,15 @@ export default function OnboardingWizard({
         <ClipboardList className="w-8 h-8 text-[#e36f1e]" />
         <div>
           <h1 className="text-2xl font-bold">My Tasks</h1>
+          {progress.fullyActivated && (
+            <button
+              type="button"
+              onClick={() => setShowOptionalSteps(false)}
+              className="text-sm text-[#e36f1e] hover:underline"
+            >
+              ← Back to onboarding summary
+            </button>
+          )}
           <p className="text-sm text-gray-500">
             {progress.completedCount} of {RBT_VISIBLE_STEPS} complete · Tier A: {progress.tierACompleted}/
             {progress.tierATotal} · Tier B: {progress.tierBCompleted}/{progress.tierBTotal}
@@ -349,7 +412,7 @@ export default function OnboardingWizard({
             }`}
           >
             {s.isLocked ? <Lock className="w-3 h-3 inline mr-0.5" /> : null}
-            {s.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG ? '40hr' : s.stepNumber}
+            {s.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG ? '40hr' : s.slug === I9_SLUG ? 'I-9' : s.stepNumber}
           </button>
         ))}
       </div>
@@ -364,6 +427,9 @@ export default function OnboardingWizard({
             </span>
             {isFortyHourStep && !current.isComplete && (
               <Badge className="bg-amber-600">Required</Badge>
+            )}
+            {!current.isComplete && isOptionalOnboardingSlug(current.slug) && (
+              <Badge variant="outline">Optional</Badge>
             )}
             {current.isComplete && <Badge className="bg-green-600">Done</Badge>}
             {current.isLocked && <Badge variant="outline">Locked</Badge>}
@@ -381,6 +447,12 @@ export default function OnboardingWizard({
             <p className="text-gray-600">Complete earlier steps to unlock this task.</p>
           ) : current.isComplete && current.flowType !== 'BOOKING' ? (
             <p className="text-green-700">This step is complete.</p>
+          ) : current.slug === I9_SLUG ? (
+            <I9StepPanel
+              current={current}
+              submitted={progress.i9Submitted}
+              onComplete={onStepComplete}
+            />
           ) : (
             <StepFlow
               current={current}
@@ -404,6 +476,45 @@ export default function OnboardingWizard({
           <ChevronRight className="w-4 h-4 ml-1" />
         </Button>
       </div>
+    </div>
+  )
+}
+
+function I9StepPanel({
+  current,
+  submitted,
+  onComplete,
+}: {
+  current: StepRow
+  submitted: boolean
+  onComplete: () => void
+}) {
+  if (submitted || current.completionStatus === 'IN_PROGRESS') {
+    return (
+      <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+        <p>
+          Section 1 submitted. HR will complete Section 2 by reviewing the original identity and work
+          authorization documents you choose to present, within {I9_SECTION2_DEADLINE_BUSINESS_DAYS} business
+          days of your start date.
+        </p>
+        <Link href={RBT_I9_PORTAL_PATH} className="font-medium text-[#e36f1e] hover:underline">
+          View your I-9 or upload your identity documents →
+        </Link>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-4">
+      <I9FormInstructions />
+      <I9AcceptableDocumentsList />
+      <DocumentUploadFlow documentId={current.documentId} title={current.title} onComplete={onComplete} />
+      <p className="text-sm text-gray-600">
+        After uploading the form, add your identity and work-authorization documents on the{' '}
+        <Link href={RBT_I9_PORTAL_PATH} className="font-medium text-[#e36f1e] hover:underline">
+          Form I-9 page
+        </Link>
+        .
+      </p>
     </div>
   )
 }

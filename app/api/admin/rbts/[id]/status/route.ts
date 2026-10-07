@@ -25,7 +25,7 @@ export async function PATCH(
 
     const previous = await prisma.rBTProfile.findUnique({
       where: { id },
-      select: { status: true },
+      select: { status: true, hiredAt: true },
     })
     if (!previous) {
       return NextResponse.json({ error: 'RBT profile not found' }, { status: 404 })
@@ -42,7 +42,10 @@ export async function PATCH(
 
       const rbtProfile = await tx.rBTProfile.update({
         where: { id },
-        data: { status },
+        data: {
+          status,
+          ...(status === 'HIRED' && !previous.hiredAt ? { hiredAt: new Date() } : {}),
+        },
       })
 
       await tx.rBTAuditLog.create({

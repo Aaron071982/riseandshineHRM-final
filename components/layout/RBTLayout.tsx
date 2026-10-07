@@ -18,7 +18,9 @@ import {
   GraduationCap,
   Award,
   Library,
+  FileCheck2,
 } from 'lucide-react'
+import { RBT_I9_PORTAL_PATH } from '@/lib/onboarding/catalog'
 import { useState, useEffect, createContext, useContext } from 'react'
 import Image from 'next/image'
 import { trackPageView } from '@/lib/activity-tracker'
@@ -66,6 +68,7 @@ function buildNavItems(opts: {
   items.push(
     { href: '/rbt/schedule', label: 'Schedule', icon: Calendar },
     { href: '/rbt/documents', label: 'Documents', shortLabel: 'Docs', icon: FileText },
+    { href: RBT_I9_PORTAL_PATH, label: 'Form I-9', shortLabel: 'I-9', icon: FileCheck2 },
     { href: '/rbt/resources', label: 'Resources', icon: BookOpen },
     { href: '/rbt/profile', label: 'Profile', icon: User }
   )

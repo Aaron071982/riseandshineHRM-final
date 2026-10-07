@@ -12,6 +12,8 @@ export const ADMIN_RBT_DOCUMENT_TYPES: ReadonlyArray<{ value: string; label: str
   { value: 'COMPANY_DOCUMENT_SUBMISSION', label: 'Company document submission' },
   { value: 'CONTRACT', label: 'Contract / offer' },
   { value: 'W4', label: 'W-4 / tax form' },
+  { value: 'I9_FORM', label: 'Form I-9' },
+  { value: 'I9_SUPPORTING_DOCUMENT', label: 'I-9 identity / work-authorization document' },
 ]
 
 export function formatRbtDocumentTypeLabel(code: string | null | undefined): string {

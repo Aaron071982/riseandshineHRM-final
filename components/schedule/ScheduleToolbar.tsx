@@ -47,10 +47,11 @@ export default function ScheduleToolbar({
   onExport,
   onExportAll,
 }: Props) {
-  const tabs: { id: ViewMode; label: string }[] = [
+  const tabs: { id: ViewMode; label: string; className?: string }[] = [
     { id: 'roster', label: 'Roster' },
     { id: 'table', label: 'Table' },
     { id: 'hours', label: 'Client hours' },
+    { id: 'constellation', label: 'Constellation', className: 'hidden lg:inline-block' },
   ]
 
   return (
@@ -81,7 +82,8 @@ export default function ScheduleToolbar({
                 'h-8 px-3 rounded-lg text-sm font-medium transition-colors',
                 view === t.id
                   ? 'bg-brand text-white'
-                  : 'text-quiet hover:bg-line-2 hover:text-ink'
+                  : 'text-quiet hover:bg-line-2 hover:text-ink',
+                t.className
               )}
             >
               {t.label}

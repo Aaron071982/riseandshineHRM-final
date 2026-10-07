@@ -22,6 +22,9 @@ import {
 } from '@/lib/crm/assessment/afls'
 import type { TreatmentAssessmentStatus, TreatmentAssessmentSource } from '@prisma/client'
 import { AssessmentPrintPager } from '@/components/crm/assessment/AssessmentPrintPager'
+import { assessmentDocumentTitle, isReassessment } from '@/lib/crm/assessment/assessmentType'
+import { GOAL_STATUS_LABELS, goalProgressSummary } from '@/lib/crm/assessment/reassessment'
+import { GOAL_STATUSES, type GoalStatus } from '@/lib/crm/assessment/assessment.schema'
 
 type Props = {
   clientId: string
@@ -42,6 +45,7 @@ type Props = {
   attachmentUrls: Record<string, string>
   status: TreatmentAssessmentStatus
   source: TreatmentAssessmentSource
+  assessmentType?: string
   basePath?: '/portal' | '/client-services'
 }
 
@@ -67,7 +71,7 @@ const SIGNATURE_BLOCKS = [
     key: 'bcba' as const,
     title: 'BCBA Signature',
     purpose:
-      'The supervising BCBA certifies this Initial Assessment and Treatment Plan is accurate and approves recommended services.',
+      'The supervising BCBA certifies this {document} is accurate and approves recommended services.',
   },
   {
     key: 'graduatePermit' as const,
@@ -85,8 +89,12 @@ const SIGNATURE_BLOCKS = [
 
 export function AssessmentPrintView(props: Props) {
   const clientName = `${props.client.firstName} ${props.client.lastName}`.trim()
+  const documentTitle = assessmentDocumentTitle(props.assessmentType)
   const sections = personalizeAssessmentValue(props.sections, clientName)
   const s = sections.summary
+  const isRe = isReassessment(props.assessmentType)
+  const re = sections.reassessment
+  const progress = isRe ? goalProgressSummary(sections) : null
   const displayDate = (value?: string | Date | null) =>
     formatUsMmDdYyyy(value) || ''
 
@@ -150,9 +158,7 @@ export function AssessmentPrintView(props: Props) {
             alt="Rise & Shine"
           />
           <p className="assessment-cover-eyebrow">CONFIDENTIAL · CLINICAL RECORD</p>
-          <h1 className="assessment-cover-title">
-            Initial Assessment &amp; Treatment Plan
-          </h1>
+          <h1 className="assessment-cover-title">{documentTitle}</h1>
           <div className="assessment-cover-title-rule" aria-hidden="true" />
 
           <div className="assessment-cover-summary">
@@ -165,6 +171,12 @@ export function AssessmentPrintView(props: Props) {
               ) : null}
               <CoverField label="Parent / Guardian" value={coverValue(s.parentName)} />
               <CoverField label="Report Date" value={coverDate(s.reportDate)} />
+              {isRe && (
+                <CoverField
+                  label="Reporting Period"
+                  value={`${coverDate(re.reportingPeriod.periodStart)} – ${coverDate(re.reportingPeriod.periodEnd)}`}
+                />
+              )}
               <CoverField label="Assessor Name" value={assessorDisplay} />
             </div>
             <div className="assessment-cover-col">
@@ -194,6 +206,122 @@ export function AssessmentPrintView(props: Props) {
       </section>
 
       <div className="print-body">
+                {isRe && (
+                  <PrintSection title="Reassessment Details">
+                    <Field label="Reporting period" value={`${displayDate(re.reportingPeriod.periodStart) || '—'} – ${displayDate(re.reportingPeriod.periodEnd) || '—'}`} />
+                    <Field label="Authorization number" value={re.reportingPeriod.authorizationNumber} />
+                    <Field label="Dates of service covered" value={re.reportingPeriod.datesOfServiceCovered} />
+
+                    <div className="section-block">
+                      <p className="subheading">Changes since last assessment</p>
+                      <Field label="Diagnosis" value={re.changesSinceLast.diagnosis} always />
+                      <Field label="Medications" value={re.changesSinceLast.medications} always />
+                      <Field label="School placement" value={re.changesSinceLast.schoolPlacement} always />
+                      <Field label="Family circumstances" value={re.changesSinceLast.familyCircumstances} always />
+                      <Field label="Team members" value={re.changesSinceLast.teamMembers} always />
+                    </div>
+
+                    <div className="section-block">
+                      <p className="subheading">Parent / caregiver training</p>
+                      <Field
+                        label="Sessions delivered"
+                        value={
+                          re.caregiverTraining.sessionsDelivered === null
+                            ? ''
+                            : `${re.caregiverTraining.sessionsDelivered} (minimum ${re.caregiverTraining.requiredMinimum})`
+                        }
+                        always
+                      />
+                      <Block title="Explanation (below minimum)" text={re.caregiverTraining.belowMinimumExplanation} />
+                      <Block title="Mitigation plan" text={re.caregiverTraining.mitigationPlan} />
+                      <Block title="Caregiver participation" text={re.caregiverTraining.participationNarrative} />
+                    </div>
+
+                    {re.instrumentComparison.length > 0 && (
+                      <div className="section-block">
+                        <p className="subheading">Standardized instrument comparison</p>
+                        <table className="print-table">
+                          <thead>
+                            <tr>
+                              <th>Instrument</th>
+                              <th>Prior (date)</th>
+                              <th>Prior result</th>
+                              <th>Current (date)</th>
+                              <th>Current result</th>
+                              <th>Interpretation</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {re.instrumentComparison.map((r) => (
+                              <tr key={r.id}>
+                                <td>{r.instrument || '—'}</td>
+                                <td>{displayDate(r.priorDate) || '—'}</td>
+                                <td>{r.priorResult || '—'}</td>
+                                <td>{displayDate(r.currentDate) || '—'}</td>
+                                <td>{r.currentResult || '—'}</td>
+                                <td>{r.interpretation || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {re.barriersDuringPeriod.length > 0 && (
+                      <div className="section-block">
+                        <p className="subheading">Barriers encountered this period</p>
+                        <table className="print-table">
+                          <thead>
+                            <tr>
+                              <th>Barrier</th>
+                              <th>Mitigation</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {re.barriersDuringPeriod.map((r) => (
+                              <tr key={r.id}>
+                                <td>{r.barrier || '—'}</td>
+                                <td>{r.mitigation || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <div className="section-block">
+                      <p className="subheading">Units requested</p>
+                      <table className="print-table">
+                        <thead>
+                          <tr>
+                            <th>CPT</th>
+                            <th>Previous request</th>
+                            <th>Requested</th>
+                            <th>Locations</th>
+                            <th>Justification</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {re.unitsRequested.map((r) => (
+                            <tr key={r.code}>
+                              <td>{r.code}</td>
+                              <td>{r.previousRequest || '—'}</td>
+                              <td>{r.unitsRequested || '—'}</td>
+                              <td>
+                                {Object.entries(r.locations)
+                                  .filter(([, on]) => on)
+                                  .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1))
+                                  .join(', ') || '—'}
+                              </td>
+                              <td>{r.justification || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </PrintSection>
+                )}
+
                 <PrintSection title="Treatment Requests">
                   <p className="prose-block">{copy(TREATMENT_REQUESTS_INTRO)}</p>
                   <TreatmentRequestsTable request={sections.treatmentRequest} />
@@ -330,7 +458,34 @@ export function AssessmentPrintView(props: Props) {
                 </PrintSection>
 
                 <PrintSection title="Response to Treatment">
+                  {progress && (
+                    <div className="section-block">
+                      <p className="subheading">Goal progress this period</p>
+                      <Field
+                        label="Summary"
+                        value={GOAL_STATUSES.map((st) => `${GOAL_STATUS_LABELS[st]}: ${progress.counts[st]}`).join(' · ')}
+                        always
+                      />
+                      {(['MASTERED', 'IN_PROGRESS', 'MODIFIED', 'DISCONTINUED'] as const).map((st) =>
+                        progress.lists[st].length ? (
+                          <Field
+                            key={st}
+                            label={GOAL_STATUS_LABELS[st]}
+                            value={progress.lists[st]
+                              .map((g) => `${g.table}: ${g.name}${g.rationale && st !== 'MASTERED' ? ` (${g.rationale})` : ''}`)
+                              .join('; ')}
+                          />
+                        ) : null
+                      )}
+                    </div>
+                  )}
                   <Block text={sections.responseToTx.narrative} />
+                  {isRe && (
+                    <Block
+                      title="Rationale for lack of progress, regression, or stagnation"
+                      text={sections.responseToTx.lackOfProgressRationale}
+                    />
+                  )}
                 </PrintSection>
 
                 <PrintSection title="97155 Interventions & Barriers to Treatment">
@@ -370,23 +525,23 @@ export function AssessmentPrintView(props: Props) {
 
                 <PrintSection title="Treatment Goals">
                   <Block text={sections.goals.behaviorReduction.analysisNarrative} />
-                  <GoalTableA title="Behavior Reduction Goals" rows={sections.goals.behaviorReduction.rows} />
-                  <GoalTableA title="Replacement Behavior Goals" rows={sections.goals.replacementBehavior.rows} />
+                  <GoalTableA title="Behavior Reduction Goals" rows={sections.goals.behaviorReduction.rows} showStatus={isRe} />
+                  <GoalTableA title="Replacement Behavior Goals" rows={sections.goals.replacementBehavior.rows} showStatus={isRe} />
                   <Block title="Current level of communication skills" text={sections.goals.communication.currentLevel} />
-                  <GoalTableA title="Communication Goals" rows={sections.goals.communication.rows} />
+                  <GoalTableA title="Communication Goals" rows={sections.goals.communication.rows} showStatus={isRe} />
                   <Block title="Current level of social skills" text={sections.goals.social.currentLevel} />
-                  <GoalTableA title="Social Interaction & Social Communication Goals" rows={sections.goals.social.rows} />
+                  <GoalTableA title="Social Interaction & Social Communication Goals" rows={sections.goals.social.rows} showStatus={isRe} />
                   <Block title="Current level of adaptive skills" text={sections.goals.adaptive.currentLevel} />
-                  <GoalTableA title="Adaptive Skills" rows={sections.goals.adaptive.rows} />
+                  <GoalTableA title="Adaptive Skills" rows={sections.goals.adaptive.rows} showStatus={isRe} />
                   <Block title="Current level of living / self-help skills" text={sections.goals.livingSelfHelp.currentLevel} />
-                  <GoalTableA title="Living / Self-Help Skills" rows={sections.goals.livingSelfHelp.rows} />
+                  <GoalTableA title="Living / Self-Help Skills" rows={sections.goals.livingSelfHelp.rows} showStatus={isRe} />
                 </PrintSection>
 
                 <PrintSection title="Parent Training">
                   <Block text={sections.parentTraining.summaryNarrative} />
-                  <GoalTableB title="Parent Training Goals" rows={sections.parentTraining.summaryGoals} />
+                  <GoalTableB title="Parent Training Goals" rows={sections.parentTraining.summaryGoals} showStatus={isRe} />
                   <Block text={sections.parentTraining.groupClinicalRationale} />
-                  <GoalTableB title="Group Parent Training Goals" rows={sections.parentTraining.groupGoals} />
+                  <GoalTableB title="Group Parent Training Goals" rows={sections.parentTraining.groupGoals} showStatus={isRe} />
                   <p className="prose-block">{GROUP_PARENT_TRAINING_GRAPHS_NOTE}</p>
                 </PrintSection>
 
@@ -406,6 +561,20 @@ export function AssessmentPrintView(props: Props) {
                   <Block text={sections.transitionPlan.communicationCriteria} />
                   <Block text={sections.transitionPlan.socialCriteria} />
                   <TransitionTable rows={sections.transitionPlan.criteriaRows} />
+                  {isRe && (
+                    <>
+                      <Field
+                        label="Criteria reviewed this period"
+                        value={
+                          sections.transitionPlan.reviewedThisPeriod
+                            ? `Yes${sections.transitionPlan.reviewedOn ? ` — ${displayDate(sections.transitionPlan.reviewedOn)}` : ''}`
+                            : 'No'
+                        }
+                        always
+                      />
+                      <Block title="Review notes" text={sections.transitionPlan.reviewNotes} />
+                    </>
+                  )}
                   <Block text={sections.transitionPlan.dischargeNarrative} />
                 </PrintSection>
 
@@ -439,7 +608,9 @@ export function AssessmentPrintView(props: Props) {
                     return (
                       <div key={key} className="signature-card">
                         <h4>{title}</h4>
-                        <p className="signature-purpose">{purpose}</p>
+                        <p className="signature-purpose">
+                          {purpose.replace('{document}', documentTitle.replace('&', 'and'))}
+                        </p>
                         <Field label="Name" value={sig.name} always />
                         <Field label="Credentials" value={sig.credentials || (key === 'bcba' ? 'BCBA/LBA' : undefined)} always />
                         {sig.signatureData ? (
@@ -810,12 +981,22 @@ function TreatmentRequestsTable({
   )
 }
 
+function goalStatusCell(r: { status: string; dateMastered: string; rationale: string }) {
+  if (!r.status) return '—'
+  const label = GOAL_STATUS_LABELS[r.status as GoalStatus]
+  const date = r.status === 'MASTERED' && r.dateMastered ? ` (${formatUsMmDdYyyy(r.dateMastered) || r.dateMastered})` : ''
+  const why = r.rationale ? ` — ${r.rationale}` : ''
+  return `${label}${date}${why}`
+}
+
 function GoalTableA({
   title,
   rows,
+  showStatus,
 }: {
   title: string
   rows: AssessmentSectionData['goals']['behaviorReduction']['rows']
+  showStatus?: boolean
 }) {
   if (rows.length === 0) return null
   return (
@@ -831,6 +1012,7 @@ function GoalTableA({
             <th>Current</th>
             <th>Mastery Criteria</th>
             <th>Target Date</th>
+            {showStatus && <th>Status</th>}
           </tr>
         </thead>
         <tbody>
@@ -843,6 +1025,7 @@ function GoalTableA({
               <td>{r.currentPerformance || '—'}</td>
               <td>{r.masteryCriteria || '—'}</td>
               <td>{formatUsMmDdYyyy(r.targetMasteryDate) || r.targetMasteryDate || '—'}</td>
+              {showStatus && <td>{goalStatusCell(r)}</td>}
             </tr>
           ))}
         </tbody>
@@ -854,9 +1037,11 @@ function GoalTableA({
 function GoalTableB({
   title,
   rows,
+  showStatus,
 }: {
   title: string
   rows: AssessmentSectionData['parentTraining']['summaryGoals']
+  showStatus?: boolean
 }) {
   if (rows.length === 0) return null
   return (
@@ -872,6 +1057,7 @@ function GoalTableB({
             <th>Mastery Criteria</th>
             <th>Target Date</th>
             <th>Methods</th>
+            {showStatus && <th>Status</th>}
           </tr>
         </thead>
         <tbody>
@@ -884,6 +1070,7 @@ function GoalTableB({
               <td>{r.masteryCriteria || '—'}</td>
               <td>{formatUsMmDdYyyy(r.targetMasteryDate) || r.targetMasteryDate || '—'}</td>
               <td>{r.methodsToBeUtilized || '—'}</td>
+              {showStatus && <td>{goalStatusCell(r)}</td>}
             </tr>
           ))}
         </tbody>

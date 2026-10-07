@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import type { ApplicationData } from './types'
+import { transportModeLabel } from '@/lib/rbt/transport'
 
 interface ApplicationStepReviewProps {
   data: ApplicationData
@@ -62,7 +63,10 @@ export default function ApplicationStepReview({ data, consent, onConsentChange }
               <strong>Languages:</strong> {data.languages.length > 0 ? [...data.languages, data.otherLanguage].filter(Boolean).join(', ') : 'None'}
             </p>
             <p>
-              <strong>Transportation:</strong> {data.transportation === 'true' ? 'Yes' : data.transportation === 'false' ? 'No' : 'Not specified'}
+              <strong>Mode of Transport:</strong> {transportModeLabel(data.transportMode) ?? 'Not specified'}
+            </p>
+            <p>
+              <strong>Boroughs Willing to Travel To:</strong> {data.travelBoroughs.length > 0 ? data.travelBoroughs.join(', ') : 'None'}
             </p>
           </CardContent>
         </Card>

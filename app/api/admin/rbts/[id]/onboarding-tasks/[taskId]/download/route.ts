@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
  * File is stored as a data URL on the onboarding task.
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string; taskId: string }> }
 ) {
   try {
@@ -17,6 +17,9 @@ export async function GET(
     if (auth.response) return auth.response
 
     const { id: rbtProfileId, taskId } = await params
+    const wantInline =
+      req.nextUrl.searchParams.get('inline') === '1' ||
+      req.nextUrl.searchParams.get('preview') === '1'
 
     const task = await prisma.onboardingTask.findFirst({
       where: {
@@ -53,7 +56,7 @@ export async function GET(
       status: 200,
       headers: {
         'Content-Type': mimeType,
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': `${wantInline ? 'inline' : 'attachment'}; filename="${filename}"`,
         'Cache-Control': 'private, no-store',
       },
     })

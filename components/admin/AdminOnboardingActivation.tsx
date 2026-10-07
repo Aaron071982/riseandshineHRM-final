@@ -5,17 +5,24 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/components/ui/toast'
 import { Loader2 } from 'lucide-react'
+import AdminI9Section from './AdminI9Section'
 
 export default function AdminOnboardingActivation({
   rbtProfileId,
   backgroundCheckClearedAt,
   supervisionCountersignedAt,
   supervisionContractStatus,
+  i9,
 }: {
   rbtProfileId: string
   backgroundCheckClearedAt: string | null
   supervisionCountersignedAt: string | null
   supervisionContractStatus: string | null
+  i9?: {
+    section1CompletedAt: string | null
+    section2CompletedAt: string | null
+    section2Notes: string | null
+  }
 }) {
   const { showToast } = useToast()
   const [loading, setLoading] = useState<string | null>(null)
@@ -61,7 +68,7 @@ export default function AdminOnboardingActivation({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-lg">Activation (Tasks 31–32)</CardTitle>
+        <CardTitle className="text-lg">Activation (Tasks 31–33)</CardTitle>
         <Button variant="outline" size="sm" onClick={downloadAll}>
           Download all (ZIP)
         </Button>
@@ -97,6 +104,14 @@ export default function AdminOnboardingActivation({
             </Button>
           )}
         </div>
+        {i9 && (
+          <AdminI9Section
+            rbtProfileId={rbtProfileId}
+            section1CompletedAt={i9.section1CompletedAt}
+            section2CompletedAt={i9.section2CompletedAt}
+            section2Notes={i9.section2Notes}
+          />
+        )}
       </CardContent>
     </Card>
   )

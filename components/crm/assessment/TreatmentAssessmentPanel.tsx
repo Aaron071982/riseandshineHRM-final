@@ -10,7 +10,9 @@ import {
   finalizeTreatmentAssessmentUpload,
   reopenTreatmentAssessment,
   softDeleteTreatmentAssessment,
+  startTreatmentReassessment,
 } from '@/lib/crm/assessment/actions'
+import { assessmentTypeLabel, isReassessment } from '@/lib/crm/assessment/assessmentType'
 import { uploadTreatmentAssessmentFile } from '@/lib/crm/assessmentUpload.client'
 import { UPLOADED_PDF_SECTION_KEY } from '@/lib/crm/assessment/storagePaths'
 import type { TreatmentAssessmentStatus, TreatmentAssessmentSource } from '@prisma/client'
@@ -66,6 +68,27 @@ export function TreatmentAssessmentPanel({
     setError(null)
     startTransition(async () => {
       const result = await createTreatmentAssessmentForm(clientId)
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      router.push(`${clientBase}/assessments/${result.assessmentId}`)
+    })
+  }
+
+  const hasFormAssessment = assessments.some((a) => a.source === 'FORM')
+
+  const onStartReassessment = () => {
+    if (
+      !confirm(
+        'Start a reassessment? The most recent completed assessment will be copied into a new draft (it is not changed). Goal performance moves to "Previous", carried-forward content is marked until you edit or review it, and signatures and dates must be entered again.'
+      )
+    ) {
+      return
+    }
+    setError(null)
+    startTransition(async () => {
+      const result = await startTreatmentReassessment(clientId)
       if (!result.ok) {
         setError(result.error)
         return
@@ -169,6 +192,21 @@ export function TreatmentAssessmentPanel({
               Fill new assessment
             </button>
           )}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={onStartReassessment}
+              disabled={pending || !hasFormAssessment}
+              title={
+                hasFormAssessment
+                  ? 'Copy the most recent assessment into a new reassessment'
+                  : 'Fill an initial assessment first'
+              }
+              className="rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand hover:bg-brand/5 disabled:opacity-50"
+            >
+              Start reassessment
+            </button>
+          )}
           {canUpload && (
             <>
               <input
@@ -211,6 +249,15 @@ export function TreatmentAssessmentPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[a.status] ?? ''}`}>
                     {a.status.replace('_', ' ')}
+                  </span>
+                  <span
+                    className={`rounded px-2 py-0.5 text-xs font-medium ${
+                      isReassessment(a.assessmentType)
+                        ? 'bg-indigo-100 text-indigo-800'
+                        : 'bg-canvas text-ink'
+                    }`}
+                  >
+                    {assessmentTypeLabel(a.assessmentType)}
                   </span>
                   <span className="rounded bg-canvas px-2 py-0.5 text-xs text-quiet">{a.source}</span>
                 </div>

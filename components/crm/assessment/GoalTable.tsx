@@ -2,205 +2,259 @@
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type {
-  GoalRowColumnA,
-  GoalRowColumnB,
+import {
+  GOAL_STATUSES,
+  type GoalRowColumnA,
+  type GoalRowColumnB,
 } from '@/lib/crm/assessment/assessment.schema'
+import { GOAL_STATUS_LABELS, goalRequiresRationale } from '@/lib/crm/assessment/reassessment'
 import { defaultTargetMasteryDate } from '@/lib/crm/assessment/targetMasteryDate'
+import {
+  PreviousValueNote,
+  carriedInputClass,
+  useCarryState,
+} from '@/components/crm/assessment/carryForward'
+import { cn } from '@/lib/utils'
+
+type CommonProps = {
+  readOnly?: boolean
+  onBlur?: () => void
+  /** Show reassessment status / date mastered / rationale columns. */
+  reassessment?: boolean
+}
 
 type GoalTableProps =
-  | {
+  | (CommonProps & {
       variant: 'A'
       rows: GoalRowColumnA[]
       onChange: (rows: GoalRowColumnA[]) => void
-      readOnly?: boolean
-      onBlur?: () => void
-    }
-  | {
+      previousRows?: GoalRowColumnA[]
+    })
+  | (CommonProps & {
       variant: 'B'
       rows: GoalRowColumnB[]
       onChange: (rows: GoalRowColumnB[]) => void
-      readOnly?: boolean
-      onBlur?: () => void
-    }
+      previousRows?: GoalRowColumnB[]
+    })
+
+type AnyRow = GoalRowColumnA | GoalRowColumnB
+
+/**
+ * plan: carried from the predecessor as-is (marked until edited).
+ * previous: auto-filled from the predecessor's Current Performance.
+ */
+type Col = { key: string; label: string; kind: 'plan' | 'previous' | 'current' }
+
+const COLS_A: Col[] = [
+  { key: 'goalName', label: 'Goal Name', kind: 'plan' },
+  { key: 'objective', label: 'Objective', kind: 'plan' },
+  { key: 'baseline', label: 'Baseline', kind: 'plan' },
+  { key: 'previousAssessmentScore', label: 'Previous Assessment Score', kind: 'previous' },
+  { key: 'currentPerformance', label: 'Current Performance', kind: 'current' },
+  { key: 'masteryCriteria', label: 'Mastery Criteria', kind: 'plan' },
+  { key: 'targetMasteryDate', label: 'Target Mastery Date', kind: 'plan' },
+]
+
+const COLS_B: Col[] = [
+  { key: 'goal', label: 'Goal', kind: 'plan' },
+  { key: 'baselinePerformance', label: 'Baseline Performance', kind: 'plan' },
+  { key: 'previousAssessmentPerformance', label: 'Previous Assessment Performance', kind: 'previous' },
+  { key: 'currentPerformance', label: 'Current Performance', kind: 'current' },
+  { key: 'masteryCriteria', label: 'Mastery Criteria', kind: 'plan' },
+  { key: 'targetMasteryDate', label: 'Target Mastery Date', kind: 'plan' },
+  { key: 'methodsToBeUtilized', label: 'Methods to be Utilized', kind: 'plan' },
+]
 
 function newRowId() {
   return crypto.randomUUID()
 }
 
+function emptyRow(variant: 'A' | 'B'): AnyRow {
+  const base = {
+    id: newRowId(),
+    currentPerformance: '',
+    masteryCriteria: '',
+    targetMasteryDate: defaultTargetMasteryDate(),
+    status: '' as const,
+    dateMastered: '',
+    rationale: '',
+  }
+  if (variant === 'A') {
+    return { ...base, goalName: '', objective: '', baseline: '', previousAssessmentScore: '' }
+  }
+  return {
+    ...base,
+    goal: '',
+    baselinePerformance: '',
+    previousAssessmentPerformance: '',
+    methodsToBeUtilized: '',
+  }
+}
+
 function CellInput({
   fieldKey,
+  kind,
   value,
+  previousValue,
   onChange,
   onBlur,
   readOnly,
 }: {
   fieldKey: string
+  kind: Col['kind']
   value: string
+  previousValue: string | undefined
   onChange: (v: string) => void
   onBlur?: () => void
   readOnly?: boolean
 }) {
   const isMastery = fieldKey === 'targetMasteryDate'
+  const carry = useCarryState(value, kind === 'plan' ? previousValue : undefined)
+  const autoFilled = kind === 'previous' && previousValue !== undefined && value.trim() !== ''
   return (
-    <Input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onBlur}
-      readOnly={readOnly}
-      placeholder={isMastery ? 'MM/YYYY' : undefined}
-      inputMode={isMastery ? 'numeric' : undefined}
-      className="min-w-[120px] text-xs"
-    />
+    <div className="space-y-1">
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        readOnly={readOnly}
+        placeholder={isMastery ? 'MM/YYYY' : undefined}
+        inputMode={isMastery ? 'numeric' : undefined}
+        title={
+          carry.state === 'carried'
+            ? 'Carried forward from the previous assessment — not edited yet'
+            : autoFilled
+              ? "Auto-filled from the previous assessment's Current Performance"
+              : undefined
+        }
+        className={cn(
+          'min-w-[120px] text-xs',
+          carriedInputClass(carry.state),
+          autoFilled && 'bg-canvas/70 italic text-quiet'
+        )}
+      />
+      <PreviousValueNote value={previousValue} show={carry.compare && carry.state === 'changed'} />
+    </div>
   )
 }
 
 export function GoalTable(props: GoalTableProps) {
-  const { readOnly, onBlur } = props
+  const { readOnly, onBlur, reassessment, variant } = props
+  const rows = props.rows as AnyRow[]
+  const previousById = new Map((props.previousRows as AnyRow[] | undefined)?.map((r) => [r.id, r]))
+  const cols = variant === 'A' ? COLS_A : COLS_B
 
-  const addRow = () => {
-    const mastery = defaultTargetMasteryDate()
-    if (props.variant === 'A') {
-      props.onChange([
-        ...props.rows,
-        {
-          id: newRowId(),
-          goalName: '',
-          objective: '',
-          baseline: '',
-          previousAssessmentScore: '',
-          currentPerformance: '',
-          masteryCriteria: '',
-          targetMasteryDate: mastery,
-        },
-      ])
-    } else {
-      props.onChange([
-        ...props.rows,
-        {
-          id: newRowId(),
-          goal: '',
-          baselinePerformance: '',
-          previousAssessmentPerformance: '',
-          currentPerformance: '',
-          masteryCriteria: '',
-          targetMasteryDate: mastery,
-          methodsToBeUtilized: '',
-        },
-      ])
-    }
+  const emit = (next: AnyRow[]) => {
+    ;(props.onChange as (rows: AnyRow[]) => void)(next)
   }
+  const update = (id: string, patch: Partial<Record<string, string>>) =>
+    emit(rows.map((r) => (r.id === id ? ({ ...r, ...patch } as AnyRow) : r)))
 
-  const removeRow = (id: string) => {
-    if (props.variant === 'A') {
-      props.onChange(props.rows.filter((r) => r.id !== id))
-    } else {
-      props.onChange(props.rows.filter((r) => r.id !== id))
-    }
-  }
+  const headers = [
+    ...cols.map((c) => c.label),
+    ...(reassessment ? ['Status', 'Date Mastered', 'Rationale'] : []),
+  ]
 
-  if (props.variant === 'A') {
-    const cols: { key: keyof GoalRowColumnA; label: string }[] = [
-      { key: 'goalName', label: 'Goal Name' },
-      { key: 'objective', label: 'Objective' },
-      { key: 'baseline', label: 'Baseline' },
-      { key: 'previousAssessmentScore', label: 'Previous Assessment Score' },
-      { key: 'currentPerformance', label: 'Current Performance' },
-      { key: 'masteryCriteria', label: 'Mastery Criteria' },
-      { key: 'targetMasteryDate', label: 'Target Mastery Date' },
-    ]
-    return (
-      <GoalTableShell
-        cols={cols.map((c) => c.label)}
-        readOnly={readOnly}
-        onAdd={addRow}
-      >
-        {props.rows.map((row) => (
+  return (
+    <GoalTableShell cols={headers} readOnly={readOnly} onAdd={() => emit([...rows, emptyRow(variant)])}>
+      {rows.map((row) => {
+        const prevRow = previousById.get(row.id)
+        const record = row as unknown as Record<string, string>
+        const prevRecord = prevRow as unknown as Record<string, string> | undefined
+        const rationaleMissing =
+          reassessment && goalRequiresRationale(row.status) && !row.rationale.trim()
+        return (
           <tr key={row.id} className="border-t border-line">
             {cols.map((col) => (
               <td key={col.key} className="p-1 align-top">
                 <CellInput
                   fieldKey={col.key}
-                  value={row[col.key] as string}
-                  onChange={(v) =>
-                    props.onChange(
-                      props.rows.map((r) =>
-                        r.id === row.id ? { ...r, [col.key]: v } : r
-                      )
-                    )
+                  kind={col.kind}
+                  value={record[col.key] ?? ''}
+                  previousValue={
+                    !prevRecord
+                      ? undefined
+                      : col.kind === 'previous'
+                        ? prevRecord.currentPerformance
+                        : prevRecord[col.key]
                   }
+                  onChange={(v) => update(row.id, { [col.key]: v })}
                   onBlur={onBlur}
                   readOnly={readOnly}
                 />
               </td>
             ))}
+            {reassessment && (
+              <>
+                <td className="p-1 align-top">
+                  <select
+                    value={row.status}
+                    onChange={(e) => update(row.id, { status: e.target.value })}
+                    onBlur={onBlur}
+                    disabled={readOnly}
+                    aria-label="Goal status"
+                    className={cn(
+                      'min-w-[130px] rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink',
+                      !row.status && 'border-dashed text-quiet'
+                    )}
+                  >
+                    <option value="">Select status…</option>
+                    {GOAL_STATUSES.map((s) => (
+                      <option key={s} value={s}>
+                        {GOAL_STATUS_LABELS[s]}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td className="p-1 align-top">
+                  <Input
+                    type="date"
+                    value={row.dateMastered}
+                    onChange={(e) => update(row.id, { dateMastered: e.target.value })}
+                    onBlur={onBlur}
+                    readOnly={readOnly}
+                    disabled={row.status !== 'MASTERED'}
+                    aria-label="Date mastered"
+                    className="min-w-[130px] text-xs disabled:opacity-40"
+                  />
+                </td>
+                <td className="p-1 align-top">
+                  <Input
+                    value={row.rationale}
+                    onChange={(e) => update(row.id, { rationale: e.target.value })}
+                    onBlur={onBlur}
+                    readOnly={readOnly}
+                    placeholder={goalRequiresRationale(row.status) ? 'Required' : 'Optional'}
+                    aria-invalid={rationaleMissing || undefined}
+                    aria-label="Rationale"
+                    className={cn(
+                      'min-w-[180px] text-xs',
+                      rationaleMissing && 'border-[var(--urgent-fg)] ring-1 ring-[var(--urgent-fg)]/40'
+                    )}
+                  />
+                  {rationaleMissing && (
+                    <p className="mt-0.5 text-[11px] font-medium text-[var(--urgent-fg)]">
+                      ! Rationale required for {GOAL_STATUS_LABELS[row.status as keyof typeof GOAL_STATUS_LABELS]}
+                    </p>
+                  )}
+                </td>
+              </>
+            )}
             {!readOnly && (
               <td className="p-1">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => removeRow(row.id)}
+                  onClick={() => emit(rows.filter((r) => r.id !== row.id))}
                 >
                   Remove
                 </Button>
               </td>
             )}
           </tr>
-        ))}
-      </GoalTableShell>
-    )
-  }
-
-  const colsB: { key: keyof GoalRowColumnB; label: string }[] = [
-    { key: 'goal', label: 'Goal' },
-    { key: 'baselinePerformance', label: 'Baseline Performance' },
-    { key: 'previousAssessmentPerformance', label: 'Previous Assessment Performance' },
-    { key: 'currentPerformance', label: 'Current Performance' },
-    { key: 'masteryCriteria', label: 'Mastery Criteria' },
-    { key: 'targetMasteryDate', label: 'Target Mastery Date' },
-    { key: 'methodsToBeUtilized', label: 'Methods to be Utilized' },
-  ]
-
-  return (
-    <GoalTableShell
-      cols={colsB.map((c) => c.label)}
-      readOnly={readOnly}
-      onAdd={addRow}
-    >
-      {props.rows.map((row) => (
-        <tr key={row.id} className="border-t border-line">
-          {colsB.map((col) => (
-            <td key={col.key} className="p-1 align-top">
-              <CellInput
-                fieldKey={col.key}
-                value={row[col.key] as string}
-                onChange={(v) =>
-                  props.onChange(
-                    props.rows.map((r) =>
-                      r.id === row.id ? { ...r, [col.key]: v } : r
-                    )
-                  )
-                }
-                onBlur={onBlur}
-                readOnly={readOnly}
-              />
-            </td>
-          ))}
-          {!readOnly && (
-            <td className="p-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => removeRow(row.id)}
-              >
-                Remove
-              </Button>
-            </td>
-          )}
-        </tr>
-      ))}
+        )
+      })}
     </GoalTableShell>
   )
 }

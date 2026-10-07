@@ -28,6 +28,7 @@ export function parseAssessmentRecord(record: {
   recommendations: unknown
   crisisPlan: unknown
   signatures: unknown
+  reassessment?: unknown
 }): AssessmentSectionData {
   const keys = Object.keys(assessmentSectionSchemas) as AssessmentSectionKey[]
   const out = {} as Record<AssessmentSectionKey, AssessmentSectionData[AssessmentSectionKey]>

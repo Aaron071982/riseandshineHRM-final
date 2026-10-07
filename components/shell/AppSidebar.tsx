@@ -61,7 +61,9 @@ function pathActive(pathname: string, href: string): boolean {
   }
   if (href === '/schedule') return pathname.startsWith('/schedule')
   if (href === '/operations') return pathname.startsWith('/operations')
-  if (href === '/admin/documents') return pathname.startsWith('/admin/documents')
+  if (href === '/admin/documents') {
+    return pathname.startsWith('/admin/documents') || pathname.startsWith('/admin/compliance')
+  }
   if (href === '/admin/onboarding') return pathname.startsWith('/admin/onboarding')
   if (href === '/admin/dashboard') return pathname === '/admin/dashboard' || pathname === '/admin'
   if (href === '/billing/dashboard') {

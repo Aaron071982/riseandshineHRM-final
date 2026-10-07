@@ -162,6 +162,22 @@ export async function createAssessmentFileSignedUrl(
   return data.signedUrl
 }
 
+/** Copies an object to a new path; returns the new path, or null if the copy failed. */
+export async function copyAssessmentFile(
+  fromPath: string,
+  toPath: string
+): Promise<string | null> {
+  if (!supabaseAdmin) return null
+  const { error } = await supabaseAdmin.storage
+    .from(ASSESSMENT_FILES_BUCKET)
+    .copy(fromPath, toPath)
+  if (error) {
+    console.error('[treatment-assessment] storage copy failed', error)
+    return null
+  }
+  return toPath
+}
+
 export async function softDeleteAssessmentAttachment(input: {
   attachmentId: string
   assessmentId: string

@@ -1,6 +1,9 @@
 import { notFound } from 'next/navigation'
 import { AssessmentFormClient } from '@/components/crm/assessment/AssessmentFormClient'
-import { loadTreatmentAssessmentDetail } from '@/lib/crm/assessment/load'
+import {
+  loadPreviousAssessmentForCompare,
+  loadTreatmentAssessmentDetail,
+} from '@/lib/crm/assessment/load'
 import { parseAssessmentRecord } from '@/lib/crm/assessment/serialize'
 import { prisma } from '@/lib/prisma'
 import {
@@ -33,6 +36,7 @@ export default async function AssessmentFormPage({ params }: Props) {
   }
 
   const sections = parseAssessmentRecord(assessment)
+  const previous = await loadPreviousAssessmentForCompare(clientId, assessment.previousAssessmentId)
 
   return (
     <AssessmentFormClient
@@ -41,6 +45,7 @@ export default async function AssessmentFormPage({ params }: Props) {
       assessmentId={assessment.id}
       status={assessment.status}
       source={assessment.source}
+      assessmentType={assessment.assessmentType}
       initialSections={sections}
       initialUpdatedAt={assessment.updatedAt.toISOString()}
       attachments={assessment.attachments.map((a) => ({
@@ -50,6 +55,7 @@ export default async function AssessmentFormPage({ params }: Props) {
         mimeType: a.mimeType,
       }))}
       canEdit={permissions.canEdit}
+      previous={previous}
     />
   )
 }

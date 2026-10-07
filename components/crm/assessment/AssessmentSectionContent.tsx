@@ -42,6 +42,27 @@ import {
   selectedSkillsAssessmentLabel,
 } from '@/lib/crm/assessment/afls'
 import { computeAgeFromDob, calendarDateFromInput } from '@/lib/crm/assessment/prefill'
+import { sameValue } from '@/lib/crm/assessment/reassessment'
+import {
+  CarryBadge,
+  CarryForwardSection,
+  PreviousValueNote,
+  carriedInputClass,
+  useCarryState,
+} from '@/components/crm/assessment/carryForward'
+import { cn } from '@/lib/utils'
+import {
+  ReassessmentDetailsSection,
+  ReassessmentResponseToTx,
+} from '@/components/crm/assessment/ReassessmentSections'
+
+export const REASSESSMENT_NAV_ITEM: { key: AssessmentSectionKey; label: string } = {
+  key: 'reassessment',
+  label: 'Reassessment Details',
+}
+
+/** Sections with no carried-forward content (new per period or re-signed). */
+const NOT_CARRIED: readonly AssessmentSectionKey[] = ['reassessment', 'signatures']
 
 export const SECTION_NAV: { key: AssessmentSectionKey; label: string }[] = [
   { key: 'summary', label: 'Initial Assessment Summary' },
@@ -71,7 +92,7 @@ type AttachmentRecord = {
   mimeType: string
 }
 
-type Props = {
+export type AssessmentSectionProps = {
   activeSection: AssessmentSectionKey
   sections: AssessmentSectionData
   setSections: React.Dispatch<React.SetStateAction<AssessmentSectionData>>
@@ -84,11 +105,21 @@ type Props = {
   clientName: string
   attachments: AttachmentRecord[]
   onUploaded: () => void
+  isReassessment?: boolean
+  /** Predecessor's sections on a reassessment (read-only reference). */
+  previous?: AssessmentSectionData | null
+  previousLabel?: string
 }
+
+type Props = AssessmentSectionProps
 
 export function AssessmentSectionContent(props: Props) {
   const { activeSection } = props
   switch (activeSection) {
+    case 'reassessment':
+      return props.isReassessment
+        ? wrap(props, 'reassessment', 'Reassessment Details', <ReassessmentDetailsSection {...props} />)
+        : null
     case 'summary':
       return <SummarySection {...props} />
     case 'treatmentRequest':
@@ -144,8 +175,60 @@ function wrap(
       saving={props.savingSection === key}
       readOnly={props.readOnly}
     >
-      {children}
+      <CarryForwardBanner props={props} sectionKey={key} />
+      <CarryForwardSection value={key}>{children}</CarryForwardSection>
     </SectionCard>
+  )
+}
+
+function CarryForwardBanner({ props, sectionKey }: { props: Props; sectionKey: AssessmentSectionKey }) {
+  if (!props.isReassessment || !props.previous || NOT_CARRIED.includes(sectionKey)) return null
+  const reviewedAt = props.sections.reassessment.reviewedSections[sectionKey]
+  const unchanged = sameValue(props.sections[sectionKey], props.previous[sectionKey])
+  const source = props.previousLabel || 'previous assessment'
+
+  const setReviewed = (on: boolean) =>
+    props.setSections((prev) => {
+      const reviewedSections = { ...prev.reassessment.reviewedSections }
+      if (on) reviewedSections[sectionKey] = new Date().toISOString().slice(0, 10)
+      else delete reviewedSections[sectionKey]
+      return { ...prev, reassessment: { ...prev.reassessment, reviewedSections } }
+    })
+
+  if (reviewedAt) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-canvas/60 px-3 py-2 text-xs text-quiet">
+        <span>
+          <span aria-hidden>✓ </span>Carried-forward content reviewed for this period on {reviewedAt}.
+        </span>
+        {!props.readOnly && (
+          <button type="button" className="font-medium text-brand hover:underline" onClick={() => setReviewed(false)}>
+            Undo
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+      <span>
+        <span aria-hidden>↻ </span>
+        {unchanged
+          ? `Everything in this section is carried forward unchanged from the ${source}.`
+          : `Carried forward from the ${source}. Fields marked "Carried forward" have not been edited yet.`}{' '}
+        Update what changed this period, or confirm the rest is still accurate.
+      </span>
+      {!props.readOnly && (
+        <button
+          type="button"
+          className="rounded-md border border-amber-400 bg-white px-2 py-1 font-medium text-amber-950 hover:bg-amber-100"
+          onClick={() => setReviewed(true)}
+        >
+          Mark reviewed
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -159,7 +242,9 @@ function SummarySection(props: Props) {
     set({ dateOfBirth, age: computeAgeFromDob(dob) })
   }
 
-  return wrap(props, 'summary', 'Initial Assessment Summary', (
+  const p = props.previous?.summary
+
+  return wrap(props, 'summary', props.isReassessment ? 'Reassessment Summary' : 'Initial Assessment Summary', (
     <div className="grid gap-3 sm:grid-cols-2">
       <Field label="Patient Name">
         <Input value={s.patientName} onChange={(e) => set({ patientName: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
@@ -167,10 +252,10 @@ function SummarySection(props: Props) {
       <Field label="Parent Name">
         <Input value={s.parentName} onChange={(e) => set({ parentName: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
-      <Field label="Diagnosis">
+      <Field label="Diagnosis" value={s.diagnosis} previous={p?.diagnosis}>
         <Input value={s.diagnosis} onChange={(e) => set({ diagnosis: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
-      <Field label="Comorbid Diagnosis">
+      <Field label="Comorbid Diagnosis" value={s.comorbidDiagnosis} previous={p?.comorbidDiagnosis}>
         <Input value={s.comorbidDiagnosis} onChange={(e) => set({ comorbidDiagnosis: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
       <Field label="Date of Birth">
@@ -179,22 +264,22 @@ function SummarySection(props: Props) {
       <Field label="Age">
         <Input value={s.age} readOnly className="bg-canvas/50" />
       </Field>
-      <Field label="Referring / Primary Care Provider">
+      <Field label="Referring / Primary Care Provider" value={s.referringProvider} previous={p?.referringProvider}>
         <Input value={s.referringProvider} onChange={(e) => set({ referringProvider: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
-      <Field label="NPI">
+      <Field label="NPI" value={s.npi} previous={p?.npi}>
         <Input value={s.npi} onChange={(e) => set({ npi: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
-      <Field label="Report Date">
+      <Field label="Report Date" value={s.reportDate} previous={p?.reportDate}>
         <Input type="date" value={s.reportDate} onChange={(e) => set({ reportDate: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
-      <Field label={`Assessor Name${ASSESSOR_CREDENTIALS_SUFFIX}`}>
+      <Field label={`Assessor Name${ASSESSOR_CREDENTIALS_SUFFIX}`} value={s.assessorName} previous={p?.assessorName}>
         <Input value={s.assessorName} onChange={(e) => set({ assessorName: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
-      <Field label="Assessor Email">
+      <Field label="Assessor Email" value={s.assessorEmail} previous={p?.assessorEmail}>
         <Input type="email" value={s.assessorEmail} onChange={(e) => set({ assessorEmail: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
-      <Field label="Assessor Phone">
+      <Field label="Assessor Phone" value={s.assessorPhone} previous={p?.assessorPhone}>
         <Input value={s.assessorPhone} onChange={(e) => set({ assessorPhone: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
     </div>
@@ -206,6 +291,8 @@ function TreatmentRequestSection(props: Props) {
   const set = (patch: Partial<typeof t>) =>
     props.setSections((prev) => ({ ...prev, treatmentRequest: { ...prev.treatmentRequest, ...patch } }))
 
+  const p = props.previous?.treatmentRequest
+
   return wrap(props, 'treatmentRequest', 'Treatment Requests & Intensity', (
     <div className="space-y-4">
       <DisplayBoilerplate
@@ -214,14 +301,14 @@ function TreatmentRequestSection(props: Props) {
       <table className="w-full border border-line text-sm">
         <thead><tr className="bg-canvas/60"><th className="p-2 text-left">Code</th><th className="p-2 text-left">Service</th><th className="p-2 text-left">Requested Hours</th></tr></thead>
         <tbody>
-          <IntensityRow code="97151" label="Initial assessment — hours per authorization period" value={t.hrs97151} onChange={(v) => set({ hrs97151: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
-          <IntensityRow code="97153" label="Direct 1:1 ABA Treatment — hours weekly initially" value={t.hrs97153Initial} onChange={(v) => set({ hrs97153Initial: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
-          <IntensityRow code="97155" label="Direction of Technician / Protocol Modification (BCBA present) — hours weekly initially" value={t.hrs97155Initial} onChange={(v) => set({ hrs97155Initial: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
-          <IntensityRow code="97156" label="Parent / Caregiver Training — hour weekly (no less than 2x sessions monthly)" value={t.hrs97156} onChange={(v) => set({ hrs97156: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
-          <IntensityRow code="97157" label="Group Parent Training — hours monthly (if applicable)" value={t.hrs97157} onChange={(v) => set({ hrs97157: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
+          <IntensityRow code="97151" label="Initial assessment — hours per authorization period" value={t.hrs97151} previous={p?.hrs97151} onChange={(v) => set({ hrs97151: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
+          <IntensityRow code="97153" label="Direct 1:1 ABA Treatment — hours weekly initially" value={t.hrs97153Initial} previous={p?.hrs97153Initial} onChange={(v) => set({ hrs97153Initial: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
+          <IntensityRow code="97155" label="Direction of Technician / Protocol Modification (BCBA present) — hours weekly initially" value={t.hrs97155Initial} previous={p?.hrs97155Initial} onChange={(v) => set({ hrs97155Initial: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
+          <IntensityRow code="97156" label="Parent / Caregiver Training — hour weekly (no less than 2x sessions monthly)" value={t.hrs97156} previous={p?.hrs97156} onChange={(v) => set({ hrs97156: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
+          <IntensityRow code="97157" label="Group Parent Training — hours monthly (if applicable)" value={t.hrs97157} previous={p?.hrs97157} onChange={(v) => set({ hrs97157: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
         </tbody>
       </table>
-      <Field label="Service Period">
+      <Field label="Service Period" value={t.servicePeriod} previous={p?.servicePeriod}>
         <Input value={t.servicePeriod} onChange={(e) => set({ servicePeriod: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
       </Field>
     </div>
@@ -338,7 +425,7 @@ function BioPsychosocialSection(props: Props) {
   return wrap(props, 'bioPsychosocial', 'Bio-Psychosocial Information', (
     <div className="space-y-3">
       {fields.map(({ key, label }) => (
-        <PrefilledTextArea key={key} label={label} value={b[key]} readOnly={props.readOnly} onBlur={props.onBlur}
+        <PrefilledTextArea key={key} label={label} value={b[key]} previousValue={props.previous?.bioPsychosocial[key]} readOnly={props.readOnly} onBlur={props.onBlur}
           onChange={(v) => props.setSections((prev) => ({ ...prev, bioPsychosocial: { ...prev.bioPsychosocial, [key]: v } }))} />
       ))}
     </div>
@@ -350,11 +437,12 @@ function InstrumentsSection(props: Props) {
   const set = (key: keyof typeof i, v: string) =>
     props.setSections((prev) => ({ ...prev, instruments: { ...prev.instruments, [key]: v } }))
   const selectedLabel = selectedSkillsAssessmentLabel(i)
+  const pi = props.previous?.instruments
   return wrap(props, 'instruments', 'Summary of Assessment Instruments & Methods', (
     <div className="space-y-3">
       <h4 className="font-medium">Indirect Methods</h4>
-      <PrefilledTextArea label="Family/caregiver(s) interview" value={i.familyCaregiverInterview} onChange={(v) => set('familyCaregiverInterview', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <PrefilledTextArea label="Records reviewed (IEP, psych evals, reports from other ABA providers, etc.)" value={i.recordsReviewed} onChange={(v) => set('recordsReviewed', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <PrefilledTextArea label="Family/caregiver(s) interview" value={i.familyCaregiverInterview} previousValue={pi?.familyCaregiverInterview} onChange={(v) => set('familyCaregiverInterview', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <PrefilledTextArea label="Records reviewed (IEP, psych evals, reports from other ABA providers, etc.)" value={i.recordsReviewed} previousValue={pi?.recordsReviewed} onChange={(v) => set('recordsReviewed', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       <h4 className="font-medium">Direct Methods / Skills Assessment(s)</h4>
       <Field label="Skills assessment instrument">
         <select
@@ -389,25 +477,25 @@ function InstrumentsSection(props: Props) {
           />
         </Field>
       )}
-      <Field label="Vineland Assessment Tool completed by parent on (updated every 6 months)">
+      <Field label="Vineland Assessment Tool completed by parent on (updated every 6 months)" value={i.vinelandCompletedDate} previous={pi?.vinelandCompletedDate}>
         <Input type="date" value={i.vinelandCompletedDate} onChange={(e) => set('vinelandCompletedDate', e.target.value)} readOnly={props.readOnly} onBlur={props.onBlur} />
       </Field>
-      <PrefilledTextArea label="Behavior Assessment (FAST) (updated every 6 months)" value={i.fastAssessment} onChange={(v) => set('fastAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <PrefilledTextArea label="Behavior Assessment (FAST) (updated every 6 months)" value={i.fastAssessment} previousValue={pi?.fastAssessment} onChange={(v) => set('fastAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       {i.skillsAssessmentType === 'AFLS' && (
-        <PrefilledTextArea label="Assessment of Functional Living Skills (AFLS)" value={i.aflsAssessment} onChange={(v) => set('aflsAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+        <PrefilledTextArea label="Assessment of Functional Living Skills (AFLS)" value={i.aflsAssessment} previousValue={pi?.aflsAssessment} onChange={(v) => set('aflsAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       )}
       {i.skillsAssessmentType === 'ATEC' && (
-        <PrefilledTextArea label="Autism Treatment Evaluation Checklist (ATEC)" value={i.atecAssessment} onChange={(v) => set('atecAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+        <PrefilledTextArea label="Autism Treatment Evaluation Checklist (ATEC)" value={i.atecAssessment} previousValue={pi?.atecAssessment} onChange={(v) => set('atecAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       )}
       {i.skillsAssessmentType === 'VB_MAPP' && (
-        <PrefilledTextArea label="VB-MAPP" value={i.vbMappAssessment} onChange={(v) => set('vbMappAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+        <PrefilledTextArea label="VB-MAPP" value={i.vbMappAssessment} previousValue={pi?.vbMappAssessment} onChange={(v) => set('vbMappAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       )}
       {i.skillsAssessmentType === 'OTHER' && (
-        <PrefilledTextArea label={selectedLabel} value={i.otherSkillsAssessmentSummary} onChange={(v) => set('otherSkillsAssessmentSummary', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+        <PrefilledTextArea label={selectedLabel} value={i.otherSkillsAssessmentSummary} previousValue={pi?.otherSkillsAssessmentSummary} onChange={(v) => set('otherSkillsAssessmentSummary', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       )}
-      <PrefilledTextArea label="Observation 1" value={i.observation1} onChange={(v) => set('observation1', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <PrefilledTextArea label="Observation 2" value={i.observation2} onChange={(v) => set('observation2', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <PrefilledTextArea label="Preference Assessment" value={i.preferenceAssessment} onChange={(v) => set('preferenceAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <PrefilledTextArea label="Observation 1" value={i.observation1} previousValue={pi?.observation1} onChange={(v) => set('observation1', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <PrefilledTextArea label="Observation 2" value={i.observation2} previousValue={pi?.observation2} onChange={(v) => set('observation2', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <PrefilledTextArea label="Preference Assessment" value={i.preferenceAssessment} previousValue={pi?.preferenceAssessment} onChange={(v) => set('preferenceAssessment', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
     </div>
   ))
 }
@@ -438,8 +526,8 @@ function PresentLevelsSection(props: Props) {
           label="Upload Vineland (PDF or image)"
           hint="PDF or image · up to 50 MB · uploads go directly to secure storage"
         />
-        <Field label="Date"><Input type="date" value={p.vineland.date} onChange={(e) => props.setSections((prev) => ({ ...prev, presentLevels: { ...prev.presentLevels, vineland: { ...prev.presentLevels.vineland, date: e.target.value } } }))} readOnly={props.readOnly} onBlur={props.onBlur} /></Field>
-        <PrefilledTextArea label="Interpretation" value={p.vineland.interpretation} onChange={(v) => props.setSections((prev) => ({ ...prev, presentLevels: { ...prev.presentLevels, vineland: { ...prev.presentLevels.vineland, interpretation: v } } }))} readOnly={props.readOnly} onBlur={props.onBlur} />
+        <Field label="Date" value={p.vineland.date} previous={props.previous?.presentLevels.vineland.date}><Input type="date" value={p.vineland.date} onChange={(e) => props.setSections((prev) => ({ ...prev, presentLevels: { ...prev.presentLevels, vineland: { ...prev.presentLevels.vineland, date: e.target.value } } }))} readOnly={props.readOnly} onBlur={props.onBlur} /></Field>
+        <PrefilledTextArea label="Interpretation" value={p.vineland.interpretation} previousValue={props.previous?.presentLevels.vineland.interpretation} onChange={(v) => props.setSections((prev) => ({ ...prev, presentLevels: { ...prev.presentLevels, vineland: { ...prev.presentLevels.vineland, interpretation: v } } }))} readOnly={props.readOnly} onBlur={props.onBlur} />
       </div>
 
       {selectedType === 'AFLS' && (
@@ -468,6 +556,7 @@ function PresentLevelsSection(props: Props) {
           title="ATEC"
           sectionKey="present_levels.atec"
           value={p.atec}
+          previous={props.previous?.presentLevels.atec}
           setValue={(atec) =>
             props.setSections((prev) => ({
               ...prev,
@@ -488,6 +577,7 @@ function PresentLevelsSection(props: Props) {
           title="VB-MAPP"
           sectionKey="present_levels.vbMapp"
           value={p.vbMapp}
+          previous={props.previous?.presentLevels.vbMapp}
           setValue={(vbMapp) =>
             props.setSections((prev) => ({
               ...prev,
@@ -508,6 +598,7 @@ function PresentLevelsSection(props: Props) {
           title={selectedLabel}
           sectionKey="present_levels.other"
           value={p.other}
+          previous={props.previous?.presentLevels.other}
           setValue={(other) =>
             props.setSections((prev) => ({
               ...prev,
@@ -527,6 +618,7 @@ function PresentLevelsSection(props: Props) {
         title="FAST"
         sectionKey="present_levels.fast"
         value={p.fast}
+        previous={props.previous?.presentLevels.fast}
         setValue={(fast) =>
           props.setSections((prev) => ({
             ...prev,
@@ -609,10 +701,12 @@ function SimplePresentLevelBlock({
   assessmentId,
   attachments,
   onUploaded,
+  previous,
 }: {
   title: string
   sectionKey: string
   value: AssessmentSectionData['presentLevels']['vineland']
+  previous?: AssessmentSectionData['presentLevels']['vineland']
   setValue: (value: AssessmentSectionData['presentLevels']['vineland']) => void
   readOnly?: boolean
   onBlur?: () => void
@@ -640,6 +734,7 @@ function SimplePresentLevelBlock({
       <PrefilledTextArea
         label="Interpretation"
         value={value.interpretation}
+        previousValue={previous?.interpretation}
         onChange={(interpretation) => setValue({ ...value, interpretation })}
         readOnly={readOnly}
         onBlur={onBlur}
@@ -650,19 +745,22 @@ function SimplePresentLevelBlock({
 
 function EnvironmentalSection(props: Props) {
   return wrap(props, 'environmental', 'Environmental Factors That Interfere with Progress/Barriers', (
-    <PrefilledTextArea value={props.sections.environmental.barriers} onChange={(v) => props.setSections((prev) => ({ ...prev, environmental: { barriers: v } }))} readOnly={props.readOnly} onBlur={props.onBlur} rows={8} />
+    <PrefilledTextArea value={props.sections.environmental.barriers} previousValue={props.previous?.environmental.barriers} onChange={(v) => props.setSections((prev) => ({ ...prev, environmental: { barriers: v } }))} readOnly={props.readOnly} onBlur={props.onBlur} rows={8} />
   ))
 }
 
 function ResponseToTxSection(props: Props) {
+  if (props.isReassessment) {
+    return wrap(props, 'responseToTx', 'Response to Treatment', <ReassessmentResponseToTx {...props} />)
+  }
   return wrap(props, 'responseToTx', 'Response to Treatment', (
-    <PrefilledTextArea value={props.sections.responseToTx.narrative} onChange={(v) => props.setSections((prev) => ({ ...prev, responseToTx: { narrative: v } }))} readOnly={props.readOnly} onBlur={props.onBlur} rows={4} />
+    <PrefilledTextArea value={props.sections.responseToTx.narrative} onChange={(v) => props.setSections((prev) => ({ ...prev, responseToTx: { ...prev.responseToTx, narrative: v } }))} readOnly={props.readOnly} onBlur={props.onBlur} rows={4} />
   ))
 }
 
 function InterventionsSection(props: Props) {
   return wrap(props, 'interventions', '97155 Interventions & Barriers to Treatment', (
-    <PrefilledTextArea value={props.sections.interventions.narrative} onChange={(v) => props.setSections((prev) => ({ ...prev, interventions: { narrative: v } }))} readOnly={props.readOnly} onBlur={props.onBlur} rows={10} />
+    <PrefilledTextArea value={props.sections.interventions.narrative} previousValue={props.previous?.interventions.narrative} onChange={(v) => props.setSections((prev) => ({ ...prev, interventions: { narrative: v } }))} readOnly={props.readOnly} onBlur={props.onBlur} rows={10} />
   ))
 }
 
@@ -685,19 +783,23 @@ function BehaviorsSection(props: Props) {
 
 function GoalsSection(props: Props) {
   const g = props.sections.goals
+  const pg = props.previous?.goals
+  const re = props.isReassessment
   const setGoals = (patch: Partial<typeof g>) => props.setSections((prev) => ({ ...prev, goals: { ...prev.goals, ...patch } }))
   return wrap(props, 'goals', 'Treatment Goals', (
     <div className="space-y-8">
       <div>
-        <PrefilledTextArea label="Analysis of Behavior Progress" value={g.behaviorReduction.analysisNarrative} onChange={(v) => setGoals({ behaviorReduction: { ...g.behaviorReduction, analysisNarrative: v } })} readOnly={props.readOnly} onBlur={props.onBlur} />
+        <PrefilledTextArea label="Analysis of Behavior Progress" value={g.behaviorReduction.analysisNarrative} previousValue={pg?.behaviorReduction.analysisNarrative} onChange={(v) => setGoals({ behaviorReduction: { ...g.behaviorReduction, analysisNarrative: v } })} readOnly={props.readOnly} onBlur={props.onBlur} />
         <p className="mb-2 mt-4 text-sm font-medium">Behavior Reduction Goals</p>
-        <GoalTable variant="A" rows={g.behaviorReduction.rows} onChange={(rows) => setGoals({ behaviorReduction: { ...g.behaviorReduction, rows } })} readOnly={props.readOnly} onBlur={props.onBlur} />
+        <GoalTable variant="A" reassessment={re} rows={g.behaviorReduction.rows} previousRows={pg?.behaviorReduction.rows} onChange={(rows) => setGoals({ behaviorReduction: { ...g.behaviorReduction, rows } })} readOnly={props.readOnly} onBlur={props.onBlur} />
       </div>
       <div>
         <p className="mb-2 text-sm font-medium">Replacement Behavior Goals</p>
         <GoalTable
           variant="A"
+          reassessment={re}
           rows={g.replacementBehavior.rows}
+          previousRows={pg?.replacementBehavior.rows}
           onChange={(rows) => setGoals({ replacementBehavior: { rows } })}
           readOnly={props.readOnly}
           onBlur={props.onBlur}
@@ -711,8 +813,8 @@ function GoalsSection(props: Props) {
       ] as const).map(([key, title, levelLabel]) => (
         <div key={key}>
           <p className="mb-2 text-sm font-medium">{title}</p>
-          <PrefilledTextArea label={levelLabel} value={g[key].currentLevel} onChange={(v) => setGoals({ [key]: { ...g[key], currentLevel: v } })} readOnly={props.readOnly} onBlur={props.onBlur} rows={2} />
-          <GoalTable variant="A" rows={g[key].rows} onChange={(rows) => setGoals({ [key]: { ...g[key], rows } })} readOnly={props.readOnly} onBlur={props.onBlur} />
+          <PrefilledTextArea label={levelLabel} value={g[key].currentLevel} previousValue={pg?.[key].currentLevel} onChange={(v) => setGoals({ [key]: { ...g[key], currentLevel: v } })} readOnly={props.readOnly} onBlur={props.onBlur} rows={2} />
+          <GoalTable variant="A" reassessment={re} rows={g[key].rows} previousRows={pg?.[key].rows} onChange={(rows) => setGoals({ [key]: { ...g[key], rows } })} readOnly={props.readOnly} onBlur={props.onBlur} />
         </div>
       ))}
     </div>
@@ -721,13 +823,14 @@ function GoalsSection(props: Props) {
 
 function ParentTrainingSection(props: Props) {
   const pt = props.sections.parentTraining
+  const ppt = props.previous?.parentTraining
   const set = (patch: Partial<typeof pt>) => props.setSections((prev) => ({ ...prev, parentTraining: { ...prev.parentTraining, ...patch } }))
   return wrap(props, 'parentTraining', 'Parent Training Summary & Goals', (
     <div className="space-y-6">
-      <PrefilledTextArea label="Parent Training Summary & Goals" value={pt.summaryNarrative} onChange={(v) => set({ summaryNarrative: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <GoalTable variant="B" rows={pt.summaryGoals} onChange={(rows) => set({ summaryGoals: rows })} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <PrefilledTextArea label="Group Parent Training Goals — Clinical Rationale" value={pt.groupClinicalRationale} onChange={(v) => set({ groupClinicalRationale: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
-      <GoalTable variant="B" rows={pt.groupGoals} onChange={(rows) => set({ groupGoals: rows })} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <PrefilledTextArea label="Parent Training Summary & Goals" value={pt.summaryNarrative} previousValue={ppt?.summaryNarrative} onChange={(v) => set({ summaryNarrative: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <GoalTable variant="B" reassessment={props.isReassessment} rows={pt.summaryGoals} previousRows={ppt?.summaryGoals} onChange={(rows) => set({ summaryGoals: rows })} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <PrefilledTextArea label="Group Parent Training Goals — Clinical Rationale" value={pt.groupClinicalRationale} previousValue={ppt?.groupClinicalRationale} onChange={(v) => set({ groupClinicalRationale: v })} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <GoalTable variant="B" reassessment={props.isReassessment} rows={pt.groupGoals} previousRows={ppt?.groupGoals} onChange={(rows) => set({ groupGoals: rows })} readOnly={props.readOnly} onBlur={props.onBlur} />
       <DisplayBoilerplate text={GROUP_PARENT_TRAINING_GRAPHS_NOTE} />
     </div>
   ))
@@ -747,9 +850,9 @@ function ServicesProtocolsSection(props: Props) {
   return wrap(props, 'servicesProtocols', 'Services Protocols & Details', (
     <div className="space-y-4">
       {blocks.map(({ key, label }) => (
-        <PrefilledTextArea key={key} label={label} value={sp[key] as string} onChange={(v) => set(key, v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+        <PrefilledTextArea key={key} label={label} value={sp[key] as string} previousValue={props.previous?.servicesProtocols[key]} onChange={(v) => set(key, v)} readOnly={props.readOnly} onBlur={props.onBlur} />
       ))}
-      <PrefilledTextArea label="Please list the names, organizations, contact information for each professional with which you coordinate care" value={sp.coordinationContacts} onChange={(v) => set('coordinationContacts', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
+      <PrefilledTextArea label="Please list the names, organizations, contact information for each professional with which you coordinate care" value={sp.coordinationContacts} previousValue={props.previous?.servicesProtocols.coordinationContacts} onChange={(v) => set('coordinationContacts', v)} readOnly={props.readOnly} onBlur={props.onBlur} />
     </div>
   ))
 }
@@ -764,20 +867,54 @@ function TransitionPlanSection(props: Props) {
     schoolConsultation: 'School consultation',
     socialSkillsProgramming: 'Social skills programming as appropriate',
   }
+  const ptp = props.previous?.transitionPlan
   return wrap(props, 'transitionPlan', 'Transition Plan / Maintenance / Discharge', (
     <div className="space-y-4">
-      <PrefilledTextArea label="Generalization strategies & Maintenance" value={tp.maintenanceGeneralization} onChange={(v) => set({ maintenanceGeneralization: v })} readOnly={props.readOnly} onBlur={props.onBlur} rows={8} />
-      <PrefilledTextArea label="Transition Plan" value={tp.transitionPlanNarrative} onChange={(v) => set({ transitionPlanNarrative: v })} readOnly={props.readOnly} onBlur={props.onBlur} rows={8} />
-      <PrefilledTextArea label="Communication hour-reduction criteria" value={tp.communicationCriteria} onChange={(v) => set({ communicationCriteria: v })} readOnly={props.readOnly} onBlur={props.onBlur} rows={8} />
-      <PrefilledTextArea label="Social hour-reduction criteria" value={tp.socialCriteria} onChange={(v) => set({ socialCriteria: v })} readOnly={props.readOnly} onBlur={props.onBlur} rows={8} />
-      <TransitionCriteriaTable rows={tp.criteriaRows} readOnly={props.readOnly} onBlur={props.onBlur}
+      <PrefilledTextArea label="Generalization strategies & Maintenance" value={tp.maintenanceGeneralization} previousValue={ptp?.maintenanceGeneralization} onChange={(v) => set({ maintenanceGeneralization: v })} readOnly={props.readOnly} onBlur={props.onBlur} rows={8} />
+      <PrefilledTextArea label="Transition Plan" value={tp.transitionPlanNarrative} previousValue={ptp?.transitionPlanNarrative} onChange={(v) => set({ transitionPlanNarrative: v })} readOnly={props.readOnly} onBlur={props.onBlur} rows={8} />
+      <PrefilledTextArea label="Communication hour-reduction criteria" value={tp.communicationCriteria} previousValue={ptp?.communicationCriteria} onChange={(v) => set({ communicationCriteria: v })} readOnly={props.readOnly} onBlur={props.onBlur} rows={8} />
+      <PrefilledTextArea label="Social hour-reduction criteria" value={tp.socialCriteria} previousValue={ptp?.socialCriteria} onChange={(v) => set({ socialCriteria: v })} readOnly={props.readOnly} onBlur={props.onBlur} rows={8} />
+      <TransitionCriteriaTable rows={tp.criteriaRows} previousRows={ptp?.criteriaRows} readOnly={props.readOnly} onBlur={props.onBlur}
         onChange={(rows) => set({ criteriaRows: rows })}
         onAdd={() => set({ criteriaRows: [...tp.criteriaRows, emptyTransitionCriteriaRow()] })} />
+      {props.isReassessment && (
+        <div
+          className={cn(
+            'space-y-3 rounded-lg border p-3',
+            tp.reviewedThisPeriod ? 'border-line bg-canvas/40' : 'border-dashed border-amber-400 bg-amber-50/50'
+          )}
+        >
+          <label className="flex items-start gap-2 text-sm font-medium text-ink">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={tp.reviewedThisPeriod}
+              disabled={props.readOnly}
+              onChange={(e) =>
+                set({
+                  reviewedThisPeriod: e.target.checked,
+                  reviewedOn: e.target.checked ? tp.reviewedOn || new Date().toISOString().slice(0, 10) : tp.reviewedOn,
+                })
+              }
+            />
+            Transition / discharge criteria reviewed this reporting period
+            {!tp.reviewedThisPeriod && <span className="font-normal text-amber-900">(required)</span>}
+          </label>
+          <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
+            <Field label="Reviewed on">
+              <Input type="date" value={tp.reviewedOn} onChange={(e) => set({ reviewedOn: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} />
+            </Field>
+            <Field label="Review notes (criteria met, adjusted, or still pending)">
+              <Textarea value={tp.reviewNotes} onChange={(e) => set({ reviewNotes: e.target.value })} onBlur={props.onBlur} readOnly={props.readOnly} rows={2} />
+            </Field>
+          </div>
+        </div>
+      )}
       <CheckboxGroup options={NEXT_LEVEL_OF_CARE_OPTIONS.map((k) => ({ key: k, label: nextLabels[k] }))}
         values={tp.nextLevelOfCare as Record<string, boolean>}
         onChange={(key, checked) => set({ nextLevelOfCare: { ...tp.nextLevelOfCare, [key]: checked } })}
         readOnly={props.readOnly} />
-      <PrefilledTextArea label="DISCHARGE" value={tp.dischargeNarrative} onChange={(v) => set({ dischargeNarrative: v })} readOnly={props.readOnly} onBlur={props.onBlur} rows={6} />
+      <PrefilledTextArea label="DISCHARGE" value={tp.dischargeNarrative} previousValue={ptp?.dischargeNarrative} onChange={(v) => set({ dischargeNarrative: v })} readOnly={props.readOnly} onBlur={props.onBlur} rows={6} />
     </div>
   ))
 }
@@ -899,7 +1036,7 @@ function CoordinationSection(props: Props) {
 
 function RecommendationsSection(props: Props) {
   return wrap(props, 'recommendations', 'Medical Necessity rational', (
-    <PrefilledTextArea value={props.sections.recommendations.narrative} onChange={(v) => props.setSections((prev) => ({ ...prev, recommendations: { narrative: v } }))} readOnly={props.readOnly} onBlur={props.onBlur} rows={12} />
+    <PrefilledTextArea value={props.sections.recommendations.narrative} previousValue={props.previous?.recommendations.narrative} onChange={(v) => props.setSections((prev) => ({ ...prev, recommendations: { narrative: v } }))} readOnly={props.readOnly} onBlur={props.onBlur} rows={12} />
   ))
 }
 
@@ -986,25 +1123,34 @@ function SignaturesSection(props: Props) {
   ))
 }
 
-function IntensityRow({ code, label, value, onChange, readOnly, onBlur }: { code: string; label: string; value: string; onChange: (v: string) => void; readOnly?: boolean; onBlur?: () => void }) {
+function IntensityRow({ code, label, value, previous, onChange, readOnly, onBlur }: { code: string; label: string; value: string; previous?: string; onChange: (v: string) => void; readOnly?: boolean; onBlur?: () => void }) {
+  const carry = useCarryState(value, previous)
   return (
     <tr className="border-t border-line">
       <td className="p-2 align-top font-mono text-xs">{code}</td>
       <td className="p-2 align-top text-xs">{label}</td>
-      <td className="p-2 align-top"><Input value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} readOnly={readOnly} className="max-w-[120px]" /></td>
+      <td className="space-y-1 p-2 align-top">
+        <Input value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} readOnly={readOnly} className={cn('max-w-[120px]', carriedInputClass(carry.state))} />
+        {(carry.state === 'carried' || carry.state === 'reviewed') && <CarryBadge state={carry.state} />}
+        <PreviousValueNote value={previous} show={carry.compare && carry.state === 'changed'} />
+      </td>
     </tr>
   )
 }
 
-function TransitionCriteriaTable({ rows, onChange, onAdd, readOnly, onBlur }: {
-  rows: AssessmentSectionData['transitionPlan']['criteriaRows']
-  onChange: (rows: AssessmentSectionData['transitionPlan']['criteriaRows']) => void
+type CriteriaRows = AssessmentSectionData['transitionPlan']['criteriaRows']
+
+function TransitionCriteriaTable({ rows, previousRows, onChange, onAdd, readOnly, onBlur }: {
+  rows: CriteriaRows
+  previousRows?: CriteriaRows
+  onChange: (rows: CriteriaRows) => void
   onAdd: () => void
   readOnly?: boolean
   onBlur?: () => void
 }) {
   const cols = ['criteria', 'directHoursChangeTo', 'parentTrainingIncrease', 'supervisionDecrease', 'dateExpected'] as const
   const labels = ['Criteria', 'Direct Hours Change to', 'Parent Training Increase', 'Supervision Decrease', 'Date Expected']
+  const previousById = new Map(previousRows?.map((r) => [r.id, r]))
   return (
     <div className="overflow-x-auto">
       <table className="min-w-[900px] w-full border border-line text-xs">
@@ -1014,7 +1160,13 @@ function TransitionCriteriaTable({ rows, onChange, onAdd, readOnly, onBlur }: {
             <tr key={row.id} className="border-t border-line">
               {cols.map((col) => (
                 <td key={col} className="p-1 align-top">
-                  <Textarea value={row[col]} onChange={(e) => onChange(rows.map((r, i) => i === ri ? { ...r, [col]: e.target.value } : r))} onBlur={onBlur} readOnly={readOnly} rows={2} className="text-xs min-w-[140px]" />
+                  <CriteriaCell
+                    value={row[col]}
+                    previous={previousById.get(row.id)?.[col]}
+                    onChange={(v) => onChange(rows.map((r, i) => i === ri ? { ...r, [col]: v } : r))}
+                    onBlur={onBlur}
+                    readOnly={readOnly}
+                  />
                 </td>
               ))}
             </tr>
@@ -1026,6 +1178,51 @@ function TransitionCriteriaTable({ rows, onChange, onAdd, readOnly, onBlur }: {
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (<div className="space-y-1"><Label>{label}</Label>{children}</div>)
+function CriteriaCell({ value, previous, onChange, onBlur, readOnly }: {
+  value: string
+  previous: string | undefined
+  onChange: (v: string) => void
+  onBlur?: () => void
+  readOnly?: boolean
+}) {
+  const carry = useCarryState(value, previous)
+  return (
+    <div className="space-y-1">
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        readOnly={readOnly}
+        rows={2}
+        title={carry.state === 'carried' ? 'Carried forward from the previous assessment — not edited yet' : undefined}
+        className={cn('text-xs min-w-[140px]', carriedInputClass(carry.state))}
+      />
+      <PreviousValueNote value={previous} show={carry.compare && carry.state === 'changed'} />
+    </div>
+  )
+}
+
+function Field({
+  label,
+  children,
+  value,
+  previous,
+}: {
+  label: string
+  children: React.ReactNode
+  /** With previous: marks the field as carried forward / shows the compare note. */
+  value?: string
+  previous?: string
+}) {
+  const carry = useCarryState(value, previous)
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <Label>{label}</Label>
+        {(carry.state === 'carried' || carry.state === 'reviewed') && <CarryBadge state={carry.state} />}
+      </div>
+      {children}
+      <PreviousValueNote value={previous} show={carry.compare && carry.state === 'changed'} />
+    </div>
+  )
 }

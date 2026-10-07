@@ -118,7 +118,7 @@ export default async function OnboardingPage() {
     <div className="space-y-6">
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-400 p-8 shadow-lg">
         <h1 className="text-4xl font-bold text-white mb-2">Onboarding</h1>
-        <p className="text-emerald-50 text-lg">32-step onboarding — Tier A / Tier B / Activation</p>
+        <p className="text-emerald-50 text-lg">33-step onboarding — Tier A / Tier B / Activation</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -130,8 +130,13 @@ export default async function OnboardingPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Onboarding status</CardTitle>
+          <Link href="/admin/compliance/i9">
+            <Button size="sm" variant="outline">
+              Form I-9 compliance
+            </Button>
+          </Link>
         </CardHeader>
         <CardContent>
           {rows.length === 0 ? (

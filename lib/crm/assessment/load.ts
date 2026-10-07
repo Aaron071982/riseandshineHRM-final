@@ -10,6 +10,7 @@ import {
   canEditTreatmentAssessment,
   canUploadTreatmentAssessmentFiles,
 } from '@/lib/crm/assessment/access'
+import { parseAssessmentRecord } from '@/lib/crm/assessment/serialize'
 import type { TreatmentAssessmentStatus, TreatmentAssessmentSource } from '@prisma/client'
 
 export type TreatmentAssessmentListItem = {
@@ -94,6 +95,29 @@ export async function loadTreatmentAssessmentDetail(
       canEdit: canEditTreatmentAssessment(user),
       canUpload: canUploadTreatmentAssessmentFiles(user),
     },
+  }
+}
+
+/**
+ * Read-only predecessor of a reassessment, for carried-forward marking and
+ * "compare to previous". Scoped to the same client; callers have already
+ * passed the client/assessment view checks.
+ */
+export async function loadPreviousAssessmentForCompare(
+  serviceClientId: string,
+  previousAssessmentId: string | null
+) {
+  if (!previousAssessmentId) return null
+  const prev = await prisma.clientTreatmentAssessment.findFirst({
+    where: { id: previousAssessmentId, serviceClientId, deletedAt: null, source: 'FORM' },
+  })
+  if (!prev) return null
+  const date = prev.reportDate ?? prev.completedAt ?? prev.createdAt
+  return {
+    id: prev.id,
+    sections: parseAssessmentRecord(prev),
+    date: date.toISOString(),
+    assessmentType: prev.assessmentType,
   }
 }
 

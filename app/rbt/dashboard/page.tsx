@@ -13,6 +13,8 @@ import {
 } from '@/lib/onboarding/catalog'
 import { listAssignedModulesForUser } from '@/lib/org-training/load'
 import { rethrowIfNextControlFlow } from '@/lib/crm/access'
+import { I9_DOCUMENT_TYPE } from '@/lib/rbtDocumentsSync'
+import { hasI9OnFile } from '@/lib/compliance/i9Status'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -290,6 +292,8 @@ async function RBTDashboardPageInner() {
     status?: string
     rbtCertJourneySeenAt?: Date | null
     rbtExamOutcome?: string | null
+    i9Section1CompletedAt?: Date | null
+    _count?: { documents: number }
   } | null = null
   let onboardingDocuments: Awaited<ReturnType<typeof prisma.onboardingDocument.findMany>> = []
   let completions: Awaited<ReturnType<typeof prisma.onboardingCompletion.findMany>> = []
@@ -307,6 +311,8 @@ async function RBTDashboardPageInner() {
           status: true,
           rbtCertJourneySeenAt: true,
           rbtExamOutcome: true,
+          i9Section1CompletedAt: true,
+          _count: { select: { documents: { where: { documentType: I9_DOCUMENT_TYPE } } } },
         },
       }),
       prisma.onboardingDocument.findMany({
@@ -464,6 +470,12 @@ async function RBTDashboardPageInner() {
         pendingUploadTitles={pendingUploadTitles}
         fortyHourIncomplete={fortyHourIncomplete}
         orgTrainingOutstanding={orgTrainingOutstanding}
+        i9Missing={
+          !hasI9OnFile({
+            i9Section1CompletedAt: rbtProfile.i9Section1CompletedAt ?? null,
+            i9FormCount: rbtProfile._count?.documents ?? 0,
+          })
+        }
       />
     )
   } catch (error) {

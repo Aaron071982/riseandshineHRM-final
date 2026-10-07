@@ -4,8 +4,9 @@ import { validateSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { supabaseAdmin, STORAGE_BUCKET } from '@/lib/supabase'
 import { syncTierMilestones, canUnlockStep, completedStepNumbers } from '@/lib/onboarding/progress'
-import { FORTY_HOUR_RBT_CERTIFICATE_SLUG } from '@/lib/onboarding/catalog'
+import { FORTY_HOUR_RBT_CERTIFICATE_SLUG, I9_SLUG } from '@/lib/onboarding/catalog'
 import {
+  I9_DOCUMENT_TYPE,
   ONBOARDING_UPLOAD_SLUG_TO_DOC_TYPE,
   mimeTypeFromFileName,
   replaceRbtDocumentOfType,
@@ -61,6 +62,8 @@ export async function POST(
         backgroundCheckClearedAt: true,
         supervisionCountersignedAt: true,
         fortyHourCourseCompleted: true,
+        i9Section1CompletedAt: true,
+        i9Section2CompletedAt: true,
       },
     })
     const done = completedStepNumbers(docs, completions, profile)
@@ -86,6 +89,10 @@ export async function POST(
 
     const now = new Date()
     const folderType = SLUG_FOLDER[document.slug] ?? 'PERSONAL_DOCUMENTS'
+    const isI9 = document.slug === I9_SLUG
+    // I-9 upload records Section 1 only; the step completes when HR records Section 2.
+    const completionStatus = isI9 && !profile.i9Section2CompletedAt ? 'IN_PROGRESS' : 'COMPLETED'
+    const completedAt = completionStatus === 'COMPLETED' ? now : null
 
     const tx = [
       prisma.onboardingCompletion.upsert({
@@ -95,18 +102,44 @@ export async function POST(
         create: {
           rbtProfileId: user.rbtProfileId,
           documentId,
-          status: 'COMPLETED',
-          completedAt: now,
+          status: completionStatus,
+          completedAt,
           signedPdfUrl: path,
           storageBucket: STORAGE_BUCKET,
         },
         update: {
-          status: 'COMPLETED',
-          completedAt: now,
+          status: completionStatus,
+          completedAt,
           signedPdfUrl: path,
           storageBucket: STORAGE_BUCKET,
         },
       }),
+      ...(isI9
+        ? [
+            prisma.rBTProfile.update({
+              where: { id: user.rbtProfileId },
+              data: { i9Section1CompletedAt: profile.i9Section1CompletedAt ?? now },
+            }),
+            prisma.rBTDocument.create({
+              data: {
+                rbtProfileId: user.rbtProfileId,
+                fileName: file.name || 'form-i9',
+                fileType: file.type || mimeTypeFromFileName(file.name || path),
+                fileData: buffer.toString('base64'),
+                documentType: I9_DOCUMENT_TYPE,
+              },
+            }),
+            prisma.rBTAuditLog.create({
+              data: {
+                rbtProfileId: user.rbtProfileId,
+                auditType: 'COMPLIANCE',
+                dateTime: now,
+                notes: `Form I-9 Section 1 uploaded by employee (${file.name || 'file'})`,
+                createdBy: user.email || 'RBT',
+              },
+            }),
+          ]
+        : []),
       prisma.employeeDocumentFolder.create({
         data: {
           rbtProfileId: user.rbtProfileId,

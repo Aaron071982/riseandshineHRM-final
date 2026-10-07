@@ -7,7 +7,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Image from 'next/image'
-import { OAUTH_RETURN_URL_KEY, isSafeOAuthReturnUrl } from '@/lib/oauth/returnUrl'
+import {
+  OAUTH_RETURN_URL_KEY,
+  RBT_RETURN_PATH_KEY,
+  isSafeOAuthReturnUrl,
+  isSafeRbtReturnPath,
+} from '@/lib/oauth/returnUrl'
 import { getPostLoginPath } from '@/lib/auth/postLogin'
 
 export default function VerifyOTPPage() {
@@ -57,6 +62,14 @@ export default function VerifyOTPPage() {
       if (oauthReturn && isSafeOAuthReturnUrl(oauthReturn)) {
         sessionStorage.removeItem(OAUTH_RETURN_URL_KEY)
         window.location.href = oauthReturn
+        return
+      }
+
+      const rbtReturn = sessionStorage.getItem(RBT_RETURN_PATH_KEY)
+      sessionStorage.removeItem(RBT_RETURN_PATH_KEY)
+      const role = String(data.role ?? '').toUpperCase()
+      if (rbtReturn && isSafeRbtReturnPath(rbtReturn) && (role === 'RBT' || role === 'CANDIDATE')) {
+        window.location.href = rbtReturn
         return
       }
 

@@ -210,6 +210,8 @@ export const environmentalSchema = z.object({
 /** §3.8 Response to Treatment */
 export const responseToTxSchema = z.object({
   narrative: z.string().optional().default(RESPONSE_TO_TREATMENT_DEFAULT),
+  /** Reassessment only: explanation for lack of progress, regression or stagnation. */
+  lackOfProgressRationale: optionalTextSchema,
 })
 
 /** §3.9 97155 Interventions */
@@ -266,6 +268,22 @@ export const behaviorsSchema = z.object({
   blocks: z.array(behaviorBlockSchema).default([]),
 })
 
+export const GOAL_STATUSES = [
+  'MASTERED',
+  'IN_PROGRESS',
+  'MODIFIED',
+  'DISCONTINUED',
+  'NOT_INTRODUCED',
+] as const
+export type GoalStatus = (typeof GOAL_STATUSES)[number]
+
+/** Reassessment goal progress fields; empty on initial assessments. */
+const goalProgressFields = {
+  status: z.enum(['', ...GOAL_STATUSES]).optional().default(''),
+  dateMastered: optionalTextSchema,
+  rationale: optionalTextSchema,
+}
+
 /** Goal table column-set A (§3.11) */
 export const goalRowColumnASchema = z.object({
   id: z.string(),
@@ -276,6 +294,7 @@ export const goalRowColumnASchema = z.object({
   currentPerformance: optionalTextSchema,
   masteryCriteria: optionalTextSchema,
   targetMasteryDate: optionalTextSchema,
+  ...goalProgressFields,
 })
 
 /** Goal table column-set B (§3.12) */
@@ -288,6 +307,7 @@ export const goalRowColumnBSchema = z.object({
   masteryCriteria: optionalTextSchema,
   targetMasteryDate: optionalTextSchema,
   methodsToBeUtilized: optionalTextSchema,
+  ...goalProgressFields,
 })
 
 /** §3.11 Treatment goals */
@@ -375,6 +395,10 @@ export const transitionPlanSchema = z.object({
     })
     .default({}),
   dischargeNarrative: z.string().optional().default(TRANSITION_DISCHARGE_DEFAULT),
+  /** Reassessment only: criteria carried forward were reviewed for this period. */
+  reviewedThisPeriod: z.boolean().optional().default(false),
+  reviewedOn: optionalDateStringSchema,
+  reviewNotes: optionalTextSchema,
 })
 
 export const contactFieldSchema = z.object({
@@ -504,6 +528,85 @@ export const signaturesSchema = z.object({
   parentGuardian: signatureEntrySchema.default({}),
 })
 
+export const REASSESSMENT_CPT_CODES = ['97151', '97153', '97155', '97156', '97157'] as const
+export const REASSESSMENT_INSTRUMENTS = ['Vineland-3', 'AFLS', 'FAST', 'PDDBI / SRS-2'] as const
+export const DEFAULT_CAREGIVER_TRAINING_MINIMUM = 6
+
+const serviceLocationsSchema = z
+  .object({
+    home: z.boolean().default(false),
+    clinic: z.boolean().default(false),
+    school: z.boolean().default(false),
+    community: z.boolean().default(false),
+    telehealth: z.boolean().default(false),
+  })
+  .default({})
+
+export const instrumentComparisonRowSchema = z.object({
+  id: z.string(),
+  instrument: optionalTextSchema,
+  priorDate: optionalDateStringSchema,
+  priorResult: optionalTextSchema,
+  currentDate: optionalDateStringSchema,
+  currentResult: optionalTextSchema,
+  interpretation: optionalTextSchema,
+})
+
+export const periodBarrierRowSchema = z.object({
+  id: z.string(),
+  barrier: optionalTextSchema,
+  mitigation: optionalTextSchema,
+})
+
+export const unitsRequestRowSchema = z.object({
+  code: z.string(),
+  previousRequest: optionalTextSchema,
+  unitsRequested: optionalTextSchema,
+  locations: serviceLocationsSchema,
+  justification: optionalTextSchema,
+})
+
+/** Reassessment-only section (reporting period, progress evidence, request). */
+export const reassessmentSchema = z.object({
+  reportingPeriod: z
+    .object({
+      periodStart: optionalDateStringSchema,
+      periodEnd: optionalDateStringSchema,
+      authorizationNumber: optionalTextSchema,
+      datesOfServiceCovered: optionalTextSchema,
+    })
+    .default({}),
+  caregiverTraining: z
+    .object({
+      sessionsDelivered: z.number().int().min(0).max(999).nullable().optional().default(null),
+      requiredMinimum: z
+        .number()
+        .int()
+        .min(0)
+        .max(999)
+        .optional()
+        .default(DEFAULT_CAREGIVER_TRAINING_MINIMUM),
+      belowMinimumExplanation: optionalTextSchema,
+      mitigationPlan: optionalTextSchema,
+      participationNarrative: optionalTextSchema,
+    })
+    .default({}),
+  instrumentComparison: z.array(instrumentComparisonRowSchema).default([]),
+  barriersDuringPeriod: z.array(periodBarrierRowSchema).default([]),
+  unitsRequested: z.array(unitsRequestRowSchema).default([]),
+  changesSinceLast: z
+    .object({
+      diagnosis: optionalTextSchema,
+      medications: optionalTextSchema,
+      schoolPlacement: optionalTextSchema,
+      familyCircumstances: optionalTextSchema,
+      teamMembers: optionalTextSchema,
+    })
+    .default({}),
+  /** Section key → ISO date the clinician confirmed carried-forward content is still accurate. */
+  reviewedSections: z.record(z.string(), z.string()).default({}),
+})
+
 /** All JSONB section keys on ClientTreatmentAssessment. */
 export const ASSESSMENT_SECTION_KEYS = [
   'summary',
@@ -524,6 +627,7 @@ export const ASSESSMENT_SECTION_KEYS = [
   'recommendations',
   'crisisPlan',
   'signatures',
+  'reassessment',
 ] as const
 
 export type AssessmentSectionKey = (typeof ASSESSMENT_SECTION_KEYS)[number]
@@ -547,6 +651,7 @@ export const assessmentSectionSchemas = {
   recommendations: recommendationsSchema,
   crisisPlan: crisisPlanSchema,
   signatures: signaturesSchema,
+  reassessment: reassessmentSchema,
 } as const satisfies Record<AssessmentSectionKey, z.ZodTypeAny>
 
 export type AssessmentSummary = z.infer<typeof assessmentSummarySchema>
@@ -577,6 +682,10 @@ export type Coordination = z.infer<typeof coordinationSchema>
 export type Recommendations = z.infer<typeof recommendationsSchema>
 export type CrisisPlan = z.infer<typeof crisisPlanSchema>
 export type Signatures = z.infer<typeof signaturesSchema>
+export type Reassessment = z.infer<typeof reassessmentSchema>
+export type InstrumentComparisonRow = z.infer<typeof instrumentComparisonRowSchema>
+export type PeriodBarrierRow = z.infer<typeof periodBarrierRowSchema>
+export type UnitsRequestRow = z.infer<typeof unitsRequestRowSchema>
 export type ContactField = z.infer<typeof contactFieldSchema>
 
 export type AssessmentSectionData = {
@@ -669,6 +778,14 @@ export function emptyCoordinationRow(): z.infer<typeof coordinationRowSchema> {
   return coordinationRowSchema.parse({ id: newId() })
 }
 
+export function emptyInstrumentComparisonRow(instrument = ''): InstrumentComparisonRow {
+  return instrumentComparisonRowSchema.parse({ id: newId(), instrument })
+}
+
+export function emptyPeriodBarrierRow(): PeriodBarrierRow {
+  return periodBarrierRowSchema.parse({ id: newId() })
+}
+
 export function emptyAflsSummaryScore(): AflsSummaryScore {
   return aflsSummaryScoreSchema.parse({ id: newId() })
 }
@@ -720,5 +837,6 @@ export function defaultAssessmentSections(): AssessmentSectionData {
     recommendations: recommendationsSchema.parse({}),
     crisisPlan: crisisPlanSchema.parse({}),
     signatures: signaturesSchema.parse({}),
+    reassessment: reassessmentSchema.parse({}),
   }
 }

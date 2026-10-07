@@ -1,4 +1,14 @@
 import type { PrismaClient } from '@prisma/client'
+import { RESUMES_STORAGE_BUCKET, STORAGE_BUCKET } from '@/lib/constants'
+
+/** `filePath` prefixes stored in the onboarding-documents bucket; everything else is a resume upload. */
+const ONBOARDING_BUCKET_PATH_PREFIXES = ['company-documents/', 'rbts/'] as const
+
+export function storageBucketForRbtDocumentPath(path: string): string {
+  return ONBOARDING_BUCKET_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))
+    ? STORAGE_BUCKET
+    : RESUMES_STORAGE_BUCKET
+}
 
 /**
  * Catalog onboarding UPLOAD step slugs → `RBTDocument.documentType`.
@@ -10,6 +20,9 @@ export const ONBOARDING_UPLOAD_SLUG_TO_DOC_TYPE: Record<string, string> = {
   'forty-hour-rbt-certificate': 'FORTY_HOUR_CERTIFICATE',
   'mandated-reporter-certificate': 'MANDATED_REPORTER_CERTIFICATE',
 }
+
+/** I-9 uploads are appended (never replace a prior I-9), so they are not in the replace map above. */
+export const I9_DOCUMENT_TYPE = 'I9_FORM'
 
 export function isOnboardingUploadSlug(slug: string | null | undefined): boolean {
   return Boolean(slug && slug in ONBOARDING_UPLOAD_SLUG_TO_DOC_TYPE)

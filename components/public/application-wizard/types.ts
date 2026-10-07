@@ -17,7 +17,8 @@ export interface ApplicationData {
   preferredAgeGroups: string[]
   languages: string[]
   otherLanguage: string
-  transportation: string
+  transportMode: string
+  travelBoroughs: string[]
   weekdayAvailability: { [key: string]: boolean }
   weekendAvailability: { [key: string]: boolean }
   preferredHoursRange: string

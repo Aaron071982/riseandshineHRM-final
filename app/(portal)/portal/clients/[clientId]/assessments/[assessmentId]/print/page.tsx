@@ -47,6 +47,7 @@ export default async function PortalAssessmentPrintPage({ params }: Props) {
       attachmentUrls={attachmentUrls}
       status={data.assessment.status}
       source={data.assessment.source}
+      assessmentType={data.assessment.assessmentType}
       basePath="/portal"
     />
   )

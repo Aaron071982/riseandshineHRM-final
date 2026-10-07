@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox'
 import type { ApplicationData } from './types'
 import { FORTY_HOUR_RBT_COURSE_PROVIDER, FORTY_HOUR_RBT_COURSE_URL } from '@/lib/onboarding/catalog'
+import { TRANSPORT_MODE_LABELS, TRANSPORT_MODES, TRAVEL_BOROUGHS } from '@/lib/rbt/transport'
 
 interface ApplicationStepRBTReadinessProps {
   data: ApplicationData
@@ -126,19 +127,45 @@ export default function ApplicationStepRBTReadiness({ data, setData }: Applicati
           )}
         </div>
         <div>
-          <Label htmlFor="transportation">Reliable Transportation?</Label>
+          <Label htmlFor="transportMode">What would be your mode of transport? *</Label>
           <Select
-            value={data.transportation}
-            onValueChange={(value) => setData({ ...data, transportation: value })}
+            value={data.transportMode}
+            onValueChange={(value) => setData({ ...data, transportMode: value })}
           >
-            <SelectTrigger>
+            <SelectTrigger id="transportMode">
               <SelectValue placeholder="Select..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="true">Yes</SelectItem>
-              <SelectItem value="false">No</SelectItem>
+              {TRANSPORT_MODES.map((mode) => (
+                <SelectItem key={mode} value={mode}>
+                  {TRANSPORT_MODE_LABELS[mode]}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
+        </div>
+        <div>
+          <Label>Which boroughs are you willing to travel to? *</Label>
+          <div className="space-y-2 mt-2">
+            {TRAVEL_BOROUGHS.map((borough) => (
+              <div key={borough} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`borough-${borough}`}
+                  checked={data.travelBoroughs.includes(borough)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setData({ ...data, travelBoroughs: [...data.travelBoroughs, borough] })
+                    } else {
+                      setData({ ...data, travelBoroughs: data.travelBoroughs.filter((b) => b !== borough) })
+                    }
+                  }}
+                />
+                <Label htmlFor={`borough-${borough}`} className="font-normal cursor-pointer">
+                  {borough}
+                </Label>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

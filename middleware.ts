@@ -42,6 +42,9 @@ export async function middleware(request: NextRequest) {
   const sessionToken = request.cookies.get('session')?.value
 
   if (!sessionToken) {
+    if (pathname === '/rbt/i9') {
+      return NextResponse.redirect(new URL(`/login?returnUrl=${encodeURIComponent(pathname)}`, request.url))
+    }
     return NextResponse.redirect(new URL('/', request.url))
   }
 

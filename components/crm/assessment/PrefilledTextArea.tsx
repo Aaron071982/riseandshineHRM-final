@@ -2,6 +2,13 @@
 
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import {
+  CarryBadge,
+  PreviousValueNote,
+  carriedInputClass,
+  useCarryState,
+} from '@/components/crm/assessment/carryForward'
+import { cn } from '@/lib/utils'
 
 type PrefilledTextAreaProps = {
   label?: string
@@ -11,6 +18,8 @@ type PrefilledTextAreaProps = {
   readOnly?: boolean
   rows?: number
   onBlur?: () => void
+  /** Predecessor's value on a reassessment; enables carried-forward marking. */
+  previousValue?: string
 }
 
 export function PrefilledTextArea({
@@ -20,18 +29,27 @@ export function PrefilledTextArea({
   readOnly,
   rows = 6,
   onBlur,
+  previousValue,
 }: PrefilledTextAreaProps) {
+  const carry = useCarryState(value, previousValue)
+  const badge = carry.state === 'carried' || carry.state === 'reviewed'
   return (
     <div className="space-y-2">
-      {label && <Label>{label}</Label>}
+      {(label || badge) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {label && <Label>{label}</Label>}
+          {badge && <CarryBadge state={carry.state} />}
+        </div>
+      )}
       <Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         readOnly={readOnly}
         rows={rows}
-        className="font-normal"
+        className={cn('font-normal', carriedInputClass(carry.state))}
       />
+      <PreviousValueNote value={previousValue} show={carry.compare && carry.state === 'changed'} />
     </div>
   )
 }

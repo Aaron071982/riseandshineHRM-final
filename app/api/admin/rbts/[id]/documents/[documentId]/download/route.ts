@@ -1,21 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/auth'
-import { supabaseAdmin, RESUMES_STORAGE_BUCKET, STORAGE_BUCKET } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
+import { storageBucketForRbtDocumentPath } from '@/lib/rbtDocumentsSync'
 import { buildContentDisposition } from '@/lib/http/contentDisposition'
 
+const MIME_BY_EXT: Record<string, string> = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  heic: 'image/heic',
+}
+
+/** Browsers only render inline when the stored type is specific; fall back to the extension. */
+function resolveContentType(fileType: string | null, fileName: string): string {
+  const stored = (fileType || '').trim().toLowerCase()
+  if (stored && stored !== 'application/octet-stream' && stored.includes('/')) return stored
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
+  return MIME_BY_EXT[ext] ?? (stored || 'application/octet-stream')
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string; documentId: string }> }
 ) {
   try {
     const auth = await requireAdminSession()
     if (auth.response) return auth.response
 
-    const { documentId } = await params
+    const { id: rbtProfileId, documentId } = await params
+    const wantInline =
+      request.nextUrl.searchParams.get('inline') === '1' ||
+      request.nextUrl.searchParams.get('preview') === '1'
 
-    const document = await prisma.rBTDocument.findUnique({
-      where: { id: documentId },
+    const document = await prisma.rBTDocument.findFirst({
+      where: { id: documentId, rbtProfileId },
     })
 
     if (!document) {
@@ -25,10 +47,9 @@ export async function GET(
     let fileBuffer: Buffer
     if (document.filePath && supabaseAdmin) {
       const path = document.filePath.trim()
-      const bucket = path.startsWith('company-documents/')
-        ? STORAGE_BUCKET
-        : RESUMES_STORAGE_BUCKET
-      const { data, error } = await supabaseAdmin.storage.from(bucket).download(path)
+      const { data, error } = await supabaseAdmin.storage
+        .from(storageBucketForRbtDocumentPath(path))
+        .download(path)
       if (error || !data) {
         console.error('Supabase download error:', error)
         return NextResponse.json(
@@ -43,9 +64,13 @@ export async function GET(
 
     return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
-        'Content-Type': document.fileType,
-        'Content-Disposition': buildContentDisposition('attachment', document.fileName),
+        'Content-Type': resolveContentType(document.fileType, document.fileName),
+        'Content-Disposition': buildContentDisposition(
+          wantInline ? 'inline' : 'attachment',
+          document.fileName
+        ),
         'Content-Length': fileBuffer.length.toString(),
+        'Cache-Control': 'private, no-store',
       },
     })
   } catch (error: unknown) {

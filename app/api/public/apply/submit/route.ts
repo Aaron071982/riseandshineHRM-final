@@ -5,6 +5,7 @@ import {
   generateApplicationSubmissionConfirmationEmail,
 } from '@/lib/email'
 import { Resend } from 'resend'
+import { parseTransportMode, parseTravelBoroughs } from '@/lib/rbt/transport'
 
 const resendApiKey = process.env.RESEND_API_KEY
 const emailFrom = process.env.EMAIL_FROM || 'noreply@riseandshinehrm.com'
@@ -203,6 +204,8 @@ export async function POST(request: NextRequest) {
         : body.canPassBackgroundCheck === 'false'
           ? false
           : null
+    const transportMode = parseTransportMode(body.transportMode)
+    const travelBoroughs = parseTravelBoroughs(body.travelBoroughs)
     const cprFirstAidCertified =
       typeof body.cprFirstAidCertified === 'string' && body.cprFirstAidCertified
         ? body.cprFirstAidCertified
@@ -240,12 +243,9 @@ export async function POST(request: NextRequest) {
           authorizedToWork,
           canPassBackgroundCheck,
           cprFirstAidCertified,
-          transportation:
-            body.transportation === 'true'
-              ? true
-              : body.transportation === 'false'
-                ? false
-                : null,
+          transportMode,
+          travelBoroughsJson: travelBoroughs.length > 0 ? travelBoroughs : undefined,
+          transportation: transportMode ? transportMode === 'CAR' : null,
           preferredHoursRange: body.preferredHoursRange || null,
           notes: body.notes || null,
         },

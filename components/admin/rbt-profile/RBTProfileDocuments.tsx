@@ -357,6 +357,22 @@ export default function RBTProfileDocuments({
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      window.open(
+                        `/api/admin/rbts/${rbtProfileId}/documents/${doc.id}/download?inline=1`,
+                        '_blank',
+                        'noopener,noreferrer'
+                      )
+                    }
+                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:border-[var(--border-subtle)] dark:text-[var(--orange-primary)] dark:hover:bg-[var(--bg-elevated-hover)]"
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    Preview
+                  </Button>
+                  <Button
                     variant="outline"
                     size="sm"
                     onClick={() => onDownload(doc.id, doc.fileName)}

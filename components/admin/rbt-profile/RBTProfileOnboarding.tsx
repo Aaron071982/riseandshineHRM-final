@@ -7,11 +7,14 @@ import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, XCircle, FileText, Download, Eye } from 'lucide-react'
 import { formatDateTime } from '@/lib/utils'
 import { getAcknowledgmentAdminSummary } from '@/lib/acknowledgment-admin-summary'
-import { ONBOARDING_CATALOG, RBT_VISIBLE_STEPS } from '@/lib/onboarding/catalog'
+import { ONBOARDING_CATALOG, RBT_VISIBLE_STEPS, getRbtVisibleCatalog } from '@/lib/onboarding/catalog'
 import AcknowledgmentAuditPanel from '@/components/admin/AcknowledgmentAuditPanel'
+import { isOnboardingUploadSlug } from '@/lib/rbtDocumentsSync'
 import type { RBTProfile } from './types'
 
 type ToastFn = (message: string, type: 'success' | 'error') => void
+
+const rbtVisibleSteps = new Set(getRbtVisibleCatalog().map((e) => e.stepNumber))
 
 interface RBTProfileOnboardingProps {
   rbtProfile: RBTProfile
@@ -80,7 +83,7 @@ export default function RBTProfileOnboarding({
     const rbtOnly = list.filter((c) => {
       const step = c.document.stepNumber
       if (step == null) return true
-      return step <= RBT_VISIBLE_STEPS
+      return rbtVisibleSteps.has(step)
     })
     return [...rbtOnly].sort((a, b) => {
       const sa = a.document.stepNumber ?? 999
@@ -260,15 +263,30 @@ export default function RBTProfileOnboarding({
                   Legacy uploads
                 </h3>
                 {legacySsnTasks.map((task) => (
-                  <Button
-                    key={task.id}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDownloadSsnTask(task.id)}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download SSN card
-                  </Button>
+                  <div key={task.id} className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        window.open(
+                          `/api/admin/rbts/${rbtProfile.id}/onboarding-tasks/${task.id}/download?inline=1`,
+                          '_blank',
+                          'noopener,noreferrer'
+                        )
+                      }
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Preview SSN card
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDownloadSsnTask(task.id)}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download SSN card
+                    </Button>
+                  </div>
                 ))}
               </div>
             )}
@@ -390,6 +408,25 @@ export default function RBTProfileOnboarding({
                           </Button>
                         </>
                       )}
+                      {completion.status === 'COMPLETED' &&
+                        completion.document.type !== 'FILLABLE_PDF' &&
+                        isOnboardingUploadSlug(completion.document.slug) &&
+                        (Boolean(completion.signedPdfUrl?.trim()) || Boolean(completion.hasSignedPdfData)) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              window.open(
+                                `/api/admin/rbts/${rbtProfile.id}/documents/completion/${completion.id}/download?inline=1`,
+                                '_blank',
+                                'noopener,noreferrer'
+                              )
+                            }
+                          >
+                            <Eye className="w-4 h-4" />
+                            Preview
+                          </Button>
+                        )}
                     </div>
                   </div>
                 </div>

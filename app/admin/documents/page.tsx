@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import AdminCompanyDocumentsPage from '@/components/admin/AdminCompanyDocumentsPage'
 import { validateSession, isAdmin } from '@/lib/auth'
@@ -16,5 +17,14 @@ export default async function AdminDocumentsPage() {
     redirect('/admin/dashboard')
   }
 
-  return <AdminCompanyDocumentsPage />
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Link href="/admin/compliance/i9" className="text-sm font-medium text-orange-600 hover:underline">
+          Form I-9 compliance report →
+        </Link>
+      </div>
+      <AdminCompanyDocumentsPage />
+    </div>
+  )
 }

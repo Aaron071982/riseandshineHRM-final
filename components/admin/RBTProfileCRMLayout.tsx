@@ -47,6 +47,7 @@ import {
 import { useToast } from '@/components/ui/toast'
 import { trackButtonClick } from '@/lib/activity-tracker'
 import { formatRbtDocumentTypeLabel } from '@/lib/rbtDocumentTypes'
+import { parseTravelBoroughs, transportModeLabel } from '@/lib/rbt/transport'
 import RBTProfileInterviews from './rbt-profile/RBTProfileInterviews'
 import RBTProfileOnboarding from './rbt-profile/RBTProfileOnboarding'
 import AdminOnboardingActivation from './AdminOnboardingActivation'
@@ -1291,7 +1292,14 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                     return arr.length > 0 ? <p>Languages: {arr.join(', ')}</p> : null
                   })()
                 : null}
-              {rbtProfile.transportation !== null && <p>Transportation: {rbtProfile.transportation ? 'Yes' : 'No'}</p>}
+              {transportModeLabel(rbtProfile.transportMode) ? (
+                <p>Mode of transport: {transportModeLabel(rbtProfile.transportMode)}</p>
+              ) : rbtProfile.transportation !== null ? (
+                <p>Transportation: {rbtProfile.transportation ? 'Yes' : 'No'}</p>
+              ) : null}
+              {parseTravelBoroughs(rbtProfile.travelBoroughsJson).length > 0 && (
+                <p>Willing to travel to: {parseTravelBoroughs(rbtProfile.travelBoroughsJson).join(', ')}</p>
+              )}
               {rbtProfile.authorizedToWork !== null && <p>Authorized to work: {rbtProfile.authorizedToWork ? 'Yes' : 'No'}</p>}
               {rbtProfile.canPassBackgroundCheck !== null && <p>Background check: {rbtProfile.canPassBackgroundCheck ? 'Yes' : 'No'}</p>}
               {rbtProfile.cprFirstAidCertified && <p>CPR/First Aid: {rbtProfile.cprFirstAidCertified === 'true' ? 'Yes' : rbtProfile.cprFirstAidCertified === 'false' ? 'No' : rbtProfile.cprFirstAidCertified}</p>}
@@ -1614,6 +1622,15 @@ export default function RBTProfileCRMLayout({ rbtProfile: initialRbtProfile, sea
                             .supervisionContractStatus ?? ''
                         ) || null
                       }
+                      i9={{
+                        section1CompletedAt: rbtProfile.i9Section1CompletedAt
+                          ? String(rbtProfile.i9Section1CompletedAt)
+                          : null,
+                        section2CompletedAt: rbtProfile.i9Section2CompletedAt
+                          ? String(rbtProfile.i9Section2CompletedAt)
+                          : null,
+                        section2Notes: rbtProfile.i9Section2Notes ?? null,
+                      }}
                     />
                     <RBTProfileOnboarding
                       rbtProfile={rbtProfile}

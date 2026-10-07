@@ -13,7 +13,12 @@ import { motion } from 'framer-motion'
 import PublicBackground from '@/components/public/PublicBackground'
 import PublicFooter from '@/components/public/PublicFooter'
 import IconChip from '@/components/public/IconChip'
-import { OAUTH_RETURN_URL_KEY, isSafeOAuthReturnUrl } from '@/lib/oauth/returnUrl'
+import {
+  OAUTH_RETURN_URL_KEY,
+  RBT_RETURN_PATH_KEY,
+  isSafeOAuthReturnUrl,
+  isSafeRbtReturnPath,
+} from '@/lib/oauth/returnUrl'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -32,6 +37,8 @@ export default function LoginPage() {
   useEffect(() => {
     if (returnUrl && isSafeOAuthReturnUrl(returnUrl)) {
       sessionStorage.setItem(OAUTH_RETURN_URL_KEY, returnUrl)
+    } else if (returnUrl && isSafeRbtReturnPath(returnUrl)) {
+      sessionStorage.setItem(RBT_RETURN_PATH_KEY, returnUrl)
     }
   }, [returnUrl])
   useEffect(() => {

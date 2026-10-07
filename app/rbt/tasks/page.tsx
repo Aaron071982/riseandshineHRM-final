@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import OnboardingWizard from '@/components/rbt/OnboardingWizard'
 import { ensureOnboardingCompletionsForRbt } from '@/lib/onboarding/progress'
 import { seedOnboardingCatalog } from '@/lib/onboarding/provision'
+import { TOTAL_ONBOARDING_STEPS } from '@/lib/onboarding/catalog'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +33,7 @@ export default async function RBTTasksPage() {
     prisma.onboardingDocument.findMany({
       where: {
         isActive: true,
-        stepNumber: { not: null, lte: 30 },
+        stepNumber: { not: null, lte: TOTAL_ONBOARDING_STEPS },
         flowType: { not: 'ADMIN_ONLY' },
       },
       orderBy: { stepNumber: 'asc' },

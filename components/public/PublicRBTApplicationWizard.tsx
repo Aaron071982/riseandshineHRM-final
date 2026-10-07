@@ -60,7 +60,8 @@ export default function PublicRBTApplicationWizard() {
     preferredAgeGroups: [],
     languages: [],
     otherLanguage: '',
-    transportation: '',
+    transportMode: '',
+    travelBoroughs: [],
     weekdayAvailability: {},
     weekendAvailability: {},
     preferredHoursRange: '',
@@ -137,6 +138,14 @@ export default function PublicRBTApplicationWizard() {
       case 2:
         if (!data.fortyHourCourseCompleted) {
           setError('Please indicate if you have completed the 40-hour RBT course')
+          return false
+        }
+        if (!data.transportMode) {
+          setError('Please select your mode of transport')
+          return false
+        }
+        if (data.travelBoroughs.length === 0) {
+          setError('Please select at least one borough you are willing to travel to')
           return false
         }
         return true

@@ -11,6 +11,8 @@ import {
   TIER_B_LAST_STEP,
   TOTAL_ONBOARDING_STEPS,
   getRbtVisibleCatalog,
+  I9_SLUG,
+  isOptionalOnboardingSlug,
 } from '@/lib/onboarding/catalog'
 
 export type OnboardingDocumentMeta = Pick<
@@ -62,7 +64,17 @@ export type OnboardingProgressSnapshot = {
     | 'supervisionCountersignedAt'
     | 'supervisionContractStatus'
     | 'artemisTrainingCompleted'
+    | 'hiredAt'
+    | 'i9Section1CompletedAt'
+    | 'i9Section2CompletedAt'
   >
+}
+
+/** I-9 timestamps are optional so callers that only need unlock state need not select them. */
+type I9Fields = Partial<Pick<RBTProfile, 'i9Section1CompletedAt' | 'i9Section2CompletedAt'>>
+
+export function isI9Complete(profile: I9Fields): boolean {
+  return !!profile.i9Section1CompletedAt && !!profile.i9Section2CompletedAt
 }
 
 function isDocComplete(
@@ -74,8 +86,10 @@ function isDocComplete(
     | 'backgroundCheckClearedAt'
     | 'supervisionCountersignedAt'
     | 'fortyHourCourseCompleted'
-  >
+  > &
+    I9Fields
 ): boolean {
+  if (doc.slug === I9_SLUG) return isI9Complete(profile)
   if (doc.flowType === 'ADMIN_ONLY') {
     if (doc.slug === 'background-check-cleared') return !!profile.backgroundCheckClearedAt
     if (doc.slug === 'supervision-countersigned') return !!profile.supervisionCountersignedAt
@@ -99,7 +113,8 @@ export function completedStepNumbers(
     | 'backgroundCheckClearedAt'
     | 'supervisionCountersignedAt'
     | 'fortyHourCourseCompleted'
-  >
+  > &
+    I9Fields
 ): Set<number> {
   const byDoc = new Map(completions.map((c) => [c.documentId, c]))
   const done = new Set<number>()
@@ -121,6 +136,9 @@ export function canUnlockStep(
   // 40-hour course is available from day one so RBTs can start it first
   // and still work through later onboarding steps in parallel.
   if (entry.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG) return true
+
+  // Form I-9 is federally required for every employee, so it is never locked; it never gates later steps.
+  if (entry.slug === I9_SLUG) return true
 
   if (stepNumber === 1) return true
   if (!done.has(1)) return false
@@ -163,10 +181,10 @@ export function isTierAComplete(done: Set<number>): boolean {
 }
 
 export function isTierBComplete(done: Set<number>): boolean {
-  // Orientation Calendly booking is post-onboarding — does not block activation.
+  // Optional steps (CPR, mandated reporter certificate, orientation booking) do not block activation.
   for (let n = TIER_B_FIRST_STEP; n <= TIER_B_LAST_STEP; n++) {
     const entry = ONBOARDING_CATALOG.find((e) => e.stepNumber === n)
-    if (entry?.slug === ORIENTATION_BOOKING_SLUG) continue
+    if (entry && isOptionalOnboardingSlug(entry.slug)) continue
     if (!done.has(n)) return false
   }
   return true
@@ -174,14 +192,16 @@ export function isTierBComplete(done: Set<number>): boolean {
 
 export function isFullyActivated(
   done: Set<number>,
-  profile: Pick<RBTProfile, 'backgroundCheckClearedAt' | 'supervisionCountersignedAt' | 'fullyActivatedAt'>
+  profile: Pick<RBTProfile, 'backgroundCheckClearedAt' | 'supervisionCountersignedAt' | 'fullyActivatedAt'> &
+    I9Fields
 ): boolean {
   if (profile.fullyActivatedAt) return true
   return (
     isTierAComplete(done) &&
     isTierBComplete(done) &&
     !!profile.backgroundCheckClearedAt &&
-    !!profile.supervisionCountersignedAt
+    !!profile.supervisionCountersignedAt &&
+    isI9Complete(profile)
   )
 }
 
@@ -222,6 +242,9 @@ export async function getOnboardingProgress(rbtProfileId: string): Promise<Onboa
         supervisionContractStatus: true,
         artemisTrainingCompleted: true,
         fortyHourCourseCompleted: true,
+        hiredAt: true,
+        i9Section1CompletedAt: true,
+        i9Section2CompletedAt: true,
       },
     }),
   ])
@@ -245,7 +268,7 @@ export async function getOnboardingProgress(rbtProfileId: string): Promise<Onboa
 
   const tierADocs = rbtDocs.filter((d) => d.tier === 'TIER_A')
   const tierBDocs = rbtDocs.filter(
-    (d) => d.tier === 'TIER_B' && d.slug !== ORIENTATION_BOOKING_SLUG
+    (d) => d.tier === 'TIER_B' && !isOptionalOnboardingSlug(d.slug)
   )
 
   return {

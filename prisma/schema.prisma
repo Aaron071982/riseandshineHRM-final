@@ -780,6 +780,10 @@ model RBTProfile {
   canPassBackgroundCheck   Boolean?
   cprFirstAidCertified     String?
   transportation           Boolean?
+  /// 'CAR' | 'TRANSIT' — application "mode of transport"; transportation mirrors CAR for legacy views.
+  transportMode            String?
+  /// Boroughs/regions the applicant is willing to travel to (string[]).
+  travelBoroughsJson       Json?
   preferredHoursRange      String?
   schedulingToken          String?            @unique
   latitude                 Float?
@@ -822,6 +826,17 @@ model RBTProfile {
   supervisionCountersignedAt  DateTime?
   supervisionCountersignedBy  String?
   supervisionContractStatus   SupervisionContractStatus?
+  /// Set when status first becomes HIRED (null for staff hired before this column existed).
+  hiredAt                     DateTime?
+  /// Form I-9 Section 1 (employee) — due by first day of work.
+  i9Section1CompletedAt       DateTime?
+  /// Form I-9 Section 2 (employer document review) — due within 3 business days of hire.
+  i9Section2CompletedAt       DateTime?
+  i9Section2CompletedBy       String?
+  /// Documents examined for Section 2 (List A, or List B + C), free text.
+  i9Section2Notes             String?                    @db.Text
+  /// Admin-set weekly capacity target for the schedule view; null falls back to preferredHoursRange, then 40.
+  weeklyTargetHours           Float?                     @map("weekly_target_hours")
   postHireStage               PostHireStage?
   activeWorkingSince          DateTime?
   activeWorkingManualOverride Boolean                    @default(false)
@@ -3930,6 +3945,8 @@ model ClientTreatmentAssessment {
   source           TreatmentAssessmentSource @default(FORM)
   assessmentType   String                    @default("INITIAL")
   reportDate       DateTime?                 @db.Date
+  /// Record this reassessment was cloned from (never mutated by the clone).
+  previousAssessmentId String?
 
   summary           Json?
   treatmentRequest  Json?
@@ -3949,6 +3966,7 @@ model ClientTreatmentAssessment {
   recommendations   Json?
   crisisPlan        Json?
   signatures        Json?
+  reassessment      Json?
 
   completedAt DateTime?
   signedAt    DateTime?
@@ -3963,10 +3981,13 @@ model ClientTreatmentAssessment {
   createdByUser User                                @relation("TreatmentAssessmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   updatedByUser User?                               @relation("TreatmentAssessmentUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
   attachments   ClientTreatmentAssessmentAttachment[]
+  previousAssessment ClientTreatmentAssessment?  @relation("AssessmentPredecessor", fields: [previousAssessmentId], references: [id], onDelete: SetNull)
+  reassessments      ClientTreatmentAssessment[] @relation("AssessmentPredecessor")
 
   @@index([serviceClientId])
   @@index([status])
   @@index([deletedAt])
+  @@index([previousAssessmentId])
   @@map("assessments")
 }
 

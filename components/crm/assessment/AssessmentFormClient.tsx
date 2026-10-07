@@ -1,13 +1,16 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { formatDistanceToNow } from 'date-fns'
+import { format, formatDistanceToNow } from 'date-fns'
 import {
   AssessmentSectionContent,
+  REASSESSMENT_NAV_ITEM,
   SECTION_NAV,
 } from '@/components/crm/assessment/AssessmentSectionContent'
+import { CarryForwardProvider } from '@/components/crm/assessment/carryForward'
+import { reassessmentIssues, sameValue } from '@/lib/crm/assessment/reassessment'
 import {
   markTreatmentAssessmentComplete,
   patchTreatmentAssessment,
@@ -17,6 +20,7 @@ import {
 } from '@/lib/crm/assessment/actions'
 import type { AssessmentSectionData, AssessmentSectionKey } from '@/lib/crm/assessment/assessment.schema'
 import { personalizeAssessmentValue } from '@/lib/crm/assessment/personalize'
+import { assessmentDocumentTitle, isReassessment } from '@/lib/crm/assessment/assessmentType'
 import type { TreatmentAssessmentStatus, TreatmentAssessmentSource } from '@prisma/client'
 
 type AttachmentRecord = {
@@ -32,13 +36,23 @@ type Props = {
   assessmentId: string
   status: TreatmentAssessmentStatus
   source: TreatmentAssessmentSource
+  assessmentType?: string
   initialSections: AssessmentSectionData
   initialUpdatedAt: string
   attachments: AttachmentRecord[]
   canEdit: boolean
   /** App base for back/print links. Default Client Services. */
   basePath?: '/portal' | '/client-services'
+  /** Reassessment only: the assessment this one was cloned from. */
+  previous?: {
+    id: string
+    sections: AssessmentSectionData
+    date: string | null
+    assessmentType: string
+  } | null
 }
+
+const NOT_CARRIED_NAV = new Set<AssessmentSectionKey>(['reassessment', 'signatures'])
 
 export function AssessmentFormClient({
   clientId,
@@ -46,17 +60,51 @@ export function AssessmentFormClient({
   assessmentId,
   status,
   source,
+  assessmentType,
   initialSections,
   initialUpdatedAt,
   attachments: initialAttachments,
   canEdit,
   basePath = '/client-services',
+  previous,
 }: Props) {
   const router = useRouter()
   const clientBase = `${basePath}/clients/${clientId}`
+  const reassessment = isReassessment(assessmentType)
   const [sections, setSections] = useState(() =>
     personalizeAssessmentValue(initialSections, clientName)
   )
+  const previousSections = useMemo(
+    () => (reassessment && previous ? personalizeAssessmentValue(previous.sections, clientName) : null),
+    [reassessment, previous, clientName]
+  )
+  const previousLabel = previous
+    ? `${previous.date ? format(new Date(previous.date), 'MMM d, yyyy') + ' ' : ''}${isReassessment(previous.assessmentType) ? 'reassessment' : 'initial assessment'}`
+    : ''
+  const [compare, setCompare] = useState(false)
+  const [overrideOpen, setOverrideOpen] = useState(false)
+  const [overrideReason, setOverrideReason] = useState('')
+  const issues = useMemo(() => (reassessment ? reassessmentIssues(sections) : []), [reassessment, sections])
+
+  const nav = useMemo(() => {
+    if (!reassessment) return SECTION_NAV
+    return [
+      { key: SECTION_NAV[0].key, label: 'Reassessment Summary' },
+      REASSESSMENT_NAV_ITEM,
+      ...SECTION_NAV.slice(1),
+    ]
+  }, [reassessment])
+
+  /** Sections still identical to the predecessor and not yet marked reviewed. */
+  const untouchedSections = useMemo(() => {
+    const out = new Set<AssessmentSectionKey>()
+    if (!previousSections) return out
+    for (const { key } of nav) {
+      if (NOT_CARRIED_NAV.has(key) || sections.reassessment.reviewedSections[key]) continue
+      if (sameValue(sections[key], previousSections[key])) out.add(key)
+    }
+    return out
+  }, [nav, sections, previousSections])
   const [attachments, setAttachments] = useState(initialAttachments)
   const [activeSection, setActiveSection] = useState<AssessmentSectionKey>('summary')
   const [lastSaved, setLastSaved] = useState(initialUpdatedAt)
@@ -71,6 +119,11 @@ export function AssessmentFormClient({
 
   const persist = useCallback(
     async (patch: Partial<AssessmentSectionData>, opts?: { autosave?: boolean; sectionKey?: AssessmentSectionKey }) => {
+      if (!reassessment && 'reassessment' in patch) {
+        const { reassessment: _omit, ...rest } = patch
+        void _omit
+        patch = rest
+      }
       const result = await patchTreatmentAssessment(assessmentId, patch, {
         autosave: opts?.autosave,
       })
@@ -83,7 +136,7 @@ export function AssessmentFormClient({
       if (opts?.sectionKey) setSavingSection(null)
       return true
     },
-    [assessmentId]
+    [assessmentId, reassessment]
   )
 
   const scheduleAutosave = useCallback(() => {
@@ -121,14 +174,25 @@ export function AssessmentFormClient({
     })
   }
 
-  const onComplete = () => {
+  const onComplete = (overrideReasonText?: string) => {
     setError(null)
+    if (reassessment && issues.length > 0 && overrideReasonText === undefined) {
+      setOverrideOpen(true)
+      return
+    }
     startTransition(async () => {
       const ok = await persist(sectionsRef.current)
       if (!ok) return
-      const result = await markTreatmentAssessmentComplete(assessmentId)
+      const result = await markTreatmentAssessmentComplete(
+        assessmentId,
+        overrideReasonText ? { overrideReason: overrideReasonText } : undefined
+      )
       if (!result.ok) setError(result.error)
-      else router.refresh()
+      else {
+        setOverrideOpen(false)
+        setOverrideReason('')
+        router.refresh()
+      }
     })
   }
 
@@ -171,13 +235,34 @@ export function AssessmentFormClient({
             <Link href={`${clientBase}?tab=assessment`} className="text-sm text-brand hover:underline">
               ← {clientName}
             </Link>
-            <h1 className="font-display text-lg font-semibold text-ink">Initial Assessment & Treatment Plan</h1>
+            <h1 className="font-display text-lg font-semibold text-ink">
+              {assessmentDocumentTitle(assessmentType)}
+            </h1>
             <p className="text-xs text-quiet">
               {status.replace('_', ' ')} · {source} · Last saved{' '}
               {lastSaved ? formatDistanceToNow(new Date(lastSaved), { addSuffix: true }) : 'never'}
             </p>
+            {reassessment && previous && (
+              <p className="text-xs text-quiet">
+                Cloned from the{' '}
+                <Link href={`${clientBase}/assessments/${previous.id}`} className="text-brand hover:underline">
+                  {previousLabel}
+                </Link>
+                {issues.length > 0 && (
+                  <span className="ml-1 font-medium text-amber-900">
+                    · ! {issues.length} checklist item{issues.length === 1 ? '' : 's'} open
+                  </span>
+                )}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {reassessment && previous && (
+              <label className="flex cursor-pointer items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas">
+                <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
+                Compare to previous
+              </label>
+            )}
             <Link
               href={`${clientBase}/assessments/${assessmentId}/print?auto=1`}
               target="_blank"
@@ -186,7 +271,7 @@ export function AssessmentFormClient({
               Download PDF
             </Link>
             {canEdit && source === 'FORM' && status !== 'COMPLETED' && status !== 'SIGNED' && (
-              <button type="button" onClick={onComplete} disabled={pending} className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand/90 disabled:opacity-50">
+              <button type="button" onClick={() => onComplete()} disabled={pending} className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand/90 disabled:opacity-50">
                 Mark complete
               </button>
             )}
@@ -207,41 +292,101 @@ export function AssessmentFormClient({
         )}
       </header>
 
+      {overrideOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="override-title">
+          <div className="w-full max-w-lg space-y-3 rounded-xl border border-line bg-surface p-5 shadow-xl">
+            <h2 id="override-title" className="font-display text-base font-semibold text-ink">
+              Reassessment checklist has {issues.length} open item{issues.length === 1 ? '' : 's'}
+            </h2>
+            <ul className="max-h-48 list-disc space-y-1 overflow-y-auto pl-5 text-sm text-ink">
+              {issues.map((issue, i) => (
+                <li key={i}>{issue.message}</li>
+              ))}
+            </ul>
+            <p className="text-sm text-quiet">
+              Go back and resolve these, or complete anyway with a reason. The reason is recorded in the audit log.
+            </p>
+            <textarea
+              value={overrideReason}
+              onChange={(e) => setOverrideReason(e.target.value)}
+              rows={3}
+              placeholder="Reason for completing with open items (min. 10 characters)"
+              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setOverrideOpen(false)} className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-canvas">
+                Go back
+              </button>
+              <button
+                type="button"
+                disabled={pending || overrideReason.trim().length < 10}
+                onClick={() => onComplete(overrideReason.trim())}
+                className="rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-brand/90 disabled:opacity-50"
+              >
+                Complete anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto grid max-w-7xl gap-6 p-4 lg:grid-cols-[220px_1fr]">
         <nav className="space-y-1 lg:sticky lg:top-24 lg:self-start">
-          {SECTION_NAV.map((s, i) => (
+          {nav.map((s, i) => (
             <button
               key={s.key}
               type="button"
               onClick={() => setActiveSection(s.key)}
-              className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
+              className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm ${
                 activeSection === s.key
                   ? 'bg-brand/10 font-medium text-brand'
                   : 'text-quiet hover:bg-canvas hover:text-ink'
               }`}
             >
-              {i + 1}. {s.label}
+              <span>
+                {i + 1}. {s.label}
+              </span>
+              {untouchedSections.has(s.key) && (
+                <span
+                  className="shrink-0 rounded border border-amber-300 bg-amber-50 px-1 text-[10px] font-semibold text-amber-900"
+                  title="Carried forward unchanged and not yet reviewed"
+                >
+                  ↻
+                </span>
+              )}
             </button>
           ))}
         </nav>
         <div className="min-w-0">
-          <AssessmentSectionContent
-            activeSection={activeSection}
-            sections={sections}
-            setSections={(updater) => {
-              setSections(updater)
-              scheduleAutosave()
+          <CarryForwardProvider
+            value={{
+              enabled: Boolean(previousSections),
+              compare,
+              previousLabel,
+              reviewedSections: sections.reassessment.reviewedSections,
             }}
-            readOnly={readOnly}
-            onBlur={onBlur}
-            onSaveSection={readOnly ? undefined : onSaveSection}
-            savingSection={savingSection}
-            clientId={clientId}
-            assessmentId={assessmentId}
-            clientName={clientName}
-            attachments={attachments}
-            onUploaded={onUploaded}
-          />
+          >
+            <AssessmentSectionContent
+              activeSection={activeSection}
+              sections={sections}
+              setSections={(updater) => {
+                setSections(updater)
+                scheduleAutosave()
+              }}
+              readOnly={readOnly}
+              onBlur={onBlur}
+              onSaveSection={readOnly ? undefined : onSaveSection}
+              savingSection={savingSection}
+              clientId={clientId}
+              assessmentId={assessmentId}
+              clientName={clientName}
+              attachments={attachments}
+              onUploaded={onUploaded}
+              isReassessment={reassessment}
+              previous={previousSections}
+              previousLabel={previousLabel}
+            />
+          </CarryForwardProvider>
         </div>
       </div>
     </div>

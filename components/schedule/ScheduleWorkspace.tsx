@@ -20,6 +20,7 @@ import TableView from './TableView'
 import ClientHoursPanel from './ClientHoursPanel'
 import SessionEditor from './SessionEditor'
 import ManageDialog from './ManageDialog'
+import ConstellationView from './constellation/ConstellationView'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Trash2, Upload } from 'lucide-react'
 
@@ -215,6 +216,8 @@ export default function ScheduleWorkspace({
     },
     [showToast, refreshFromServer]
   )
+
+  const fallBackToRoster = useCallback(() => setView('roster'), [])
 
   const openCreate = (defaults?: Partial<ScheduleSlot>) =>
     setEditor({ mode: 'create', defaults })
@@ -421,6 +424,25 @@ export default function ScheduleWorkspace({
 
       {view === 'hours' && (
         <ClientHoursPanel clients={clients} slots={visibleSlots} onRefresh={refreshFromServer} />
+      )}
+
+      {view === 'constellation' && (
+        <ConstellationView
+          therapists={therapists}
+          clients={clients}
+          slots={visibleSlots}
+          conflicts={conflicts}
+          search={search}
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+          borough={borough}
+          onEditSlot={openEdit}
+          onAddSlot={openCreate}
+          onSlotSaved={onSlotSaved}
+          onSlotDeleted={onSlotDeleted}
+          onRefresh={refreshFromServer}
+          onNarrowScreen={fallBackToRoster}
+        />
       )}
 
       {(editor.mode === 'create' || editor.mode === 'edit') && (

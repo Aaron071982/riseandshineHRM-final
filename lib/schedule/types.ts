@@ -46,5 +46,5 @@ export type ScheduleWorkspaceData = {
   allowedUsers: { id: string; email: string }[]
 }
 
-export type ViewMode = 'roster' | 'table' | 'hours'
+export type ViewMode = 'roster' | 'table' | 'hours' | 'constellation'
 export type RowDimension = 'therapist' | 'client'

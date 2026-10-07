@@ -113,6 +113,12 @@ export interface RBTProfile {
   canPassBackgroundCheck: boolean | null
   cprFirstAidCertified: string | null
   transportation: boolean | null
+  transportMode?: string | null
+  travelBoroughsJson?: unknown
+  hiredAt?: Date | string | null
+  i9Section1CompletedAt?: Date | string | null
+  i9Section2CompletedAt?: Date | string | null
+  i9Section2Notes?: string | null
   preferredHoursRange: string | null
   postHireStage?: string | null
   activityState?: string | null

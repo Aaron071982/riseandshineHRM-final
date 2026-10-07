@@ -6,9 +6,19 @@ import type {
 } from '@prisma/client'
 
 export const ESIGN_CONSENT_SLUG = 'esignature-consent'
-export const TOTAL_ONBOARDING_STEPS = 32
-export const RBT_VISIBLE_STEPS = 30
+export const TOTAL_ONBOARDING_STEPS = 33
+export const RBT_VISIBLE_STEPS = 31
 export const TIER_A_LAST_STEP = 25
+
+/** Form I-9 (I9_EMPLOYMENT_ELIGIBILITY). Complete only when Section 1 and Section 2 are both recorded. */
+export const I9_SLUG = 'i9-employment-eligibility'
+export const I9_STEP_NUMBER = 33
+/** Shown alongside W-4 / IT-2104 in the RBT task list. */
+export const I9_DISPLAY_AFTER_STEP = 21
+export const I9_SECTION2_DEADLINE_BUSINESS_DAYS = 3
+export const USCIS_I9_FORM_URL = 'https://www.uscis.gov/i-9'
+/** Standalone I-9 page, reachable regardless of onboarding progress. */
+export const RBT_I9_PORTAL_PATH = '/rbt/i9'
 export const TIER_B_FIRST_STEP = 26
 export const TIER_B_LAST_STEP = 30
 
@@ -66,13 +76,23 @@ export const ONBOARDING_CATALOG: CatalogEntry[] = [
   { stepNumber: 24, title: 'Background Check Authorization', slug: 'background-check-authorization', type: 'FILLABLE_PDF', category: 'DOWNLOAD_REUPLOAD', flowType: 'NATIVE_FORM', tier: 'TIER_A', unlockGroup: 'fillable_forms', folder: 'COMPLETED_ONBOARDING_FORMS', file: 'BackgroundCheckLetter.pdf', isRequired: true },
   { stepNumber: 25, title: 'Upload Social Security Card', slug: 'upload-social-security-card', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_A', unlockGroup: 'fillable_forms', folder: 'PERSONAL_DOCUMENTS', file: null, isRequired: true },
   { stepNumber: 26, title: 'Sexual Harassment Prevention Training + Quiz', slug: 'sexual-harassment-training', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'TRAINING_QUIZ', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: 'RiseShine_SexualHarassmentPolicy_v1.pdf', isRequired: true },
-  { stepNumber: 27, title: 'Mandated Reporter Training Certificate', slug: 'mandated-reporter-certificate', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
-  { stepNumber: 28, title: 'CPR/First Aid Certificate', slug: 'cpr-first-aid-certificate', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
+  { stepNumber: 27, title: 'Mandated Reporter Training Certificate', slug: 'mandated-reporter-certificate', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: false },
+  { stepNumber: 28, title: 'CPR/First Aid Certificate', slug: 'cpr-first-aid-certificate', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: false },
   { stepNumber: 29, title: '40-Hour RBT Training Certificate', slug: FORTY_HOUR_RBT_CERTIFICATE_SLUG, type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'UPLOAD', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
-  { stepNumber: 30, title: 'Schedule Orientation (60 min)', slug: ORIENTATION_BOOKING_SLUG, type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'BOOKING', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: true },
+  { stepNumber: 30, title: 'Schedule Orientation (60 min)', slug: ORIENTATION_BOOKING_SLUG, type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'BOOKING', tier: 'TIER_B', unlockGroup: null, folder: 'RBT_CERTIFICATE', file: null, isRequired: false },
   { stepNumber: 31, title: 'Background Check Cleared (Admin)', slug: 'background-check-cleared', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'ADMIN_ONLY', tier: 'ACTIVATION', unlockGroup: null, folder: 'ACKNOWLEDGMENT_FORMS', file: null, isRequired: true },
   { stepNumber: 32, title: 'Supervision Contract Countersigned (Admin)', slug: 'supervision-countersigned', type: 'ACKNOWLEDGMENT', category: 'ESIGN_ONLY', flowType: 'ADMIN_ONLY', tier: 'ACTIVATION', unlockGroup: null, folder: 'ACKNOWLEDGMENT_FORMS', file: null, isRequired: true },
+  { stepNumber: I9_STEP_NUMBER, title: 'Form I-9 (Employment Eligibility Verification)', slug: I9_SLUG, type: 'ACKNOWLEDGMENT', category: 'DOWNLOAD_REUPLOAD', flowType: 'UPLOAD', tier: 'ACTIVATION', unlockGroup: 'fillable_forms', folder: 'PERSONAL_DOCUMENTS', file: null, isRequired: true },
 ]
+
+/** Steps RBTs may still complete, but that never block onboarding completion. */
+export const OPTIONAL_ONBOARDING_SLUGS: ReadonlySet<string> = new Set(
+  ONBOARDING_CATALOG.filter((e) => !e.isRequired).map((e) => e.slug)
+)
+
+export function isOptionalOnboardingSlug(slug: string): boolean {
+  return OPTIONAL_ONBOARDING_SLUGS.has(slug)
+}
 
 export function getCatalogEntry(stepNumber: number): CatalogEntry | undefined {
   return ONBOARDING_CATALOG.find((e) => e.stepNumber === stepNumber)
@@ -82,12 +102,20 @@ export function getRbtVisibleCatalog(): CatalogEntry[] {
   return ONBOARDING_CATALOG.filter((e) => e.flowType !== 'ADMIN_ONLY')
 }
 
-/** Surface the 40-hour course first in the RBT UI without changing catalog step numbers. */
+function displayPosition(step: { slug: string; stepNumber: number }): number {
+  if (step.slug === I9_SLUG) return I9_DISPLAY_AFTER_STEP + 0.5
+  return step.stepNumber
+}
+
+/**
+ * Surface the 40-hour course first and the I-9 next to the tax forms in the RBT UI
+ * without changing catalog step numbers.
+ */
 export function sortRbtOnboardingSteps<T extends { slug: string; stepNumber: number }>(steps: T[]): T[] {
   return [...steps].sort((a, b) => {
     const aFirst = a.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG ? 0 : 1
     const bFirst = b.slug === FORTY_HOUR_RBT_CERTIFICATE_SLUG ? 0 : 1
     if (aFirst !== bFirst) return aFirst - bFirst
-    return a.stepNumber - b.stepNumber
+    return displayPosition(a) - displayPosition(b)
   })
 }

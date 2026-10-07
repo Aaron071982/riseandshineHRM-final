@@ -21,9 +21,17 @@ import {
   safeParseAssessmentPatch,
   type AssessmentSectionKey,
 } from '@/lib/crm/assessment/assessment.schema'
+import { isReassessment } from '@/lib/crm/assessment/assessmentType'
 import { sectionsWithClientPrefill } from '@/lib/crm/assessment/prefill'
-import { UPLOADED_PDF_SECTION_KEY } from '@/lib/crm/assessment/storagePaths'
-import type { Prisma } from '@prisma/client'
+import { reassessmentIssues } from '@/lib/crm/assessment/reassessment'
+import { createReassessmentRecord } from '@/lib/crm/assessment/reassessmentRecord'
+import { parseAssessmentRecord } from '@/lib/crm/assessment/serialize'
+import { copyAssessmentFile } from '@/lib/crm/assessment/storage'
+import {
+  buildAssessmentStoragePath,
+  UPLOADED_PDF_SECTION_KEY,
+} from '@/lib/crm/assessment/storagePaths'
+import { Prisma } from '@prisma/client'
 
 function revalidateAssessmentPaths(serviceClientId: string, assessmentId?: string) {
   revalidatePath(`/client-services/clients/${serviceClientId}`)
@@ -137,6 +145,93 @@ export async function createTreatmentAssessmentForm(
   }
 }
 
+/**
+ * Starts a reassessment by cloning every section (and attached graphs) of the
+ * most recent completed in-app assessment into a new record linked by
+ * previousAssessmentId. The predecessor is only read. Signatures, report dates
+ * and status are not carried; goal performance rolls current → previous.
+ */
+export async function startTreatmentReassessment(
+  serviceClientId: string,
+  sourceAssessmentId?: string
+): Promise<ActionResult<{ assessmentId: string }>> {
+  try {
+    const user = await getClientServicesUser()
+    assertCanEditTreatmentAssessment(user)
+    await assertCanViewClient(user, serviceClientId)
+
+    const baseWhere = { serviceClientId, deletedAt: null, source: 'FORM' as const }
+    const source = sourceAssessmentId
+      ? await prisma.clientTreatmentAssessment.findFirst({
+          where: { ...baseWhere, id: sourceAssessmentId },
+          include: { attachments: { where: { deletedAt: null } } },
+        })
+      : (await prisma.clientTreatmentAssessment.findFirst({
+          where: { ...baseWhere, status: { in: ['COMPLETED', 'SIGNED'] } },
+          orderBy: [{ completedAt: 'desc' }, { createdAt: 'desc' }],
+          include: { attachments: { where: { deletedAt: null } } },
+        })) ??
+        (await prisma.clientTreatmentAssessment.findFirst({
+          where: baseWhere,
+          orderBy: { createdAt: 'desc' },
+          include: { attachments: { where: { deletedAt: null } } },
+        }))
+
+    if (!source) {
+      return {
+        ok: false,
+        error: 'No in-app assessment to copy from. Fill an initial assessment first.',
+        status: 400,
+      }
+    }
+
+    const created = await createReassessmentRecord(source, user.id)
+
+    const attachments = source.attachments.filter(
+      (a) => a.sectionKey !== UPLOADED_PDF_SECTION_KEY
+    )
+    if (attachments.length > 0) {
+      const rows = await Promise.all(
+        attachments.map(async (a) => {
+          const copiedPath = await copyAssessmentFile(
+            a.storagePath,
+            buildAssessmentStoragePath({
+              serviceClientId,
+              assessmentId: created.id,
+              sectionKey: a.sectionKey,
+              fileName: a.fileName,
+            })
+          )
+          return {
+            assessmentId: created.id,
+            sectionKey: a.sectionKey,
+            kind: a.kind,
+            storagePath: copiedPath ?? a.storagePath,
+            fileName: a.fileName,
+            mimeType: a.mimeType,
+            sizeBytes: a.sizeBytes,
+            uploadedByUserId: a.uploadedByUserId,
+          }
+        })
+      )
+      await prisma.clientTreatmentAssessmentAttachment.createMany({ data: rows })
+    }
+
+    await auditTreatmentAssessmentAction({
+      userId: user.id,
+      serviceClientId,
+      assessmentId: created.id,
+      action: 'CREATED',
+      detail: `REASSESSMENT_FROM:${source.id}`,
+    })
+
+    revalidateAssessmentPaths(serviceClientId, created.id)
+    return { ok: true, assessmentId: created.id }
+  } catch (err) {
+    return fail(err)
+  }
+}
+
 export async function finalizeTreatmentAssessmentUpload(input: {
   serviceClientId: string
   assessmentId: string
@@ -233,7 +328,7 @@ export async function patchTreatmentAssessment(
 
     const assessment = await prisma.clientTreatmentAssessment.findFirst({
       where: { id: assessmentId, deletedAt: null },
-      select: { id: true, serviceClientId: true, status: true, source: true },
+      select: { id: true, serviceClientId: true, status: true, source: true, assessmentType: true },
     })
     if (!assessment) {
       return { ok: false, error: 'Assessment not found', status: 404 }
@@ -255,6 +350,7 @@ export async function patchTreatmentAssessment(
     }
 
     for (const key of Object.keys(parsed.data) as AssessmentSectionKey[]) {
+      if (key === 'reassessment' && !isReassessment(assessment.assessmentType)) continue
       const value = parsed.data[key]
       if (value !== undefined) {
         ;(data as Record<string, unknown>)[key] = value
@@ -294,8 +390,14 @@ export async function saveTreatmentAssessmentSection(
   return patchTreatmentAssessment(assessmentId, { [sectionKey]: parsed.data })
 }
 
+/**
+ * Reassessments with open checklist items (missing rationales, caregiver
+ * training below minimum, …) complete only with an override reason, which is
+ * written to the audit trail.
+ */
 export async function markTreatmentAssessmentComplete(
-  assessmentId: string
+  assessmentId: string,
+  opts?: { overrideReason?: string }
 ): Promise<ActionResult<{ assessmentId: string }>> {
   try {
     const user = await getClientServicesUser()
@@ -303,7 +405,6 @@ export async function markTreatmentAssessmentComplete(
 
     const assessment = await prisma.clientTreatmentAssessment.findFirst({
       where: { id: assessmentId, deletedAt: null },
-      select: { id: true, serviceClientId: true, status: true, source: true },
     })
     if (!assessment) {
       return { ok: false, error: 'Assessment not found', status: 404 }
@@ -316,6 +417,22 @@ export async function markTreatmentAssessmentComplete(
     }
 
     await assertCanViewClient(user, assessment.serviceClientId)
+
+    let overrideDetail: string | undefined
+    if (isReassessment(assessment.assessmentType)) {
+      const issues = reassessmentIssues(parseAssessmentRecord(assessment))
+      if (issues.length > 0) {
+        const reason = opts?.overrideReason?.trim() ?? ''
+        if (reason.length < 10) {
+          return {
+            ok: false,
+            error: `Reassessment checklist has ${issues.length} open item${issues.length === 1 ? '' : 's'}: ${issues.map((i) => i.message).join(' ')}`,
+            status: 400,
+          }
+        }
+        overrideDetail = `OVERRIDE(${issues.length} open):${reason.slice(0, 300)}`
+      }
+    }
 
     const now = new Date()
     await prisma.clientTreatmentAssessment.update({
@@ -332,6 +449,7 @@ export async function markTreatmentAssessmentComplete(
       serviceClientId: assessment.serviceClientId,
       assessmentId,
       action: 'COMPLETED',
+      detail: overrideDetail,
     })
 
     revalidateAssessmentPaths(assessment.serviceClientId, assessmentId)
